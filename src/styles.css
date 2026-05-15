@@ -1,0 +1,29 @@
+/* Shared Styles */
+@import './styles/shared/common.css';
+@import './styles/shared/LoginForm.css';
+
+/* Admin Styles */
+@import './styles/admin/AdminLayout.css';
+@import './styles/admin/Sidebar.css';
+@import './styles/admin/DashboardPage.css';
+@import './styles/admin/ResidentPage.css';
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  min-height: 100%;
+}
+
+body {
+  min-height: 100vh;
+  font-family: Inter, Segoe UI, Roboto, Arial, sans-serif;
+  color: #0f172a;
+  background: linear-gradient(145deg, #eef2ff 0%, #f8fafc 55%, #e2e8f0 100%);
+}
