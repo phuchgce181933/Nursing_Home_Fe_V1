@@ -27,7 +27,7 @@ export const sidebarData = [
     children: [
       {
         title: "Accounts",
-        path: "/admin/accounts",
+        path: "/admin/profile",
       },
     ],
   },
