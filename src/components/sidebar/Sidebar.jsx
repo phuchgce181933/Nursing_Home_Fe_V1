@@ -1,7 +1,7 @@
 import { NavLink } from "react-router-dom";
 import { sidebarData } from "./sidebarData";
 
-function Sidebar() {
+function Sidebar({ items = sidebarData }) {
   return (
     <aside className="sidebar">
       <div className="sidebar__header">
@@ -9,7 +9,7 @@ function Sidebar() {
       </div>
 
       <div className="sidebar__nav">
-        {sidebarData.map((item, index) => (
+        {items.map((item, index) => (
           <div key={index}>
             {item.path ? (
               <NavLink

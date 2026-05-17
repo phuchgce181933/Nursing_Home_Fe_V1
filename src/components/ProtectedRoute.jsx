@@ -1,6 +1,21 @@
 import { Navigate } from 'react-router-dom';
 import useAuth from '../hooks/useAuth';
 
+const getHomePath = (role) => {
+  switch (role) {
+    case 'admin':
+      return '/admin/dashboard';
+    case 'doctor':
+      return '/doctor/dashboard';
+    case 'nurse':
+      return '/nurse/dashboard';
+    case 'family':
+      return '/family/dashboard';
+    default:
+      return '/profile';
+  }
+};
+
 function ProtectedRoute({ children, requiredRole }) {
   const { token, user, loading } = useAuth();
 
@@ -13,7 +28,7 @@ function ProtectedRoute({ children, requiredRole }) {
   }
 
   if (requiredRole && user?.role !== requiredRole) {
-    return <Navigate to="/profile" replace />;
+    return <Navigate to={getHomePath(user?.role)} replace />;
   }
 
   return children;

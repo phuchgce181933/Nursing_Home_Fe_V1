@@ -4,6 +4,21 @@ import LoginForm from '../components/LoginForm';
 import useAuth from '../hooks/useAuth';
 import '../styles/shared/LoginForm.css';
 
+const getRedirectPath = (role) => {
+  switch (role) {
+    case 'admin':
+      return '/admin/dashboard';
+    case 'doctor':
+      return '/doctor/dashboard';
+    case 'nurse':
+      return '/nurse/dashboard';
+    case 'family':
+      return '/family/dashboard';
+    default:
+      return '/profile';
+  }
+};
+
 function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -14,12 +29,7 @@ function LoginPage() {
     try {
       const data = await login(credentials);
       setMessage('Đăng nhập thành công.');
-      // Redirect based on role
-      if (data.user.role === 'admin') {
-        navigate('/admin/dashboard');
-      } else {
-        navigate('/profile');
-      }
+      navigate(getRedirectPath(data.user.role));
     } catch (err) {
       setMessage(err?.response?.data?.message || 'Đăng nhập thất bại.');
     }
