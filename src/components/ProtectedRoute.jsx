@@ -1,26 +1,13 @@
 import { Navigate } from 'react-router-dom';
-import useAuth from '../hooks/useAuth';
-
-const getHomePath = (role) => {
-  switch (role) {
-    case 'admin':
-      return '/admin/dashboard';
-    case 'doctor':
-      return '/doctor/dashboard';
-    case 'nurse':
-      return '/nurse/dashboard';
-    case 'family':
-      return '/family/dashboard';
-    default:
-      return '/profile';
-  }
-};
+import { useAuth } from '../hooks/useAuth';
+import { getHomePath } from '../constants/routes';
+import LoadingSpinner from './ui/LoadingSpinner';
 
 function ProtectedRoute({ children, requiredRole }) {
   const { token, user, loading } = useAuth();
 
   if (loading) {
-    return <div>Loading...</div>;
+    return <LoadingSpinner />;
   }
 
   if (!token) {
