@@ -6,5 +6,5 @@ export const ROLE_HOME_PATHS = {
 };
 
 export function getHomePath(role) {
-  return ROLE_HOME_PATHS[role] ?? '/profile';
+  return ROLE_HOME_PATHS[role] ?? '/login';
 }

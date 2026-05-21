@@ -1,8 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
+import HomePage from '../pages/HomePage';
 import LoginPage from '../pages/LoginPage';
-import ProfilePage from '../pages/ProfilePage';
 import PlaceholderPage from '../pages/PlaceholderPage';
-import AdminLayout from '../layouts/AdminLayout';
 import RoleLayout from '../layouts/RoleLayout';
 import DashboardPage from '../pages/admin/DashboardPage';
 import ResidentPage from '../pages/admin/ResidentPage';
@@ -15,22 +14,14 @@ import ProtectedRoute from '../components/ProtectedRoute';
 function AppRoutes() {
   return (
     <Routes>
+      <Route path="/" element={<HomePage />} />
       <Route path="/login" element={<LoginPage />} />
-
-      <Route
-        path="/profile"
-        element={
-          <ProtectedRoute>
-            <ProfilePage />
-          </ProtectedRoute>
-        }
-      />
 
       <Route
         path="/admin/*"
         element={
           <ProtectedRoute requiredRole="admin">
-            <AdminLayout />
+            <RoleLayout />
           </ProtectedRoute>
         }
       >
@@ -86,8 +77,7 @@ function AppRoutes() {
         <Route path="messages" element={<PlaceholderPage title="Tin nhắn" />} />
       </Route>
 
-      <Route path="/" element={<Navigate to="/login" replace />} />
-      <Route path="*" element={<Navigate to="/login" replace />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }

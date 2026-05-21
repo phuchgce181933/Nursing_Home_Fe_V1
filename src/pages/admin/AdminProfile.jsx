@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Mail, Phone, Shield, Activity, BadgeCheck, UserCircle } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
@@ -9,8 +10,22 @@ function formatDate(value) {
 }
 
 function AdminProfile() {
-  const { user, loading, logout } = useAuth();
+  const { user, loading, logout, updateProfile } = useAuth();
   const navigate = useNavigate();
+  const [editMode, setEditMode] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+  const [formData, setFormData] = useState({ fullName: '', phone: '', gender: '' });
+
+  useEffect(() => {
+    if (user) {
+      setFormData({
+        fullName: user.fullName || '',
+        phone: user.phone || '',
+        gender: user.gender || '',
+      });
+    }
+  }, [user]);
 
   if (loading || !user) {
     return <LoadingSpinner label="Đang tải hồ sơ..." />;
@@ -21,12 +36,34 @@ function AdminProfile() {
     navigate('/login');
   };
 
+  const handleChange = (event) => {
+    const { name, value } = event.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setSaving(true);
+    setMessage('');
+    try {
+      await updateProfile(formData);
+      setMessage('Cập nhật hồ sơ thành công.');
+      setEditMode(false);
+    } catch (error) {
+      setMessage(error?.response?.data?.message || 'Cập nhật hồ sơ thất bại.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="profile-page">
       <header className="profile-page__header">
         <h1 className="profile-page__title">Hồ sơ quản trị</h1>
         <p className="profile-page__subtitle">Thông tin tài khoản và nhân sự</p>
       </header>
+
+      {message && <div className="profile-page__message">{message}</div>}
 
       <div className="profile-page__grid">
         <section className="profile-card profile-card--accent">
@@ -54,26 +91,88 @@ function AdminProfile() {
           </ul>
         </section>
 
-        <section className="profile-card">
-          <h2 className="profile-card__heading">
-            <Activity size={18} />
-            Thông tin hệ thống
-          </h2>
-          <dl className="profile-details">
-            <div>
-              <dt>User ID</dt>
-              <dd>{user._id}</dd>
-            </div>
-            <div>
-              <dt>Ngày tạo</dt>
-              <dd>{formatDate(user.createdAt)}</dd>
-            </div>
-            <div>
-              <dt>Đăng nhập gần nhất</dt>
-              <dd>{formatDate(user.lastLoginAt)}</dd>
-            </div>
-          </dl>
-        </section>
+        {!editMode ? (
+          <section className="profile-card">
+            <h2 className="profile-card__heading">
+              <Activity size={18} />
+              Thông tin sửa đổi
+            </h2>
+            <p>Nhấn nút “Cập nhật hồ sơ” để chỉnh sửa thông tin.</p>
+          </section>
+        ) : (
+          <section className="profile-card profile-form-card">
+            <h2 className="profile-card__heading">
+              <Activity size={18} />
+              Sửa thông tin
+            </h2>
+
+            <form className="profile-form" onSubmit={handleSubmit}>
+              <div className="profile-form__field">
+                <label className="profile-form__label" htmlFor="fullName">
+                  Họ và tên
+                </label>
+                <input
+                  id="fullName"
+                  name="fullName"
+                  type="text"
+                  value={formData.fullName}
+                  onChange={handleChange}
+                  className="profile-form__input"
+                  required
+                />
+              </div>
+
+              <div className="profile-form__field">
+                <label className="profile-form__label" htmlFor="phone">
+                  Số điện thoại
+                </label>
+                <input
+                  id="phone"
+                  name="phone"
+                  type="text"
+                  value={formData.phone}
+                  onChange={handleChange}
+                  className="profile-form__input"
+                />
+              </div>
+
+              <div className="profile-form__field">
+                <label className="profile-form__label" htmlFor="gender">
+                  Giới tính
+                </label>
+                <select
+                  id="gender"
+                  name="gender"
+                  value={formData.gender}
+                  onChange={handleChange}
+                  className="profile-form__input"
+                >
+                  <option value="">Chọn giới tính</option>
+                  <option value="male">Nam</option>
+                  <option value="female">Nữ</option>
+                  <option value="other">Khác</option>
+                </select>
+              </div>
+
+              <div className="profile-form__actions">
+                <button type="submit" className="button button--primary" disabled={saving}>
+                  {saving ? 'Đang lưu...' : 'Lưu thay đổi'}
+                </button>
+                <button
+                  type="button"
+                  className="button button--secondary"
+                  onClick={() => {
+                    setFormData({ fullName: user.fullName || '', phone: user.phone || '', gender: user.gender || '' });
+                    setMessage('');
+                    setEditMode(false);
+                  }}
+                >
+                  Hủy
+                </button>
+              </div>
+            </form>
+          </section>
+        )}
 
         <section className="profile-card">
           <h2 className="profile-card__heading">Hồ sơ nhân sự</h2>
@@ -107,12 +206,16 @@ function AdminProfile() {
       </div>
 
       <section className="profile-page__actions">
-        <button type="button" className="button button--primary">
-          Cập nhật hồ sơ
-        </button>
-        <button type="button" className="button button--secondary">
-          Đổi mật khẩu
-        </button>
+        {!editMode && (
+          <button type="button" className="button button--primary" onClick={() => setEditMode(true)}>
+            Cập nhật hồ sơ
+          </button>
+        )}
+        {editMode && (
+          <button type="button" className="button button--secondary" onClick={() => setEditMode(false)}>
+            Hủy chỉnh sửa
+          </button>
+        )}
         <button type="button" className="button button--danger" onClick={handleLogout}>
           Đăng xuất
         </button>

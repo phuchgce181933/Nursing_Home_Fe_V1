@@ -23,12 +23,14 @@ function LoginPage() {
   const isSuccess = message.includes('thành công');
 
   return (
-    <div className="app-shell">
-      <div className="card login-card">
+    <div className="app-shell login-page">
+      <div className="login-card">
+        <div className="login-page__eyebrow">ElderCare Portal</div>
         <header className="login-page__header">
-          <h1 className="login-page__title">Nursing Home</h1>
-          <p className="login-page__subtitle">Hệ thống quản lý viện dưỡng lão</p>
+          <h1 className="login-page__title">Đăng nhập an toàn</h1>
+          <p className="login-page__subtitle">Sign in to access patient records securely.</p>
         </header>
+
         {message && (
           <div
             className={`message login-page__message ${
@@ -38,7 +40,12 @@ function LoginPage() {
             {message}
           </div>
         )}
+
         <LoginForm onLogin={handleLogin} />
+
+        <div className="login-page__footer-note">
+          <span>HIPAA Compliant System.</span> Unauthorized access is strictly prohibited and monitored.
+        </div>
       </div>
     </div>
   );
