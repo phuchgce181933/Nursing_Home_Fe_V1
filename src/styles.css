@@ -30,6 +30,8 @@
 /* Family Styles */
 @import './styles/family/SubmitAdmissionPage.css';
 @import './styles/family/AdmissionRequestsHistoryPage.css';
+@import './styles/family/SubmitFacilityTourPage.css';
+@import './styles/family/FacilityTourHistoryPage.css';
 
 * {
   margin: 0;
