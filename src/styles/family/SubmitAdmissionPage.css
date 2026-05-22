@@ -12,7 +12,6 @@
   padding: 32px 20px 60px;
 }
 
-.sap-page__header {}
 
 .sap-page__title {
   font-size: 28px;
@@ -39,7 +38,8 @@
 .sap-stepper__track,
 .sap-stepper__progress {
   position: absolute;
-  top: 20px;               /* half of circle height */
+  top: 20px;
+  /* half of circle height */
   left: 20px;
   right: 20px;
   height: 2px;
@@ -123,12 +123,18 @@
 }
 
 @keyframes sap-slide-in {
-  from { opacity: 0; transform: translateY(12px); }
-  to   { opacity: 1; transform: translateY(0);    }
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* ─── section ─────────────────────────────────────── */
-.sap-section {}
 
 .sap-section__heading {
   display: flex;
@@ -452,8 +458,13 @@
 
 /* ─── spinner ─────────────────────────────────────── */
 @keyframes sap-spin {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .sap-spinner {
@@ -774,6 +785,7 @@
     opacity: 0;
     transform: translateY(-6px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -816,7 +828,8 @@
   align-items: center;
   gap: 16px;
   padding: 20px 24px;
-  background: #fffbeb; /* amber/yellow background */
+  background: #fffbeb;
+  /* amber/yellow background */
   border: 1.5px solid #fde047;
   border-radius: 16px;
   color: #b45309;
@@ -901,12 +914,14 @@
     align-items: stretch !important;
     gap: 16px;
   }
+
   .sap-lockout__banner-actions {
     width: 100%;
     flex-direction: row;
     flex-wrap: wrap;
     gap: 10px;
   }
+
   .sap-lockout__banner-btn {
     flex: 1;
     min-width: 140px;
@@ -982,6 +997,7 @@
   border: 1.5px solid #cbd5e1;
   background: #ffffff;
 }
+
 .sap-lockout__card--complete .sap-lockout__card-badge.is-complete {
   background: #dcfce7;
   color: #15803d;
@@ -992,10 +1008,12 @@
   border: 1.5px solid #fef08a;
   background: #fefef2;
 }
+
 .sap-lockout__card--pending .sap-lockout__card-badge.is-pending {
   background: #fef3c7;
   color: #b45309;
 }
+
 .sap-lockout__card--pending .sap-lockout__card-icon {
   color: #d97706;
 }
@@ -1006,6 +1024,7 @@
   background: #f8fafc;
   opacity: 0.85;
 }
+
 .sap-lockout__card--locked .sap-lockout__card-badge.is-locked {
   background: #f1f5f9;
   color: #64748b;

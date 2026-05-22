@@ -11,6 +11,8 @@ import {
   AlertCircle,
   Loader2,
   XCircle,
+  Activity,
+  CheckCircle,
 } from 'lucide-react';
 import admissionService from '../../../services/admission.service';
 
@@ -253,6 +255,27 @@ export default function AdmissionDetailDrawer({
 
   const timelineSteps = getTimelineSteps();
 
+  const scheduledDate = admission?.initialAssessmentScheduledAt || admission?.consultationScheduledAt;
+  const appointmentNotes = admission?.initialAssessmentNotes || admission?.consultationNotes || 'At Assessment Room, Block A';
+  const appointmentTitle = admission?.initialAssessmentScheduledAt ? 'HEALTH ASSESSMENT APPOINTMENT' : 'CONSULTATION APPOINTMENT';
+
+  const getStepIcon = (key) => {
+    switch (key) {
+      case 'new_request':
+        return <Clock size={8} />;
+      case 'consulting':
+        return <Phone size={8} />;
+      case 'assessing':
+        return <Activity size={8} />;
+      case 'contracting':
+        return <CheckCircle size={8} />;
+      case 'checked_in':
+        return <Check size={8} />;
+      default:
+        return null;
+    }
+  };
+
   return (
     <>
       {/* Backdrop */}
@@ -330,7 +353,10 @@ export default function AdmissionDetailDrawer({
                     return (
                       <div key={step.key} className={`arh-timeline__step ${isDone ? 'is-done' : isActive ? 'is-active' : ''}`}>
                         {/* Bullet symbol */}
-                        <div className="arh-timeline__dot" />
+                        <div className="arh-timeline__dot flex items-center justify-center">
+                          {isDone && <Check size={8} className="text-white" />}
+                          {isActive && getStepIcon(step.key)}
+                        </div>
 
                         {/* Title and stats */}
                         <div>
@@ -363,17 +389,17 @@ export default function AdmissionDetailDrawer({
                 <h5 className="arh-drawer__section-title">
                   <User size={16} /> PRIMARY CONTACT
                 </h5>
-                <div className="arh-detail-card__profile" style={{ background: 'rgba(239, 244, 255, 0.6)', border: '1px solid rgba(27, 54, 93, 0.05)', padding: '14px', borderRadius: '12px' }}>
+                <div className="arh-detail-card__profile" style={{ background: 'rgba(239, 244, 255, 0.4)', border: '1px solid rgba(27, 54, 93, 0.05)', padding: '14px', borderRadius: '12px' }}>
                   <img
                     alt="Requester photo"
                     className="arh-detail-card__avatar"
-                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuCw1JHjxU_o7_-__niraQnP2CdxiMEgWXFe6XQhY4QY8bwtE71GgBG9rJE3sU2zJsGd3r0RMtIRS56Gr50w7canNfvgWxVKiZEdIadSXbKESrwE_6RGA2Nje0w6iX5sigo8B5_kM9YOmTA_jIntC2RiY9KJqBelQD1M6IbYjoR1LZ8MHDnArpVUrJzlMLBLB_LaT-YRDWJJWXE5fw5voI_RMvZDsecp2CZd8yN3xNOyD0R1DCa_jgDuof2rKfmJcETVUz-OeIAObh5t"
+                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuCJXACrUfkBY9FzZgqaYWlbX2_62AvB8l3uq1FtPvHQLPXjrGi_pCx100ZMjqgFsjpLnyALy7cQ5HakNfzB6W_5g45qDwYQEw1vHmVH5smWEcdKtoEiRARx_wst369IQZWNEsbxfaQiR7N8bZ8CdZpY4zVsLhpqnZGHYN0qm0QbBarwa-WWJ7keBArDnMmO3hrwY_wqVVkmiqKVtfEhifVie9Jn2HWA4tbPhuGX_x4lUz6m_HgraTM9IbraKGLNxKx4xcqhALN9SqZE"
                   />
                   <div className="arh-detail-card__info">
                     <h4 className="arh-detail-card__name">
                       {admission.familyAccount?.fullName || admission.requestedByName || 'Relative'}
                     </h4>
-                    <p className="arh-detail-item__value" style={{ marginTop: '4px', fontSize: '12px', color: '#64748b' }}>
+                    <p className="arh-detail-item__value" style={{ marginTop: '4px', fontSize: '12.5px', color: '#475569', fontWeight: '500' }}>
                       {formatRelationship(admission.applicant?.relationshipToRequester)} • {admission.requestedByPhone || admission.familyAccount?.phone || 'N/A'}
                     </p>
                   </div>
@@ -414,13 +440,13 @@ export default function AdmissionDetailDrawer({
               </div>
 
               {/* Health Profile Card */}
-              <div className="arh-detail-card">
-                <h5 className="arh-drawer__section-title" style={{ color: '#ba1a1a' }}>
+              <div className="arh-detail-card arh-detail-card--health-alert">
+                <h5 className="arh-drawer__section-title">
                   <AlertCircle size={16} /> HEALTH INFORMATION
                 </h5>
                 <div className="arh-detail-grid" style={{ gridTemplateColumns: '1fr' }}>
                   <div className="arh-detail-item">
-                    <p className="arh-detail-item__label">Allergies</p>
+                    <p className="arh-detail-item__label" style={{ color: '#ba1a1a' }}>Allergies</p>
                     <div className="arh-tags" style={{ marginTop: '4px' }}>
                       {admission.applicant?.allergies && admission.applicant.allergies.length > 0 ? (
                         admission.applicant.allergies.map((alg, i) => (
@@ -435,11 +461,11 @@ export default function AdmissionDetailDrawer({
                   </div>
 
                   <div className="arh-detail-item" style={{ marginTop: '8px' }}>
-                    <p className="arh-detail-item__label">Chronic Conditions</p>
+                    <p className="arh-detail-item__label" style={{ color: '#ba1a1a' }}>Chronic Conditions</p>
                     <div className="arh-tags" style={{ marginTop: '4px' }}>
                       {admission.applicant?.chronicConditions && admission.applicant.chronicConditions.length > 0 ? (
                         admission.applicant.chronicConditions.map((cond, i) => (
-                          <span key={i} className="arh-tag" style={{ color: '#1B365D', background: 'rgba(27, 54, 93, 0.08)' }}>
+                          <span key={i} className="arh-tag" style={{ color: '#ba1a1a', background: 'rgba(186, 26, 26, 0.08)' }}>
                             {cond}
                           </span>
                         ))
@@ -449,14 +475,38 @@ export default function AdmissionDetailDrawer({
                     </div>
                   </div>
 
-                  <div className="arh-detail-item" style={{ marginTop: '12px', borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
-                    <p className="arh-detail-item__label">Detailed Health Summary</p>
-                    <p className="arh-detail-item__value" style={{ fontStyle: 'italic', background: '#f8fafc', padding: '8px 12px', borderRadius: '8px', marginTop: '4px' }}>
+                  <div className="arh-detail-item" style={{ marginTop: '12px', borderTop: '1px solid rgba(186, 26, 26, 0.15)', paddingTop: '8px' }}>
+                    <p className="arh-detail-item__label" style={{ color: '#ba1a1a' }}>Detailed Health Summary</p>
+                    <p className="arh-detail-item__value" style={{ fontStyle: 'italic', background: 'rgba(255, 255, 255, 0.6)', padding: '8px 12px', borderRadius: '8px', marginTop: '4px', border: '1px dashed rgba(186, 26, 26, 0.15)', color: '#334155' }}>
                       "{admission.applicant?.initialHealthCondition || 'No detailed health summary provided'}"
                     </p>
                   </div>
                 </div>
               </div>
+
+              {/* Health Assessment / Consultation Appointment Card */}
+              {scheduledDate && (
+                <div className="arh-detail-card arh-detail-card--appointment">
+                  <h5 className="arh-drawer__section-title">
+                    <Calendar size={16} /> {appointmentTitle}
+                  </h5>
+                  <div className="flex items-center gap-4 bg-white/70 p-3 rounded-lg border border-emerald-100 shadow-sm mt-3">
+                    <div className="bg-[#2D6A4F] text-white w-12 h-12 rounded flex flex-col items-center justify-center leading-none flex-shrink-0 font-sans shadow-[0_2px_6px_rgba(45,106,79,0.2)]">
+                      <span className="text-[15px] font-bold">{getCalendarDay(scheduledDate)}</span>
+                      <span className="text-[9px] font-medium uppercase mt-0.5">{getCalendarMonth(scheduledDate)}</span>
+                    </div>
+                    <div>
+                      <p className="font-bold text-slate-800 text-[13.5px]">
+                        {formatDayOfWeek(scheduledDate)}, {formatEnglishDate(scheduledDate)}
+                      </p>
+                      <p className="text-slate-500 text-[12.5px] mt-1 font-medium flex items-center gap-1">
+                        <Clock size={12} className="text-slate-400" />
+                        {formatTime(scheduledDate)} • {appointmentNotes}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Extra Admission details */}
               <div className="arh-detail-card">
@@ -466,7 +516,7 @@ export default function AdmissionDetailDrawer({
                 <div className="arh-detail-grid">
                   <div className="arh-detail-item">
                     <p className="arh-detail-item__label">Preferred Admission Date</p>
-                    <p className="arh-detail-item__value" style={{ color: '#6366f1', fontWeight: 'bold' }}>
+                    <p className="arh-detail-item__value" style={{ color: '#1B365D', fontWeight: 'bold' }}>
                       {formatEnglishDate(admission.preferredAdmissionDate)}
                     </p>
                   </div>
@@ -490,32 +540,28 @@ export default function AdmissionDetailDrawer({
                   )}
                 </div>
               </div>
-
-              {/* Footer Cancel Action Inside scroll view */}
-              {isCancellable && (
-                <div style={{ marginTop: '12px' }}>
-                  <button
-                    className="arh-drawer__btn arh-drawer__btn--cancel"
-                    style={{ width: '100%' }}
-                    onClick={() => setShowCancelModal(true)}
-                  >
-                    <XCircle size={18} />
-                    Cancel Admission Request
-                  </button>
-                </div>
-              )}
             </>
           )}
         </div>
 
-        {/* Solid Layout Footer */}
+        {/* Pinned Glass Layout Footer */}
         <div className="arh-drawer__footer">
-          <button
-            className="arh-drawer__btn arh-drawer__btn--primary"
-            onClick={onClose}
-          >
-            Close
-          </button>
+          {isCancellable ? (
+            <button
+              className="arh-drawer__btn arh-drawer__btn--cancel w-full"
+              onClick={() => setShowCancelModal(true)}
+            >
+              <XCircle size={18} />
+              Cancel Admission Request
+            </button>
+          ) : (
+            <button
+              className="arh-drawer__btn arh-drawer__btn--primary w-full"
+              onClick={onClose}
+            >
+              Close Details
+            </button>
+          )}
         </div>
       </div>
 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, Eye, Inbox, Loader2, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Plus, Eye, Inbox, Loader2, Calendar, ChevronLeft, ChevronRight, Clock, CheckCircle } from 'lucide-react';
 import admissionService from '../../services/admission.service';
 import AdmissionDetailDrawer from '../../components/family/SubmitAdmission/AdmissionDetailDrawer';
 
@@ -80,7 +80,6 @@ const getEligibilityLabel = (status) => {
       return 'Pending';
   }
 };
-
 export default function AdmissionRequestsHistoryPage() {
   const navigate = useNavigate();
 
@@ -101,6 +100,9 @@ export default function AdmissionRequestsHistoryPage() {
   const [selectedId, setSelectedId] = useState(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
+  // Statistics states
+  const [stats, setStats] = useState({ active: 0, completed: 0, appointments: 0 });
+
   // Debounce search input
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -111,7 +113,33 @@ export default function AdmissionRequestsHistoryPage() {
     return () => clearTimeout(timer);
   }, [search]);
 
-  // Fetch data
+  // Fetch stats for all family admissions
+  const loadStats = async () => {
+    try {
+      const res = await admissionService.getAdmissionHistory({ limit: 1000 });
+      const allAdmissions = res?.data || [];
+
+      const active = allAdmissions.filter(adm =>
+        ['new_request', 'consulting', 'assessing', 'contracting'].includes(adm.status)
+      ).length;
+
+      const completed = allAdmissions.filter(adm =>
+        adm.status === 'checked_in'
+      ).length;
+
+      const appointments = allAdmissions.filter(adm => {
+        const sched = adm.initialAssessmentScheduledAt || adm.consultationScheduledAt;
+        if (!sched) return false;
+        return new Date(sched) > new Date();
+      }).length;
+
+      setStats({ active, completed, appointments });
+    } catch (err) {
+      console.error('Failed to load admission stats:', err);
+    }
+  };
+
+  // Fetch paginated data
   const loadData = async () => {
     try {
       setLoading(true);
@@ -133,8 +161,10 @@ export default function AdmissionRequestsHistoryPage() {
     }
   };
 
+  // Initial load
   useEffect(() => {
     loadData();
+    loadStats();
   }, [page, status, debouncedSearch, dateStr]);
 
   const handleOpenDetail = (id) => {
@@ -143,8 +173,9 @@ export default function AdmissionRequestsHistoryPage() {
   };
 
   const handleCancelSuccess = () => {
-    // Reload table list instantly when request is cancelled
+    // Reload table list and stats instantly when request is cancelled
     loadData();
+    loadStats();
   };
 
   // Generate page numbers array
@@ -171,6 +202,48 @@ export default function AdmissionRequestsHistoryPage() {
             <Plus size={16} />
             Submit New Request
           </button>
+        </div>
+
+        {/* Statistics Cards Grid */}
+        <div className="arh-stats-grid">
+          {/* Active Requests Card */}
+          <div className="arh-stat-card">
+            <div className="arh-stat-card__header">
+              <div className="arh-stat-card__icon-box arh-stat-card__icon-box--pending">
+                <Clock size={20} />
+              </div>
+              <span className="arh-stat-card__label">Active Requests</span>
+            </div>
+            <div className="arh-stat-card__value">
+              {String(stats.active).padStart(2, '0')}
+            </div>
+          </div>
+
+          {/* Completed Admissions Card */}
+          <div className="arh-stat-card">
+            <div className="arh-stat-card__header">
+              <div className="arh-stat-card__icon-box arh-stat-card__icon-box--completed">
+                <CheckCircle size={20} />
+              </div>
+              <span className="arh-stat-card__label">Completed Admissions</span>
+            </div>
+            <div className="arh-stat-card__value">
+              {String(stats.completed).padStart(2, '0')}
+            </div>
+          </div>
+
+          {/* Upcoming Appointments Card */}
+          <div className="arh-stat-card">
+            <div className="arh-stat-card__header">
+              <div className="arh-stat-card__icon-box arh-stat-card__icon-box--appointment">
+                <Calendar size={20} />
+              </div>
+              <span className="arh-stat-card__label">Upcoming Appointments</span>
+            </div>
+            <div className="arh-stat-card__value">
+              {String(stats.appointments).padStart(2, '0')}
+            </div>
+          </div>
         </div>
 
         {/* Search & Filter Bar (Glass Card) */}
