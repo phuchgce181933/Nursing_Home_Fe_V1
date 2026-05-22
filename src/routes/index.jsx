@@ -10,6 +10,7 @@ import AdminProfile from '../pages/admin/AdminProfile';
 import DoctorDashboardPage from '../pages/doctor/DoctorDashboardPage';
 import NurseDashboardPage from '../pages/nurse/NurseDashboardPage';
 import FamilyDashboardPage from '../pages/family/FamilyDashboardPage';
+import SubmitAdmissionPage from '../pages/family/SubmitAdmissionPage';
 import ProtectedRoute from '../components/ProtectedRoute';
 
 function AppRoutes() {
@@ -72,6 +73,15 @@ function AppRoutes() {
       </Route>
 
       <Route
+        path="/family/admission-requests/new"
+        element={
+          <ProtectedRoute requiredRole="family">
+            <SubmitAdmissionPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
         path="/family/*"
         element={
           <ProtectedRoute requiredRole="family">
@@ -81,6 +91,7 @@ function AppRoutes() {
       >
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<FamilyDashboardPage />} />
+        <Route path="admission-requests" element={<PlaceholderPage title="Lịch sử yêu cầu nhập viện" />} />
         <Route path="resident" element={<PlaceholderPage title="Hồ sơ người thân" />} />
         <Route path="notifications" element={<PlaceholderPage title="Thông báo" />} />
         <Route path="messages" element={<PlaceholderPage title="Tin nhắn" />} />

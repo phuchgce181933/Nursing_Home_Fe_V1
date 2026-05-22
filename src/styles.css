@@ -1,3 +1,5 @@
+@import "tailwindcss";
+
 /* Shared Styles */
 @import './styles/shared/common.css';
 @import './styles/shared/LoginForm.css';
@@ -8,6 +10,9 @@
 @import './styles/admin/DashboardPage.css';
 @import './styles/admin/ResidentPage.css';
 @import './styles/admin/ProfilePage.css';
+
+/* Family Styles */
+@import './styles/family/SubmitAdmissionPage.css';
 
 * {
   margin: 0;
