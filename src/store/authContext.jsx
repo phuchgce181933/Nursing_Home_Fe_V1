@@ -33,6 +33,12 @@ export function AuthProvider({ children }) {
     return data;
   };
 
+  const updateProfile = async (profileData) => {
+    const updatedUser = await authService.updateProfile(profileData);
+    setUser((prev) => ({ ...prev, ...updatedUser }));
+    return updatedUser;
+  };
+
   const logout = () => {
     authService.logout();
     setToken(null);
@@ -40,7 +46,7 @@ export function AuthProvider({ children }) {
   };
 
   const value = useMemo(
-    () => ({ token, user, loading, login, logout }),
+    () => ({ token, user, loading, login, logout, updateProfile }),
     [token, user, loading]
   );
 
