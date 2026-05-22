@@ -18,6 +18,7 @@
 /* Shared Styles */
 @import './styles/shared/common.css';
 @import './styles/shared/LoginForm.css';
+@import './styles/shared/HomePage.css';
 
 /* Admin Styles */
 @import './styles/admin/AdminLayout.css';
