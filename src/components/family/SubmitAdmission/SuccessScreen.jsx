@@ -9,22 +9,23 @@ import {
   Share2,
 } from 'lucide-react';
 
-const formatVietnameseDate = (dateStr) => {
+const formatEnglishDate = (dateStr) => {
   if (!dateStr) return '';
   try {
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return dateStr;
-    const day = d.getDate();
-    const month = d.getMonth() + 1;
-    const year = d.getFullYear();
-    return `${day} Tháng ${month}, ${year}`;
+    return d.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
   } catch (e) {
     return dateStr;
   }
 };
 
 export default function SuccessScreen({ submittedData = {}, formData = {}, navigate }) {
-  const patientName = submittedData?.applicant?.fullName || formData.fullName || 'Nguyễn Văn An';
+  const patientName = submittedData?.applicant?.fullName || formData.fullName || 'N/A';
   const rawPrefDate = submittedData?.preferredAdmissionDate || formData.preferredDate;
 
   return (
@@ -36,9 +37,9 @@ export default function SuccessScreen({ submittedData = {}, formData = {}, navig
         </div>
 
         {/* success message */}
-        <h2 className="sap-success__title">Gửi yêu cầu thành công!</h2>
+        <h2 className="sap-success__title">Request Submitted Successfully!</h2>
         <p className="sap-success__desc">
-          Cảm ơn bạn đã tin tưởng <strong>An Nhiên Care Home</strong>. Đội ngũ tư vấn sẽ xem xét hồ sơ và liên hệ với bạn trong vòng <strong>24 giờ</strong> tới.
+          Thank you for choosing <strong>An Nhien Care Home</strong>. Our advisory team will review your application and contact you within the next <strong>24 hours</strong>.
         </p>
 
         {/* detail cards row */}
@@ -48,7 +49,7 @@ export default function SuccessScreen({ submittedData = {}, formData = {}, navig
               <User size={20} />
             </div>
             <div className="sap-success__summary-card-info">
-              <span className="sap-success__summary-card-label">NGƯỜI CAO TUỔI</span>
+              <span className="sap-success__summary-card-label">RESIDENT</span>
               <span className="sap-success__summary-card-value">{patientName}</span>
             </div>
           </div>
@@ -58,9 +59,9 @@ export default function SuccessScreen({ submittedData = {}, formData = {}, navig
               <Calendar size={20} />
             </div>
             <div className="sap-success__summary-card-info">
-              <span className="sap-success__summary-card-label">NGÀY DỰ KIẾN</span>
+              <span className="sap-success__summary-card-label">PREFERRED DATE</span>
               <span className="sap-success__summary-card-value">
-                {rawPrefDate ? formatVietnameseDate(rawPrefDate) : 'Chưa xác định'}
+                {rawPrefDate ? formatEnglishDate(rawPrefDate) : 'Not specified'}
               </span>
             </div>
           </div>
@@ -72,9 +73,9 @@ export default function SuccessScreen({ submittedData = {}, formData = {}, navig
             <Info size={18} />
           </div>
           <div className="sap-success__advice-content">
-            <h4 className="sap-success__advice-title">Bước tiếp theo</h4>
+            <h4 className="sap-success__advice-title">Next Steps</h4>
             <p className="sap-success__advice-text">
-              Vui lòng chuẩn bị các giấy tờ tùy thân và hồ sơ bệnh án gần nhất để buổi trao đổi diễn ra thuận lợi nhất.
+              Please prepare the resident's identification documents and most recent medical records to facilitate our upcoming consultation.
             </p>
           </div>
         </div>
@@ -87,7 +88,7 @@ export default function SuccessScreen({ submittedData = {}, formData = {}, navig
             onClick={() => navigate('/family/admission-requests')}
           >
             <History size={16} />
-            Xem lịch sử yêu cầu
+            View Request History
           </button>
           <button
             type="button"
@@ -95,7 +96,7 @@ export default function SuccessScreen({ submittedData = {}, formData = {}, navig
             onClick={() => navigate('/family/dashboard')}
           >
             <Home size={16} />
-            Về trang chủ
+            Back to Dashboard
           </button>
         </div>
 
@@ -111,15 +112,15 @@ export default function SuccessScreen({ submittedData = {}, formData = {}, navig
               className="sap-success__hotline-avatar"
             />
             <div className="sap-success__hotline-text">
-              <span className="sap-success__hotline-label">Bạn cần hỗ trợ ngay?</span>
+              <span className="sap-success__hotline-label">Need Urgent Support?</span>
               <span className="sap-success__hotline-number">Hotline: 1900 8888</span>
             </div>
           </div>
           <div className="sap-success__hotline-actions">
-            <button type="button" className="sap-success__hotline-icon-btn" aria-label="Nhắn tin hỗ trợ">
+            <button type="button" className="sap-success__hotline-icon-btn" aria-label="Send support message">
               <MessageSquare size={18} />
             </button>
-            <button type="button" className="sap-success__hotline-icon-btn" aria-label="Chia sẻ thông tin">
+            <button type="button" className="sap-success__hotline-icon-btn" aria-label="Share information">
               <Share2 size={18} />
             </button>
           </div>

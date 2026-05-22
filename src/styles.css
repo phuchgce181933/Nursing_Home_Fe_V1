@@ -1,5 +1,20 @@
 @import "tailwindcss";
 
+@theme {
+  --color-navy-deep: #1B365D;
+  --color-sage-healing: #4F7942;
+  --color-status-success: #2D6A4F;
+  --color-status-warning: #B07D05;
+  --color-status-info: #0077B6;
+  --color-error: #ba1a1a;
+  --color-surface-container-low: #eff4ff;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-high: #dce9ff;
+  --color-surface-container-highest: #d3e4fe;
+  --color-outline-variant: #c4c6cf;
+  --color-outline: #74777f;
+}
+
 /* Shared Styles */
 @import './styles/shared/common.css';
 @import './styles/shared/LoginForm.css';
@@ -13,6 +28,7 @@
 
 /* Family Styles */
 @import './styles/family/SubmitAdmissionPage.css';
+@import './styles/family/AdmissionRequestsHistoryPage.css';
 
 * {
   margin: 0;

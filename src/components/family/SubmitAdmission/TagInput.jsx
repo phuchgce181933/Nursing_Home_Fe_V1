@@ -28,7 +28,7 @@ export default function TagInput({ tags = [], onRemove, onAdd, placeholder }) {
       {tags.map((t) => (
         <span key={t} className="sap-tag">
           {t}
-          <button type="button" onClick={() => onRemove(t)} aria-label={`Xóa ${t}`}>
+          <button type="button" onClick={() => onRemove(t)} aria-label={`Remove ${t}`}>
             <X size={12} />
           </button>
         </span>

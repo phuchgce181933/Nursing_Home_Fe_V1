@@ -7,6 +7,7 @@ import {
   Pill,
   Activity,
   Bell,
+  History,
 } from 'lucide-react';
 
 export const roleSidebarData = {
@@ -59,6 +60,11 @@ export const roleSidebarData = {
       title: 'Trang Gia đình',
       icon: LayoutDashboard,
       path: '/family/dashboard',
+    },
+    {
+      title: 'Lịch sử yêu cầu',
+      icon: History,
+      path: '/family/admission-requests',
     },
     {
       title: 'Người thân',

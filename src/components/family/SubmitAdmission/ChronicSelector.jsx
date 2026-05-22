@@ -2,14 +2,14 @@ import { useState } from 'react';
 import { Check, X } from 'lucide-react';
 
 const CHRONIC_SUGGESTIONS = [
-  'Tiểu đường',
-  'Cao huyết áp',
-  'Tim mạch',
-  'Hen suyễn',
-  'Alzheimer',
-  'Parkinson',
-  'Suy thận',
-  'Viêm khớp',
+  'Diabetes',
+  'Hypertension',
+  'Cardiovascular Disease',
+  'Asthma',
+  "Alzheimer's",
+  "Parkinson's",
+  'Chronic Kidney Disease',
+  'Arthritis',
 ];
 
 export default function ChronicSelector({ selected = [], onChange }) {
@@ -68,11 +68,11 @@ export default function ChronicSelector({ selected = [], onChange }) {
               addCustom();
             }
           }}
-          placeholder="Thêm bệnh lý khác (VD: Alzheimer)..."
+          placeholder="Add other conditions (e.g., Alzheimer's)..."
           className="sap-input sap-chronic__add-input"
         />
         <button type="button" className="sap-btn sap-btn--outline sap-chronic__add-btn" onClick={addCustom}>
-          Thêm
+          Add
         </button>
       </div>
     </div>

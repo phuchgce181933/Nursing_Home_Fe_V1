@@ -1,11 +1,11 @@
 import { ClipboardCheck, Phone, AlertCircle, Info } from 'lucide-react';
 
 const ADMISSION_REASONS = [
-  { value: 'long_term_care', label: 'Chăm sóc dài hạn / Long-term care' },
-  { value: 'rehabilitation', label: 'Phục hồi chức năng / Rehab' },
-  { value: 'post_surgery',   label: 'Chăm sóc sau phẫu thuật / Post-surgery' },
-  { value: 'hospice',        label: 'Chăm sóc cuối đời / Hospice' },
-  { value: 'other',          label: 'Khác / Other' },
+  { value: 'long_term_care', label: 'Long-term Care' },
+  { value: 'rehabilitation', label: 'Rehabilitation & Therapy' },
+  { value: 'post_surgery',   label: 'Post-surgery Recovery' },
+  { value: 'hospice',        label: 'Hospice & Palliative Care' },
+  { value: 'other',          label: 'Other Reason' },
 ];
 
 export default function Step3({ data = {}, onChange, errors = {}, touched = {}, onBlur }) {
@@ -34,12 +34,12 @@ export default function Step3({ data = {}, onChange, errors = {}, touched = {}, 
     <div className="sap-section">
       <div className="sap-section__heading">
         <ClipboardCheck size={16} />
-        Chi tiết nhập viện / Admission Details
+        Admission Details
       </div>
 
       <div className="sap-grid-2">
         <div className="sap-field">
-          <label className="sap-label">Ngày dự kiến nhập viện / Preferred Date</label>
+          <label className="sap-label">Preferred Date</label>
           <input type="date" {...field('preferredDate')} />
           {touched.preferredDate && errors.preferredDate && (
             <div className="sap-field__error-message">
@@ -51,9 +51,9 @@ export default function Step3({ data = {}, onChange, errors = {}, touched = {}, 
         <div className="sap-field">
           <label className="sap-label">
             <Phone size={13} style={{ display: 'inline', marginRight: 4 }} />
-            Số điện thoại liên hệ / Contact Phone
+            Contact Phone
           </label>
-          <input type="tel" placeholder="Nhập số điện thoại" {...field('contactPhone')} />
+          <input type="tel" placeholder="Enter contact phone number" {...field('contactPhone')} />
           {touched.contactPhone && errors.contactPhone && (
             <div className="sap-field__error-message">
               <AlertCircle size={12} />
@@ -62,9 +62,9 @@ export default function Step3({ data = {}, onChange, errors = {}, touched = {}, 
           )}
         </div>
         <div className="sap-field sap-field--full">
-          <label className="sap-label">Lý do nhập viện / Reason for Admission</label>
+          <label className="sap-label">Reason for Admission</label>
           <select {...selectField('admissionReason')}>
-            <option value="">Chọn lý do chính</option>
+            <option value="">Select main reason</option>
             {ADMISSION_REASONS.map(({ value, label }) => (
               <option key={value} value={value}>
                 {label}
@@ -79,10 +79,10 @@ export default function Step3({ data = {}, onChange, errors = {}, touched = {}, 
           )}
         </div>
         <div className="sap-field sap-field--full">
-          <label className="sap-label">Ghi chú thêm / Additional Notes</label>
+          <label className="sap-label">Additional Notes</label>
           <textarea
             rows={4}
-            placeholder="Yêu cầu đặc biệt về phòng ở, chế độ dinh dưỡng, v.v..."
+            placeholder="Special requests regarding room, dietary requirements, assistance, etc..."
             {...textareaField('additionalNotes')}
           />
           {touched.additionalNotes && errors.additionalNotes && (
@@ -97,10 +97,7 @@ export default function Step3({ data = {}, onChange, errors = {}, touched = {}, 
           <div className="sap-info-alert">
             <Info size={18} className="sap-info-alert__icon" />
             <p>
-              Sau khi gửi yêu cầu, đội ngũ chuyên viên của{' '}
-              <strong>ElderCare</strong> sẽ liên hệ với bạn trong vòng{' '}
-              <strong>24 giờ</strong> để xác nhận thông tin và hướng dẫn các
-              bước tiếp theo.
+              Upon submission, our <strong>An Nhien Care Home</strong> specialist team will contact you within <strong>24 hours</strong> to verify the information and guide you through the next steps.
             </p>
           </div>
         </div>

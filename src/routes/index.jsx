@@ -11,6 +11,7 @@ import DoctorDashboardPage from '../pages/doctor/DoctorDashboardPage';
 import NurseDashboardPage from '../pages/nurse/NurseDashboardPage';
 import FamilyDashboardPage from '../pages/family/FamilyDashboardPage';
 import SubmitAdmissionPage from '../pages/family/SubmitAdmissionPage';
+import AdmissionRequestsHistoryPage from '../pages/family/AdmissionRequestsHistoryPage';
 import ProtectedRoute from '../components/ProtectedRoute';
 
 function AppRoutes() {
@@ -91,7 +92,7 @@ function AppRoutes() {
       >
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<FamilyDashboardPage />} />
-        <Route path="admission-requests" element={<PlaceholderPage title="Lịch sử yêu cầu nhập viện" />} />
+        <Route path="admission-requests" element={<AdmissionRequestsHistoryPage />} />
         <Route path="resident" element={<PlaceholderPage title="Hồ sơ người thân" />} />
         <Route path="notifications" element={<PlaceholderPage title="Thông báo" />} />
         <Route path="messages" element={<PlaceholderPage title="Tin nhắn" />} />
