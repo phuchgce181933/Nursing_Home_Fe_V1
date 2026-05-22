@@ -94,6 +94,39 @@ const formatAdmissionReason = (reason) => {
   return reason.charAt(0).toUpperCase() + reason.slice(1);
 };
 
+const getCalendarDay = (dateStr) => {
+  if (!dateStr) return '';
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '';
+    return d.getDate().toString().padStart(2, '0');
+  } catch (e) {
+    return '';
+  }
+};
+
+const getCalendarMonth = (dateStr) => {
+  if (!dateStr) return '';
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+  } catch (e) {
+    return '';
+  }
+};
+
+const formatDayOfWeek = (dateStr) => {
+  if (!dateStr) return '';
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleDateString('en-US', { weekday: 'long' });
+  } catch (e) {
+    return '';
+  }
+};
+
 export default function AdmissionDetailDrawer({
   isOpen,
   onClose,
