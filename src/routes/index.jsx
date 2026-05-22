@@ -5,6 +5,7 @@ import PlaceholderPage from '../pages/PlaceholderPage';
 import RoleLayout from '../layouts/RoleLayout';
 import DashboardPage from '../pages/admin/DashboardPage';
 import ResidentPage from '../pages/admin/ResidentPage';
+import StaffPage from '../pages/admin/StaffPage';
 import AdminProfile from '../pages/admin/AdminProfile';
 import DoctorDashboardPage from '../pages/doctor/DoctorDashboardPage';
 import NurseDashboardPage from '../pages/nurse/NurseDashboardPage';
@@ -28,6 +29,7 @@ function AppRoutes() {
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<DashboardPage />} />
         <Route path="residents" element={<ResidentPage />} />
+        <Route path="staff" element={<StaffPage />} />
         <Route path="profile" element={<AdminProfile />} />
         <Route path="*" element={<PlaceholderPage title="Trang quản trị" />} />
       </Route>

@@ -5,6 +5,8 @@ import LoadingSpinner from './ui/LoadingSpinner';
 
 function ProtectedRoute({ children, requiredRole }) {
   const { token, user, loading } = useAuth();
+  const normalizedRole = user?.role?.toLowerCase();
+  const normalizedRequiredRole = requiredRole?.toLowerCase();
 
   if (loading) {
     return <LoadingSpinner />;
@@ -14,8 +16,8 @@ function ProtectedRoute({ children, requiredRole }) {
     return <Navigate to="/login" replace />;
   }
 
-  if (requiredRole && user?.role !== requiredRole) {
-    return <Navigate to={getHomePath(user?.role)} replace />;
+  if (normalizedRequiredRole && normalizedRole !== normalizedRequiredRole) {
+    return <Navigate to={getHomePath(normalizedRole)} replace />;
   }
 
   return children;

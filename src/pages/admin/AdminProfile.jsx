@@ -1,21 +1,61 @@
 import { useEffect, useState } from 'react';
-import { Mail, Phone, Shield, Activity, BadgeCheck, UserCircle } from 'lucide-react';
+import {
+  Mail,
+  Phone,
+  BadgeCheck,
+  UserCircle,
+  Pencil,
+  BriefcaseBusiness,
+  ShieldCheck,
+} from 'lucide-react';
+
 import { useAuth } from '../../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
+
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
+
+import '../../styles/admin/ProfilePage.css';
 
 function formatDate(value) {
   if (!value) return '—';
-  return new Date(value).toLocaleString('vi-VN');
+
+  return new Date(value).toLocaleString('en-US', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
+const genderMap = {
+  male: 'Male',
+  female: 'Female',
+  other: 'Other',
+};
+
 function AdminProfile() {
-  const { user, loading, logout, updateProfile } = useAuth();
+  const { user, loading, logout, updateProfile } =
+    useAuth();
+
   const navigate = useNavigate();
-  const [editMode, setEditMode] = useState(false);
+
+  const [activeTab, setActiveTab] =
+    useState('personal');
+
+  const [editMode, setEditMode] =
+    useState(false);
+
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState('');
-  const [formData, setFormData] = useState({ fullName: '', phone: '', gender: '' });
+
+  const [message, setMessage] =
+    useState('');
+
+  const [formData, setFormData] = useState({
+    fullName: '',
+    phone: '',
+    gender: '',
+  });
 
   useEffect(() => {
     if (user) {
@@ -27,8 +67,15 @@ function AdminProfile() {
     }
   }, [user]);
 
-  if (loading || !user) {
-    return <LoadingSpinner label="Đang tải hồ sơ..." />;
+  if (loading) {
+    return (
+      <LoadingSpinner label="Loading profile..." />
+    );
+  }
+
+  if (!user) {
+    navigate('/login');
+    return null;
   }
 
   const handleLogout = () => {
@@ -38,19 +85,32 @@ function AdminProfile() {
 
   const handleChange = (event) => {
     const { name, value } = event.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+
     setSaving(true);
     setMessage('');
+
     try {
       await updateProfile(formData);
-      setMessage('Cập nhật hồ sơ thành công.');
+
+      setMessage(
+        'Profile updated successfully.'
+      );
+
       setEditMode(false);
     } catch (error) {
-      setMessage(error?.response?.data?.message || 'Cập nhật hồ sơ thất bại.');
+      setMessage(
+        error?.response?.data?.message ||
+          'Failed to update profile.'
+      );
     } finally {
       setSaving(false);
     }
@@ -59,167 +119,381 @@ function AdminProfile() {
   return (
     <div className="profile-page">
       <header className="profile-page__header">
-        <h1 className="profile-page__title">Hồ sơ quản trị</h1>
-        <p className="profile-page__subtitle">Thông tin tài khoản và nhân sự</p>
+        <div>
+          <h1 className="profile-page__title">
+            My Profile
+          </h1>
+
+          <p className="profile-page__subtitle">
+            Manage your account information
+          </p>
+        </div>
       </header>
 
-      {message && <div className="profile-page__message">{message}</div>}
+      {message && (
+        <div className="profile-page__message">
+          {message}
+        </div>
+      )}
 
-      <div className="profile-page__grid">
-        <section className="profile-card profile-card--accent">
-          <UserCircle size={72} className="profile-card__avatar" />
-          <h2 className="profile-card__name">{user.fullName}</h2>
-          <span className="profile-card__role">{user.role?.toUpperCase()}</span>
-          <p className={`profile-card__status ${user.isActive ? 'is-active' : 'is-inactive'}`}>
-            <BadgeCheck size={16} />
-            {user.isActive ? 'Tài khoản đang hoạt động' : 'Tài khoản không hoạt động'}
-          </p>
+      <div className="profile-hero">
+        <div className="profile-hero__left">
+          <div className="profile-hero__avatar">
+            <UserCircle size={70} />
+          </div>
 
-          <ul className="profile-card__list">
-            <li>
+          <div>
+            <div className="profile-hero__top">
+              <h2>{user.fullName}</h2>
+
+              <span className="profile-badge">
+                {user.role}
+              </span>
+
+              <span
+                className={`profile-status ${
+                  user.isActive
+                    ? 'is-active'
+                    : 'is-inactive'
+                }`}
+              >
+                <BadgeCheck size={14} />
+
+                {user.isActive
+                  ? 'Active'
+                  : 'Inactive'}
+              </span>
+            </div>
+
+            <div className="profile-hero__meta">
               <Mail size={16} />
+
               <span>{user.email}</span>
-            </li>
-            <li>
-              <Phone size={16} />
-              <span>{user.phone || '—'}</span>
-            </li>
-            <li>
-              <Shield size={16} />
-              <span>Giới tính: {user.gender || '—'}</span>
-            </li>
-          </ul>
-        </section>
+            </div>
 
-        {!editMode ? (
-          <section className="profile-card">
-            <h2 className="profile-card__heading">
-              <Activity size={18} />
-              Thông tin sửa đổi
-            </h2>
-            <p>Nhấn nút “Cập nhật hồ sơ” để chỉnh sửa thông tin.</p>
-          </section>
-        ) : (
-          <section className="profile-card profile-form-card">
-            <h2 className="profile-card__heading">
-              <Activity size={18} />
-              Sửa thông tin
-            </h2>
+            <p className="profile-hero__login">
+              Last login:{' '}
+              {formatDate(user.lastLoginAt)}
+            </p>
+          </div>
+        </div>
 
-            <form className="profile-form" onSubmit={handleSubmit}>
-              <div className="profile-form__field">
-                <label className="profile-form__label" htmlFor="fullName">
-                  Họ và tên
-                </label>
-                <input
-                  id="fullName"
-                  name="fullName"
-                  type="text"
-                  value={formData.fullName}
-                  onChange={handleChange}
-                  className="profile-form__input"
-                  required
-                />
-              </div>
+        <button
+          type="button"
+          className="button button--secondary"
+          onClick={() =>
+            setEditMode((prev) => !prev)
+          }
+        >
+          <Pencil size={16} />
 
-              <div className="profile-form__field">
-                <label className="profile-form__label" htmlFor="phone">
-                  Số điện thoại
-                </label>
-                <input
-                  id="phone"
-                  name="phone"
-                  type="text"
-                  value={formData.phone}
-                  onChange={handleChange}
-                  className="profile-form__input"
-                />
-              </div>
-
-              <div className="profile-form__field">
-                <label className="profile-form__label" htmlFor="gender">
-                  Giới tính
-                </label>
-                <select
-                  id="gender"
-                  name="gender"
-                  value={formData.gender}
-                  onChange={handleChange}
-                  className="profile-form__input"
-                >
-                  <option value="">Chọn giới tính</option>
-                  <option value="male">Nam</option>
-                  <option value="female">Nữ</option>
-                  <option value="other">Khác</option>
-                </select>
-              </div>
-
-              <div className="profile-form__actions">
-                <button type="submit" className="button button--primary" disabled={saving}>
-                  {saving ? 'Đang lưu...' : 'Lưu thay đổi'}
-                </button>
-                <button
-                  type="button"
-                  className="button button--secondary"
-                  onClick={() => {
-                    setFormData({ fullName: user.fullName || '', phone: user.phone || '', gender: user.gender || '' });
-                    setMessage('');
-                    setEditMode(false);
-                  }}
-                >
-                  Hủy
-                </button>
-              </div>
-            </form>
-          </section>
-        )}
-
-        <section className="profile-card">
-          <h2 className="profile-card__heading">Hồ sơ nhân sự</h2>
-          {user.staffProfile ? (
-            <dl className="profile-details">
-              <div>
-                <dt>Mã nhân viên</dt>
-                <dd>{user.staffProfile.staffCode}</dd>
-              </div>
-              <div>
-                <dt>Nhóm vai trò</dt>
-                <dd>{user.staffProfile.roleCategory}</dd>
-              </div>
-              <div>
-                <dt>Chuyên môn</dt>
-                <dd>{user.staffProfile.specialty || '—'}</dd>
-              </div>
-              <div>
-                <dt>Khu vực phụ trách</dt>
-                <dd>{user.staffProfile.responsibleAreaIds?.length || 0} khu vực</dd>
-              </div>
-              <div>
-                <dt>Cư dân được giao</dt>
-                <dd>{user.staffProfile.assignedResidentIds?.length || 0} người</dd>
-              </div>
-            </dl>
-          ) : (
-            <p className="profile-card__empty">Chưa có hồ sơ nhân sự.</p>
-          )}
-        </section>
+          {editMode
+            ? 'Cancel'
+            : 'Edit Profile'}
+        </button>
       </div>
 
-      <section className="profile-page__actions">
-        {!editMode && (
-          <button type="button" className="button button--primary" onClick={() => setEditMode(true)}>
-            Cập nhật hồ sơ
+      <div className="profile-layout">
+        <aside className="profile-sidebar">
+          <button
+            type="button"
+            className={`profile-sidebar__item ${
+              activeTab === 'personal'
+                ? 'is-active'
+                : ''
+            }`}
+            onClick={() =>
+              setActiveTab('personal')
+            }
+          >
+            <UserCircle size={18} />
+            Personal Info
           </button>
-        )}
-        {editMode && (
-          <button type="button" className="button button--secondary" onClick={() => setEditMode(false)}>
-            Hủy chỉnh sửa
+
+          <button
+            type="button"
+            className={`profile-sidebar__item ${
+              activeTab === 'work'
+                ? 'is-active'
+                : ''
+            }`}
+            onClick={() =>
+              setActiveTab('work')
+            }
+          >
+            <BriefcaseBusiness size={18} />
+            Work Information
           </button>
-        )}
-        <button type="button" className="button button--danger" onClick={handleLogout}>
-          Đăng xuất
-        </button>
-      </section>
+
+          <button
+            type="button"
+            className={`profile-sidebar__item ${
+              activeTab === 'security'
+                ? 'is-active'
+                : ''
+            }`}
+            onClick={() =>
+              setActiveTab('security')
+            }
+          >
+            <ShieldCheck size={18} />
+            Security
+          </button>
+        </aside>
+
+        <div className="profile-content">
+          {activeTab === 'personal' && (
+            <section className="profile-card">
+              <div className="profile-card__header">
+                <div>
+                  <h3>Personal Information</h3>
+
+                  <p>
+                    Manage your personal identity
+                    and contact details.
+                  </p>
+                </div>
+              </div>
+
+              {editMode ? (
+                <form
+                  className="profile-form"
+                  onSubmit={handleSubmit}
+                >
+                  <div className="profile-grid">
+                    <div className="profile-form__field">
+                      <label>Full Name</label>
+
+                      <input
+                        type="text"
+                        name="fullName"
+                        value={formData.fullName}
+                        onChange={handleChange}
+                        className="profile-form__input"
+                      />
+                    </div>
+
+                    <div className="profile-form__field">
+                      <label>Phone Number</label>
+
+                      <input
+                        type="text"
+                        name="phone"
+                        value={formData.phone}
+                        onChange={handleChange}
+                        className="profile-form__input"
+                      />
+                    </div>
+
+                    <div className="profile-form__field">
+                      <label>Gender</label>
+
+                      <select
+                        name="gender"
+                        value={formData.gender}
+                        onChange={handleChange}
+                        className="profile-form__input"
+                      >
+                        <option value="">
+                          Select gender
+                        </option>
+
+                        <option value="male">
+                          Male
+                        </option>
+
+                        <option value="female">
+                          Female
+                        </option>
+
+                        <option value="other">
+                          Other
+                        </option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="profile-form__actions">
+                    <button
+                      type="submit"
+                      className="button button--primary"
+                      disabled={saving}
+                    >
+                      {saving
+                        ? 'Saving...'
+                        : 'Save Changes'}
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <div className="profile-grid">
+                  <div>
+                    <span className="profile-label">
+                      Full Name
+                    </span>
+
+                    <p className="profile-value">
+                      {user.fullName || '—'}
+                    </p>
+                  </div>
+
+                  <div className="profile-grid__wide">
+                    <span className="profile-label">
+                      Email Address
+                    </span>
+
+                    <p className="profile-value">
+                      {user.email || '—'}
+                    </p>
+                  </div>
+
+                  <div>
+                    <span className="profile-label">
+                      Phone Number
+                    </span>
+
+                    <p className="profile-value">
+                      {user.phone || '—'}
+                    </p>
+                  </div>
+
+                  <div>
+                    <span className="profile-label">
+                      Gender
+                    </span>
+
+                    <p className="profile-value">
+                      {genderMap[user.gender] ||
+                        '—'}
+                    </p>
+                  </div>
+
+                  <div>
+                    <span className="profile-label">
+                      Account Created
+                    </span>
+
+                    <p className="profile-value">
+                      {formatDate(
+                        user.createdAt
+                      )}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </section>
+          )}
+
+          {activeTab === 'work' && (
+            <section className="profile-card">
+              <div className="profile-card__header">
+                <div>
+                  <h3>Work Information</h3>
+
+                  <p>
+                    Staff and organization related
+                    information.
+                  </p>
+                </div>
+              </div>
+
+              {user.staffProfile ? (
+                <div className="profile-grid">
+                  <div>
+                    <span className="profile-label">
+                      Staff Code
+                    </span>
+
+                    <p className="profile-value">
+                      {
+                        user.staffProfile
+                          .staffCode
+                      }
+                    </p>
+                  </div>
+
+                  <div>
+                    <span className="profile-label">
+                      Role Category
+                    </span>
+
+                    <p className="profile-value">
+                      {
+                        user.staffProfile
+                          .roleCategory
+                      }
+                    </p>
+                  </div>
+
+                  <div>
+                    <span className="profile-label">
+                      Specialty
+                    </span>
+
+                    <p className="profile-value">
+                      {user.staffProfile
+                        .specialty || '—'}
+                    </p>
+                  </div>
+
+                  <div>
+                    <span className="profile-label">
+                      Responsible Areas
+                    </span>
+
+                    <p className="profile-value">
+                      {user.staffProfile
+                        .responsibleAreaIds
+                        ?.length || 0}
+                    </p>
+                  </div>
+
+                  <div>
+                    <span className="profile-label">
+                      Assigned Residents
+                    </span>
+
+                    <p className="profile-value">
+                      {user.staffProfile
+                        .assignedResidentIds
+                        ?.length || 0}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <p className="profile-empty">
+                  No staff profile found.
+                </p>
+              )}
+            </section>
+          )}
+
+          {activeTab === 'security' && (
+            <section className="profile-security">
+              <div>
+                <h3>Change Password</h3>
+
+                <p>
+                  Keep your account secure by
+                  regularly updating your password.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                className="button button--light"
+                onClick={() =>
+                  navigate(
+                    '/admin/change-password'
+                  )
+                }
+              >
+                Update Password
+              </button>
+            </section>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

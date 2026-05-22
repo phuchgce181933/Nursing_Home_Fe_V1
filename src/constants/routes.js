@@ -6,5 +6,6 @@ export const ROLE_HOME_PATHS = {
 };
 
 export function getHomePath(role) {
-  return ROLE_HOME_PATHS[role] ?? '/login';
+  const normalizedRole = role?.toLowerCase();
+  return ROLE_HOME_PATHS[normalizedRole] ?? '/login';
 }

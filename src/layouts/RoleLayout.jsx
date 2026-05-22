@@ -5,7 +5,8 @@ import { sidebarData } from '../components/sidebar/roleSidebarData';
 
 function RoleLayout() {
   const { user } = useAuth();
-  const items = sidebarData[user?.role] ?? [];
+  const roleKey = user?.role?.toLowerCase();
+  const items = sidebarData[roleKey] ?? [];
 
   return (
     <div className="admin-layout">
