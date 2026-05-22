@@ -269,7 +269,11 @@ export default function SubmitAdmissionPage() {
   };
 
   const handlePrev = () => {
-    if (step > 1) setStep(step - 1);
+    if (step > 1) {
+      setStep(step - 1);
+    } else {
+      navigate('/');
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -433,9 +437,9 @@ export default function SubmitAdmissionPage() {
         <div className="sap-footer">
           <button
             type="button"
-            className={`sap-btn sap-btn--outline ${step === 1 ? 'sap-btn--invisible' : ''}`}
+            className="sap-btn sap-btn--outline"
             onClick={handlePrev}
-            disabled={step === 1 || submitting}
+            disabled={submitting}
           >
             <ChevronLeft size={16} />
             Back

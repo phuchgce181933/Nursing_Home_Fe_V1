@@ -1,6 +1,14 @@
 import { Link } from 'react-router-dom';
+import { useAuth } from '../hooks/useAuth';
 
 function HomePage() {
+  const { token, user } = useAuth();
+
+  // Redirect to the request form if logged in as a family member, otherwise redirect to login
+  const bookPath = (token && user?.role === 'family')
+    ? '/family/admission-requests/new'
+    : '/login';
+
   return (
     <div className="home-page">
       <header className="home-header">
@@ -19,7 +27,7 @@ function HomePage() {
           <Link to="#contact">Contact</Link>
         </nav>
 
-        <Link to="/login" className="home-header__button">
+        <Link to={bookPath} className="home-header__button">
           Book a Visit
         </Link>
       </header>
