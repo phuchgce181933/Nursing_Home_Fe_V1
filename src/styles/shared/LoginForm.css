@@ -1,32 +1,6 @@
-.app-shell.login-page {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 40px 16px;
-  background: radial-gradient(circle at top, rgba(37, 99, 235, 0.16), transparent 28%),
-    linear-gradient(180deg, #eef2ff 0%, #f8fafc 35%, #ffffff 100%);
-}
-
 .login-card {
-  width: min(520px, 100%);
-  background: #ffffff;
-  border-radius: 32px;
-  box-shadow: 0 32px 90px rgba(15, 23, 42, 0.14);
-  padding: 40px 36px;
-  border: 1px solid rgba(15, 23, 42, 0.06);
-}
-
-.login-page__eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 18px;
-  color: #1d4ed8;
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  max-width: 450px;
+  padding: 34px;
 }
 
 .login-page__header {
@@ -34,154 +8,82 @@
 }
 
 .login-page__title {
-  font-size: clamp(2rem, 2.8vw, 2.8rem);
-  line-height: 1.05;
-  font-weight: 800;
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
   color: #0f172a;
 }
 
 .login-page__subtitle {
-  margin-top: 10px;
-  color: #475569;
+  margin-top: 8px;
   font-size: 14px;
-  line-height: 1.75;
+  color: #475569;
 }
 
 .login-page__message {
   margin-bottom: 18px;
-  padding: 16px 18px;
-  border-radius: 16px;
-  font-weight: 600;
-}
-
-.message--success {
-  background: #ecfdf5;
-  color: #0f766e;
-}
-
-.message--error {
-  background: #fef2f2;
-  color: #b91c1c;
 }
 
 .login-form {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 18px;
 }
 
-.login-form__field {
-  display: grid;
-  gap: 10px;
+.login-form__group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .login-form__label {
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   color: #334155;
-}
-
-.login-form__input-group {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  align-items: center;
-  gap: 12px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 16px;
-  padding: 12px 16px;
-}
-
-.login-form__icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 12px;
-  background: #e0efff;
-  color: #1d4ed8;
-  font-size: 0.95rem;
 }
 
 .login-form__input {
   width: 100%;
-  border: none;
-  background: transparent;
-  font-size: 15px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 14px;
   color: #0f172a;
-  outline: none;
-  min-height: 44px;
+  background: #ffffff;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .login-form__input::placeholder {
   color: #94a3b8;
 }
 
-.login-form__meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
-.login-form__checkbox {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 14px;
-  color: #475569;
-}
-
-.login-form__checkbox input {
-  width: 16px;
-  height: 16px;
-  accent-color: #2563eb;
-}
-
-.login-form__forgot {
-  border: none;
-  background: transparent;
-  color: #1d4ed8;
-  font-size: 14px;
-  font-weight: 700;
-  cursor: pointer;
+.login-form__input:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
 }
 
 .login-form__button {
-  width: 100%;
   border: none;
-  border-radius: 16px;
-  padding: 16px;
+  border-radius: 10px;
+  margin-top: 4px;
+  padding: 12px;
   font-weight: 700;
-  font-size: 15px;
+  font-size: 14px;
   color: #ffffff;
-  background: linear-gradient(90deg, #1d4ed8 0%, #2563eb 100%);
+  background: linear-gradient(90deg, #2563eb 0%, #1d4ed8 100%);
   cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition: transform 0.2s, box-shadow 0.2s, filter 0.2s;
 }
 
 .login-form__button:hover {
   transform: translateY(-1px);
-  box-shadow: 0 16px 30px rgba(37, 99, 235, 0.18);
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.35);
 }
 
 .login-form__button:disabled {
-  opacity: 0.7;
+  opacity: 0.65;
   cursor: not-allowed;
   transform: none;
   box-shadow: none;
-}
-
-.login-page__footer-note {
-  margin-top: 24px;
-  font-size: 13px;
-  color: #64748b;
-  line-height: 1.75;
-}
-
-@media (max-width: 640px) {
-  .login-card {
-    padding: 28px 20px;
-  }
 }

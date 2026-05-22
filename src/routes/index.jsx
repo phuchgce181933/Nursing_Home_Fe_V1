@@ -1,7 +1,9 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
-import HomePage from '../pages/HomePage';
 import LoginPage from '../pages/LoginPage';
+import HomePage from '../pages/HomePage';
+import ProfilePage from '../pages/ProfilePage';
 import PlaceholderPage from '../pages/PlaceholderPage';
+import AdminLayout from '../layouts/AdminLayout';
 import RoleLayout from '../layouts/RoleLayout';
 import DashboardPage from '../pages/admin/DashboardPage';
 import ResidentPage from '../pages/admin/ResidentPage';
@@ -9,19 +11,29 @@ import AdminProfile from '../pages/admin/AdminProfile';
 import DoctorDashboardPage from '../pages/doctor/DoctorDashboardPage';
 import NurseDashboardPage from '../pages/nurse/NurseDashboardPage';
 import FamilyDashboardPage from '../pages/family/FamilyDashboardPage';
+import SubmitAdmissionPage from '../pages/family/SubmitAdmissionPage';
+import AdmissionRequestsHistoryPage from '../pages/family/AdmissionRequestsHistoryPage';
 import ProtectedRoute from '../components/ProtectedRoute';
 
 function AppRoutes() {
   return (
     <Routes>
-      <Route path="/" element={<HomePage />} />
       <Route path="/login" element={<LoginPage />} />
+
+      <Route
+        path="/profile"
+        element={
+          <ProtectedRoute>
+            <ProfilePage />
+          </ProtectedRoute>
+        }
+      />
 
       <Route
         path="/admin/*"
         element={
           <ProtectedRoute requiredRole="admin">
-            <RoleLayout />
+            <AdminLayout />
           </ProtectedRoute>
         }
       >
@@ -63,6 +75,15 @@ function AppRoutes() {
       </Route>
 
       <Route
+        path="/family/admission-requests/new"
+        element={
+          <ProtectedRoute requiredRole="family">
+            <SubmitAdmissionPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
         path="/family/*"
         element={
           <ProtectedRoute requiredRole="family">
@@ -72,11 +93,13 @@ function AppRoutes() {
       >
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<FamilyDashboardPage />} />
+        <Route path="admission-requests" element={<AdmissionRequestsHistoryPage />} />
         <Route path="resident" element={<PlaceholderPage title="Hồ sơ người thân" />} />
         <Route path="notifications" element={<PlaceholderPage title="Thông báo" />} />
         <Route path="messages" element={<PlaceholderPage title="Tin nhắn" />} />
       </Route>
 
+      <Route path="/" element={<HomePage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

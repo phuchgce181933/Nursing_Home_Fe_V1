@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { sidebarData } from "./roleSidebarData";
+import { sidebarData } from "./sidebarData";
 
 function Sidebar({ items = sidebarData }) {
   return (

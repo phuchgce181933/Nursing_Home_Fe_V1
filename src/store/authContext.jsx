@@ -7,11 +7,14 @@ export const AuthContext = createContext(null);
 export function AuthProvider({ children }) {
   const [token, setToken] = useState(getAuthToken());
   const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(!!getAuthToken());
 
   useEffect(() => {
     const loadProfile = async () => {
-      if (!token) return;
+      if (!token) {
+        setLoading(false);
+        return;
+      }
       setLoading(true);
       try {
         const profile = await authService.fetchProfile();
@@ -23,7 +26,12 @@ export function AuthProvider({ children }) {
         setLoading(false);
       }
     };
-    loadProfile();
+
+    if (token && !user) {
+      loadProfile();
+    } else {
+      setLoading(false);
+    }
   }, [token]);
 
   const login = async (credentials) => {
@@ -33,12 +41,6 @@ export function AuthProvider({ children }) {
     return data;
   };
 
-  const updateProfile = async (profileData) => {
-    const updatedUser = await authService.updateProfile(profileData);
-    setUser((prev) => ({ ...prev, ...updatedUser }));
-    return updatedUser;
-  };
-
   const logout = () => {
     authService.logout();
     setToken(null);
@@ -46,7 +48,7 @@ export function AuthProvider({ children }) {
   };
 
   const value = useMemo(
-    () => ({ token, user, loading, login, logout, updateProfile }),
+    () => ({ token, user, loading, login, logout }),
     [token, user, loading]
   );
 

@@ -12,11 +12,6 @@ const fetchProfile = async () => {
   return response.data;
 };
 
-const updateProfile = async (data) => {
-  const response = await axiosClient.put('/auth/profile', data);
-  return response.data;
-};
-
 const logout = () => {
   removeAuthToken();
 };
@@ -24,6 +19,5 @@ const logout = () => {
 export default {
   login,
   fetchProfile,
-  updateProfile,
   logout,
 };
