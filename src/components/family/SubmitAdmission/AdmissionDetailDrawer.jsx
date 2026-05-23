@@ -1845,7 +1845,7 @@ export default function AdmissionDetailDrawer({
 
               <div className="bg-slate-50 border border-slate-100 p-3 rounded-xl mb-4">
                 <p className="text-xs text-[#1B365D] font-medium leading-relaxed">
-                  <strong>💡 Business Rule Note:</strong> Bed and Room ObjectIds must be valid 24-character hexadecimal strings if entered. Leave them empty to proceed with general check-in (both default to <code>null</code>).
+                  <strong>Business Rule Note:</strong> Bed and Room ObjectIds must be valid 24-character hexadecimal strings if entered. Leave them empty to proceed with general check-in (both default to <code>null</code>).
                 </p>
               </div>
 

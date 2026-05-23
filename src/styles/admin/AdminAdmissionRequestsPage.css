@@ -570,18 +570,28 @@
 }
 
 .arh-modal__title {
-  font-size: 20px;
-  font-weight: 800;
-  color: #1b365d;
+  font-size: 18px !important;
+  font-weight: 700 !important;
+  color: #1b365d !important;
   margin-bottom: 12px;
-  letter-spacing: -0.02em;
+  letter-spacing: normal !important;
 }
 
 .arh-modal__text {
-  font-size: 14px;
-  color: #64748b;
-  line-height: 1.6;
-  margin-bottom: 20px;
+  font-size: 13.5px !important;
+  color: #64748b !important;
+  line-height: 1.5;
+  margin-bottom: 22px;
+}
+
+.arh-modal label {
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  color: #475569 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.06em !important;
+  margin-bottom: 8px !important;
+  display: block !important;
 }
 
 .arh-modal__textarea {
