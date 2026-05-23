@@ -1,15 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, Loader2 } from 'lucide-react';
+import { Search, Loader2, Grid, List, Activity, Check, CheckCircle } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import servicePackageService from '../../services/servicePackage.service';
-import '../../styles/admin/AdminAdmissionRequestsPage.css'; // Reuse premium healthcare styles
+import '../../styles/admin/ServicePackagesPage.css'; // Premium care plans styling sheet
 
 const TIER_OPTIONS = [
   { value: '', label: 'All Tiers' },
-  { value: 'basic', label: 'Basic' },
-  { value: 'standard', label: 'Standard' },
-  { value: 'premium', label: 'Premium' },
-  { value: 'vip', label: 'VIP' },
+  { value: 'basic', label: 'Basic Level' },
+  { value: 'standard', label: 'Standard Level' },
+  { value: 'premium', label: 'Premium Level' },
+  { value: 'vip', label: 'VIP Level' },
 ];
 
 const ACTIVE_OPTIONS = [
@@ -27,18 +27,28 @@ export default function ServicePackagesPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // View style toggle: 'grid' (SaaS care cards) or 'table' (administrative row data)
+  const [viewType, setViewType] = useState('grid');
+
   // Pagination states
   const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(10);
+  const [limit, setLimit] = useState(20); // Show more items in grid view
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
+
+  // Stats counters
+  const [stats, setStats] = useState({
+    totalPlans: 0,
+    activePlans: 0,
+    vipPremiumPlans: 0,
+  });
 
   // Filter states
   const [search, setSearch] = useState('');
   const [tier, setTier] = useState('');
-  const [isActive, setIsActive] = useState('true'); // Default filter to show active packages
+  const [isActive, setIsActive] = useState('true'); // Default filter to active packages
 
-  // Applied filters for query
+  // Applied filters
   const [appliedFilters, setAppliedFilters] = useState({
     search: '',
     tier: '',
@@ -78,9 +88,18 @@ export default function ServicePackagesPage() {
       setData(res?.data || []);
       setTotal(res?.total || 0);
       setTotalPages(res?.totalPages || 1);
+
+      // Compute statistics dynamically from the loaded dataset
+      if (res?.data) {
+        setStats({
+          totalPlans: res.total || 0,
+          activePlans: res.data.filter(x => x.isActive).length,
+          vipPremiumPlans: res.data.filter(x => ['premium', 'vip'].includes(x.tier)).length,
+        });
+      }
     } catch (err) {
       console.error('Failed to fetch service packages:', err);
-      setError('Could not retrieve service packages. Please check your network or privileges.');
+      setError('Could not retrieve service packages. Please check your privileges or network connection.');
     } finally {
       setLoading(false);
     }
@@ -106,7 +125,7 @@ export default function ServicePackagesPage() {
     setAppliedFilters({ search: '', tier: '', isActive: 'true' });
   };
 
-  // Load details
+  // Load details modal
   const handleOpenDetail = async (pkgId) => {
     try {
       setError(null);
@@ -234,31 +253,61 @@ export default function ServicePackagesPage() {
     }
   };
 
-  const getTierBadgeClass = (tierVal) => {
+  const getTierTagClass = (tierVal) => {
     switch (tierVal) {
       case 'basic':
-        return 'assess-badge-adm--pending';
+        return 'sp-tier-tag--basic';
       case 'standard':
-        return 'status-badge-custom-adm--consulting';
+        return 'sp-tier-tag--standard';
       case 'premium':
-        return 'assess-badge-adm--eligible';
+        return 'sp-tier-tag--premium';
       case 'vip':
-        return 'status-badge-custom-adm--contracting';
+        return 'sp-tier-tag--vip';
       default:
-        return 'assess-badge-adm--pending';
+        return 'sp-tier-tag--basic';
+    }
+  };
+
+  const getDossierHeaderClass = (tierVal) => {
+    switch (tierVal) {
+      case 'basic':
+        return 'dossier-header--basic';
+      case 'standard':
+        return 'dossier-header--standard';
+      case 'premium':
+        return 'dossier-header--premium';
+      case 'vip':
+        return 'dossier-header--vip';
+      default:
+        return 'dossier-header--basic';
+    }
+  };
+
+  const getCardHeaderClass = (tierVal) => {
+    switch (tierVal) {
+      case 'basic':
+        return 'sp-card__header--basic';
+      case 'standard':
+        return 'sp-card__header--standard';
+      case 'premium':
+        return 'sp-card__header--premium';
+      case 'vip':
+        return 'sp-card__header--vip';
+      default:
+        return 'sp-card__header--basic';
     }
   };
 
   return (
-    <div className="adm-container">
+    <div className="sp-container">
       {/* Top Banner Header */}
-      <div className="adm-header">
+      <div className="sp-header">
         <div>
           <h1>Care Service Packages</h1>
           <p>
             {isAdmin
-              ? 'Create, modify, view, and manage care packages for residents.'
-              : 'View and check care service package details.'}
+              ? 'Configure, manage, and monitor residential care packages for elderly residents.'
+              : 'Review standard medical and care service packages.'}
           </p>
         </div>
         {isAdmin && (
@@ -267,24 +316,57 @@ export default function ServicePackagesPage() {
               resetForm();
               setShowCreateModal(true);
             }}
-            className="adm-btn-apply"
-            style={{ borderRadius: '12px' }}
+            className="sp-btn-edit"
+            style={{ borderRadius: '12px', padding: '12px 24px' }}
           >
             Create New Package
           </button>
         )}
       </div>
 
-      {/* Filter Panel */}
-      <div className="adm-filter-panel">
-        <form onSubmit={handleApplyFilters}>
-          <div className="adm-filter-grid">
-            <div className="adm-filter-group">
+      {/* Stats Dashboard Banner */}
+      <div className="sp-stats-grid">
+        <div className="sp-stat-card">
+          <div className="sp-stat-icon-wrapper">
+            <Activity size={20} />
+          </div>
+          <div className="sp-stat-info">
+            <span className="sp-stat-label">Total Care Plans</span>
+            <span className="sp-stat-value">{stats.totalPlans}</span>
+          </div>
+        </div>
+
+        <div className="sp-stat-card active">
+          <div className="sp-stat-icon-wrapper">
+            <CheckCircle size={20} />
+          </div>
+          <div className="sp-stat-info">
+            <span className="sp-stat-label">Active Plans</span>
+            <span className="sp-stat-value">{stats.activePlans}</span>
+          </div>
+        </div>
+
+        <div className="sp-stat-card">
+          <div className="sp-stat-icon-wrapper">
+            <span className="font-bold text-xs">VIP</span>
+          </div>
+          <div className="sp-stat-info">
+            <span className="sp-stat-label">VIP & Premium</span>
+            <span className="sp-stat-value">{stats.vipPremiumPlans}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Filter and View Toggle bar */}
+      <div className="sp-action-bar">
+        <div className="sp-filter-row">
+          <form onSubmit={handleApplyFilters} className="flex flex-wrap gap-3 items-center w-full">
+            <div className="adm-filter-group" style={{ minWidth: '240px' }}>
               <div className="adm-filter-input-wrapper">
                 <Search className="adm-filter-input-icon" size={16} />
                 <input
                   type="text"
-                  placeholder="Search by name or code..."
+                  placeholder="Search name or package code..."
                   className="adm-filter-input"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
@@ -292,7 +374,7 @@ export default function ServicePackagesPage() {
               </div>
             </div>
 
-            <div className="adm-filter-group">
+            <div className="adm-filter-group" style={{ minWidth: '160px' }}>
               <select
                 className="adm-filter-select"
                 value={tier}
@@ -306,7 +388,7 @@ export default function ServicePackagesPage() {
               </select>
             </div>
 
-            <div className="adm-filter-group">
+            <div className="adm-filter-group" style={{ minWidth: '160px' }}>
               <select
                 className="adm-filter-select"
                 value={isActive}
@@ -319,21 +401,46 @@ export default function ServicePackagesPage() {
                 ))}
               </select>
             </div>
-          </div>
 
-          <div className="flex justify-end gap-3 border-t border-slate-100 pt-4 mt-4">
-            <button
-              type="button"
-              onClick={handleResetFilters}
-              className="adm-btn-clear"
-            >
-              Reset Filters
-            </button>
-            <button type="submit" className="adm-btn-apply">
-              Apply Filters
-            </button>
-          </div>
-        </form>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={handleResetFilters}
+                className="adm-btn-clear"
+                style={{ padding: '10px 18px' }}
+              >
+                Reset
+              </button>
+              <button
+                type="submit"
+                className="adm-btn-apply"
+                style={{ padding: '10px 20px', background: '#1B365D' }}
+              >
+                Apply Filters
+              </button>
+            </div>
+          </form>
+        </div>
+
+        {/* View Toggle (Grid / Table) */}
+        <div className="sp-view-toggle">
+          <button
+            onClick={() => setViewType('grid')}
+            className={`sp-toggle-btn ${viewType === 'grid' ? 'is-active' : ''}`}
+            title="Grid View"
+          >
+            <Grid size={15} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'text-bottom' }} />
+            Grid Card
+          </button>
+          <button
+            onClick={() => setViewType('table')}
+            className={`sp-toggle-btn ${viewType === 'table' ? 'is-active' : ''}`}
+            title="Table View"
+          >
+            <List size={15} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'text-bottom' }} />
+            Table Rows
+          </button>
+        </div>
       </div>
 
       {/* Content Body */}
@@ -343,17 +450,89 @@ export default function ServicePackagesPage() {
         </div>
       )}
 
-      <div className="adm-table-card">
-        {loading && data.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-slate-400">
-            <Loader2 className="animate-spin text-indigo-600 mb-3" size={32} />
-            <p>Loading care service packages...</p>
-          </div>
-        ) : data.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-slate-400">
-            <p className="font-medium">No service packages found matching filters.</p>
-          </div>
-        ) : (
+      {loading && data.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-24 text-slate-400">
+          <Loader2 className="animate-spin text-indigo-600 mb-3" size={32} />
+          <p>Loading care service packages...</p>
+        </div>
+      ) : data.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 text-slate-400 bg-white border border-slate-100 rounded-2xl">
+          <p className="font-medium">No service packages found matching filters.</p>
+        </div>
+      ) : viewType === 'grid' ? (
+        /* GORGEOUS PREMIUM CARE PLANS GRID VIEW */
+        <div className="sp-card-grid">
+          {data.map((pkg) => (
+            <div key={pkg._id} className="sp-card">
+              <div className={`sp-card__header ${getCardHeaderClass(pkg.tier)}`}>
+                <span className="sp-card__code">{pkg.packageCode || 'PKG-SERVICE'}</span>
+                <div className="sp-card__title-row">
+                  <span className="sp-card__title">{pkg.name}</span>
+                  <span className={`sp-tier-tag ${getTierTagClass(pkg.tier)}`}>
+                    {pkg.tier}
+                  </span>
+                </div>
+              </div>
+
+              <div className="sp-card__body">
+                <span className="sp-card__price-label">Pricing Rate</span>
+                <p className="sp-card__price">
+                  {pkg.monthlyPrice?.toLocaleString() || 0}
+                  <span>VND / month</span>
+                </p>
+
+                <p className="sp-card__desc">
+                  {pkg.description || 'Comprehensive clinical care and daily living assistance for residents.'}
+                </p>
+
+                <div className="sp-card__divider" />
+
+                <span className="sp-card__services-title">Services Included</span>
+                <div className="sp-card__services-list">
+                  {pkg.services && pkg.services.slice(0, 4).map((s, idx) => (
+                    <div key={idx} className="sp-card__service-item">
+                      <Check size={13} className="sp-card__service-bullet" />
+                      <span>{s}</span>
+                    </div>
+                  ))}
+                  {pkg.services && pkg.services.length > 4 && (
+                    <span className="text-[11.5px] text-[#2D6A4F] font-bold italic mt-1 pl-5">
+                      +{pkg.services.length - 4} other clinical features
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="sp-card__footer">
+                <button
+                  onClick={() => handleOpenDetail(pkg._id)}
+                  className="sp-btn-view"
+                >
+                  View Details
+                </button>
+                {isAdmin && pkg.isActive && (
+                  <>
+                    <button
+                      onClick={() => handleOpenEdit(pkg)}
+                      className="sp-btn-edit"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDeletePackage(pkg._id, pkg.name)}
+                      className="sp-btn-deactivate"
+                    >
+                      Deactivate
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        /* PROFESSIONAL ADMINISTRATIVE TABLE VIEW */
+        <div className="adm-table-card">
           <div className="adm-table-responsive">
             <table className="adm-table">
               <thead>
@@ -381,7 +560,7 @@ export default function ServicePackagesPage() {
                     >
                       <div className="flex items-center gap-2">
                         <span>{pkg.name}</span>
-                        <span className={`status-badge-custom-adm ${getTierBadgeClass(pkg.tier)}`}>
+                        <span className={`sp-tier-tag ${getTierTagClass(pkg.tier)}`}>
                           {pkg.tier}
                         </span>
                       </div>
@@ -423,8 +602,8 @@ export default function ServicePackagesPage() {
                       <div className="flex gap-2">
                         <button
                           onClick={() => handleOpenDetail(pkg._id)}
-                          className="adm-btn-clear"
-                          style={{ padding: '6px 12px', fontSize: '11px', borderRadius: '8px' }}
+                          className="sp-btn-view"
+                          style={{ padding: '6px 12px', fontSize: '12px', borderRadius: '8px' }}
                         >
                           View
                         </button>
@@ -432,15 +611,15 @@ export default function ServicePackagesPage() {
                           <>
                             <button
                               onClick={() => handleOpenEdit(pkg)}
-                              className="adm-btn-apply"
-                              style={{ padding: '6px 12px', fontSize: '11px', borderRadius: '8px', boxShadow: 'none' }}
+                              className="sp-btn-edit"
+                              style={{ padding: '6px 12px', fontSize: '12px', borderRadius: '8px' }}
                             >
                               Edit
                             </button>
                             <button
                               onClick={() => handleDeletePackage(pkg._id, pkg.name)}
-                              className="arh-drawer__btn arh-drawer__btn--cancel"
-                              style={{ padding: '6px 12px', fontSize: '11px', borderRadius: '8px', minHeight: 'unset' }}
+                              className="sp-btn-deactivate"
+                              style={{ padding: '6px 12px', fontSize: '12px', borderRadius: '8px' }}
                             >
                               Deactivate
                             </button>
@@ -453,94 +632,92 @@ export default function ServicePackagesPage() {
               </tbody>
             </table>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Pagination Footer */}
-        {totalPages > 1 && (
-          <div className="adm-pagination-footer">
-            <div className="pagination-info">
-              Showing page <span>{page}</span> of <span>{totalPages}</span> ({total} total packages)
-            </div>
-            <div className="pagination-controls">
-              <button
-                disabled={page === 1 || loading}
-                onClick={() => setPage(page - 1)}
-                className="btn-page"
-              >
-                Prev
-              </button>
-              <span className="page-indicator">{page}</span>
-              <button
-                disabled={page === totalPages || loading}
-                onClick={() => setPage(page + 1)}
-                className="btn-page"
-              >
-                Next
-              </button>
-            </div>
+      {/* Pagination Footer */}
+      {totalPages > 1 && (
+        <div className="adm-pagination-footer" style={{ borderRadius: '16px', background: '#ffffff', border: '1px solid #e2e8f0' }}>
+          <div className="pagination-info">
+            Showing page <span>{page}</span> of <span>{totalPages}</span> ({total} total packages)
           </div>
-        )}
-      </div>
+          <div className="pagination-controls">
+            <button
+              disabled={page === 1 || loading}
+              onClick={() => setPage(page - 1)}
+              className="btn-page"
+            >
+              Prev
+            </button>
+            <span className="page-indicator">{page}</span>
+            <button
+              disabled={page === totalPages || loading}
+              onClick={() => setPage(page + 1)}
+              className="btn-page"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
 
-      {/* Package Detail Modal */}
+      {/* GORGEOUS MEDICAL CARE PLAN DOSSIER (Detail Modal Overlay) */}
       {showDetailModal && selectedPackage && (
         <div className="arh-modal-backdrop" onClick={() => setShowDetailModal(false)}>
-          <div className="arh-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-between items-center w-full mb-3">
-              <h4 className="arh-modal__title">{selectedPackage.name}</h4>
-              <span className={`status-badge-custom-adm ${getTierBadgeClass(selectedPackage.tier)}`}>
-                {selectedPackage.tier}
-              </span>
-            </div>
-            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-4">
-              Code: {selectedPackage.packageCode}
-            </p>
-
-            <div className="mb-4">
-              <label className="block text-xs font-bold text-[#1B365D] mb-1.5 uppercase tracking-wide">
-                Price per Month
-              </label>
-              <p className="text-lg font-bold text-[#1B365D] bg-[#1B365D]/5 px-3 py-2 rounded-xl border border-[#1B365D]/10">
-                {selectedPackage.monthlyPrice?.toLocaleString()} VND
-              </p>
+          <div className="arh-modal dossier-modal" onClick={(e) => e.stopPropagation()}>
+            {/* Header with custom tier background gradient */}
+            <div className={`dossier-header ${getDossierHeaderClass(selectedPackage.tier)}`}>
+              <span className="dossier-header__code">Dossier: {selectedPackage.packageCode || 'PKG-DOSSIER'}</span>
+              <div className="dossier-header__title-row">
+                <h3 className="dossier-header__title">{selectedPackage.name}</h3>
+                <span className="dossier-header__tag">{selectedPackage.tier}</span>
+              </div>
             </div>
 
-            <div className="mb-4">
-              <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wide">
-                Description
-              </label>
-              <p className="text-sm text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-100 italic">
-                {selectedPackage.description || 'No description provided.'}
-              </p>
-            </div>
+            {/* Content Body (Clean clinical grid, no crude text boxes!) */}
+            <div className="dossier-body">
+              {/* Premium Pricing Highlight Panel */}
+              <div className="dossier-price-panel">
+                <span className="dossier-price-label">Price per Month</span>
+                <span className="dossier-price-value">
+                  {selectedPackage.monthlyPrice?.toLocaleString()} <span>VND</span>
+                </span>
+              </div>
 
-            <div className="mb-6">
-              <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">
-                Services Included
-              </label>
-              {selectedPackage.services && selectedPackage.services.length > 0 ? (
-                <div className="flex flex-col gap-2 max-h-40 overflow-y-auto">
-                  {selectedPackage.services.map((srv, i) => (
-                    <div
-                      key={i}
-                      className="text-xs text-slate-700 bg-slate-50 border border-slate-100 px-3 py-2 rounded-lg font-sans"
-                    >
-                      • {srv}
+              {/* Italic plan description dossier block */}
+              <span className="dossier-section-title">Care Description</span>
+              <div className="dossier-desc">
+                "{selectedPackage.description || 'Standard specialized clinical services, health monitoring, and cognitive assistance designated for elderly care.'}"
+              </div>
+
+              {/* Included services with checkmark bullets */}
+              <span className="dossier-section-title">Included Medical Services</span>
+              <div className="dossier-services-box">
+                {selectedPackage.services && selectedPackage.services.length > 0 ? (
+                  selectedPackage.services.map((srv, i) => (
+                    <div key={i} className="dossier-service-row">
+                      <span className="dossier-service-bullet">
+                        <Check size={14} strokeWidth={3} />
+                      </span>
+                      <span>{srv}</span>
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-xs text-slate-400 italic">No services listed.</p>
-              )}
-            </div>
+                  ))
+                ) : (
+                  <p className="text-xs text-slate-400 italic py-3 text-center">No services specified for this care tier.</p>
+                )}
+              </div>
 
-            <button
-              className="adm-btn-clear w-full"
-              style={{ padding: '10px 24px', borderRadius: '20px' }}
-              onClick={() => setShowDetailModal(false)}
-            >
-              Close Details
-            </button>
+              {/* dossier footer with unified button */}
+              <div className="dossier-footer">
+                <button
+                  type="button"
+                  className="sp-btn-close-dossier"
+                  onClick={() => setShowDetailModal(false)}
+                >
+                  Close Dossier
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -549,9 +726,9 @@ export default function ServicePackagesPage() {
       {showCreateModal && (
         <div className="arh-modal-backdrop" onClick={() => setShowCreateModal(false)}>
           <div className="arh-modal" style={{ maxWidth: '600px' }} onClick={(e) => e.stopPropagation()}>
-            <h4 className="arh-modal__title">Create Service Care Package</h4>
+            <h4 className="arh-modal__title">Create Care Plan Package</h4>
             <p className="arh-modal__text">
-              Create a new care service plan with specific tier pricing and features.
+              Create a new specialized healthcare service package for active admissions.
             </p>
 
             <form onSubmit={handleCreatePackage}>
@@ -569,7 +746,7 @@ export default function ServicePackagesPage() {
                   type="text"
                   className="adm-filter-input"
                   style={{ paddingLeft: '14px' }}
-                  placeholder="e.g. Premium Health Plan"
+                  placeholder="e.g. Standard Clinical Care Plan"
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
                   required
@@ -586,10 +763,10 @@ export default function ServicePackagesPage() {
                     value={formTier}
                     onChange={(e) => setFormTier(e.target.value)}
                   >
-                    <option value="basic">Basic</option>
-                    <option value="standard">Standard</option>
-                    <option value="premium">Premium</option>
-                    <option value="vip">VIP</option>
+                    <option value="basic">Basic Level</option>
+                    <option value="standard">Standard Level</option>
+                    <option value="premium">Premium Level</option>
+                    <option value="vip">VIP Level</option>
                   </select>
                 </div>
                 <div>
@@ -613,7 +790,7 @@ export default function ServicePackagesPage() {
                 <textarea
                   className="arh-modal__textarea"
                   style={{ minHeight: '60px' }}
-                  placeholder="Short summary of this care plan..."
+                  placeholder="Summarize care features, target health requirements..."
                   value={formDescription}
                   onChange={(e) => setFormDescription(e.target.value)}
                 />
@@ -625,8 +802,8 @@ export default function ServicePackagesPage() {
                 </label>
                 <textarea
                   className="arh-modal__textarea"
-                  style={{ minHeight: '100px', fontFamily: 'monospace' }}
-                  placeholder="e.g.&#10;24/7 Nursing Support&#10;Daily Health Monitoring&#10;Physical Therapy Sessions"
+                  style={{ minHeight: '120px', fontFamily: 'monospace' }}
+                  placeholder="e.g.&#10;Specialized Geriatric Assessment&#10;Geriatric Nurse Support 24/7&#10;Clinical Medication Administration"
                   value={formServices}
                   onChange={(e) => setFormServices(e.target.value)}
                 />
@@ -647,12 +824,12 @@ export default function ServicePackagesPage() {
                 </button>
                 <button
                   type="submit"
-                  className="adm-btn-apply flex-1 justify-center"
-                  style={{ borderRadius: '20px', padding: '10px', backgroundColor: '#1B365D' }}
+                  className="sp-btn-edit flex-1 justify-center"
+                  style={{ borderRadius: '20px', padding: '10px' }}
                   disabled={submitting}
                 >
                   {submitting && <Loader2 className="animate-spin mr-1" size={13} />}
-                  Create Package
+                  Create Plan
                 </button>
               </div>
             </form>
@@ -664,9 +841,9 @@ export default function ServicePackagesPage() {
       {showEditModal && selectedPackage && (
         <div className="arh-modal-backdrop" onClick={() => setShowEditModal(false)}>
           <div className="arh-modal" style={{ maxWidth: '600px' }} onClick={(e) => e.stopPropagation()}>
-            <h4 className="arh-modal__title">Edit Care Package</h4>
+            <h4 className="arh-modal__title">Modify Care Plan Package</h4>
             <p className="arh-modal__text">
-              Modify details for <strong className="text-slate-800">{selectedPackage.name}</strong>.
+              Edit pricing details and features for <strong className="text-slate-800">{selectedPackage.name}</strong>.
             </p>
 
             <form onSubmit={handleUpdatePackage}>
@@ -700,10 +877,10 @@ export default function ServicePackagesPage() {
                     value={formTier}
                     onChange={(e) => setFormTier(e.target.value)}
                   >
-                    <option value="basic">Basic</option>
-                    <option value="standard">Standard</option>
-                    <option value="premium">Premium</option>
-                    <option value="vip">VIP</option>
+                    <option value="basic">Basic Level</option>
+                    <option value="standard">Standard Level</option>
+                    <option value="premium">Premium Level</option>
+                    <option value="vip">VIP Level</option>
                   </select>
                 </div>
                 <div>
@@ -738,7 +915,7 @@ export default function ServicePackagesPage() {
                 </label>
                 <textarea
                   className="arh-modal__textarea"
-                  style={{ minHeight: '100px', fontFamily: 'monospace' }}
+                  style={{ minHeight: '120px', fontFamily: 'monospace' }}
                   value={formServices}
                   onChange={(e) => setFormServices(e.target.value)}
                 />
@@ -759,12 +936,12 @@ export default function ServicePackagesPage() {
                 </button>
                 <button
                   type="submit"
-                  className="adm-btn-apply flex-1 justify-center"
-                  style={{ borderRadius: '20px', padding: '10px', backgroundColor: '#1B365D' }}
+                  className="sp-btn-edit flex-1 justify-center"
+                  style={{ borderRadius: '20px', padding: '10px' }}
                   disabled={submitting}
                 >
                   {submitting && <Loader2 className="animate-spin mr-1" size={13} />}
-                  Update Package
+                  Update Plan
                 </button>
               </div>
             </form>
