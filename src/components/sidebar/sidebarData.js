@@ -48,6 +48,18 @@ export const sidebarData = [
   },
 
   {
+    title: "Admission Management",
+    icon: ClipboardList,
+    children: [
+      {
+        title: "Admission Requests",
+        path: "/admin/admission-requests",
+      },
+    ],
+  },
+
+
+  {
     title: "Buildings & Facilities",
     icon: Building2,
     children: [

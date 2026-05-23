@@ -15,6 +15,7 @@ import {
   CheckCircle,
 } from 'lucide-react';
 import admissionService from '../../../services/admission.service';
+import servicePackageService from '../../../services/servicePackage.service';
 
 const formatEnglishDate = (dateStr) => {
   if (!dateStr) return 'N/A';
@@ -56,7 +57,10 @@ const formatRelationship = (rel) => {
     anh_chi_em: 'Sibling',
     chau: 'Grandchild',
     bo_me: 'Parent',
-    khac: 'Other'
+    khac: 'Other',
+    bo: 'Father',
+    me: 'Mother',
+    con: 'Child'
   };
   const normalized = rel.toLowerCase().replace(/_/g, ' ').trim();
   if (mapping[normalized]) return mapping[normalized];
@@ -88,7 +92,11 @@ const formatAdmissionReason = (reason) => {
     daycare: 'Daycare',
     palliative_care: 'Palliative Care',
     assisted_living: 'Assisted Living',
-    memory_care: 'Memory Care'
+    memory_care: 'Memory Care',
+    'chăm sóc dài hạn': 'Long-term Care',
+    'điều trị phục hồi chức năng': 'Short-term Rehabilitation',
+    'nghỉ dưỡng ngắn hạn': 'Short-term Rehabilitation',
+    'khác': 'Other'
   };
   const normalized = reason.toLowerCase().replace(/_/g, ' ').trim();
   if (mapping[reason]) return mapping[reason];
@@ -134,6 +142,7 @@ export default function AdmissionDetailDrawer({
   onClose,
   admissionId,
   onCancelSuccess,
+  isAdmin = false,
 }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -141,6 +150,20 @@ export default function AdmissionDetailDrawer({
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancellationReason, setCancellationReason] = useState('');
   const [cancelling, setCancelling] = useState(false);
+
+  // Admin approval state
+  const [showApproveModal, setShowApproveModal] = useState(false);
+  const [packages, setPackages] = useState([]);
+  const [loadingPackages, setLoadingPackages] = useState(false);
+  const [selectedPackage, setSelectedPackage] = useState('');
+  const [adminNotes, setAdminNotes] = useState('');
+  const [approving, setApproving] = useState(false);
+  const [isOpenPackageDropdown, setIsOpenPackageDropdown] = useState(false);
+
+  // Admin rejection state
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState('');
+  const [rejecting, setRejecting] = useState(false);
 
   // Load details whenever admissionId changes
   useEffect(() => {
@@ -150,7 +173,9 @@ export default function AdmissionDetailDrawer({
       try {
         setLoading(true);
         setError(null);
-        const res = await admissionService.getAdmissionDetail(admissionId);
+        const res = isAdmin
+          ? await admissionService.adminGetAdmissionDetail(admissionId)
+          : await admissionService.getAdmissionDetail(admissionId);
         setAdmission(res?.admission || null);
       } catch (err) {
         console.error('Failed to load admission details:', err);
@@ -161,7 +186,25 @@ export default function AdmissionDetailDrawer({
     };
 
     fetchDetail();
-  }, [isOpen, admissionId]);
+  }, [isOpen, admissionId, isAdmin]);
+
+  // Load packages when approve modal opens
+  useEffect(() => {
+    if (showApproveModal) {
+      const fetchPackages = async () => {
+        try {
+          setLoadingPackages(true);
+          const res = await servicePackageService.getServicePackageList({ isActive: true }, 'admin');
+          setPackages(res?.data || []);
+        } catch (err) {
+          console.error('Failed to fetch service packages:', err);
+        } finally {
+          setLoadingPackages(false);
+        }
+      };
+      fetchPackages();
+    }
+  }, [showApproveModal]);
 
   if (!isOpen) return null;
 
@@ -178,7 +221,9 @@ export default function AdmissionDetailDrawer({
         onCancelSuccess();
       }
       // Reload details
-      const res = await admissionService.getAdmissionDetail(admissionId);
+      const res = isAdmin
+        ? await admissionService.adminGetAdmissionDetail(admissionId)
+        : await admissionService.getAdmissionDetail(admissionId);
       setAdmission(res?.admission || null);
     } catch (err) {
       console.error('Failed to cancel admission request:', err);
@@ -188,10 +233,70 @@ export default function AdmissionDetailDrawer({
     }
   };
 
-  // Determine if request is cancellable
+  const handleApproveRequest = async () => {
+    if (!admissionId) return;
+    try {
+      setApproving(true);
+      await admissionService.adminApproveAdmission(admissionId, {
+        assignedServicePackage: selectedPackage || undefined,
+        notes: adminNotes.trim() || undefined,
+      });
+      setShowApproveModal(false);
+      setSelectedPackage('');
+      setAdminNotes('');
+      if (onCancelSuccess) {
+        onCancelSuccess();
+      }
+      // Reload details
+      const res = await admissionService.adminGetAdmissionDetail(admissionId);
+      setAdmission(res?.admission || null);
+    } catch (err) {
+      console.error('Failed to approve request:', err);
+      alert(err.response?.data?.message || 'An error occurred while approving the request.');
+    } finally {
+      setApproving(false);
+    }
+  };
+
+  const handleRejectRequest = async () => {
+    if (!admissionId || !rejectionReason.trim()) return;
+    try {
+      setRejecting(true);
+      await admissionService.adminRejectAdmission(admissionId, {
+        rejectionReason: rejectionReason.trim(),
+      });
+      setShowRejectModal(false);
+      setRejectionReason('');
+      if (onCancelSuccess) {
+        onCancelSuccess();
+      }
+      // Reload details
+      const res = await admissionService.adminGetAdmissionDetail(admissionId);
+      setAdmission(res?.admission || null);
+    } catch (err) {
+      console.error('Failed to reject request:', err);
+      alert(err.response?.data?.message || 'An error occurred while rejecting the request.');
+    } finally {
+      setRejecting(false);
+    }
+  };
+
+  // Determine if request is cancellable (family mode)
   const isCancellable =
+    !isAdmin &&
     admission &&
     ['new_request', 'consulting', 'assessing', 'contracting'].includes(admission.status);
+
+  // Determine if request is approvable/rejectable (admin mode)
+  const isApprovable =
+    isAdmin &&
+    admission &&
+    ['new_request', 'consulting', 'assessing', 'contracting'].includes(admission.status);
+
+  const isRejectable =
+    isAdmin &&
+    admission &&
+    ['new_request', 'consulting', 'assessing'].includes(admission.status);
 
   // Dynamic timeline builder
   const getTimelineSteps = () => {
@@ -215,8 +320,8 @@ export default function AdmissionDetailDrawer({
         date: admission.consultedAt
           ? `${formatEnglishDate(admission.consultedAt)}`
           : admission.consultationScheduledAt
-          ? `Scheduled: ${formatEnglishDate(admission.consultationScheduledAt)}`
-          : '',
+            ? `Scheduled: ${formatEnglishDate(admission.consultationScheduledAt)}`
+            : '',
         isDone: ['assessing', 'contracting', 'checked_in'].includes(admission.status) || !!admission.consultedAt,
         isActive: admission.status === 'consulting',
       },
@@ -335,7 +440,7 @@ export default function AdmissionDetailDrawer({
 
                   {admission.status === 'cancelled' && (
                     <div className="arh-timeline__step is-cancelled">
-                      <div className="arh-timeline__dot" />
+                      <div className="arh-timeline__dot animate-pulse" />
                       <p className="arh-timeline__title">Request Cancelled</p>
                       <p className="arh-timeline__date">
                         Cancelled date: {formatEnglishDate(admission.cancelledAt || admission.updatedAt)}
@@ -364,13 +469,12 @@ export default function AdmissionDetailDrawer({
                             {step.title}
                           </p>
                           <div className="flex items-center gap-2 mt-0.5">
-                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider ${
-                              isDone
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider ${isDone
                                 ? 'bg-emerald-50 text-status-success'
                                 : isActive
-                                ? 'bg-indigo-50 text-navy-deep'
-                                : 'bg-slate-100 text-slate-400'
-                            }`}>
+                                  ? 'bg-indigo-50 text-navy-deep'
+                                  : 'bg-slate-100 text-slate-400'
+                              }`}>
                               {step.statusText}
                             </span>
                             {step.date && (
@@ -402,6 +506,12 @@ export default function AdmissionDetailDrawer({
                     <p className="arh-detail-item__value" style={{ marginTop: '4px', fontSize: '12.5px', color: '#475569', fontWeight: '500' }}>
                       {formatRelationship(admission.applicant?.relationshipToRequester)} • {admission.requestedByPhone || admission.familyAccount?.phone || 'N/A'}
                     </p>
+                    {isAdmin && admission.familyAccount && (
+                      <div className="text-[11.5px] text-slate-500 mt-2 font-medium bg-white/70 p-2 rounded border border-slate-100 flex flex-col gap-0.5">
+                        <div><strong>Username:</strong> {admission.familyAccount.username || 'N/A'}</div>
+                        <div><strong>Family Email:</strong> {admission.familyAccount.email || 'N/A'}</div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -508,6 +618,18 @@ export default function AdmissionDetailDrawer({
                 </div>
               )}
 
+              {/* Service Package Card (if assigned) */}
+              {admission.assignedServicePackage && (
+                <div className="arh-detail-card" style={{ borderLeft: '4px solid #2D6A4F', background: 'rgba(45, 106, 79, 0.03)' }}>
+                  <h5 className="arh-drawer__section-title" style={{ color: '#2D6A4F' }}>
+                    <CheckCircle size={16} /> ASSIGNED SERVICE PACKAGE
+                  </h5>
+                  <div className="mt-2 text-[13.5px] font-bold text-[#1B365D]">
+                    {admission.assignedServicePackage}
+                  </div>
+                </div>
+              )}
+
               {/* Extra Admission details */}
               <div className="arh-detail-card">
                 <h5 className="arh-drawer__section-title">
@@ -546,7 +668,37 @@ export default function AdmissionDetailDrawer({
 
         {/* Pinned Glass Layout Footer */}
         <div className="arh-drawer__footer">
-          {isCancellable ? (
+          {isAdmin ? (
+            <div className="flex gap-3 w-full">
+              {isRejectable && (
+                <button
+                  className="arh-drawer__btn arh-drawer__btn--cancel flex-1"
+                  onClick={() => setShowRejectModal(true)}
+                >
+                  <XCircle size={18} />
+                  Reject Request
+                </button>
+              )}
+              {isApprovable && (
+                <button
+                  className="arh-drawer__btn arh-drawer__btn--primary flex-1"
+                  style={{ background: '#2D6A4F' }}
+                  onClick={() => setShowApproveModal(true)}
+                >
+                  <CheckCircle size={18} />
+                  Approve Request
+                </button>
+              )}
+              {!isApprovable && !isRejectable && (
+                <button
+                  className="arh-drawer__btn arh-drawer__btn--primary w-full"
+                  onClick={onClose}
+                >
+                  Close Details
+                </button>
+              )}
+            </div>
+          ) : isCancellable ? (
             <button
               className="arh-drawer__btn arh-drawer__btn--cancel w-full"
               onClick={() => setShowCancelModal(true)}
@@ -603,8 +755,199 @@ export default function AdmissionDetailDrawer({
                 onClick={handleCancelRequest}
                 disabled={cancelling}
               >
-                {cancelling && <Loader2 className="animate-spin" size={13} />}
+                {cancelling && <Loader2 className="animate-spin mr-1" size={13} />}
                 Confirm Cancellation
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Admin Approve Modal */}
+      {showApproveModal && (
+        <div
+          className="arh-modal-backdrop"
+          onClick={() => {
+            setShowApproveModal(false);
+            setIsOpenPackageDropdown(false);
+          }}
+        >
+          <div
+            className="arh-modal"
+            onClick={(e) => {
+              e.stopPropagation();
+              // Đóng dropdown khi click vùng trống khác trong modal
+              if (isOpenPackageDropdown) setIsOpenPackageDropdown(false);
+            }}
+          >
+            <h4 className="arh-modal__title">Approve Admission Request</h4>
+            <p className="arh-modal__text">
+              You are approving the admission request for <strong className="text-slate-800">{admission?.applicant?.fullName}</strong>. This transitions the request to <span className="font-bold text-emerald-600">Contracting</span> and verifies health eligibility.
+            </p>
+
+            <div className="mb-4 relative">
+              <label className="block text-xs font-semibold text-slate-500 mb-2 font-sans tracking-wide">
+                Assign Care Service Package <span className="text-slate-400 font-normal italic text-[11px] ml-1">(optional)</span>
+              </label>
+              {loadingPackages ? (
+                <div className="flex items-center gap-2 py-2.5 text-xs text-slate-400">
+                  <Loader2 size={14} className="animate-spin" />
+                  <span>Loading active care packages...</span>
+                </div>
+              ) : (
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsOpenPackageDropdown(!isOpenPackageDropdown);
+                    }}
+                    className="w-full px-4 py-2.5 text-sm rounded-xl border border-slate-200 bg-white shadow-sm flex justify-between items-center cursor-pointer hover:border-slate-300 transition-all font-sans text-left"
+                    style={{ minHeight: '42px', fontFamily: "'Inter', sans-serif" }}
+                  >
+                    <span className="text-slate-700 font-medium">
+                      {selectedPackage || '-- No Care Package Assignment --'}
+                    </span>
+                    <span className="text-slate-400 text-xs transition-transform duration-200" style={{ transform: isOpenPackageDropdown ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+                      ▼
+                    </span>
+                  </button>
+
+                  {isOpenPackageDropdown && (
+                    <div
+                      className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-xl z-[1100] max-h-60 overflow-y-auto animate-fade-in"
+                      style={{ fontFamily: "'Inter', sans-serif", boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05)' }}
+                    >
+                      <div
+                        className="px-4 py-2 hover:bg-slate-50 cursor-pointer text-[10px] text-slate-400 font-bold border-b border-slate-100 transition-all uppercase tracking-wider text-center"
+                        onClick={() => {
+                          setSelectedPackage('');
+                          setIsOpenPackageDropdown(false);
+                        }}
+                      >
+                        -- Leave Empty (No Care Package) --
+                      </div>
+                      {packages.map((pkg) => (
+                        <div
+                          key={pkg._id}
+                          className="px-4 py-2 hover:bg-[#1B365D]/5 cursor-pointer border-b border-slate-100 last:border-b-0 flex flex-col gap-1 transition-all"
+                          onClick={() => {
+                            setSelectedPackage(pkg.name);
+                            setIsOpenPackageDropdown(false);
+                          }}
+                        >
+                          {/* Hàng 1: Tên dịch vụ bên trái, Tag Tier bên phải */}
+                          <div className="flex justify-between items-center w-full">
+                            <span className="text-[13px] font-medium text-[#1B365D] tracking-wide">
+                              {pkg.name}
+                            </span>
+                            <span className="font-medium uppercase text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-md text-[9px] tracking-wider border border-emerald-100 flex-shrink-0">
+                              {pkg.tier}
+                            </span>
+                          </div>
+
+                          {/* Hàng 2: Giá tiền nằm dưới, căn phải */}
+                          <div className="flex justify-end w-full">
+                            <span className="font-medium text-[#1B365D]/80 text-[11.5px] bg-slate-50 px-1.5 py-0.5 rounded-md border border-slate-100">
+                              {pkg.monthlyPrice?.toLocaleString()} VND / month
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
+                Administrative Notes
+              </label>
+              <textarea
+                className="arh-modal__textarea"
+                placeholder="Add special instructions, comments, or follow-up tasks..."
+                value={adminNotes}
+                onChange={(e) => setAdminNotes(e.target.value)}
+              />
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                className="adm-btn-clear flex-1"
+                style={{ borderRadius: '20px', padding: '10px 24px' }}
+                onClick={() => {
+                  setShowApproveModal(false);
+                  setSelectedPackage('');
+                  setAdminNotes('');
+                  setIsOpenPackageDropdown(false);
+                }}
+                disabled={approving}
+              >
+                Cancel
+              </button>
+              <button
+                className="adm-btn-apply flex-1 justify-center"
+                style={{ borderRadius: '20px', padding: '10px 24px', backgroundColor: '#1B365D' }}
+                onClick={handleApproveRequest}
+                disabled={approving}
+              >
+                {approving && <Loader2 className="animate-spin mr-1" size={13} />}
+                Confirm Approval
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Admin Reject Modal */}
+      {showRejectModal && (
+        <div
+          className="arh-modal-backdrop"
+          onClick={() => setShowRejectModal(false)}
+        >
+          <div
+            className="arh-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h4 className="arh-modal__title" style={{ color: '#ba1a1a' }}>Reject Admission Request</h4>
+            <p className="arh-modal__text">
+              You are rejecting the admission request for <strong className="text-slate-800">{admission?.applicant?.fullName}</strong>. This transitions the request to <span className="font-bold text-red-600">Cancelled</span> and marks them as ineligible.
+            </p>
+
+            <div className="mb-4">
+              <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
+                Rejection Reason (Mandatory)
+              </label>
+              <textarea
+                className="arh-modal__textarea"
+                style={{ border: '1px solid rgba(186, 26, 26, 0.25)' }}
+                placeholder="Enter details on why this application is rejected..."
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                className="arh-drawer__btn"
+                style={{ background: '#f1f5f9', color: '#475569' }}
+                onClick={() => {
+                  setShowRejectModal(false);
+                  setRejectionReason('');
+                }}
+                disabled={rejecting}
+              >
+                Cancel
+              </button>
+              <button
+                className="arh-drawer__btn arh-drawer__btn--cancel"
+                onClick={handleRejectRequest}
+                disabled={rejecting || !rejectionReason.trim()}
+              >
+                {rejecting && <Loader2 className="animate-spin mr-1" size={13} />}
+                Confirm Rejection
               </button>
             </div>
           </div>
