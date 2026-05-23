@@ -642,6 +642,26 @@
   display: block !important;
 }
 
+/* Perfect form spacing and button row layout inside modal */
+.arh-modal .mb-3,
+.arh-modal .mb-4,
+.arh-modal .mb-5 {
+  margin-bottom: 20px !important;
+}
+
+.arh-modal .grid {
+  display: grid !important;
+  grid-template-columns: repeat(2, 1fr) !important;
+  gap: 16px !important;
+  margin-bottom: 20px !important;
+}
+
+.arh-modal .flex.gap-3.pt-2,
+.arh-modal .flex.gap-3 {
+  margin-top: 24px !important;
+  padding-top: 0 !important;
+}
+
 .arh-modal__textarea {
   width: 100%;
   min-height: 100px;
