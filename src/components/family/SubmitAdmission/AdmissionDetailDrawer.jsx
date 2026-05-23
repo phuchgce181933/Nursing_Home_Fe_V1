@@ -14,6 +14,7 @@ import {
   Activity,
   CheckCircle,
 } from 'lucide-react';
+import { useAuth } from '../../../hooks/useAuth';
 import admissionService from '../../../services/admission.service';
 import servicePackageService from '../../../services/servicePackage.service';
 
@@ -144,6 +145,13 @@ export default function AdmissionDetailDrawer({
   onCancelSuccess,
   isAdmin = false,
 }) {
+  const { user } = useAuth();
+  const userRole = user?.role || '';
+  const isDoctorRole = userRole === 'doctor';
+  const isNurseRole = userRole === 'nurse';
+  const isAdminRole = ['admin', 'manager'].includes(userRole);
+  const isDoctorOrNurseRole = isDoctorRole || isNurseRole;
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [admission, setAdmission] = useState(null);
@@ -165,7 +173,56 @@ export default function AdmissionDetailDrawer({
   const [rejectionReason, setRejectionReason] = useState('');
   const [rejecting, setRejecting] = useState(false);
 
-  // Load details whenever admissionId changes
+  // New Workflow Action States
+  // 1. Assign Consultant
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [staffMembers, setStaffMembers] = useState([]);
+  const [loadingStaff, setLoadingStaff] = useState(false);
+  const [selectedStaffId, setSelectedStaffId] = useState('');
+  const [assigning, setAssigning] = useState(false);
+
+  // 2. Pre-admission Consultation
+  const [showConsultationModal, setShowConsultationModal] = useState(false);
+  const [consultationNotes, setConsultationNotes] = useState('');
+  const [consultationGenNotes, setConsultationGenNotes] = useState('');
+  const [recordingConsultation, setRecordingConsultation] = useState(false);
+
+  // 3. Initial Assessment Scheduling
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [scheduleDate, setScheduleDate] = useState('');
+  const [initialAssessmentNotes, setInitialAssessmentNotes] = useState('');
+  const [scheduleGenNotes, setScheduleGenNotes] = useState('');
+  const [scheduling, setScheduling] = useState(false);
+
+  // 4. Evaluate Admission Eligibility
+  const [showEligibilityModal, setShowEligibilityModal] = useState(false);
+  const [eligibilityStatus, setEligibilityStatus] = useState('eligible');
+  const [assessmentResult, setAssessmentResult] = useState('');
+  const [rejReason, setRejReason] = useState('');
+  const [eligibilityGenNotes, setEligibilityGenNotes] = useState('');
+  const [evaluating, setEvaluating] = useState(false);
+
+  // 5. Assign Service Package
+  const [showAssignPackageModal, setShowAssignPackageModal] = useState(false);
+  const [selectedPackageId, setSelectedPackageId] = useState('');
+  const [assigningPackage, setAssigningPackage] = useState(false);
+
+  // 6. Create Admission Contract
+  const [showContractModal, setShowContractModal] = useState(false);
+  const [contractNum, setContractNum] = useState('');
+  const [contractStart, setContractStart] = useState('');
+  const [contractEnd, setContractEnd] = useState('');
+  const [contractTerms, setContractTerms] = useState('');
+  const [contractGenNotes, setContractGenNotes] = useState('');
+  const [creatingContract, setCreatingContract] = useState(false);
+
+  // 7. Check-in Resident
+  const [showCheckInModal, setShowCheckInModal] = useState(false);
+  const [assignedBedHex, setAssignedBedHex] = useState('');
+  const [assignedRoomHex, setAssignedRoomHex] = useState('');
+  const [checkingIn, setCheckingIn] = useState(false);
+
+  // Load details whenever admissionId changes or role changes
   useEffect(() => {
     if (!isOpen || !admissionId) return;
 
@@ -173,7 +230,8 @@ export default function AdmissionDetailDrawer({
       try {
         setLoading(true);
         setError(null);
-        const res = isAdmin
+        // Cả admin, manager, doctor, nurse đều dùng chung route admin để đọc chi tiết nhờ BE đã mở quyền đọc
+        const res = (isAdmin || isDoctorOrNurseRole || isAdminRole)
           ? await admissionService.adminGetAdmissionDetail(admissionId)
           : await admissionService.getAdmissionDetail(admissionId);
         setAdmission(res?.admission || null);
@@ -186,11 +244,11 @@ export default function AdmissionDetailDrawer({
     };
 
     fetchDetail();
-  }, [isOpen, admissionId, isAdmin]);
+  }, [isOpen, admissionId, isAdmin, isDoctorOrNurseRole, isAdminRole]);
 
-  // Load packages when approve modal opens
+  // Load packages when approve modal or assign package modal opens
   useEffect(() => {
-    if (showApproveModal) {
+    if (showApproveModal || showAssignPackageModal) {
       const fetchPackages = async () => {
         try {
           setLoadingPackages(true);
@@ -204,7 +262,26 @@ export default function AdmissionDetailDrawer({
       };
       fetchPackages();
     }
-  }, [showApproveModal]);
+  }, [showApproveModal, showAssignPackageModal]);
+
+  // Load staff members when assign consultant modal opens
+  useEffect(() => {
+    if (showAssignModal) {
+      const fetchStaff = async () => {
+        try {
+          setLoadingStaff(true);
+          const res = await admissionService.getStaffList({ isActive: true });
+          const filtered = (res?.data || []).filter(x => ['doctor', 'nurse'].includes(x.role));
+          setStaffMembers(filtered);
+        } catch (err) {
+          console.error('Failed to fetch staff members:', err);
+        } finally {
+          setLoadingStaff(false);
+        }
+      };
+      fetchStaff();
+    }
+  }, [showAssignModal]);
 
   if (!isOpen) return null;
 
@@ -221,7 +298,7 @@ export default function AdmissionDetailDrawer({
         onCancelSuccess();
       }
       // Reload details
-      const res = isAdmin
+      const res = (isAdmin || isDoctorOrNurseRole || isAdminRole)
         ? await admissionService.adminGetAdmissionDetail(admissionId)
         : await admissionService.getAdmissionDetail(admissionId);
       setAdmission(res?.admission || null);
@@ -278,6 +355,178 @@ export default function AdmissionDetailDrawer({
       alert(err.response?.data?.message || 'An error occurred while rejecting the request.');
     } finally {
       setRejecting(false);
+    }
+  };
+
+  // Workflow Handlers
+  const handleAssignConsultant = async (e) => {
+    if (e) e.preventDefault();
+    if (!admissionId || !selectedStaffId) return;
+
+    try {
+      setAssigning(true);
+      await admissionService.adminAssignConsultant(admissionId, { consultantId: selectedStaffId });
+      setShowAssignModal(false);
+      setSelectedStaffId('');
+      if (onCancelSuccess) onCancelSuccess();
+      const res = await admissionService.adminGetAdmissionDetail(admissionId);
+      setAdmission(res?.admission || null);
+    } catch (err) {
+      console.error('Failed to assign consultant:', err);
+      alert(err.response?.data?.message || 'An error occurred while assigning the consultant.');
+    } finally {
+      setAssigning(false);
+    }
+  };
+
+  const handleRecordConsultation = async (e) => {
+    if (e) e.preventDefault();
+    if (!admissionId || !consultationNotes.trim()) return;
+
+    try {
+      setRecordingConsultation(true);
+      await admissionService.medicalRecordConsultation(admissionId, {
+        consultationNotes: consultationNotes.trim(),
+        notes: consultationGenNotes.trim() || undefined,
+      });
+      setShowConsultationModal(false);
+      setConsultationNotes('');
+      setConsultationGenNotes('');
+      if (onCancelSuccess) onCancelSuccess();
+      const res = await admissionService.adminGetAdmissionDetail(admissionId);
+      setAdmission(res?.admission || null);
+    } catch (err) {
+      console.error('Failed to record consultation:', err);
+      alert(err.response?.data?.message || 'An error occurred while recording the consultation.');
+    } finally {
+      setRecordingConsultation(false);
+    }
+  };
+
+  const handleScheduleAssessment = async (e) => {
+    if (e) e.preventDefault();
+    if (!admissionId || !scheduleDate) return;
+
+    try {
+      setScheduling(true);
+      await admissionService.medicalScheduleAssessment(admissionId, {
+        scheduledAt: new Date(scheduleDate).toISOString(),
+        initialAssessmentNotes: initialAssessmentNotes.trim() || undefined,
+        notes: scheduleGenNotes.trim() || undefined,
+      });
+      setShowScheduleModal(false);
+      setScheduleDate('');
+      setInitialAssessmentNotes('');
+      setScheduleGenNotes('');
+      if (onCancelSuccess) onCancelSuccess();
+      const res = await admissionService.adminGetAdmissionDetail(admissionId);
+      setAdmission(res?.admission || null);
+    } catch (err) {
+      console.error('Failed to schedule assessment:', err);
+      alert(err.response?.data?.message || 'An error occurred while scheduling the assessment.');
+    } finally {
+      setScheduling(false);
+    }
+  };
+
+  const handleEvaluateEligibility = async (e) => {
+    if (e) e.preventDefault();
+    if (!admissionId || !assessmentResult.trim()) return;
+
+    try {
+      setEvaluating(true);
+      await admissionService.medicalEvaluateEligibility(admissionId, {
+        eligibilityStatus,
+        assessmentResult: assessmentResult.trim(),
+        rejectionReason: eligibilityStatus === 'not_eligible' ? (rejReason.trim() || undefined) : undefined,
+        notes: eligibilityGenNotes.trim() || undefined,
+      });
+      setShowEligibilityModal(false);
+      setAssessmentResult('');
+      setRejReason('');
+      setEligibilityGenNotes('');
+      if (onCancelSuccess) onCancelSuccess();
+      const res = await admissionService.adminGetAdmissionDetail(admissionId);
+      setAdmission(res?.admission || null);
+    } catch (err) {
+      console.error('Failed to evaluate eligibility:', err);
+      alert(err.response?.data?.message || 'An error occurred while evaluating eligibility.');
+    } finally {
+      setEvaluating(false);
+    }
+  };
+
+  const handleAssignPackage = async (e) => {
+    if (e) e.preventDefault();
+    if (!admissionId || !selectedPackageId) return;
+
+    try {
+      setAssigningPackage(true);
+      await admissionService.adminAssignServicePackage(admissionId, { servicePackageId: selectedPackageId });
+      setShowAssignPackageModal(false);
+      setSelectedPackageId('');
+      if (onCancelSuccess) onCancelSuccess();
+      const res = await admissionService.adminGetAdmissionDetail(admissionId);
+      setAdmission(res?.admission || null);
+    } catch (err) {
+      console.error('Failed to assign package:', err);
+      alert(err.response?.data?.message || 'An error occurred while assigning the service package.');
+    } finally {
+      setAssigningPackage(false);
+    }
+  };
+
+  const handleCreateContract = async (e) => {
+    if (e) e.preventDefault();
+    if (!admissionId || !contractNum.trim()) return;
+
+    try {
+      setCreatingContract(true);
+      await admissionService.adminCreateContract(admissionId, {
+        contractNumber: contractNum.trim(),
+        contractStartDate: contractStart ? new Date(contractStart).toISOString() : undefined,
+        contractEndDate: contractEnd ? new Date(contractEnd).toISOString() : undefined,
+        contractTerms: contractTerms.trim() || undefined,
+        notes: contractGenNotes.trim() || undefined,
+      });
+      setShowContractModal(false);
+      setContractNum('');
+      setContractStart('');
+      setContractEnd('');
+      setContractTerms('');
+      setContractGenNotes('');
+      if (onCancelSuccess) onCancelSuccess();
+      const res = await admissionService.adminGetAdmissionDetail(admissionId);
+      setAdmission(res?.admission || null);
+    } catch (err) {
+      console.error('Failed to create contract:', err);
+      alert(err.response?.data?.message || 'An error occurred while creating the contract.');
+    } finally {
+      setCreatingContract(false);
+    }
+  };
+
+  const handleCheckInResident = async (e) => {
+    if (e) e.preventDefault();
+    if (!admissionId) return;
+
+    try {
+      setCheckingIn(true);
+      await admissionService.adminCheckInResident(admissionId, {
+        bedId: assignedBedHex.trim() || undefined,
+        roomId: assignedRoomHex.trim() || undefined,
+      });
+      setShowCheckInModal(false);
+      setAssignedBedHex('');
+      setAssignedRoomHex('');
+      if (onCancelSuccess) onCancelSuccess();
+      const res = await admissionService.adminGetAdmissionDetail(admissionId);
+      setAdmission(res?.admission || null);
+    } catch (err) {
+      console.error('Failed to check-in resident:', err);
+      alert(err.response?.data?.message || 'An error occurred during resident check-in.');
+    } finally {
+      setCheckingIn(false);
     }
   };
 
@@ -662,6 +911,121 @@ export default function AdmissionDetailDrawer({
                   )}
                 </div>
               </div>
+
+              {/* Administrative & Care Workflow Actions */}
+              {(
+                (isAdminRole && (admission.status !== 'cancelled' && admission.status !== 'checked_in')) ||
+                (isDoctorOrNurseRole && ['new_request', 'consulting', 'assessing'].includes(admission.status))
+              ) && (
+                <div className="arh-detail-card font-sans" style={{ borderLeft: '4px solid #1B365D', background: 'rgba(27, 54, 93, 0.02)' }}>
+                  <h5 className="arh-drawer__section-title" style={{ color: '#1B365D' }}>
+                    <Activity size={16} /> WORKFLOW ACTIONS
+                  </h5>
+                  <div className="flex flex-wrap gap-2 pt-2">
+                    {/* 1. Assign Consultant (Admin/Manager role) */}
+                    {isAdminRole && admission.status !== 'cancelled' && admission.status !== 'checked_in' && (
+                      <button
+                        type="button"
+                        onClick={() => setShowAssignModal(true)}
+                        className="adm-btn-apply"
+                        style={{ padding: '8px 16px', fontSize: '12px', borderRadius: '10px', boxShadow: 'none', background: '#1B365D' }}
+                      >
+                        Assign Consultant
+                      </button>
+                    )}
+
+                    {/* 2. Pre-admission Consultation (Doctor & Nurse roles) */}
+                    {isDoctorOrNurseRole && ['new_request', 'consulting'].includes(admission.status) && (
+                      <button
+                        type="button"
+                        onClick={() => setShowConsultationModal(true)}
+                        className="adm-btn-apply"
+                        style={{ padding: '8px 16px', fontSize: '12px', borderRadius: '10px', boxShadow: 'none', background: '#1B365D' }}
+                      >
+                        Record Consultation
+                      </button>
+                    )}
+
+                    {/* 3. Initial Assessment Scheduling (Doctor & Nurse roles) */}
+                    {isDoctorOrNurseRole && ['new_request', 'consulting', 'assessing'].includes(admission.status) && (
+                      <button
+                        type="button"
+                        onClick={() => setShowScheduleModal(true)}
+                        className="adm-btn-apply"
+                        style={{ padding: '8px 16px', fontSize: '12px', borderRadius: '10px', boxShadow: 'none', background: '#1B365D' }}
+                      >
+                        Schedule Assessment
+                      </button>
+                    )}
+
+                    {/* 4. Evaluate Admission Eligibility (Doctor role only) */}
+                    {isDoctorRole && ['consulting', 'assessing'].includes(admission.status) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEligibilityStatus(admission.eligibilityStatus === 'not_eligible' ? 'not_eligible' : 'eligible');
+                          setAssessmentResult(admission.assessmentResult || '');
+                          setRejReason(admission.rejectionReason || '');
+                          setShowEligibilityModal(true);
+                        }}
+                        className="adm-btn-apply"
+                        style={{ padding: '8px 16px', fontSize: '12px', borderRadius: '10px', boxShadow: 'none', background: '#1B365D' }}
+                      >
+                        Evaluate Eligibility
+                      </button>
+                    )}
+
+                    {/* 5. Assign Service Package (Admin/Manager role) */}
+                    {isAdminRole && ['assessing', 'contracting'].includes(admission.status) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedPackageId(admission.servicePackageId?._id || '');
+                          setShowAssignPackageModal(true);
+                        }}
+                        className="adm-btn-apply"
+                        style={{ padding: '8px 16px', fontSize: '12px', borderRadius: '10px', boxShadow: 'none', background: '#1B365D' }}
+                      >
+                        Assign Service Package
+                      </button>
+                    )}
+
+                    {/* 6. Create Admission Contract (Admin/Manager role) */}
+                    {isAdminRole && ['assessing', 'contracting'].includes(admission.status) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setContractNum(admission.contractNumber || '');
+                          setContractStart(admission.contractStartDate ? admission.contractStartDate.split('T')[0] : '');
+                          setContractEnd(admission.contractEndDate ? admission.contractEndDate.split('T')[0] : '');
+                          setContractTerms(admission.contractTerms || '');
+                          setShowContractModal(true);
+                        }}
+                        className="adm-btn-apply"
+                        style={{ padding: '8px 16px', fontSize: '12px', borderRadius: '10px', boxShadow: 'none', background: '#1B365D' }}
+                      >
+                        {admission.contractNumber ? 'Edit Contract' : 'Create Contract'}
+                      </button>
+                    )}
+
+                    {/* 7. Check-in Resident (Admin/Manager role) */}
+                    {isAdminRole && admission.status === 'contracting' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAssignedBedHex(admission.assignedBedId || '');
+                          setAssignedRoomHex(admission.assignedRoomId || '');
+                          setShowCheckInModal(true);
+                        }}
+                        className="adm-btn-apply"
+                        style={{ padding: '8px 16px', fontSize: '12px', borderRadius: '10px', boxShadow: 'none', background: '#1B365D' }}
+                      >
+                        Check-in Resident
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>
@@ -948,6 +1312,568 @@ export default function AdmissionDetailDrawer({
                 Confirm Rejection
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 1. Assign Consultant Modal */}
+      {showAssignModal && (
+        <div className="arh-modal-backdrop" onClick={() => setShowAssignModal(false)}>
+          <div className="arh-modal" onClick={(e) => e.stopPropagation()}>
+            <h4 className="arh-modal__title">Assign Consultant</h4>
+            <p className="arh-modal__text">
+              Select a medical staff member (Doctor or Nurse) to be in charge of consultation and initial assessment for <strong className="text-slate-800">{admission?.applicant?.fullName}</strong>.
+            </p>
+
+            <form onSubmit={handleAssignConsultant}>
+              <div className="mb-4">
+                <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
+                  Select Consultant *
+                </label>
+                {loadingStaff ? (
+                  <div className="flex items-center gap-2 py-2 text-xs text-slate-400">
+                    <Loader2 size={14} className="animate-spin" />
+                    <span>Loading available staff...</span>
+                  </div>
+                ) : (
+                  <select
+                    className="adm-filter-select"
+                    value={selectedStaffId}
+                    onChange={(e) => setSelectedStaffId(e.target.value)}
+                    required
+                  >
+                    <option value="">-- Pick Doctor or Nurse --</option>
+                    {staffMembers.map((st) => (
+                      <option key={st._id} value={st._id}>
+                        {st.fullName} ({st.role.toUpperCase()})
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  className="adm-btn-clear flex-1"
+                  style={{ borderRadius: '20px', padding: '10px 24px' }}
+                  onClick={() => {
+                    setShowAssignModal(false);
+                    setSelectedStaffId('');
+                  }}
+                  disabled={assigning}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="adm-btn-apply flex-1 justify-center"
+                  style={{ borderRadius: '20px', padding: '10px 24px', backgroundColor: '#1B365D' }}
+                  disabled={assigning || !selectedStaffId}
+                >
+                  {assigning && <Loader2 className="animate-spin mr-1" size={13} />}
+                  Assign Consultant
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 2. Record Pre-admission Consultation Modal */}
+      {showConsultationModal && (
+        <div className="arh-modal-backdrop" onClick={() => setShowConsultationModal(false)}>
+          <div className="arh-modal" onClick={(e) => e.stopPropagation()}>
+            <h4 className="arh-modal__title">Record Pre-admission Consultation</h4>
+            <p className="arh-modal__text">
+              Log consultation and support notes for <strong className="text-slate-800">{admission?.applicant?.fullName}</strong> to evaluate care requirements.
+            </p>
+
+            <form onSubmit={handleRecordConsultation}>
+              <div className="mb-3">
+                <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
+                  Consultation Notes *
+                </label>
+                <textarea
+                  className="arh-modal__textarea"
+                  style={{ minHeight: '120px' }}
+                  placeholder="Record summary of notes, family requests, care expectations, etc..."
+                  value={consultationNotes}
+                  onChange={(e) => setConsultationNotes(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
+                  Additional Notes
+                </label>
+                <textarea
+                  className="arh-modal__textarea"
+                  style={{ minHeight: '60px' }}
+                  placeholder="Optional general notes..."
+                  value={consultationGenNotes}
+                  onChange={(e) => setConsultationGenNotes(e.target.value)}
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  className="adm-btn-clear flex-1"
+                  style={{ borderRadius: '20px', padding: '10px 24px' }}
+                  onClick={() => {
+                    setShowConsultationModal(false);
+                    setConsultationNotes('');
+                    setConsultationGenNotes('');
+                  }}
+                  disabled={recordingConsultation}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="adm-btn-apply flex-1 justify-center"
+                  style={{ borderRadius: '20px', padding: '10px 24px', backgroundColor: '#1B365D' }}
+                  disabled={recordingConsultation || !consultationNotes.trim()}
+                >
+                  {recordingConsultation && <Loader2 className="animate-spin mr-1" size={13} />}
+                  Record Consultation
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 3. Schedule Initial Assessment Modal */}
+      {showScheduleModal && (
+        <div className="arh-modal-backdrop" onClick={() => setShowScheduleModal(false)}>
+          <div className="arh-modal" onClick={(e) => e.stopPropagation()}>
+            <h4 className="arh-modal__title">Schedule Initial Health Assessment</h4>
+            <p className="arh-modal__text">
+              Set a date and time for the physical health and cognitive assessment of <strong className="text-slate-800">{admission?.applicant?.fullName}</strong>.
+            </p>
+
+            <form onSubmit={handleScheduleAssessment}>
+              <div className="mb-3">
+                <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
+                  Assessment Date & Time * (Must be in the future)
+                </label>
+                <input
+                  type="datetime-local"
+                  className="adm-filter-input"
+                  style={{ paddingLeft: '14px' }}
+                  value={scheduleDate}
+                  onChange={(e) => setScheduleDate(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="mb-3">
+                <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
+                  Initial Assessment Notes
+                </label>
+                <textarea
+                  className="arh-modal__textarea"
+                  style={{ minHeight: '60px' }}
+                  placeholder="Special instructions for patient preparation, location (e.g. Room B102)..."
+                  value={initialAssessmentNotes}
+                  onChange={(e) => setInitialAssessmentNotes(e.target.value)}
+                />
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
+                  General Notes
+                </label>
+                <textarea
+                  className="arh-modal__textarea"
+                  style={{ minHeight: '50px' }}
+                  placeholder="Optional general notes..."
+                  value={scheduleGenNotes}
+                  onChange={(e) => setScheduleGenNotes(e.target.value)}
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  className="adm-btn-clear flex-1"
+                  style={{ borderRadius: '20px', padding: '10px 24px' }}
+                  onClick={() => {
+                    setShowScheduleModal(false);
+                    setScheduleDate('');
+                    setInitialAssessmentNotes('');
+                    setScheduleGenNotes('');
+                  }}
+                  disabled={scheduling}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="adm-btn-apply flex-1 justify-center"
+                  style={{ borderRadius: '20px', padding: '10px 24px', backgroundColor: '#1B365D' }}
+                  disabled={scheduling || !scheduleDate}
+                >
+                  {scheduling && <Loader2 className="animate-spin mr-1" size={13} />}
+                  Schedule Assessment
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 4. Evaluate Admission Eligibility Modal */}
+      {showEligibilityModal && (
+        <div className="arh-modal-backdrop" onClick={() => setShowEligibilityModal(false)}>
+          <div className="arh-modal" onClick={(e) => e.stopPropagation()}>
+            <h4 className="arh-modal__title">Evaluate Admission Eligibility</h4>
+            <p className="arh-modal__text">
+              As a Doctor, evaluate the physical/medical eligibility of <strong className="text-slate-800">{admission?.applicant?.fullName}</strong> for staying at the care home.
+            </p>
+
+            <form onSubmit={handleEvaluateEligibility}>
+              <div className="mb-3">
+                <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
+                  Eligibility Status *
+                </label>
+                <select
+                  className="adm-filter-select"
+                  value={eligibilityStatus}
+                  onChange={(e) => setEligibilityStatus(e.target.value)}
+                  required
+                >
+                  <option value="eligible">Eligible (Đủ điều kiện nhập viện)</option>
+                  <option value="not_eligible">Ineligible (Không đủ điều kiện - Từ chối)</option>
+                </select>
+              </div>
+
+              <div className="mb-3">
+                <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
+                  Medical Assessment Result Summary *
+                </label>
+                <textarea
+                  className="arh-modal__textarea"
+                  style={{ minHeight: '80px' }}
+                  placeholder="Provide detailed clinical assessment result and reasoning..."
+                  value={assessmentResult}
+                  onChange={(e) => setAssessmentResult(e.target.value)}
+                  required
+                />
+              </div>
+
+              {eligibilityStatus === 'not_eligible' && (
+                <div className="mb-3">
+                  <label className="block text-xs font-bold text-red-600 mb-1.5 uppercase tracking-wider">
+                    Rejection Reason *
+                  </label>
+                  <textarea
+                    className="arh-modal__textarea"
+                    style={{ minHeight: '60px', border: '1.5px solid #fed7d7' }}
+                    placeholder="Provide mandatory reason why resident is ineligible (e.g. Requires ICU care, contagious disease)..."
+                    value={rejReason}
+                    onChange={(e) => setRejReason(e.target.value)}
+                    required
+                  />
+                </div>
+              )}
+
+              <div className="mb-4">
+                <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
+                  General Notes
+                </label>
+                <textarea
+                  className="arh-modal__textarea"
+                  style={{ minHeight: '50px' }}
+                  placeholder="Optional general notes..."
+                  value={eligibilityGenNotes}
+                  onChange={(e) => setEligibilityGenNotes(e.target.value)}
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  className="adm-btn-clear flex-1"
+                  style={{ borderRadius: '20px', padding: '10px 24px' }}
+                  onClick={() => {
+                    setShowEligibilityModal(false);
+                    setAssessmentResult('');
+                    setRejReason('');
+                    setEligibilityGenNotes('');
+                  }}
+                  disabled={evaluating}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="adm-btn-apply flex-1 justify-center"
+                  style={{ borderRadius: '20px', padding: '10px 24px', backgroundColor: '#1B365D' }}
+                  disabled={evaluating || !assessmentResult.trim() || (eligibilityStatus === 'not_eligible' && !rejReason.trim())}
+                >
+                  {evaluating && <Loader2 className="animate-spin mr-1" size={13} />}
+                  Submit Evaluation
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 5. Assign Service Package Modal */}
+      {showAssignPackageModal && (
+        <div className="arh-modal-backdrop" onClick={() => setShowAssignPackageModal(false)}>
+          <div className="arh-modal" onClick={(e) => e.stopPropagation()}>
+            <h4 className="arh-modal__title">Assign Care Service Package</h4>
+            <p className="arh-modal__text">
+              Assign or update the Care Service Package for <strong className="text-slate-800">{admission?.applicant?.fullName}</strong>.
+            </p>
+
+            <form onSubmit={handleAssignPackage}>
+              <div className="mb-4 relative">
+                <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
+                  Active Care Package *
+                </label>
+                {loadingPackages ? (
+                  <div className="flex items-center gap-2 py-2 text-xs text-slate-400">
+                    <Loader2 size={14} className="animate-spin" />
+                    <span>Loading active packages...</span>
+                  </div>
+                ) : (
+                  <select
+                    className="adm-filter-select"
+                    value={selectedPackageId}
+                    onChange={(e) => setSelectedPackageId(e.target.value)}
+                    required
+                  >
+                    <option value="">-- Pick active package --</option>
+                    {packages.map((pkg) => (
+                      <option key={pkg._id} value={pkg._id}>
+                        {pkg.name} ({pkg.tier.toUpperCase()} - {pkg.monthlyPrice?.toLocaleString()} VND/mo)
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  className="adm-btn-clear flex-1"
+                  style={{ borderRadius: '20px', padding: '10px 24px' }}
+                  onClick={() => {
+                    setShowAssignPackageModal(false);
+                    setSelectedPackageId('');
+                  }}
+                  disabled={assigningPackage}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="adm-btn-apply flex-1 justify-center"
+                  style={{ borderRadius: '20px', padding: '10px 24px', backgroundColor: '#1B365D' }}
+                  disabled={assigningPackage || !selectedPackageId}
+                >
+                  {assigningPackage && <Loader2 className="animate-spin mr-1" size={13} />}
+                  Assign Package
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 6. Create Admission Contract Modal */}
+      {showContractModal && (
+        <div className="arh-modal-backdrop" onClick={() => setShowContractModal(false)}>
+          <div className="arh-modal" onClick={(e) => e.stopPropagation()}>
+            <h4 className="arh-modal__title">Create/Edit Admission Contract</h4>
+            <p className="arh-modal__text">
+              Generate admission service terms and sign the care contract for <strong className="text-slate-800">{admission?.applicant?.fullName}</strong>.
+            </p>
+
+            <form onSubmit={handleCreateContract}>
+              <div className="mb-3">
+                <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
+                  Contract Number *
+                </label>
+                <input
+                  type="text"
+                  className="adm-filter-input"
+                  style={{ paddingLeft: '14px' }}
+                  placeholder="e.g. HĐ-2026-0001"
+                  value={contractNum}
+                  onChange={(e) => setContractNum(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
+                    Contract Start Date
+                  </label>
+                  <input
+                    type="date"
+                    className="adm-filter-input"
+                    style={{ paddingLeft: '14px' }}
+                    value={contractStart}
+                    onChange={(e) => setContractStart(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
+                    Contract End Date
+                  </label>
+                  <input
+                    type="date"
+                    className="adm-filter-input"
+                    style={{ paddingLeft: '14px' }}
+                    value={contractEnd}
+                    onChange={(e) => setContractEnd(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="mb-3">
+                <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
+                  Contract Terms & Conditions
+                </label>
+                <textarea
+                  className="arh-modal__textarea"
+                  style={{ minHeight: '80px' }}
+                  placeholder="Enter details about billing cycles, responsibility clauses, emergency contacts..."
+                  value={contractTerms}
+                  onChange={(e) => setContractTerms(e.target.value)}
+                />
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
+                  General Notes
+                </label>
+                <textarea
+                  className="arh-modal__textarea"
+                  style={{ minHeight: '50px' }}
+                  placeholder="Optional general notes..."
+                  value={contractGenNotes}
+                  onChange={(e) => setContractGenNotes(e.target.value)}
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  className="adm-btn-clear flex-1"
+                  style={{ borderRadius: '20px', padding: '10px 24px' }}
+                  onClick={() => {
+                    setShowContractModal(false);
+                    setContractNum('');
+                    setContractStart('');
+                    setContractEnd('');
+                    setContractTerms('');
+                    setContractGenNotes('');
+                  }}
+                  disabled={creatingContract}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="adm-btn-apply flex-1 justify-center"
+                  style={{ borderRadius: '20px', padding: '10px 24px', backgroundColor: '#1B365D' }}
+                  disabled={creatingContract || !contractNum.trim()}
+                >
+                  {creatingContract && <Loader2 className="animate-spin mr-1" size={13} />}
+                  Sign Contract
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 7. Check-in Resident Modal */}
+      {showCheckInModal && (
+        <div className="arh-modal-backdrop" onClick={() => setShowCheckInModal(false)}>
+          <div className="arh-modal" onClick={(e) => e.stopPropagation()}>
+            <h4 className="arh-modal__title">Confirm Resident Check-in</h4>
+            <p className="arh-modal__text">
+              Finalize room and bed assignment for <strong className="text-slate-800">{admission?.applicant?.fullName}</strong>. This registers them as an active resident.
+            </p>
+
+            <form onSubmit={handleCheckInResident}>
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
+                    Assigned Bed ID (ObjectId)
+                  </label>
+                  <input
+                    type="text"
+                    className="adm-filter-input"
+                    style={{ paddingLeft: '14px' }}
+                    placeholder="Optional Bed ObjectId"
+                    value={assignedBedHex}
+                    onChange={(e) => setAssignedBedHex(e.target.value)}
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1 italic leading-normal">
+                    Format: 24-char hex string. Leave empty if no specific bed is assigned yet.
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
+                    Assigned Room ID (ObjectId)
+                  </label>
+                  <input
+                    type="text"
+                    className="adm-filter-input"
+                    style={{ paddingLeft: '14px' }}
+                    placeholder="Optional Room ObjectId"
+                    value={assignedRoomHex}
+                    onChange={(e) => setAssignedRoomHex(e.target.value)}
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1 italic leading-normal">
+                    Format: 24-char hex string. Leave empty if no specific room is assigned yet.
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-slate-50 border border-slate-100 p-3 rounded-xl mb-4">
+                <p className="text-xs text-[#1B365D] font-medium leading-relaxed">
+                  <strong>💡 Business Rule Note:</strong> Bed and Room ObjectIds must be valid 24-character hexadecimal strings if entered. Leave them empty to proceed with general check-in (both default to <code>null</code>).
+                </p>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  className="adm-btn-clear flex-1"
+                  style={{ borderRadius: '20px', padding: '10px 24px' }}
+                  onClick={() => {
+                    setShowCheckInModal(false);
+                    setAssignedBedHex('');
+                    setAssignedRoomHex('');
+                  }}
+                  disabled={checkingIn}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="adm-btn-apply flex-1 justify-center"
+                  style={{ borderRadius: '20px', padding: '10px 24px', backgroundColor: '#1B365D' }}
+                  disabled={checkingIn}
+                >
+                  {checkingIn && <Loader2 className="animate-spin mr-1" size={13} />}
+                  Confirm Check-in
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
