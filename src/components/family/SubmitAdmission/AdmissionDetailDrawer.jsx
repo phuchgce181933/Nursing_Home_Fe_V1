@@ -956,6 +956,11 @@ export default function AdmissionDetailDrawer({
                     <Activity size={16} /> WORKFLOW ACTIONS
                   </h5>
                   <div className="flex flex-wrap gap-2 pt-2">
+                    {isAdminRole && (
+                      <div className="w-full text-xs text-[#1B365D] bg-blue-50/50 p-2.5 rounded-lg border border-blue-100/60 leading-normal mb-2 font-medium">
+                        <strong>Medical Workflow Note:</strong> Pre-admission Consultation, Initial Assessment Scheduling, and Eligibility Evaluation are strictly designated for <strong>Doctor</strong> & <strong>Nurse</strong> roles. To perform these steps, please log in as a Doctor (<code>doctor@test.com</code>) or Nurse (<code>nurse@test.com</code>).
+                      </div>
+                    )}
                     {/* 1. Assign Consultant (Admin/Manager role) */}
                     {isAdminRole && admission.status !== 'cancelled' && admission.status !== 'checked_in' && (
                       <button
