@@ -585,3 +585,108 @@
 .sp-btn-close-dossier:hover {
   background-color: #122543;
 }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * CUSTOM PREMIUM MODALS & BACKDROPS (Glassmorphism & animations)
+ * ───────────────────────────────────────────────────────────────────────────── */
+.arh-modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 1050;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: modalFadeIn 0.2s ease-out;
+}
+
+.arh-modal {
+  background: #ffffff;
+  border-radius: 20px;
+  width: 100%;
+  max-width: 520px;
+  padding: 28px;
+  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25);
+  animation: modalSlideUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  border: 1px solid rgba(27, 54, 93, 0.05);
+}
+
+.arh-modal__title {
+  font-size: 20px;
+  font-weight: 800;
+  color: #1b365d;
+  margin-bottom: 12px;
+  letter-spacing: -0.02em;
+}
+
+.arh-modal__text {
+  font-size: 14.5px;
+  color: #64748b;
+  line-height: 1.6;
+  margin-bottom: 20px;
+}
+
+.arh-modal__textarea {
+  width: 100%;
+  min-height: 100px;
+  padding: 12px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 12px;
+  font-size: 14px;
+  color: #334155;
+  background-color: #f8fafc;
+  outline: none;
+  resize: vertical;
+  transition: all 0.2s ease;
+}
+
+.arh-modal__textarea:focus {
+  border-color: #2d6a4f;
+  background-color: #ffffff;
+  box-shadow: 0 0 0 3px rgba(45, 106, 79, 0.1);
+}
+
+.adm-btn-clear {
+  padding: 9px 18px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #64748b;
+  background-color: #ffffff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.adm-btn-clear:hover {
+  background-color: #f8fafc;
+  border-color: #cbd5e1;
+  color: #334155;
+}
+
+@keyframes modalFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.animate-fade-in {
+  animation: modalFadeIn 0.2s ease-out;
+}
+
+@keyframes modalSlideUp {
+  from {
+    transform: translateY(24px) scale(0.96);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+

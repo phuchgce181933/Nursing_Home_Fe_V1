@@ -60,6 +60,8 @@ export default function ServicePackagesPage() {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeactivateConfirm, setShowDeactivateConfirm] = useState(false);
+  const [packageToDeactivate, setPackageToDeactivate] = useState(null);
 
   // Form states
   const [formName, setFormName] = useState('');
@@ -235,15 +237,18 @@ export default function ServicePackagesPage() {
   };
 
   // Soft Delete Package
-  const handleDeletePackage = async (pkgId, pkgName) => {
-    const confirmDelete = window.confirm(
-      `Are you sure you want to deactivate/soft-delete "${pkgName}"? Deactivated packages cannot be assigned to new admissions.`
-    );
-    if (!confirmDelete) return;
+  const handleDeletePackage = (pkgId, pkgName) => {
+    setPackageToDeactivate({ id: pkgId, name: pkgName });
+    setShowDeactivateConfirm(true);
+  };
 
+  const handleConfirmDeactivate = async () => {
+    if (!packageToDeactivate) return;
     try {
       setLoading(true);
-      await servicePackageService.deleteServicePackage(pkgId);
+      await servicePackageService.deleteServicePackage(packageToDeactivate.id);
+      setShowDeactivateConfirm(false);
+      setPackageToDeactivate(null);
       fetchPackages();
     } catch (err) {
       console.error('Failed to delete package:', err);
@@ -945,6 +950,66 @@ export default function ServicePackagesPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Deactivation Confirmation Modal */}
+      {showDeactivateConfirm && packageToDeactivate && (
+        <div className="arh-modal-backdrop animate-fade-in" onClick={() => {
+          if (!loading) {
+            setShowDeactivateConfirm(false);
+            setPackageToDeactivate(null);
+          }
+        }}>
+          <div className="arh-modal" style={{ maxWidth: '480px' }} onClick={(e) => e.stopPropagation()}>
+            <h4 className="arh-modal__title" style={{ color: '#ef4444' }}>Deactivate Care Package</h4>
+            <p className="arh-modal__text" style={{ marginBottom: '24px', fontSize: '14.5px', color: '#475569' }}>
+              Are you sure you want to deactivate/soft-delete <strong>"{packageToDeactivate.name}"</strong>?
+              <span className="block mt-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                Deactivated packages cannot be assigned to new admissions.
+              </span>
+            </p>
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                className="adm-btn-clear flex-1"
+                style={{ borderRadius: '20px', padding: '12px', fontSize: '13.5px', fontWeight: '600' }}
+                onClick={() => {
+                  setShowDeactivateConfirm(false);
+                  setPackageToDeactivate(null);
+                }}
+                disabled={loading}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="flex-1 justify-center align-middle text-center"
+                style={{
+                  borderRadius: '20px',
+                  padding: '12px',
+                  background: '#ef4444',
+                  color: '#ffffff',
+                  fontWeight: '700',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '13.5px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'background-color 0.15s ease',
+                }}
+                onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#dc2626'}
+                onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#ef4444'}
+                onClick={handleConfirmDeactivate}
+                disabled={loading}
+              >
+                {loading && <Loader2 className="animate-spin mr-2" size={14} />}
+                Confirm Deactivation
+              </button>
+            </div>
           </div>
         </div>
       )}
