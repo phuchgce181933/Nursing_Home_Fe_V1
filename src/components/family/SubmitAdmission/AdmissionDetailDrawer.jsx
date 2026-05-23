@@ -176,22 +176,6 @@ export default function AdmissionDetailDrawer({
   // Modal error state for displaying beautiful error banner instead of browser alert popup
   const [modalError, setModalError] = useState(null);
 
-  // Reset modal error when any modal state changes
-  useEffect(() => {
-    setModalError(null);
-  }, [
-    showCancelModal,
-    showApproveModal,
-    showRejectModal,
-    showAssignModal,
-    showConsultationModal,
-    showScheduleModal,
-    showEligibilityModal,
-    showAssignPackageModal,
-    showContractModal,
-    showCheckInModal
-  ]);
-
   // New Workflow Action States
   // 1. Assign Consultant
   const [showAssignModal, setShowAssignModal] = useState(false);
@@ -240,6 +224,22 @@ export default function AdmissionDetailDrawer({
   const [assignedBedHex, setAssignedBedHex] = useState('');
   const [assignedRoomHex, setAssignedRoomHex] = useState('');
   const [checkingIn, setCheckingIn] = useState(false);
+
+  // Reset modal error when any modal state changes
+  useEffect(() => {
+    setModalError(null);
+  }, [
+    showCancelModal,
+    showApproveModal,
+    showRejectModal,
+    showAssignModal,
+    showConsultationModal,
+    showScheduleModal,
+    showEligibilityModal,
+    showAssignPackageModal,
+    showContractModal,
+    showCheckInModal
+  ]);
 
   // Load details whenever admissionId changes or role changes
   useEffect(() => {
