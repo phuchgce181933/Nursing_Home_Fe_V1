@@ -173,6 +173,25 @@ export default function AdmissionDetailDrawer({
   const [rejectionReason, setRejectionReason] = useState('');
   const [rejecting, setRejecting] = useState(false);
 
+  // Modal error state for displaying beautiful error banner instead of browser alert popup
+  const [modalError, setModalError] = useState(null);
+
+  // Reset modal error when any modal state changes
+  useEffect(() => {
+    setModalError(null);
+  }, [
+    showCancelModal,
+    showApproveModal,
+    showRejectModal,
+    showAssignModal,
+    showConsultationModal,
+    showScheduleModal,
+    showEligibilityModal,
+    showAssignPackageModal,
+    showContractModal,
+    showCheckInModal
+  ]);
+
   // New Workflow Action States
   // 1. Assign Consultant
   const [showAssignModal, setShowAssignModal] = useState(false);
@@ -304,7 +323,7 @@ export default function AdmissionDetailDrawer({
       setAdmission(res?.admission || null);
     } catch (err) {
       console.error('Failed to cancel admission request:', err);
-      alert(err.response?.data?.message || 'An error occurred while cancelling the request. Please try again.');
+      setModalError(err.response?.data?.message || 'An error occurred while cancelling the request. Please try again.');
     } finally {
       setCancelling(false);
     }
@@ -329,7 +348,7 @@ export default function AdmissionDetailDrawer({
       setAdmission(res?.admission || null);
     } catch (err) {
       console.error('Failed to approve request:', err);
-      alert(err.response?.data?.message || 'An error occurred while approving the request.');
+      setModalError(err.response?.data?.message || 'An error occurred while approving the request.');
     } finally {
       setApproving(false);
     }
@@ -352,7 +371,7 @@ export default function AdmissionDetailDrawer({
       setAdmission(res?.admission || null);
     } catch (err) {
       console.error('Failed to reject request:', err);
-      alert(err.response?.data?.message || 'An error occurred while rejecting the request.');
+      setModalError(err.response?.data?.message || 'An error occurred while rejecting the request.');
     } finally {
       setRejecting(false);
     }
@@ -373,7 +392,7 @@ export default function AdmissionDetailDrawer({
       setAdmission(res?.admission || null);
     } catch (err) {
       console.error('Failed to assign consultant:', err);
-      alert(err.response?.data?.message || 'An error occurred while assigning the consultant.');
+      setModalError(err.response?.data?.message || 'An error occurred while assigning the consultant.');
     } finally {
       setAssigning(false);
     }
@@ -397,7 +416,7 @@ export default function AdmissionDetailDrawer({
       setAdmission(res?.admission || null);
     } catch (err) {
       console.error('Failed to record consultation:', err);
-      alert(err.response?.data?.message || 'An error occurred while recording the consultation.');
+      setModalError(err.response?.data?.message || 'An error occurred while recording the consultation.');
     } finally {
       setRecordingConsultation(false);
     }
@@ -423,7 +442,7 @@ export default function AdmissionDetailDrawer({
       setAdmission(res?.admission || null);
     } catch (err) {
       console.error('Failed to schedule assessment:', err);
-      alert(err.response?.data?.message || 'An error occurred while scheduling the assessment.');
+      setModalError(err.response?.data?.message || 'An error occurred while scheduling the assessment.');
     } finally {
       setScheduling(false);
     }
@@ -450,7 +469,7 @@ export default function AdmissionDetailDrawer({
       setAdmission(res?.admission || null);
     } catch (err) {
       console.error('Failed to evaluate eligibility:', err);
-      alert(err.response?.data?.message || 'An error occurred while evaluating eligibility.');
+      setModalError(err.response?.data?.message || 'An error occurred while evaluating eligibility.');
     } finally {
       setEvaluating(false);
     }
@@ -470,7 +489,7 @@ export default function AdmissionDetailDrawer({
       setAdmission(res?.admission || null);
     } catch (err) {
       console.error('Failed to assign package:', err);
-      alert(err.response?.data?.message || 'An error occurred while assigning the service package.');
+      setModalError(err.response?.data?.message || 'An error occurred while assigning the service package.');
     } finally {
       setAssigningPackage(false);
     }
@@ -500,7 +519,7 @@ export default function AdmissionDetailDrawer({
       setAdmission(res?.admission || null);
     } catch (err) {
       console.error('Failed to create contract:', err);
-      alert(err.response?.data?.message || 'An error occurred while creating the contract.');
+      setModalError(err.response?.data?.message || 'An error occurred while creating the contract.');
     } finally {
       setCreatingContract(false);
     }
@@ -524,7 +543,7 @@ export default function AdmissionDetailDrawer({
       setAdmission(res?.admission || null);
     } catch (err) {
       console.error('Failed to check-in resident:', err);
-      alert(err.response?.data?.message || 'An error occurred during resident check-in.');
+      setModalError(err.response?.data?.message || 'An error occurred during resident check-in.');
     } finally {
       setCheckingIn(false);
     }
@@ -895,6 +914,21 @@ export default function AdmissionDetailDrawer({
                     <p className="arh-detail-item__label">Relationship</p>
                     <p className="arh-detail-item__value">{formatRelationship(admission.applicant?.relationshipToRequester)}</p>
                   </div>
+                  {admission.consultantId && (
+                    <div className="arh-detail-item" style={{ gridColumn: 'span 2', marginTop: '6px', borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
+                      <p className="arh-detail-item__label" style={{ color: '#1B365D' }}>Assigned Consultant</p>
+                      <p className="arh-detail-item__value" style={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span className="text-[#1B365D] bg-slate-100 px-2 py-0.5 rounded text-[12px] font-semibold border border-slate-200">
+                          {admission.consultantId.fullName} ({admission.consultantId.role?.toUpperCase()})
+                        </span>
+                        {admission.consultantId.email && (
+                          <span className="text-xs text-slate-400 font-normal">
+                            ({admission.consultantId.email})
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  )}
                   <div className="arh-detail-item" style={{ gridColumn: 'span 2' }}>
                     <p className="arh-detail-item__label">Reason for Admission</p>
                     <p className="arh-detail-item__value" style={{ fontSize: '12.5px' }}>
@@ -1094,6 +1128,11 @@ export default function AdmissionDetailDrawer({
               Are you sure you want to cancel the admission request for{' '}
               <strong className="text-slate-800">{admission?.applicant?.fullName}</strong>? This action will immediately terminate the entire consultation process and cannot be undone.
             </p>
+            {modalError && (
+              <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-lg text-xs mb-4">
+                {modalError}
+              </div>
+            )}
             <textarea
               className="arh-modal__textarea"
               placeholder="Please share your reason for cancellation (e.g., Change of family plans, found alternative solution...)"
@@ -1146,6 +1185,11 @@ export default function AdmissionDetailDrawer({
             <p className="arh-modal__text">
               You are approving the admission request for <strong className="text-slate-800">{admission?.applicant?.fullName}</strong>. This transitions the request to <span className="font-bold text-emerald-600">Contracting</span> and verifies health eligibility.
             </p>
+            {modalError && (
+              <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-lg text-xs mb-4 font-sans">
+                {modalError}
+              </div>
+            )}
 
             <div className="mb-4 relative">
               <label className="block text-xs font-semibold text-slate-500 mb-2 font-sans tracking-wide">
@@ -1276,6 +1320,11 @@ export default function AdmissionDetailDrawer({
             <p className="arh-modal__text">
               You are rejecting the admission request for <strong className="text-slate-800">{admission?.applicant?.fullName}</strong>. This transitions the request to <span className="font-bold text-red-600">Cancelled</span> and marks them as ineligible.
             </p>
+            {modalError && (
+              <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-lg text-xs mb-4 font-sans">
+                {modalError}
+              </div>
+            )}
 
             <div className="mb-4">
               <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
@@ -1324,6 +1373,11 @@ export default function AdmissionDetailDrawer({
             <p className="arh-modal__text">
               Select a medical staff member (Doctor or Nurse) to be in charge of consultation and initial assessment for <strong className="text-slate-800">{admission?.applicant?.fullName}</strong>.
             </p>
+            {modalError && (
+              <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-lg text-xs mb-4 font-sans">
+                {modalError}
+              </div>
+            )}
 
             <form onSubmit={handleAssignConsultant}>
               <div className="mb-4">
@@ -1388,6 +1442,11 @@ export default function AdmissionDetailDrawer({
             <p className="arh-modal__text">
               Log consultation and support notes for <strong className="text-slate-800">{admission?.applicant?.fullName}</strong> to evaluate care requirements.
             </p>
+            {modalError && (
+              <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-lg text-xs mb-4 font-sans">
+                {modalError}
+              </div>
+            )}
 
             <form onSubmit={handleRecordConsultation}>
               <div className="mb-3">
@@ -1454,6 +1513,11 @@ export default function AdmissionDetailDrawer({
             <p className="arh-modal__text">
               Set a date and time for the physical health and cognitive assessment of <strong className="text-slate-800">{admission?.applicant?.fullName}</strong>.
             </p>
+            {modalError && (
+              <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-lg text-xs mb-4 font-sans">
+                {modalError}
+              </div>
+            )}
 
             <form onSubmit={handleScheduleAssessment}>
               <div className="mb-3">
@@ -1534,6 +1598,11 @@ export default function AdmissionDetailDrawer({
             <p className="arh-modal__text">
               As a Doctor, evaluate the physical/medical eligibility of <strong className="text-slate-800">{admission?.applicant?.fullName}</strong> for staying at the care home.
             </p>
+            {modalError && (
+              <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-lg text-xs mb-4 font-sans">
+                {modalError}
+              </div>
+            )}
 
             <form onSubmit={handleEvaluateEligibility}>
               <div className="mb-3">
@@ -1632,6 +1701,11 @@ export default function AdmissionDetailDrawer({
             <p className="arh-modal__text">
               Assign or update the Care Service Package for <strong className="text-slate-800">{admission?.applicant?.fullName}</strong>.
             </p>
+            {modalError && (
+              <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-lg text-xs mb-4 font-sans">
+                {modalError}
+              </div>
+            )}
 
             <form onSubmit={handleAssignPackage}>
               <div className="mb-4 relative">
@@ -1696,6 +1770,11 @@ export default function AdmissionDetailDrawer({
             <p className="arh-modal__text">
               Generate admission service terms and sign the care contract for <strong className="text-slate-800">{admission?.applicant?.fullName}</strong>.
             </p>
+            {modalError && (
+              <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-lg text-xs mb-4 font-sans">
+                {modalError}
+              </div>
+            )}
 
             <form onSubmit={handleCreateContract}>
               <div className="mb-3">
@@ -1806,6 +1885,11 @@ export default function AdmissionDetailDrawer({
             <p className="arh-modal__text">
               Finalize room and bed assignment for <strong className="text-slate-800">{admission?.applicant?.fullName}</strong>. This registers them as an active resident.
             </p>
+            {modalError && (
+              <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-lg text-xs mb-4 font-sans">
+                {modalError}
+              </div>
+            )}
 
             <form onSubmit={handleCheckInResident}>
               <div className="grid grid-cols-2 gap-3 mb-4">
