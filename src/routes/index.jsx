@@ -10,6 +10,7 @@ import ResidentPage from '../pages/admin/ResidentPage';
 import AdminProfile from '../pages/admin/AdminProfile';
 import AdminAdmissionRequestsPage from '../pages/admin/AdminAdmissionRequestsPage';
 import AdminTourRequestsPage from '../pages/admin/AdminTourRequestsPage';
+import ServicePackagesPage from '../pages/admin/ServicePackagesPage';
 import DoctorDashboardPage from '../pages/doctor/DoctorDashboardPage';
 import NurseDashboardPage from '../pages/nurse/NurseDashboardPage';
 import FamilyDashboardPage from '../pages/family/FamilyDashboardPage';
@@ -47,6 +48,7 @@ function AppRoutes() {
         <Route path="profile" element={<AdminProfile />} />
         <Route path="admission-requests" element={<AdminAdmissionRequestsPage />} />
         <Route path="tour-requests" element={<AdminTourRequestsPage />} />
+        <Route path="service-packages" element={<ServicePackagesPage />} />
         <Route path="*" element={<PlaceholderPage title="Trang quản trị" />} />
       </Route>
 
@@ -60,6 +62,8 @@ function AppRoutes() {
       >
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<DoctorDashboardPage />} />
+        <Route path="admission-requests" element={<AdminAdmissionRequestsPage />} />
+        <Route path="service-packages" element={<ServicePackagesPage />} />
         <Route path="appointments" element={<PlaceholderPage title="Lịch khám" />} />
         <Route path="patients" element={<PlaceholderPage title="Danh sách bệnh nhân" />} />
         <Route path="messages" element={<PlaceholderPage title="Tin nhắn" />} />
@@ -75,6 +79,8 @@ function AppRoutes() {
       >
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<NurseDashboardPage />} />
+        <Route path="admission-requests" element={<AdminAdmissionRequestsPage />} />
+        <Route path="service-packages" element={<ServicePackagesPage />} />
         <Route path="care-notes" element={<PlaceholderPage title="Ghi chú chăm sóc" />} />
         <Route path="medications" element={<PlaceholderPage title="Thuốc" />} />
         <Route path="messages" element={<PlaceholderPage title="Tin nhắn" />} />
