@@ -8,6 +8,7 @@ import RoleLayout from '../layouts/RoleLayout';
 import DashboardPage from '../pages/admin/DashboardPage';
 import ResidentPage from '../pages/admin/ResidentPage';
 import AdminProfile from '../pages/admin/AdminProfile';
+import AdminAdmissionRequestsPage from '../pages/admin/AdminAdmissionRequestsPage';
 import DoctorDashboardPage from '../pages/doctor/DoctorDashboardPage';
 import NurseDashboardPage from '../pages/nurse/NurseDashboardPage';
 import FamilyDashboardPage from '../pages/family/FamilyDashboardPage';
@@ -43,6 +44,7 @@ function AppRoutes() {
         <Route path="dashboard" element={<DashboardPage />} />
         <Route path="residents" element={<ResidentPage />} />
         <Route path="profile" element={<AdminProfile />} />
+        <Route path="admission-requests" element={<AdminAdmissionRequestsPage />} />
         <Route path="*" element={<PlaceholderPage title="Trang quản trị" />} />
       </Route>
 
