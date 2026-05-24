@@ -13,6 +13,8 @@ import NurseDashboardPage from '../pages/nurse/NurseDashboardPage';
 import FamilyDashboardPage from '../pages/family/FamilyDashboardPage';
 import SubmitAdmissionPage from '../pages/family/SubmitAdmissionPage';
 import AdmissionRequestsHistoryPage from '../pages/family/AdmissionRequestsHistoryPage';
+import SubmitFacilityTourPage from '../pages/family/SubmitFacilityTourPage';
+import FacilityTourHistoryPage from '../pages/family/FacilityTourHistoryPage';
 import ProtectedRoute from '../components/ProtectedRoute';
 
 function AppRoutes() {
@@ -84,6 +86,15 @@ function AppRoutes() {
       />
 
       <Route
+        path="/family/facility-tours/new"
+        element={
+          <ProtectedRoute requiredRole="family">
+            <SubmitFacilityTourPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
         path="/family/*"
         element={
           <ProtectedRoute requiredRole="family">
@@ -94,6 +105,7 @@ function AppRoutes() {
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<FamilyDashboardPage />} />
         <Route path="admission-requests" element={<AdmissionRequestsHistoryPage />} />
+        <Route path="facility-tours" element={<FacilityTourHistoryPage />} />
         <Route path="resident" element={<PlaceholderPage title="Hồ sơ người thân" />} />
         <Route path="notifications" element={<PlaceholderPage title="Thông báo" />} />
         <Route path="messages" element={<PlaceholderPage title="Tin nhắn" />} />

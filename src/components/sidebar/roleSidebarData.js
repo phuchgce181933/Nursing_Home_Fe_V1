@@ -67,6 +67,11 @@ export const roleSidebarData = {
       path: '/family/admission-requests',
     },
     {
+      title: 'Facility Tour History',
+      icon: Calendar,
+      path: '/family/facility-tours',
+    },
+    {
       title: 'Người thân',
       icon: Users,
       path: '/family/resident',

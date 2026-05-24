@@ -9,6 +9,10 @@ function HomePage() {
     ? '/family/admission-requests/new'
     : '/login';
 
+  const tourPath = (token && user?.role === 'family')
+    ? '/family/facility-tours/new'
+    : '/login';
+
   return (
     <div className="home-page">
       <header className="home-header">
@@ -42,7 +46,7 @@ function HomePage() {
               mang lại sự an tâm tuyệt đối cho gia đình.
             </p>
             <div className="home-hero__actions">
-              <a href="#contact" className="button button--primary">Đăng ký tham quan</a>
+              <Link to={tourPath} className="button button--primary">Đăng ký tham quan</Link>
               <a href="#services" className="button button--outline">Tư vấn dịch vụ</a>
             </div>
           </div>
