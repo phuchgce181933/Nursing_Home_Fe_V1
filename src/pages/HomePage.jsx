@@ -1,8 +1,83 @@
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { Check } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
+import { getAuthToken } from '../utils/auth';
+import servicePackageService from '../services/servicePackage.service';
+
+const DEFAULT_PACKAGES = [
+  {
+    _id: 'default-basic',
+    name: 'Basic Care Package',
+    tier: 'basic',
+    monthlyPrice: 12000000,
+    description: 'Daily living assistance, standard health monitoring, and professional nutrition guidelines.',
+    services: [
+      'Daily assistance with dining, bathing, and laundry',
+      'Vital signs check (blood pressure, heart rate) twice daily',
+      'Regular check-ups by family doctor once every two weeks',
+      'Basic daily recreational activities and community events'
+    ]
+  },
+  {
+    _id: 'default-standard',
+    name: 'Standard Care Package',
+    tier: 'standard',
+    monthlyPrice: 18000000,
+    description: 'Comprehensive clinical support combined with active rehabilitation and continuous health telemetry.',
+    services: [
+      'All features included in the Basic Care package',
+      'Personalized physiotherapy and rehab 3 times a week',
+      'Weekly clinical check-ups by specialist doctors',
+      '24/7 continuous health tracking via smart medical devices',
+      'Specialized dietary plans customized by clinical nutritionists'
+    ]
+  },
+  {
+    _id: 'default-premium',
+    name: 'Premium Care Package',
+    tier: 'premium',
+    monthlyPrice: 28000000,
+    description: 'Specialized therapies for residents recovering from stroke, injuries, or living with cognitive decline.',
+    services: [
+      'All features included in the Standard Care package',
+      'Daily 1-on-1 intensive physical therapy and cognitive training',
+      'Doctor check-ups every two days and 24/7 on-duty nurses',
+      'Tailored cognitive support plans for dementia and Alzheimer care',
+      'Exclusive access to creative hobby clubs and wellness activities'
+    ]
+  }
+];
 
 function HomePage() {
   const { token, user } = useAuth();
+  const [packages, setPackages] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const loadPackages = async () => {
+      const activeToken = getAuthToken();
+      if (activeToken) {
+        try {
+          setLoading(true);
+          const res = await servicePackageService.getServicePackageList({ isActive: true }, 'medical');
+          if (res?.data && res.data.length > 0) {
+            setPackages(res.data);
+          } else {
+            setPackages(DEFAULT_PACKAGES);
+          }
+        } catch (err) {
+          console.error('Failed to load packages on home page:', err);
+          setPackages(DEFAULT_PACKAGES);
+        } finally {
+          setLoading(false);
+        }
+      } else {
+        setPackages(DEFAULT_PACKAGES);
+      }
+    };
+    loadPackages();
+  }, [token]);
 
   // Redirect to the request form if logged in as a family member, otherwise redirect to login
   const bookPath = (token && user?.role === 'family')
@@ -23,7 +98,7 @@ function HomePage() {
         <nav className="home-nav">
           <Link to="#home">Home</Link>
           <Link to="#intro">Intro</Link>
-          <Link to="#services">Services</Link>
+          <Link to="/services">Services</Link>
           <Link to="#tech">Tech</Link>
           <Link to="#living">Living Space</Link>
           <Link to="#pricing">Pricing</Link>
@@ -126,6 +201,50 @@ function HomePage() {
                 </div>
               </div>
             </article>
+          </div>
+        </section>
+
+        <section className="home-pricing" id="pricing">
+          <div className="section-head">
+            <span>Care Plans & Pricing</span>
+            <h2>Our Care Service Packages</h2>
+            <p>
+              An Nhiên Care Home provides a wide range of specialized care packages tailored to the unique physical conditions and medical needs of senior residents.
+            </p>
+          </div>
+
+          <div className="pricing-grid">
+            {packages.slice(0, 3).map((pkg) => {
+              const isStandard = pkg.tier === 'standard';
+              const badgeClass = `pricing-card__badge ${pkg.tier}`;
+              return (
+                <div key={pkg._id} className={`pricing-card ${isStandard ? 'featured' : ''}`}>
+                  <span className={badgeClass}>{pkg.tier}</span>
+                  <h3 className="pricing-card__title">{pkg.name}</h3>
+                  <div className="pricing-card__price-box">
+                    <span className="pricing-card__price">{pkg.monthlyPrice?.toLocaleString() || 0}</span>
+                    <span className="pricing-card__period">VND / month</span>
+                  </div>
+                  <p className="pricing-card__description">{pkg.description || 'Comprehensive clinical care, health monitoring, and daily residential support.'}</p>
+                  <div className="pricing-card__divider" />
+                  <span className="pricing-card__list-title">Services Included:</span>
+                  <div className="pricing-card__list">
+                    {pkg.services && pkg.services.map((srv, idx) => (
+                      <div key={idx} className="pricing-card__item">
+                        <Check size={14} />
+                        <span>{srv}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <Link
+                    to={bookPath}
+                    className={`pricing-card__button ${isStandard ? 'pricing-card__button--primary' : 'pricing-card__button--secondary'}`}
+                  >
+                    Register for Admission
+                  </Link>
+                </div>
+              );
+            })}
           </div>
         </section>
 

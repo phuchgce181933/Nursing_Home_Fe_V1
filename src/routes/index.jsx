@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import LoginPage from '../pages/LoginPage';
 import HomePage from '../pages/HomePage';
+import ServicesPage from '../pages/ServicesPage';
 import ProfilePage from '../pages/ProfilePage';
 import PlaceholderPage from '../pages/PlaceholderPage';
 import AdminLayout from '../layouts/AdminLayout';
@@ -121,6 +122,7 @@ function AppRoutes() {
         <Route path="messages" element={<PlaceholderPage title="Tin nhắn" />} />
       </Route>
 
+      <Route path="/services" element={<ServicesPage />} />
       <Route path="/" element={<HomePage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
