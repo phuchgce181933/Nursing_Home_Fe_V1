@@ -430,8 +430,15 @@ export default function AdmissionDetailDrawer({
 
     try {
       setScheduling(true);
+      let selectedDate = new Date(scheduleDate);
+      const now = new Date();
+      // If the selected date is in the past or less than 5 minutes in the future relative to the client clock
+      if (selectedDate.getTime() - now.getTime() < 5 * 60 * 1000) {
+        selectedDate = new Date(now.getTime() + 10 * 60 * 1000);
+      }
+
       await admissionService.medicalScheduleAssessment(admissionId, {
-        scheduledAt: new Date(scheduleDate).toISOString(),
+        scheduledAt: selectedDate.toISOString(),
         initialAssessmentNotes: initialAssessmentNotes.trim() || undefined,
         notes: scheduleGenNotes.trim() || undefined,
       });
@@ -499,12 +506,12 @@ export default function AdmissionDetailDrawer({
 
   const handleCreateContract = async (e) => {
     if (e) e.preventDefault();
-    if (!admissionId || !contractNum.trim()) return;
+    if (!admissionId) return;
 
     try {
       setCreatingContract(true);
       await admissionService.adminCreateContract(admissionId, {
-        contractNumber: contractNum.trim(),
+        contractNumber: contractNum.trim() || undefined,
         contractStartDate: contractStart ? new Date(contractStart).toISOString() : undefined,
         contractEndDate: contractEnd ? new Date(contractEnd).toISOString() : undefined,
         contractTerms: contractTerms.trim() || undefined,
@@ -1031,7 +1038,13 @@ export default function AdmissionDetailDrawer({
                       <button
                         type="button"
                         onClick={() => {
-                          setContractNum(admission.contractNumber || '');
+                          if (admission.contractNumber) {
+                            setContractNum(admission.contractNumber);
+                          } else {
+                            const year = new Date().getFullYear();
+                            const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+                            setContractNum(`HĐ-${year}-${randomSuffix}`);
+                          }
                           setContractStart(admission.contractStartDate ? admission.contractStartDate.split('T')[0] : '');
                           setContractEnd(admission.contractEndDate ? admission.contractEndDate.split('T')[0] : '');
                           setContractTerms(admission.contractTerms || '');
