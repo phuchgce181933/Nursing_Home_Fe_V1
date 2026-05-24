@@ -55,6 +55,10 @@ export const sidebarData = [
         title: "Admission Requests",
         path: "/admin/admission-requests",
       },
+      {
+        title: "Tour Requests",
+        path: "/admin/tour-requests",
+      },
     ],
   },
 

@@ -291,7 +291,7 @@ export default function AdmissionDetailDrawer({
   const isApprovable =
     isAdmin &&
     admission &&
-    ['new_request', 'consulting', 'assessing', 'contracting'].includes(admission.status);
+    ['new_request', 'consulting', 'assessing'].includes(admission.status);
 
   const isRejectable =
     isAdmin &&
@@ -675,17 +675,15 @@ export default function AdmissionDetailDrawer({
                   className="arh-drawer__btn arh-drawer__btn--cancel flex-1"
                   onClick={() => setShowRejectModal(true)}
                 >
-                  <XCircle size={18} />
                   Reject Request
                 </button>
               )}
               {isApprovable && (
                 <button
                   className="arh-drawer__btn arh-drawer__btn--primary flex-1"
-                  style={{ background: '#2D6A4F' }}
+                  style={{ background: '#1B365D' }}
                   onClick={() => setShowApproveModal(true)}
                 >
-                  <CheckCircle size={18} />
                   Approve Request
                 </button>
               )}

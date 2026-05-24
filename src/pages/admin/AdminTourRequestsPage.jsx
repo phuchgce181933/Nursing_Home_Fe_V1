@@ -13,26 +13,21 @@ import {
   XCircle,
   Clock,
   Activity,
-  UserCheck,
+  Users,
 } from 'lucide-react';
-import admissionService from '../../services/admission.service';
-import AdmissionDetailDrawer from '../../components/family/SubmitAdmission/AdmissionDetailDrawer';
+import facilityTourService from '../../services/facilityTour.service';
+import AdminTourDetailDrawer from '../../components/family/FacilityTour/AdminTourDetailDrawer';
+
+// CSS Imports to align designs perfectly
+import '../../styles/admin/AdminAdmissionRequestsPage.css';
+import '../../styles/family/FacilityTourHistoryPage.css';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All Statuses' },
-  { value: 'new_request', label: 'New Request' },
-  { value: 'consulting', label: 'Consulting' },
-  { value: 'assessing', label: 'Assessing' },
-  { value: 'contracting', label: 'Contracting' },
-  { value: 'checked_in', label: 'Checked In' },
-  { value: 'cancelled', label: 'Cancelled' },
-];
-
-const ELIGIBILITY_OPTIONS = [
-  { value: '', label: 'All Eligibility' },
-  { value: 'pending', label: 'Pending Assessment' },
-  { value: 'eligible', label: 'Eligible' },
-  { value: 'not_eligible', label: 'Ineligible' },
+  { value: 'pending', label: 'Pending Review' },
+  { value: 'confirmed', label: 'Approved & Confirmed' },
+  { value: 'completed', label: 'Completed' },
+  { value: 'cancelled', label: 'Cancelled / Rejected' },
 ];
 
 const formatEnglishDate = (dateStr) => {
@@ -52,18 +47,14 @@ const formatEnglishDate = (dateStr) => {
 
 const getStatusBadgeClass = (status) => {
   switch (status) {
-    case 'new_request':
-      return 'status-badge-custom-adm--new';
-    case 'consulting':
-      return 'status-badge-custom-adm--consulting';
-    case 'assessing':
-      return 'status-badge-custom-adm--assessing';
-    case 'contracting':
-      return 'status-badge-custom-adm--contracting';
-    case 'checked_in':
-      return 'status-badge-custom-adm--checked-in';
+    case 'pending':
+      return 'status-badge-custom-adm--new'; // Blue/Slate theme for pending
+    case 'confirmed':
+      return 'status-badge-custom-adm--contracting'; // Green theme for confirmed
+    case 'completed':
+      return 'status-badge-custom-adm--checked-in'; // Emerald/Dark green for completed
     case 'cancelled':
-      return 'status-badge-custom-adm--cancelled';
+      return 'status-badge-custom-adm--cancelled'; // Red theme for cancelled
     default:
       return 'status-badge-custom-adm--cancelled';
   }
@@ -71,46 +62,20 @@ const getStatusBadgeClass = (status) => {
 
 const getStatusLabel = (status) => {
   switch (status) {
-    case 'new_request':
-      return 'New Request';
-    case 'consulting':
-      return 'Consulting';
-    case 'assessing':
-      return 'Assessing';
-    case 'contracting':
-      return 'Contracting';
-    case 'checked_in':
-      return 'Checked In';
+    case 'pending':
+      return 'Pending Review';
+    case 'confirmed':
+      return 'Confirmed';
+    case 'completed':
+      return 'Completed';
     case 'cancelled':
       return 'Cancelled';
     default:
-      return status;
+      return status || 'Unknown';
   }
 };
 
-const getEligibilityBadgeClass = (eligibility) => {
-  switch (eligibility) {
-    case 'eligible':
-      return 'assess-badge-adm--eligible';
-    case 'not_eligible':
-      return 'assess-badge-adm--ineligible';
-    default:
-      return 'assess-badge-adm--pending';
-  }
-};
-
-const getEligibilityLabel = (eligibility) => {
-  switch (eligibility) {
-    case 'eligible':
-      return 'Eligible';
-    case 'not_eligible':
-      return 'Ineligible';
-    default:
-      return 'Pending';
-  }
-};
-
-export default function AdminAdmissionRequestsPage() {
+export default function AdminTourRequestsPage() {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -121,18 +86,17 @@ export default function AdminAdmissionRequestsPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
 
-  // Metrics states
+  // Dashboard counter states
   const [metrics, setMetrics] = useState({
     total: 0,
-    new: 0,
-    processing: 0,
+    pending: 0,
+    confirmed: 0,
     completed: 0,
   });
 
   // Filter states
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
-  const [eligibilityStatus, setEligibilityStatus] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
 
@@ -140,109 +104,104 @@ export default function AdminAdmissionRequestsPage() {
   const [appliedFilters, setAppliedFilters] = useState({
     search: '',
     status: '',
-    eligibilityStatus: '',
     from: '',
     to: '',
   });
 
   // Detail Drawer state
-  const [selectedAdmissionId, setSelectedAdmissionId] = useState(null);
+  const [selectedTourId, setSelectedTourId] = useState(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
-  // Fetch admission requests
-  const fetchRequests = useCallback(async () => {
+  // Fetch tour requests
+  const fetchTours = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      
+
       const params = {
         page,
         limit,
         search: appliedFilters.search || undefined,
         status: appliedFilters.status || undefined,
-        eligibilityStatus: appliedFilters.eligibilityStatus || undefined,
         from: appliedFilters.from || undefined,
         to: appliedFilters.to || undefined,
       };
 
-      const res = await admissionService.adminGetAdmissionList(params);
-      
+      const res = await facilityTourService.adminGetTourList(params);
+
       setData(res?.data || []);
       setTotal(res?.total || 0);
       setTotalPages(res?.totalPages || 1);
 
-      // Compute simple dashboard metrics from the data list
+      // Compute counter statistics
       if (res?.data) {
-        const totalCount = res.total || 0;
         setMetrics({
-          total: totalCount,
-          new: res.data.filter(x => x.status === 'new_request').length,
-          processing: res.data.filter(x => ['consulting', 'assessing', 'contracting'].includes(x.status)).length,
-          completed: res.data.filter(x => x.status === 'checked_in').length,
+          total: res.total || 0,
+          pending: res.data.filter(x => x.status === 'pending').length,
+          confirmed: res.data.filter(x => x.status === 'confirmed').length,
+          completed: res.data.filter(x => x.status === 'completed').length,
         });
       }
     } catch (err) {
-      console.error('Failed to load admission requests:', err);
-      setError('Could not retrieve admission requests. Please check your credentials or network connection.');
+      console.error('Failed to load facility tour requests:', err);
+      setError('Could not retrieve facility tour requests. Please check your credentials or network connection.');
     } finally {
       setLoading(false);
     }
   }, [page, limit, appliedFilters]);
 
   useEffect(() => {
-    fetchRequests();
-  }, [fetchRequests]);
+    fetchTours();
+  }, [fetchTours]);
 
   // Apply filters trigger
   const handleApplyFilters = (e) => {
     if (e) e.preventDefault();
     setPage(1);
-    setAppliedFilters({ search, status, eligibilityStatus, from, to });
+    setAppliedFilters({ search, status, from, to });
   };
 
   // Reset filters
   const handleResetFilters = () => {
     setSearch('');
     setStatus('');
-    setEligibilityStatus('');
     setFrom('');
     setTo('');
     setPage(1);
-    setAppliedFilters({ search: '', status: '', eligibilityStatus: '', from: '', to: '' });
+    setAppliedFilters({ search: '', status: '', from: '', to: '' });
   };
 
   // Open detail drawer
   const handleOpenDetails = (id) => {
-    setSelectedAdmissionId(id);
+    setSelectedTourId(id);
     setIsDrawerOpen(true);
   };
 
-  // Close drawer & reload list on success
+  // Close drawer
   const handleDrawerClose = () => {
     setIsDrawerOpen(false);
-    setSelectedAdmissionId(null);
+    setSelectedTourId(null);
   };
 
   const handleActionSuccess = () => {
-    fetchRequests();
+    fetchTours();
   };
 
   return (
     <div className="adm-container">
-      
       {/* Top Banner Header */}
       <div className="adm-header">
         <div>
           <h1>
-            <ClipboardList className="text-emerald-sage" size={26} />
-            Admission Requests
+            <Calendar className="text-emerald-sage" size={26} />
+            Tour Booking Requests
           </h1>
           <p>
-            Review, evaluate, approve, and track family admission requests for elderly residents.
+            Manage facility visitations, approve time slots, and consult with family member accounts.
           </p>
         </div>
         <button
-          onClick={fetchRequests}
+          onClick={fetchTours}
           disabled={loading}
           className="adm-btn-refresh"
         >
@@ -264,38 +223,36 @@ export default function AdminAdmissionRequestsPage() {
           </div>
         </div>
 
-        {/* New Card */}
+        {/* Pending Card */}
         <div className="adm-card-stat">
           <div className="adm-stat-icon" style={{ backgroundColor: '#eff6ff', color: '#2563eb' }}>
             <Clock size={22} />
           </div>
           <div>
-            <span className="adm-stat-label">New Requests</span>
-            <span className="adm-stat-value">{data.filter(x => x.status === 'new_request').length}</span>
+            <span className="adm-stat-label">Pending Review</span>
+            <span className="adm-stat-value">{data.filter(x => x.status === 'pending').length}</span>
           </div>
         </div>
 
-        {/* Processing Card */}
+        {/* Confirmed Card */}
         <div className="adm-card-stat">
-          <div className="adm-stat-icon" style={{ backgroundColor: '#faf5ff', color: '#9333ea' }}>
-            <Activity size={22} />
+          <div className="adm-stat-icon" style={{ backgroundColor: '#effdf4', color: '#16a34a' }}>
+            <CheckCircle size={22} />
           </div>
           <div>
-            <span className="adm-stat-label">In Processing</span>
-            <span className="adm-stat-value">
-              {data.filter(x => ['consulting', 'assessing', 'contracting'].includes(x.status)).length}
-            </span>
+            <span className="adm-stat-label">Confirmed Tours</span>
+            <span className="adm-stat-value">{data.filter(x => x.status === 'confirmed').length}</span>
           </div>
         </div>
 
-        {/* Admitted Card */}
+        {/* Completed Card */}
         <div className="adm-card-stat">
-          <div className="adm-stat-icon" style={{ backgroundColor: '#ecfdf5', color: '#059669' }}>
-            <UserCheck size={22} />
+          <div className="adm-stat-icon" style={{ backgroundColor: '#f0fdfa', color: '#0d9488' }}>
+            <Users size={22} />
           </div>
           <div>
-            <span className="adm-stat-label">Admitted</span>
-            <span className="adm-stat-value">{data.filter(x => x.status === 'checked_in').length}</span>
+            <span className="adm-stat-label">Completed Tours</span>
+            <span className="adm-stat-value">{data.filter(x => x.status === 'completed').length}</span>
           </div>
         </div>
       </div>
@@ -303,8 +260,7 @@ export default function AdminAdmissionRequestsPage() {
       {/* Filter and Search Panel */}
       <div className="adm-filter-panel">
         <form onSubmit={handleApplyFilters}>
-          <div className="adm-filter-grid">
-            
+          <div className="adm-filter-grid" style={{ gridTemplateColumns: '2fr 1fr' }}>
             {/* Search Input */}
             <div className="adm-filter-group">
               <div className="adm-filter-input-wrapper">
@@ -312,7 +268,7 @@ export default function AdminAdmissionRequestsPage() {
                 <input
                   type="text"
                   className="adm-filter-input"
-                  placeholder="Search code, relative name, phone..."
+                  placeholder="Search contact name, phone, or email..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
@@ -333,30 +289,15 @@ export default function AdminAdmissionRequestsPage() {
                 ))}
               </select>
             </div>
-
-            {/* Eligibility Select */}
-            <div className="adm-filter-group">
-              <select
-                className="adm-filter-select"
-                value={eligibilityStatus}
-                onChange={(e) => setEligibilityStatus(e.target.value)}
-              >
-                {ELIGIBILITY_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </div>
           </div>
 
           {/* Secondary Filters - Dates & Buttons */}
           <div className="adm-filter-row-secondary">
             <div className="adm-filter-date-group">
               <span className="adm-date-title">
-                <Calendar size={13} className="text-slate-400" /> Submitted Range:
+                <Calendar size={13} className="text-slate-400" /> Preferred Date Range:
               </span>
-              
+
               <input
                 type="date"
                 className="adm-date-input"
@@ -396,7 +337,7 @@ export default function AdminAdmissionRequestsPage() {
         {loading && data.length === 0 ? (
           <div className="p-16 flex flex-col items-center justify-center bg-white" style={{ minHeight: '300px' }}>
             <RefreshCw className="animate-spin text-emerald-sage mb-3" size={32} />
-            <p className="text-slate-500 text-sm">Retrieving admission dossiers...</p>
+            <p className="text-slate-500 text-sm">Retrieving tour requests...</p>
           </div>
         ) : error ? (
           <div className="p-10 flex flex-col items-center justify-center text-center bg-white" style={{ minHeight: '300px' }}>
@@ -404,7 +345,7 @@ export default function AdminAdmissionRequestsPage() {
             <p className="text-slate-800 font-bold mb-1">An error occurred</p>
             <p className="text-slate-500 text-sm max-w-md">{error}</p>
             <button
-              onClick={fetchRequests}
+              onClick={fetchTours}
               className="mt-4 px-5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm rounded-xl font-semibold transition-all"
             >
               Try Again
@@ -413,11 +354,11 @@ export default function AdminAdmissionRequestsPage() {
         ) : data.length === 0 ? (
           <div className="p-16 text-center flex flex-col items-center justify-center bg-white" style={{ minHeight: '300px' }}>
             <div className="bg-slate-50 p-4 rounded-full text-slate-400 mb-3" style={{ width: 'fit-content' }}>
-              <ClipboardList size={30} />
+              <Calendar size={30} />
             </div>
-            <p className="text-slate-700 font-bold mb-1">No Admission Requests Found</p>
+            <p className="text-slate-700 font-bold mb-1">No Tour Requests Found</p>
             <p className="text-slate-400 text-xs max-w-sm">
-              We couldn't find any admission requests matching your search or filters.
+              We couldn't find any tour requests matching your search or filters.
             </p>
           </div>
         ) : (
@@ -425,12 +366,12 @@ export default function AdminAdmissionRequestsPage() {
             <table className="adm-table">
               <thead>
                 <tr>
-                  <th>Request Code</th>
-                  <th>Elderly Resident</th>
+                  <th>Request ID</th>
                   <th>Primary Contact</th>
-                  <th>Preferred Date</th>
+                  <th>Family Account Profile</th>
+                  <th>Preferred Schedule</th>
+                  <th style={{ textAlign: 'center' }}>Visitors</th>
                   <th>Submitted Date</th>
-                  <th style={{ textAlign: 'center' }}>Medical Assessment</th>
                   <th style={{ textAlign: 'center' }}>Status</th>
                   <th style={{ textAlign: 'center' }}>Actions</th>
                 </tr>
@@ -443,18 +384,17 @@ export default function AdminAdmissionRequestsPage() {
                     onClick={() => handleOpenDetails(row._id)}
                   >
                     <td className="cell-code-adm">
-                      #{row.requestCode || `ANH-${row._id.substring(0, 4).toUpperCase()}`}
+                      #{row._id.substring(18).toUpperCase()}
                     </td>
                     <td>
-                      <div className="cell-resident-name">{row.applicant?.fullName || 'N/A'}</div>
+                      <div className="cell-resident-name">{row.contactName || 'N/A'}</div>
                       <div className="cell-resident-meta">
-                        {row.applicant?.gender === 'male' ? 'MALE' : row.applicant?.gender === 'female' ? 'FEMALE' : row.applicant?.gender || 'N/A'}
-                        {row.applicant?.dateOfBirth ? ` • ${new Date().getFullYear() - new Date(row.applicant.dateOfBirth).getFullYear()} years old` : ''}
+                        {row.contactPhone || 'No Phone'}
                       </div>
                     </td>
                     <td>
                       <div className="cell-contact-name">
-                        {row.familyAccount?.fullName || row.requestedByName || 'Relative'}
+                        {row.familyAccount?.fullName || 'N/A'}
                         {row.familyAccount?.username && (
                           <span className="text-[11px] text-slate-400 font-normal ml-1.5">
                             (@{row.familyAccount.username})
@@ -462,19 +402,22 @@ export default function AdminAdmissionRequestsPage() {
                         )}
                       </div>
                       <div className="cell-contact-phone">
-                        {row.requestedByPhone || row.familyAccount?.phone || 'N/A'}
+                        {row.familyAccount?.email || ''}
                       </div>
                     </td>
                     <td style={{ fontWeight: '500', color: '#475569' }}>
-                      {formatEnglishDate(row.preferredAdmissionDate)}
+                      <div style={{ fontSize: '13px', color: '#1e293b' }}>
+                        {formatEnglishDate(row.preferredDate)}
+                      </div>
+                      <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
+                        Slot: {row.status === 'confirmed' ? (row.confirmedTimeSlot || row.preferredTimeSlot) : row.preferredTimeSlot}
+                      </div>
+                    </td>
+                    <td style={{ textAlign: 'center', fontWeight: '600', color: '#475569' }}>
+                      {row.numberOfVisitors || 1}
                     </td>
                     <td className="cell-date">
                       {formatEnglishDate(row.createdAt)}
-                    </td>
-                    <td style={{ textAlign: 'center' }}>
-                      <span className={`assess-badge-adm ${getEligibilityBadgeClass(row.eligibilityStatus)}`}>
-                        {getEligibilityLabel(row.eligibilityStatus)}
-                      </span>
                     </td>
                     <td style={{ textAlign: 'center' }}>
                       <span className={`status-badge-custom-adm ${getStatusBadgeClass(row.status)}`}>
@@ -503,7 +446,7 @@ export default function AdminAdmissionRequestsPage() {
             <div className="pagination-info">
               Showing <span>{(page - 1) * limit + 1}</span> to{' '}
               <span>{Math.min(page * limit, total)}</span> of{' '}
-              <span>{total}</span> dossiers
+              <span>{total}</span> tour bookings
             </div>
 
             <div className="pagination-controls">
@@ -514,7 +457,7 @@ export default function AdminAdmissionRequestsPage() {
               >
                 <ChevronLeft size={16} />
               </button>
-              
+
               <div className="page-indicator">
                 Page {page} / {totalPages}
               </div>
@@ -532,12 +475,11 @@ export default function AdminAdmissionRequestsPage() {
       </div>
 
       {/* Slide-out Administrative Drawer */}
-      <AdmissionDetailDrawer
+      <AdminTourDetailDrawer
         isOpen={isDrawerOpen}
         onClose={handleDrawerClose}
-        admissionId={selectedAdmissionId}
-        onCancelSuccess={handleActionSuccess}
-        isAdmin={true}
+        tourId={selectedTourId}
+        onActionSuccess={handleActionSuccess}
       />
     </div>
   );
