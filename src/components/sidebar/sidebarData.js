@@ -59,6 +59,10 @@ export const sidebarData = [
         title: "Tour Requests",
         path: "/admin/tour-requests",
       },
+      {
+        title: "Service Packages",
+        path: "/admin/service-packages",
+      },
     ],
   },
 

@@ -310,6 +310,18 @@ const medicalEvaluateEligibility = async (admissionId, body) => {
   return response.data;
 };
 
+/**
+ * Admin | List Staff Accounts
+ * Lấy danh sách tài khoản nhân viên (để gán consultant).
+ *
+ * @param {object} params - Query parameters (role, isActive, search, page, limit)
+ * @returns {object} { data: Staff[], total, page, limit, totalPages }
+ */
+const getStaffList = async (params = {}) => {
+  const response = await axiosClient.get('/auth/staff', { params });
+  return response.data;
+};
+
 export default {
   // Family
   submitAdmissionRequest,
@@ -325,6 +337,7 @@ export default {
   adminAssignServicePackage,
   adminCreateContract,
   adminCheckInResident,
+  getStaffList,
   // Medical Staff (Doctor / Nurse)
   medicalRecordConsultation,
   medicalScheduleAssessment,

@@ -8,6 +8,7 @@ import {
   Activity,
   Bell,
   History,
+  ClipboardList,
 } from 'lucide-react';
 
 export const roleSidebarData = {
@@ -26,6 +27,16 @@ export const roleSidebarData = {
       title: 'Bệnh nhân',
       icon: Users,
       path: '/doctor/patients',
+    },
+    {
+      title: 'Yêu cầu Nhập viện',
+      icon: ClipboardList,
+      path: '/doctor/admission-requests',
+    },
+    {
+      title: 'Gói Dịch vụ',
+      icon: HeartPulse,
+      path: '/doctor/service-packages',
     },
     {
       title: 'Tin nhắn',
@@ -48,6 +59,16 @@ export const roleSidebarData = {
       title: 'Thuốc',
       icon: Pill,
       path: '/nurse/medications',
+    },
+    {
+      title: 'Yêu cầu Nhập viện',
+      icon: ClipboardList,
+      path: '/nurse/admission-requests',
+    },
+    {
+      title: 'Gói Dịch vụ',
+      icon: HeartPulse,
+      path: '/nurse/service-packages',
     },
     {
       title: 'Tin nhắn',
