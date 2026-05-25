@@ -4,11 +4,14 @@ import HomePage from '../pages/HomePage';
 import ServicesPage from '../pages/ServicesPage';
 import ProfilePage from '../pages/ProfilePage';
 import PlaceholderPage from '../pages/PlaceholderPage';
+import ForgotPasswordPage from '../pages/ForgotPasswordPage';
+import ResetPasswordPage from '../pages/ResetPasswordPage';
 import AdminLayout from '../layouts/AdminLayout';
 import RoleLayout from '../layouts/RoleLayout';
 import DashboardPage from '../pages/admin/DashboardPage';
 import ResidentPage from '../pages/admin/ResidentPage';
 import AdminProfile from '../pages/admin/AdminProfile';
+import AdminAccountsPage from '../pages/admin/AdminAccountsPage';
 import AdminAdmissionRequestsPage from '../pages/admin/AdminAdmissionRequestsPage';
 import AdminTourRequestsPage from '../pages/admin/AdminTourRequestsPage';
 import ServicePackagesPage from '../pages/admin/ServicePackagesPage';
@@ -25,6 +28,8 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
 
       <Route
         path="/profile"
@@ -47,6 +52,7 @@ function AppRoutes() {
         <Route path="dashboard" element={<DashboardPage />} />
         <Route path="residents" element={<ResidentPage />} />
         <Route path="profile" element={<AdminProfile />} />
+        <Route path="accounts" element={<AdminAccountsPage />} />
         <Route path="admission-requests" element={<AdminAdmissionRequestsPage />} />
         <Route path="tour-requests" element={<AdminTourRequestsPage />} />
         <Route path="service-packages" element={<ServicePackagesPage />} />

@@ -26,8 +26,12 @@ export const sidebarData = [
     icon: Shield,
     children: [
       {
-        title: "Accounts",
+        title: "My Profile",
         path: "/admin/profile",
+      },
+      {
+        title: "Accounts",
+        path: "/admin/accounts",
       },
     ],
   },
@@ -89,7 +93,7 @@ export const sidebarData = [
   {
     title: "Staff Management",
     icon: ClipboardList,
-    path: "/admin/staff",
+    path: "/admin/accounts",
   },
 
   {
