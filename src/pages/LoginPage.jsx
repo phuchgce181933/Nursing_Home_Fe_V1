@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import LoginForm from '../components/LoginForm';
 import { useAuth } from '../hooks/useAuth';
 import { getHomePath } from '../constants/routes';
@@ -13,8 +13,9 @@ function LoginPage() {
     setMessage('');
     try {
       const data = await login(credentials);
+      const role = data.role || data.user?.role;
       setMessage('Đăng nhập thành công.');
-      navigate(getHomePath(data.user.role));
+      navigate(getHomePath(role));
     } catch (err) {
       setMessage(err?.response?.data?.message || 'Đăng nhập thất bại.');
     }
@@ -39,6 +40,11 @@ function LoginPage() {
           </div>
         )}
         <LoginForm onLogin={handleLogin} />
+        <div style={{ marginTop: 16, textAlign: 'center' }}>
+          <Link to="/forgot-password" style={{ color: '#2563eb', textDecoration: 'none', fontWeight: 600 }}>
+            Quên mật khẩu?
+          </Link>
+        </div>
       </div>
     </div>
   );

@@ -15,6 +15,7 @@ export function AuthProvider({ children }) {
         setLoading(false);
         return;
       }
+
       setLoading(true);
       try {
         const profile = await authService.fetchProfile();
@@ -22,6 +23,7 @@ export function AuthProvider({ children }) {
       } catch {
         setToken(null);
         removeAuthToken();
+        setUser(null);
       } finally {
         setLoading(false);
       }
@@ -32,23 +34,41 @@ export function AuthProvider({ children }) {
     } else {
       setLoading(false);
     }
-  }, [token]);
+  }, [token, user]);
 
   const login = async (credentials) => {
     const data = await authService.login(credentials);
     setToken(data.token);
-    setUser(data.user);
-    return data;
+
+    try {
+      const profile = await authService.fetchProfile();
+      setUser(profile);
+      return profile;
+    } catch {
+      setUser(data.user);
+      return data;
+    }
+  };
+
+  const refreshUser = async () => {
+    if (!token) {
+      return null;
+    }
+
+    const profile = await authService.fetchProfile();
+    setUser(profile);
+    return profile;
   };
 
   const logout = () => {
     authService.logout();
     setToken(null);
     setUser(null);
+    setLoading(false);
   };
 
   const value = useMemo(
-    () => ({ token, user, loading, login, logout }),
+    () => ({ token, user, loading, login, logout, refreshUser }),
     [token, user, loading]
   );
 
