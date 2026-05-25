@@ -46,6 +46,7 @@ function AppRoutes() {
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<DashboardPage />} />
         <Route path="residents" element={<ResidentPage />} />
+        <Route path="residents/create" element={<ResidentPage defaultMode="create" />} />
         <Route path="profile" element={<AdminProfile />} />
         <Route path="admission-requests" element={<AdminAdmissionRequestsPage />} />
         <Route path="tour-requests" element={<AdminTourRequestsPage />} />

@@ -40,10 +40,6 @@ export const sidebarData = [
         title: "Resident List",
         path: "/admin/residents",
       },
-      {
-        title: "Add Resident",
-        path: "/admin/residents/create",
-      },
     ],
   },
 
