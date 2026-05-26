@@ -22,6 +22,7 @@ import SubmitAdmissionPage from '../pages/family/SubmitAdmissionPage';
 import AdmissionRequestsHistoryPage from '../pages/family/AdmissionRequestsHistoryPage';
 import SubmitFacilityTourPage from '../pages/family/SubmitFacilityTourPage';
 import FacilityTourHistoryPage from '../pages/family/FacilityTourHistoryPage';
+import IncidentManagementPage from '../pages/IncidentManagementPage';
 import ProtectedRoute from '../components/ProtectedRoute';
 
 function AppRoutes() {
@@ -57,6 +58,7 @@ function AppRoutes() {
         <Route path="admission-requests" element={<AdminAdmissionRequestsPage />} />
         <Route path="tour-requests" element={<AdminTourRequestsPage />} />
         <Route path="service-packages" element={<ServicePackagesPage />} />
+        <Route path="incidents" element={<IncidentManagementPage />} />
         <Route path="*" element={<PlaceholderPage title="Trang quản trị" />} />
       </Route>
 
@@ -70,11 +72,13 @@ function AppRoutes() {
       >
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<DoctorDashboardPage />} />
+        <Route path="profile" element={<ProfilePage />} />
         <Route path="admission-requests" element={<AdminAdmissionRequestsPage />} />
         <Route path="service-packages" element={<ServicePackagesPage />} />
         <Route path="appointments" element={<PlaceholderPage title="Lịch khám" />} />
         <Route path="patients" element={<PlaceholderPage title="Danh sách bệnh nhân" />} />
         <Route path="messages" element={<PlaceholderPage title="Tin nhắn" />} />
+        <Route path="incidents" element={<IncidentManagementPage />} />
       </Route>
 
       <Route
@@ -87,11 +91,13 @@ function AppRoutes() {
       >
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<NurseDashboardPage />} />
+        <Route path="profile" element={<ProfilePage />} />
         <Route path="admission-requests" element={<AdminAdmissionRequestsPage />} />
         <Route path="service-packages" element={<ServicePackagesPage />} />
         <Route path="care-notes" element={<PlaceholderPage title="Ghi chú chăm sóc" />} />
         <Route path="medications" element={<PlaceholderPage title="Thuốc" />} />
         <Route path="messages" element={<PlaceholderPage title="Tin nhắn" />} />
+        <Route path="incidents" element={<IncidentManagementPage />} />
       </Route>
 
       <Route

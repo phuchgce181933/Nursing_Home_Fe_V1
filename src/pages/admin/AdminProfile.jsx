@@ -384,6 +384,14 @@ function AdminProfile() {
 
                 <button
                   type="button"
+                  className="button button--secondary"
+                  onClick={() => navigate('/forgot-password')}
+                >
+                  Forgot Password
+                </button>
+
+                <button
+                  type="button"
                   className="button button--danger"
                   onClick={handleLogout}
                 >

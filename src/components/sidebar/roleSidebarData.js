@@ -9,6 +9,8 @@ import {
   Bell,
   History,
   ClipboardList,
+  FileText,
+  UserCircle,
 } from 'lucide-react';
 
 export const roleSidebarData = {
@@ -17,6 +19,11 @@ export const roleSidebarData = {
       title: 'Dashboard Bác sĩ',
       icon: LayoutDashboard,
       path: '/doctor/dashboard',
+    },
+    {
+      title: 'Hồ sơ cá nhân',
+      icon: UserCircle,
+      path: '/doctor/profile',
     },
     {
       title: 'Lịch khám',
@@ -39,6 +46,11 @@ export const roleSidebarData = {
       path: '/doctor/service-packages',
     },
     {
+      title: 'Sự cố',
+      icon: FileText,
+      path: '/doctor/incidents',
+    },
+    {
       title: 'Tin nhắn',
       icon: MessageSquare,
       path: '/doctor/messages',
@@ -49,6 +61,11 @@ export const roleSidebarData = {
       title: 'Dashboard Điều dưỡng',
       icon: LayoutDashboard,
       path: '/nurse/dashboard',
+    },
+    {
+      title: 'Hồ sơ cá nhân',
+      icon: UserCircle,
+      path: '/nurse/profile',
     },
     {
       title: 'Ghi chú chăm sóc',
@@ -69,6 +86,11 @@ export const roleSidebarData = {
       title: 'Gói Dịch vụ',
       icon: HeartPulse,
       path: '/nurse/service-packages',
+    },
+    {
+      title: 'Sự cố',
+      icon: FileText,
+      path: '/nurse/incidents',
     },
     {
       title: 'Tin nhắn',
