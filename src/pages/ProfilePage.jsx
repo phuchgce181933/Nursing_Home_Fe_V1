@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Mail, Phone, Shield, UserCircle } from 'lucide-react';
 import authService from '../services/auth.service';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
@@ -32,6 +33,7 @@ function toDateInput(value) {
 
 function ProfilePage() {
   const { user, logout, refreshUser } = useAuth();
+  const navigate = useNavigate();
   const [profileForm, setProfileForm] = useState(initialProfileForm);
   const [passwordForm, setPasswordForm] = useState(initialPasswordForm);
   const [message, setMessage] = useState('');
@@ -240,6 +242,9 @@ function ProfilePage() {
               <div className="profile-page__actions">
                 <button type="submit" className="button button--primary" disabled={isSaving}>
                   {isSaving ? 'Đang xử lý...' : 'Đổi mật khẩu'}
+                </button>
+                <button type="button" className="button button--secondary" onClick={() => navigate('/forgot-password')}>
+                  Quên mật khẩu
                 </button>
                 <button type="button" className="button button--danger" onClick={logout}>
                   Đăng xuất
