@@ -1,4 +1,4 @@
-import '../../styles/admin/ResidentPage.css';
+import '../../../styles/admin/ResidentPage.css';
 
 function ResidentPage() {
   const residents = [

@@ -7,6 +7,7 @@ import {
   Pill,
   Activity,
   Bell,
+  CalendarOff,
 } from 'lucide-react';
 
 export const roleSidebarData = {
@@ -25,6 +26,11 @@ export const roleSidebarData = {
       title: 'Bệnh nhân',
       icon: Users,
       path: '/doctor/patients',
+    },
+    {
+      title: 'Nghỉ phép',
+      icon: CalendarOff,
+      path: '/doctor/leave',
     },
     {
       title: 'Tin nhắn',
@@ -47,6 +53,11 @@ export const roleSidebarData = {
       title: 'Thuốc',
       icon: Pill,
       path: '/nurse/medications',
+    },
+    {
+      title: 'Nghỉ phép',
+      icon: CalendarOff,
+      path: '/nurse/leave',
     },
     {
       title: 'Tin nhắn',

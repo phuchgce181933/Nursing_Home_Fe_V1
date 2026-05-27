@@ -11,6 +11,8 @@ const getHomePath = (role) => {
       return '/nurse/dashboard';
     case 'family':
       return '/family/dashboard';
+    case 'manager':
+      return '/manager/dashboard';
     default:
       return '/profile';
   }
