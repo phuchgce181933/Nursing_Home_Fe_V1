@@ -1,0 +1,68 @@
+.resident-context {
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.resident-context__identity {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0 0 8px;
+  line-height: 1.45;
+}
+
+.resident-context__status-row {
+  margin: 0 0 10px;
+}
+
+.resident-context__section {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0 0 6px;
+}
+
+.resident-context__row {
+  font-size: 0.875rem;
+  color: #334155;
+  margin-bottom: 4px;
+  line-height: 1.4;
+}
+
+.resident-context__unassigned {
+  font-size: 0.875rem;
+  color: #94a3b8;
+  margin: 0;
+  font-style: italic;
+}
+
+.resident-context .residency-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.resident-context .residency-badge--admitted {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.resident-context .residency-badge--pending {
+  background: #fef9c3;
+  color: #a16207;
+}
+
+.resident-context .residency-badge--discharged {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.resident-context .residency-badge--default {
+  background: #e0f2fe;
+  color: #0369a1;
+}

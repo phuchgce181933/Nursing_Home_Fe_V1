@@ -1,0 +1,49 @@
+.resident-action-cell {
+  white-space: nowrap;
+}
+
+.resident-action-group {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.resident-icon-btn {
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.resident-icon-btn svg {
+  width: 15px;
+  height: 15px;
+}
+
+.resident-icon-btn--view {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.resident-icon-btn--view:hover {
+  background: #bae6fd;
+}
+
+.resident-icon-btn--edit {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.resident-icon-btn--edit:hover {
+  background: #bfdbfe;
+}
+
+.resident-icon-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
