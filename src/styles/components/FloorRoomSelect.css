@@ -1,0 +1,26 @@
+.floor-room-select {
+  display: contents;
+}
+
+.floor-room-select__error {
+  grid-column: 1 / -1;
+  color: #dc2626;
+  font-size: 0.8rem;
+  margin: 0 0 8px;
+}
+
+.floor-room-select .form-group select {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  background: #fff;
+}
+
+.floor-room-select .field-hint {
+  display: block;
+  color: #94a3b8;
+  font-size: 0.72rem;
+  margin-top: 4px;
+}

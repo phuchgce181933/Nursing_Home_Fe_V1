@@ -9,7 +9,19 @@ import ResetPasswordPage from '../pages/ResetPasswordPage';
 import AdminLayout from '../layouts/AdminLayout';
 import RoleLayout from '../layouts/RoleLayout';
 import DashboardPage from '../pages/admin/DashboardPage';
-import ResidentPage from '../pages/admin/ResidentPage';
+import ResidentPage from '../pages/admin/residents';
+import FamilyManagementPage from '../pages/admin/residents/family';
+import ResidentsByAreaPage from '../pages/admin/residents/by-area';
+import InitialHealthPage from '../pages/admin/residents/initial-health';
+import PreExistingConditionsPage from '../pages/admin/residents/pre-existing-conditions';
+import DrugAllergiesPage from '../pages/admin/residents/drug-allergies';
+import TransferResidentPage from '../pages/admin/residents/transfer';
+import StaffProfilesPage from '../pages/admin/staff/profiles';
+import ShiftManagementPage from '../pages/admin/staff/shifts';
+import StaffAssignmentPage from '../pages/admin/staff/assignments';
+import EmergencyAvailabilityPage from '../pages/admin/staff/emergency';
+import LeaveRequestAdminPage from '../pages/admin/staff/leave-requests';
+import LeaveRequestPage from '../pages/shared/LeaveRequestPage';
 import AdminProfile from '../pages/admin/AdminProfile';
 import AdminAccountsPage from '../pages/admin/AdminAccountsPage';
 import AdminAdmissionRequestsPage from '../pages/admin/AdminAdmissionRequestsPage';
@@ -54,7 +66,50 @@ function AppRoutes() {
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<DashboardPage />} />
         <Route path="residents" element={<ResidentPage />} />
+        <Route path="residents/family" element={<FamilyManagementPage />} />
+        <Route path="residents/by-area" element={<ResidentsByAreaPage />} />
+        <Route path="residents/initial-health" element={<InitialHealthPage />} />
+        <Route path="residents/pre-existing-conditions" element={<PreExistingConditionsPage />} />
+        <Route path="residents/drug-allergies" element={<DrugAllergiesPage />} />
+        <Route path="residents/transfer-room" element={<TransferResidentPage />} />
+        <Route path="staff/profiles" element={<StaffProfilesPage />} />
+        <Route path="staff/shifts" element={<ShiftManagementPage />} />
+        <Route path="staff/assignments" element={<StaffAssignmentPage />} />
+        <Route path="staff/emergency" element={<EmergencyAvailabilityPage />} />
+        <Route path="staff/leave-requests" element={<LeaveRequestAdminPage />} />
         <Route path="residents/create" element={<ResidentPage defaultMode="create" />} />
+        <Route path="profile" element={<AdminProfile />} />
+        <Route path="accounts" element={<AdminAccountsPage />} />
+        <Route path="admission-requests" element={<AdminAdmissionRequestsPage />} />
+        <Route path="tour-requests" element={<AdminTourRequestsPage />} />
+        <Route path="service-packages" element={<ServicePackagesPage />} />
+        <Route path="medications" element={<PharmacyPage />} />
+        <Route path="activities" element={<AdminActivitiesPage />} />
+        <Route path="incidents" element={<IncidentManagementPage />} />
+        <Route path="*" element={<PlaceholderPage title="Trang quản trị" />} />
+      </Route>
+      <Route
+        path="/manager/*"
+        element={
+          <ProtectedRoute requiredRole="manager">
+            <AdminLayout />
+          </ProtectedRoute>
+        }
+      >
+        <Route index element={<Navigate to="dashboard" replace />} />
+        <Route path="dashboard" element={<DashboardPage />} />
+        <Route path="residents" element={<ResidentPage />} />
+        <Route path="residents/family" element={<FamilyManagementPage />} />
+        <Route path="residents/by-area" element={<ResidentsByAreaPage />} />
+        <Route path="residents/initial-health" element={<InitialHealthPage />} />
+        <Route path="residents/pre-existing-conditions" element={<PreExistingConditionsPage />} />
+        <Route path="residents/drug-allergies" element={<DrugAllergiesPage />} />
+        <Route path="residents/transfer-room" element={<TransferResidentPage />} />
+        <Route path="staff/profiles" element={<StaffProfilesPage />} />
+        <Route path="staff/shifts" element={<ShiftManagementPage />} />
+        <Route path="staff/assignments" element={<StaffAssignmentPage />} />
+        <Route path="staff/emergency" element={<EmergencyAvailabilityPage />} />
+        <Route path="staff/leave-requests" element={<LeaveRequestAdminPage />} />
         <Route path="profile" element={<AdminProfile />} />
         <Route path="accounts" element={<AdminAccountsPage />} />
         <Route path="admission-requests" element={<AdminAdmissionRequestsPage />} />
@@ -81,6 +136,7 @@ function AppRoutes() {
         <Route path="service-packages" element={<ServicePackagesPage />} />
         <Route path="appointments" element={<PlaceholderPage title="Lịch khám" />} />
         <Route path="patients" element={<PlaceholderPage title="Danh sách bệnh nhân" />} />
+        <Route path="leave" element={<LeaveRequestPage />} />
         <Route path="messages" element={<PlaceholderPage title="Tin nhắn" />} />
         <Route path="incidents" element={<IncidentManagementPage />} />
       </Route>
@@ -99,6 +155,7 @@ function AppRoutes() {
         <Route path="admission-requests" element={<AdminAdmissionRequestsPage />} />
         <Route path="service-packages" element={<ServicePackagesPage />} />
         <Route path="care-notes" element={<PlaceholderPage title="Ghi chú chăm sóc" />} />
+        <Route path="leave" element={<LeaveRequestPage />} />
         <Route path="medications" element={<PharmacyPage />} />
         <Route path="messages" element={<PlaceholderPage title="Tin nhắn" />} />
         <Route path="incidents" element={<IncidentManagementPage />} />

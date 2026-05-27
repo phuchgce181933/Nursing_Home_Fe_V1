@@ -63,6 +63,30 @@ export const sidebarData = [
         title: "Service Packages",
         path: "/admin/service-packages",
       },
+      {
+        title: "Thông tin thân nhân",
+        path: "/admin/residents/family",
+      },
+      {
+        title: "Cư dân theo khu vực",
+        path: "/admin/residents/by-area",
+      },
+      {
+        title: "Sức khỏe ban đầu",
+        path: "/admin/residents/initial-health",
+      },
+      {
+        title: "Bệnh lý nền & tiền sử",
+        path: "/admin/residents/pre-existing-conditions",
+      },
+      {
+        title: "Dị ứng thuốc",
+        path: "/admin/residents/drug-allergies",
+      },
+      {
+        title: "Chuyển phòng cư dân",
+        path: "/admin/residents/transfer-room",
+      },
     ],
   },
 
@@ -89,7 +113,28 @@ export const sidebarData = [
   {
     title: "Staff Management",
     icon: ClipboardList,
-    path: "/admin/accounts",
+    children: [
+      {
+        title: "Hồ sơ nhân viên",
+        path: "/admin/staff/profiles",
+      },
+      {
+        title: "Ca làm việc",
+        path: "/admin/staff/shifts",
+      },
+      {
+        title: "Phân công khu vực",
+        path: "/admin/staff/assignments",
+      },
+      {
+        title: "Sẵn sàng khẩn cấp",
+        path: "/admin/staff/emergency",
+      },
+      {
+        title: "Đơn nghỉ phép",
+        path: "/admin/staff/leave-requests",
+      },
+    ],
   },
 
   {
