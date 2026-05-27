@@ -16,6 +16,7 @@ import AdminAdmissionRequestsPage from '../pages/admin/AdminAdmissionRequestsPag
 import AdminTourRequestsPage from '../pages/admin/AdminTourRequestsPage';
 import ServicePackagesPage from '../pages/admin/ServicePackagesPage';
 import PharmacyPage from '../pages/pharmacist/PharmacyPage';
+import AdminActivitiesPage from '../pages/admin/AdminActivitiesPage';
 import DoctorDashboardPage from '../pages/doctor/DoctorDashboardPage';
 import NurseDashboardPage from '../pages/nurse/NurseDashboardPage';
 import FamilyDashboardPage from '../pages/family/FamilyDashboardPage';
@@ -60,6 +61,7 @@ function AppRoutes() {
         <Route path="tour-requests" element={<AdminTourRequestsPage />} />
         <Route path="service-packages" element={<ServicePackagesPage />} />
         <Route path="medications" element={<PharmacyPage />} />
+        <Route path="activities" element={<AdminActivitiesPage />} />
         <Route path="incidents" element={<IncidentManagementPage />} />
         <Route path="*" element={<PlaceholderPage title="Trang quản trị" />} />
       </Route>
