@@ -15,6 +15,7 @@ import AdminAccountsPage from '../pages/admin/AdminAccountsPage';
 import AdminAdmissionRequestsPage from '../pages/admin/AdminAdmissionRequestsPage';
 import AdminTourRequestsPage from '../pages/admin/AdminTourRequestsPage';
 import ServicePackagesPage from '../pages/admin/ServicePackagesPage';
+import PharmacyPage from '../pages/pharmacist/PharmacyPage';
 import AdminActivitiesPage from '../pages/admin/AdminActivitiesPage';
 import DoctorDashboardPage from '../pages/doctor/DoctorDashboardPage';
 import NurseDashboardPage from '../pages/nurse/NurseDashboardPage';
@@ -59,6 +60,7 @@ function AppRoutes() {
         <Route path="admission-requests" element={<AdminAdmissionRequestsPage />} />
         <Route path="tour-requests" element={<AdminTourRequestsPage />} />
         <Route path="service-packages" element={<ServicePackagesPage />} />
+        <Route path="medications" element={<PharmacyPage />} />
         <Route path="activities" element={<AdminActivitiesPage />} />
         <Route path="incidents" element={<IncidentManagementPage />} />
         <Route path="*" element={<PlaceholderPage title="Trang quản trị" />} />
@@ -97,9 +99,28 @@ function AppRoutes() {
         <Route path="admission-requests" element={<AdminAdmissionRequestsPage />} />
         <Route path="service-packages" element={<ServicePackagesPage />} />
         <Route path="care-notes" element={<PlaceholderPage title="Ghi chú chăm sóc" />} />
-        <Route path="medications" element={<PlaceholderPage title="Thuốc" />} />
+        <Route path="medications" element={<PharmacyPage />} />
         <Route path="messages" element={<PlaceholderPage title="Tin nhắn" />} />
         <Route path="incidents" element={<IncidentManagementPage />} />
+      </Route>
+
+      <Route
+        path="/pharmacist/*"
+        element={
+          <ProtectedRoute requiredRole="pharmacist">
+            <RoleLayout />
+          </ProtectedRoute>
+        }
+      >
+        <Route index element={<Navigate to="overview" replace />} />
+        <Route path="overview" element={<PharmacyPage defaultTab="overview" />} />
+        <Route path="profile" element={<ProfilePage />} />
+        <Route path="medications" element={<PharmacyPage defaultTab="medications" />} />
+        <Route path="suppliers" element={<PharmacyPage defaultTab="suppliers" />} />
+        <Route path="stocks" element={<PharmacyPage defaultTab="stocks" />} />
+        <Route path="dispense" element={<PharmacyPage defaultTab="dispense" />} />
+        <Route path="reports" element={<PharmacyPage defaultTab="reports" />} />
+        <Route path="*" element={<PlaceholderPage title="Trang dược sĩ" />} />
       </Route>
 
       <Route

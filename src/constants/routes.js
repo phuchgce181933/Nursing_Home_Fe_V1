@@ -3,6 +3,7 @@ export const ROLE_HOME_PATHS = {
   doctor: '/doctor/dashboard',
   nurse: '/nurse/dashboard',
   family: '/family/dashboard',
+  pharmacist: '/pharmacist/overview',
 };
 
 export function getHomePath(role) {
