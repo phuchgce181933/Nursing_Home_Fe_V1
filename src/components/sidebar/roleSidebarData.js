@@ -11,6 +11,9 @@ import {
   ClipboardList,
   FileText,
   UserCircle,
+  PackageOpen,
+  Truck,
+  ShieldCheck,
 } from 'lucide-react';
 
 export const roleSidebarData = {
@@ -128,6 +131,43 @@ export const roleSidebarData = {
       title: 'Tin nhắn',
       icon: MessageSquare,
       path: '/family/messages',
+    },
+  ],
+  pharmacist: [
+    {
+      title: 'Tổng quan nhà thuốc',
+      icon: LayoutDashboard,
+      path: '/pharmacist/overview',
+    },
+    {
+      title: 'Hồ sơ cá nhân',
+      icon: UserCircle,
+      path: '/pharmacist/profile',
+    },
+    {
+      title: 'Quản lý thuốc',
+      icon: Pill,
+      path: '/pharmacist/medications',
+    },
+    {
+      title: 'Nhà cung cấp',
+      icon: Truck,
+      path: '/pharmacist/suppliers',
+    },
+    {
+      title: 'Tồn kho',
+      icon: PackageOpen,
+      path: '/pharmacist/stocks',
+    },
+    {
+      title: 'Cấp phát thuốc',
+      icon: ShieldCheck,
+      path: '/pharmacist/dispense',
+    },
+    {
+      title: 'Báo cáo',
+      icon: FileText,
+      path: '/pharmacist/reports',
     },
   ],
 };
