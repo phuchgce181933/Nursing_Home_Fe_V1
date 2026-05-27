@@ -1,6 +1,26 @@
 import axiosClient from '../api/axiosClient';
 import facilityService from './facility.service';
 
+const createResident = async (body) => {
+  const response = await axiosClient.post('/admin/residents', body);
+  return response.data;
+};
+
+const getResidentList = async (params = {}) => {
+  const response = await axiosClient.get('/admin/residents', { params });
+  return response.data;
+};
+
+const updateResidentPersonalInfo = async (residentId, body) => {
+  const response = await axiosClient.patch(`/admin/residents/${residentId}/personal-info`, body);
+  return response.data;
+};
+
+const updateResidentFamilyInfo = async (residentId, body) => {
+  const response = await axiosClient.patch(`/admin/residents/${residentId}/family-info`, body);
+  return response.data;
+};
+
 const isAreaRouteMissing = (error) => {
   const status = error?.response?.status;
   const msg = String(error?.response?.data?.message || '').toLowerCase();
@@ -490,6 +510,10 @@ const transferResidentToRoom = (residentId, body) =>
   axiosClient.post(`/residents/${residentId}/transfer-room`, body).then((r) => r.data);
 
 const residentService = {
+  createResident,
+  getResidentList,
+  updateResidentPersonalInfo,
+  updateResidentFamilyInfo,
   listForAssignment,
   listForFamilyManagement,
   getFamilyInfo,

@@ -1,0 +1,383 @@
+.profile-page {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  align-items: center;
+  width: 100%;
+}
+
+.profile-page__container {
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.profile-page__header {
+  padding-bottom: 4px;
+  width: 100%;
+}
+
+.profile-page__title {
+  font-size: 28px;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.03em;
+}
+
+.profile-page__subtitle {
+  margin-top: 8px;
+  color: #64748b;
+  font-size: 15px;
+  line-height: 1.6;
+  max-width: 780px;
+}
+
+.profile-page__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+.admin-profile__layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr) minmax(420px, 1.2fr);
+  gap: 20px;
+  width: 100%;
+  align-items: start;
+}
+
+.admin-profile__column {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.profile-card {
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.08);
+  width: 100%;
+  max-width: 100%;
+}
+
+.profile-card--accent {
+  background: linear-gradient(160deg, #eff6ff 0%, #ffffff 100%);
+}
+
+.profile-card__avatar {
+  color: #2563eb;
+  margin-bottom: 8px;
+}
+
+.profile-card__name {
+  font-size: 22px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.profile-card__role {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #475569;
+}
+
+.profile-card__status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  font-size: 14px;
+}
+
+.profile-card__status.is-active {
+  color: #15803d;
+}
+
+.profile-card__status.is-inactive {
+  color: #b91c1c;
+}
+
+.profile-card__list {
+  list-style: none;
+  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.profile-card__list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #475569;
+  font-size: 14px;
+}
+
+.profile-card__heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 18px;
+  font-size: 18px;
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.profile-details {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.profile-details dt {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #94a3b8;
+}
+
+.profile-details dd {
+  margin-top: 4px;
+  color: #1e293b;
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.profile-card__empty {
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.profile-page__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 6px;
+}
+
+.loading-spinner {
+  min-height: 240px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: #64748b;
+}
+
+.loading-spinner__ring {
+  width: 36px;
+  height: 36px;
+  border: 3px solid #dbeafe;
+  border-top-color: #2563eb;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.loading-spinner__label {
+  font-size: 14px;
+}
+
+.profile-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.profile-form__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.profile-form__field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.profile-form__label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #334155;
+}
+
+.profile-form__input {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 11px 12px;
+  font-size: 14px;
+  color: #0f172a;
+  background: #ffffff;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.profile-form__input:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
+}
+
+.account-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 18px;
+  margin-bottom: 20px;
+  padding: 16px 18px;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+}
+
+.account-toolbar h2 {
+  margin-bottom: 6px;
+}
+
+.account-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.account-filter-row .profile-form__input {
+  min-width: 180px;
+}
+
+.account-table-wrap {
+  overflow-x: auto;
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  margin-bottom: 0;
+}
+
+.account-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  background: #ffffff;
+}
+
+.account-table thead {
+  background: #f8fafc;
+}
+
+.account-table th,
+.account-table td {
+  padding: 14px 12px;
+  border-bottom: 1px solid #e2e8f0;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.account-table th {
+  color: #475569;
+  font-weight: 800;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.account-table tbody tr:hover {
+  background: #f8fbff;
+}
+
+.account-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  margin-right: 8px;
+}
+
+.account-chip--active {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.account-chip--inactive {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.account-chip--banned {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.account-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.account-actions .button {
+  min-width: 96px;
+}
+
+.account-pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 18px;
+  padding: 12px 16px;
+  border-radius: 999px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #334155;
+  font-weight: 600;
+}
+
+@media (max-width: 980px) {
+  .admin-profile__layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .profile-page__title {
+    font-size: 24px;
+  }
+
+  .profile-page__subtitle {
+    font-size: 14px;
+  }
+
+  .profile-card {
+    padding: 20px;
+  }
+
+  .account-table th,
+  .account-table td {
+    padding: 12px 10px;
+    font-size: 13px;
+  }
+
+  .account-pagination {
+    border-radius: 18px;
+    flex-direction: column;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

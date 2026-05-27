@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { getAuthToken } from '../utils/auth';
+import { getAuthToken, removeAuthToken } from '../utils/auth';
 
 const axiosClient = axios.create({
   baseURL: '/api',
@@ -15,5 +15,15 @@ axiosClient.interceptors.request.use((config) => {
   }
   return config;
 });
+
+axiosClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      removeAuthToken();
+    }
+    return Promise.reject(error);
+  }
+);
 
 export default axiosClient;
