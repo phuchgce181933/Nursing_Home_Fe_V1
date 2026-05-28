@@ -259,6 +259,7 @@ function AdminAccountsPage() {
                   <option value="nurse">Nurse</option>
                   <option value="manager">Manager</option>
                   <option value="staff">Staff</option>
+                  <option value="pharmacist">Pharmacist</option>
                 </select>
               </label>
 
@@ -358,7 +359,7 @@ function AdminAccountsPage() {
                 <option value="">All Roles</option>
                 <option value="doctor">Doctor</option>
                 <option value="nurse">Nurse</option>
-                <option value="manager">Manager</option>
+                <option value="caregiver">Caregiver</option>
                 <option value="staff">Staff</option>
                 <option value="admin">Admin</option>
               </select>

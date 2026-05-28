@@ -11,7 +11,8 @@ import {
   HeartPulse,
   Home,
 } from 'lucide-react';
-import residentService from '../../services/resident.service';
+import residentService from '../../../services/resident.service';
+import '../../../styles/admin/ResidentPage.css';
 
 const GENDERS = [
   { value: '', label: 'All Genders' },
