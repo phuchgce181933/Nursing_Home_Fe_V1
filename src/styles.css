@@ -35,6 +35,9 @@
 @import './styles/family/SubmitFacilityTourPage.css';
 @import './styles/family/FacilityTourHistoryPage.css';
 
+/* Medication Styles (Doctor + Nurse) */
+@import './styles/medications/MedicationPage.css';
+
 * {
   margin: 0;
   padding: 0;

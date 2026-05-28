@@ -39,6 +39,26 @@ export const roleSidebarData = {
       icon: Users,
       path: '/doctor/patients',
     },
+    {
+      title: 'Thuốc',
+      icon: Pill,
+      path: '/doctor/medications',
+    },
+    {
+      title: 'Yêu cầu Nhập viện',
+      icon: ClipboardList,
+      path: '/doctor/admission-requests',
+    },
+    {
+      title: 'Gói Dịch vụ',
+      icon: HeartPulse,
+      path: '/doctor/service-packages',
+    },
+    {
+      title: 'Sự cố',
+      icon: FileText,
+      path: '/doctor/incidents',
+    },
     { title: 'Yêu cầu Nhập viện', icon: ClipboardList, path: '/doctor/admission-requests' },
     { title: 'Gói Dịch vụ', icon: HeartPulse, path: '/doctor/service-packages' },
     { title: 'Sự cố', icon: FileText, path: '/doctor/incidents' },
