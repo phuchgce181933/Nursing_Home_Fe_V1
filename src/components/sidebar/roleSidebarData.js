@@ -27,6 +27,11 @@ export const roleSidebarData = {
       path: '/doctor/patients',
     },
     {
+      title: 'Thuốc',
+      icon: Pill,
+      path: '/doctor/medications',
+    },
+    {
       title: 'Tin nhắn',
       icon: MessageSquare,
       path: '/doctor/messages',

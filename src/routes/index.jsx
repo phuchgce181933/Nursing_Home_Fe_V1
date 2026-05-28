@@ -8,6 +8,8 @@ import DashboardPage from '../pages/admin/DashboardPage';
 import ResidentPage from '../pages/admin/ResidentPage';
 import DoctorDashboardPage from '../pages/doctor/DoctorDashboardPage';
 import NurseDashboardPage from '../pages/nurse/NurseDashboardPage';
+import MedicationPage from '../pages/nurse/MedicationPage';
+import DoctorMedicationPage from '../pages/doctor/MedicationPage';
 import FamilyDashboardPage from '../pages/family/FamilyDashboardPage';
 import ProtectedRoute from '../components/ProtectedRoute';
 
@@ -45,6 +47,7 @@ function AppRoutes() {
         <Route path="dashboard" element={<DoctorDashboardPage />} />
         <Route path="appointments" element={<PlaceholderPage title="Lịch khám" />} />
         <Route path="patients" element={<PlaceholderPage title="Danh sách bệnh nhân" />} />
+        <Route path="medications" element={<DoctorMedicationPage />} />
         <Route path="messages" element={<PlaceholderPage title="Tin nhắn" />} />
       </Route>
       <Route
@@ -57,7 +60,7 @@ function AppRoutes() {
       >
         <Route path="dashboard" element={<NurseDashboardPage />} />
         <Route path="care-notes" element={<PlaceholderPage title="Ghi chú chăm sóc" />} />
-        <Route path="medications" element={<PlaceholderPage title="Thuốc" />} />
+        <Route path="medications" element={<MedicationPage />} />
         <Route path="messages" element={<PlaceholderPage title="Tin nhắn" />} />
       </Route>
       <Route

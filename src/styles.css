@@ -8,6 +8,9 @@
 @import './styles/admin/DashboardPage.css';
 @import './styles/admin/ResidentPage.css';
 
+/* Medication Styles (Doctor + Nurse) */
+@import './styles/medications/MedicationPage.css';
+
 * {
   margin: 0;
   padding: 0;
