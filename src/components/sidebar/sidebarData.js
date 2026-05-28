@@ -26,6 +26,10 @@ export const sidebarData = [
     icon: Shield,
     children: [
       {
+        title: "My Profile",
+        path: "/admin/profile",
+      },
+      {
         title: "Accounts",
         path: "/admin/accounts",
       },
@@ -40,12 +44,28 @@ export const sidebarData = [
         title: "Resident List",
         path: "/admin/residents",
       },
+    ],
+  },
+
+  {
+    title: "Admission Management",
+    icon: ClipboardList,
+    children: [
       {
-        title: "Add Resident",
-        path: "/admin/residents/create",
+        title: "Admission Requests",
+        path: "/admin/admission-requests",
+      },
+      {
+        title: "Tour Requests",
+        path: "/admin/tour-requests",
+      },
+      {
+        title: "Service Packages",
+        path: "/admin/service-packages",
       },
     ],
   },
+
 
   {
     title: "Buildings & Facilities",
@@ -69,7 +89,7 @@ export const sidebarData = [
   {
     title: "Staff Management",
     icon: ClipboardList,
-    path: "/admin/staff",
+    path: "/admin/accounts",
   },
 
   {
