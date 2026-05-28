@@ -59,10 +59,6 @@ export const roleSidebarData = {
       icon: FileText,
       path: '/doctor/incidents',
     },
-    { title: 'Yêu cầu Nhập viện', icon: ClipboardList, path: '/doctor/admission-requests' },
-    { title: 'Gói Dịch vụ', icon: HeartPulse, path: '/doctor/service-packages' },
-    { title: 'Sự cố', icon: FileText, path: '/doctor/incidents' },
-    { title: 'Nghỉ phép', icon: CalendarOff, path: '/doctor/leave' },
     {
       title: 'Tin nhắn',
       icon: MessageSquare,
