@@ -3,7 +3,7 @@ export default function StaffDeactivateModal({ staff, onConfirm, onClose, loadin
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
+      <div className="modal staff-profile-modal" onClick={(e) => e.stopPropagation()}>
         <div className="deactivate-modal__icon">⚠️</div>
 
         <h2 className="modal__title" style={{ color: '#dc2626' }}>Vô hiệu hóa tài khoản</h2>

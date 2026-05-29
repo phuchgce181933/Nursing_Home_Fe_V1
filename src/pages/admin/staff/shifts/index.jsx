@@ -13,6 +13,7 @@ import { canAssignShift } from '../../../../utils/staffAssignable';
 import { isStaffOnLeaveForAssignment } from '../../../../utils/leaveUtils';
 import { getApiErrorPayload, blockingCareTasksMessage } from '../../../../utils/blockingCareTasks';
 import BlockingCareTasksAlert from '../../../../components/staff/BlockingCareTasksAlert';
+import AdminPageShell from '../../../../components/admin/AdminPageShell';
 import '../../../../styles/admin/ShiftManagementPage.css';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -698,7 +699,7 @@ function AssignTab() {
   const canEdit    = (s) => ['draft', 'published'].includes(s.status);
   const canPublish = (s) => s.status === 'draft';
   const canConfirm = (s) => s.status === 'published';
-  const canCancel  = (s) => !['completed', 'cancelled'].includes(s.status);
+  const canCancel  = (s) => ['published', 'confirmed'].includes(s.status);
   const canDelete  = (s) => s.status === 'draft';
 
   return (
@@ -934,12 +935,10 @@ export default function ShiftManagementPage() {
   const [tab, setTab] = useState('templates');
 
   return (
-    <div className="shift-page">
-      <div className="shift-page__header">
-        <h1 className="shift-page__title">Quản lý ca làm việc</h1>
-        <p className="shift-page__subtitle">3 ca cố định (DAWN · DAY · EVENING) → Phân công → Kiểm tra xung đột → Xem lịch</p>
-      </div>
-
+    <AdminPageShell
+      title="Quản lý ca làm việc"
+      subtitle="3 ca cố định (DAWN · DAY · EVENING) → Phân công → Kiểm tra xung đột → Xem lịch"
+    >
       <div className="tabs">
         {TABS.map((t) => (
           <button
@@ -957,6 +956,6 @@ export default function ShiftManagementPage() {
         {tab === 'assign'    && <AssignTab />}
         {tab === 'schedule'  && <ScheduleTab />}
       </div>
-    </div>
+    </AdminPageShell>
   );
 }

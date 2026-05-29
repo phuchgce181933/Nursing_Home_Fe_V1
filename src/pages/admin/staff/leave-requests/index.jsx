@@ -8,6 +8,7 @@ import {
   CONFLICT_ICON,
   CONFLICT_LABEL,
 } from '../../../../constants/shiftConflicts';
+import AdminPageShell from '../../../../components/admin/AdminPageShell';
 import '../../../../styles/admin/LeaveRequestAdminPage.css';
 
 const STATUS_LABELS = {
@@ -326,15 +327,10 @@ export default function LeaveRequestAdminPage() {
   };
 
   return (
-    <div className="leave-admin-page">
-      <div className="leave-admin-page__header">
-        <h1 className="leave-admin-page__title">Quản lý đơn nghỉ phép</h1>
-        <p className="leave-admin-page__subtitle">
-          Khi duyệt đơn có ca trong kỳ nghỉ, chọn người thế ca cùng vai trò — hệ thống chuyển ca và nhiệm vụ
-          chăm sóc (nếu đủ khu vực), không hủy ca.
-        </p>
-      </div>
-
+    <AdminPageShell
+      title="Quản lý đơn nghỉ phép"
+      subtitle="Khi duyệt đơn có ca trong kỳ nghỉ, chọn người thế ca cùng vai trò — hệ thống chuyển ca và nhiệm vụ chăm sóc (nếu đủ khu vực), không hủy ca."
+    >
       <div className="leave-stats">
         {[
           { s: 'pending', icon: '⏳', label: 'Chờ duyệt' },
@@ -344,13 +340,11 @@ export default function LeaveRequestAdminPage() {
         ].map(({ s, icon, label }) => (
           <div
             key={s}
-            className={`leave-stat leave-stat--${s}`}
-            style={{
-              cursor: 'pointer',
-              outline: filterStatus === s ? '2px solid #3b82f6' : 'none',
-              borderRadius: 12,
-            }}
+            className={`leave-stat leave-stat--${s}${filterStatus === s ? ' leave-stat--selected' : ''}`}
             onClick={() => setFilter(filterStatus === s ? '' : s)}
+            onKeyDown={(e) => e.key === 'Enter' && setFilter(filterStatus === s ? '' : s)}
+            role="button"
+            tabIndex={0}
           >
             <div className="leave-stat__icon">{icon}</div>
             <div>
@@ -397,10 +391,10 @@ export default function LeaveRequestAdminPage() {
 
       {error && <div className="leave-admin-error">{error}</div>}
 
-      <div className="data-table-wrap">
-        <table className="data-table">
+      <div className="resident-page__table">
+        <table className="resident-page__table-element">
           <thead>
-            <tr>
+            <tr className="resident-page__table-header">
               <th>Nhân viên</th>
               <th>Vai trò</th>
               <th>Loại nghỉ</th>
@@ -507,6 +501,6 @@ export default function LeaveRequestAdminPage() {
           onSuccess={handleApproveSuccess}
         />
       )}
-    </div>
+    </AdminPageShell>
   );
 }

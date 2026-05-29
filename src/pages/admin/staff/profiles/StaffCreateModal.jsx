@@ -106,7 +106,7 @@ export default function StaffCreateModal({
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal modal--wide modal--scroll" onClick={(e) => e.stopPropagation()}>
+      <div className="modal modal--wide modal--scroll staff-profile-modal" onClick={(e) => e.stopPropagation()}>
         <h2 className="modal__title">Thêm nhân viên mới</h2>
 
         {serverError && <p className="form-error">{serverError}</p>}

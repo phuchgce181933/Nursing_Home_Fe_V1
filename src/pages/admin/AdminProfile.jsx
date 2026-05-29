@@ -161,8 +161,8 @@ function AdminProfile() {
                 </div>
 
                 <div>
-                  <dt>Role Category</dt>
-                  <dd>{user.staffProfile.roleCategory}</dd>
+                  <dt>Vai trò hệ thống</dt>
+                  <dd>{user.role}</dd>
                 </div>
 
                 <div>

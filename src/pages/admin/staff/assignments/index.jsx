@@ -7,6 +7,8 @@ import { canAssignAreas, canAssignResidents, NON_ASSIGNABLE_ROLES } from '../../
 import { isStaffOnLeaveForAssignment } from '../../../../utils/leaveUtils';
 import { getApiErrorPayload, blockingCareTasksMessage } from '../../../../utils/blockingCareTasks';
 import BlockingCareTasksAlert from '../../../../components/staff/BlockingCareTasksAlert';
+import AdminPageShell from '../../../../components/admin/AdminPageShell';
+import { getLocalDateString } from '../../../../utils/dateUtils';
 import '../../../../styles/admin/StaffAssignmentPage.css';
 
 const CARE_TASK_TAB_HINT =
@@ -27,7 +29,7 @@ const CARE_LEVELS = [
   { value: 'medium', label: '🟠 Trung bình' },
   { value: 'high',   label: '🔴 Cao' },
 ];
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => getLocalDateString();
 
 const filterAssignableStaff = (list) =>
   (list || []).filter(
@@ -742,8 +744,17 @@ function ResidentTab({ staff, loading, assignmentDate, onStaffUpdated }) {
 }
 
 // ── Tab 3: Care Tasks (bước 3 — sau khu vực + cư dân) ───────────────────────
-const TASK_STATUS_LABELS = { pending: 'Chờ', in_progress: 'Đang làm', completed: 'Hoàn thành', skipped: 'Bỏ qua' };
-const TASK_STATUS_NEXT   = { pending: ['in_progress', 'skipped'], in_progress: ['completed', 'skipped'] };
+const TASK_STATUS_LABELS = {
+  pending: 'Chờ',
+  in_progress: 'Đang làm',
+  completed: 'Hoàn thành',
+  skipped: 'Bỏ qua',
+  missed: 'Bỏ lỡ',
+};
+const TASK_STATUS_NEXT = {
+  pending: ['in_progress', 'skipped'],
+  in_progress: ['completed', 'skipped'],
+};
 
 const toMinutes = (hhmm) => {
   if (!hhmm || typeof hhmm !== 'string') return null;
@@ -967,14 +978,29 @@ function CareTaskTab({ assignmentDate, staff }) {
     loadAssignedResidents(entry?.userId);
   };
 
+  const minScheduledTime =
+    form.workDate === (ctx?.todayVN || today()) ? (ctx?.minScheduledTime || '') : '';
+
   const handleCreate = async () => {
     setSaveErr('');
     if (selectedStaffEntry && onLeaveByUserId[String(selectedStaffEntry.userId)]) {
       setSaveErr('Nhân viên đang nghỉ phép trong ngày này — không thể giao nhiệm vụ.');
       return;
     }
+    if (!form.shiftId || !selectedShift) {
+      setSaveErr('Vui lòng chọn ca làm việc.');
+      return;
+    }
     const scheduledTimeTrimmed = form.scheduledTime?.trim();
-    if (scheduledTimeTrimmed && selectedShift && !isTimeWithinShift(scheduledTimeTrimmed, selectedShift)) {
+    if (!scheduledTimeTrimmed) {
+      setSaveErr('Vui lòng chọn giờ dự kiến.');
+      return;
+    }
+    if (minScheduledTime && scheduledTimeTrimmed < minScheduledTime) {
+      setSaveErr(`Giờ dự kiến phải từ ${minScheduledTime} trở đi (theo giờ hiện tại).`);
+      return;
+    }
+    if (selectedShift && !isTimeWithinShift(scheduledTimeTrimmed, selectedShift)) {
       setSaveErr(
         `Giờ dự kiến phải nằm trong khung ca ${selectedShift.startTime} - ${selectedShift.endTime}.`
       );
@@ -985,13 +1011,13 @@ function CareTaskTab({ assignmentDate, staff }) {
       const payload = {
         staffProfileId: form.staffProfileId,
         residentId: form.residentId,
+        shiftId: form.shiftId,
         taskType: form.taskType,
         careLevel: form.careLevel,
         workDate: form.workDate,
-        scheduledTime: scheduledTimeTrimmed || undefined,
+        scheduledTime: scheduledTimeTrimmed,
         notes: form.notes || undefined,
       };
-      if (form.shiftId) payload.shiftId = form.shiftId;
       await careTaskService.createCareTask(payload);
       setShowForm(false);
       loadTasks();
@@ -1058,7 +1084,9 @@ function CareTaskTab({ assignmentDate, staff }) {
         <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: 20, marginBottom: 16 }}>
           <div style={{ fontWeight: 600, marginBottom: 4 }}>Giao nhiệm vụ chăm sóc mới</div>
           <p style={{ fontSize: '0.78rem', color: '#64748b', marginBottom: 12 }}>
-            Nhân viên phải có ca đã đăng/xác nhận và cư dân đã được giao ở bước 2.
+            Nhân viên phải có ca đã đăng/xác nhận (chưa kết thúc), cư dân đã giao ở bước 2, và giờ dự kiến
+            từ thời điểm hiện tại trở đi. Nhiệm vụ chưa hoàn thành sẽ tự chuyển «Bỏ lỡ» khi hết ca
+            (khác «Bỏ qua» do quản lý chủ động chọn).
           </p>
           {saveError && <Alert type="error" msg={saveError} />}
           <div className="form-grid">
@@ -1091,12 +1119,13 @@ function CareTaskTab({ assignmentDate, staff }) {
               )}
             </div>
 
-            {shiftOptions.length > 1 && (
+            {shiftOptions.length > 0 && (
               <div className="form-group">
-                <label>Ca làm việc</label>
+                <label>Ca làm việc *</label>
                 <select
                   value={form.shiftId}
                   onChange={(e) => setForm((p) => ({ ...p, shiftId: e.target.value }))}
+                  disabled={!form.staffProfileId}
                 >
                   {shiftOptions.map((sh) => (
                     <option key={sh._id} value={sh._id}>
@@ -1155,15 +1184,18 @@ function CareTaskTab({ assignmentDate, staff }) {
             </div>
 
             <div className="form-group">
-              <label>Giờ dự kiến</label>
+              <label>Giờ dự kiến *</label>
               <input
                 type="time"
+                required
+                min={minScheduledTime || undefined}
                 value={form.scheduledTime}
                 onChange={(e) => setForm((p) => ({ ...p, scheduledTime: e.target.value }))}
               />
               {selectedShift && (
                 <small className="field-hint">
                   Khung hợp lệ: {selectedShift.startTime} - {selectedShift.endTime}
+                  {minScheduledTime ? ` · Từ ${minScheduledTime} trở đi` : ''}
                 </small>
               )}
             </div>
@@ -1177,7 +1209,13 @@ function CareTaskTab({ assignmentDate, staff }) {
             <button
               className="btn btn--primary"
               onClick={handleCreate}
-              disabled={saving || !form.staffProfileId || !form.residentId}
+              disabled={
+                saving
+                || !form.staffProfileId
+                || !form.residentId
+                || !form.shiftId
+                || !form.scheduledTime?.trim()
+              }
             >
               {saving ? 'Đang lưu...' : 'Lưu nhiệm vụ'}
             </button>
@@ -1198,22 +1236,27 @@ function CareTaskTab({ assignmentDate, staff }) {
         <table className="data-table">
           <thead>
             <tr>
-              <th>Nhân viên</th><th>Cư dân</th><th>Loại nhiệm vụ</th><th>Mức độ</th>
+              <th>Nhân viên</th><th>Cư dân</th><th>Ca</th><th>Loại nhiệm vụ</th><th>Mức độ</th>
               <th>Giờ</th><th>Trạng thái</th><th>Thao tác</th>
             </tr>
           </thead>
           <tbody>
             {tasks.length === 0 && (
-              <tr><td colSpan={7} className="empty-state">Không có nhiệm vụ nào ngày này</td></tr>
+              <tr><td colSpan={8} className="empty-state">Không có nhiệm vụ nào ngày này</td></tr>
             )}
             {tasks.map((t) => {
               const staffName = t.staffProfileId?.userId?.fullName || t.staffProfileId?.staffCode || '—';
               const resident = t.residentId?.fullName || t.residentId?.residentCode || '—';
+              const shift = t.shiftId;
+              const shiftLabel = shift
+                ? `${shift.name || 'Ca'} · ${shift.startTime}–${shift.endTime}`
+                : '—';
               const next = TASK_STATUS_NEXT[t.status] || [];
               return (
                 <tr key={t._id}>
                   <td>{staffName}</td>
                   <td>{resident}</td>
+                  <td><small>{shiftLabel}</small></td>
                   <td>{taskTypeLabel(t.taskType)}</td>
                   <td>{careLevelLabel(t.careLevel)}</td>
                   <td>{t.scheduledTime || '—'}</td>
@@ -1221,6 +1264,9 @@ function CareTaskTab({ assignmentDate, staff }) {
                     <span className={`task-status task-status--${t.status}`}>
                       {TASK_STATUS_LABELS[t.status] || t.status}
                     </span>
+                    {t.status === 'missed' && (
+                      <small className="field-hint" style={{ display: 'block' }}>Hết ca</small>
+                    )}
                   </td>
                   <td>
                     {next.map((s) => (
@@ -1260,6 +1306,11 @@ export default function StaffAssignmentPage() {
   const [staff, setStaff]         = useState([]);
   const [loading, setLoading]     = useState(false);
 
+  useEffect(() => {
+    const minDate = today();
+    if (assignmentDate < minDate) setAssignmentDate(minDate);
+  }, [assignmentDate]);
+
   const loadStaff = useCallback(async () => {
     setLoading(true);
     try {
@@ -1277,12 +1328,10 @@ export default function StaffAssignmentPage() {
   }, [loadStaff]);
 
   return (
-    <div className="assignment-page">
-      <div className="assignment-page__header">
-        <h1 className="assignment-page__title">Phân công nhân viên</h1>
-        <p className="assignment-page__subtitle">Khu vực phụ trách, cư dân chăm sóc và nhiệm vụ theo ca</p>
-      </div>
-
+    <AdminPageShell
+      title="Phân công nhân viên"
+      subtitle="Khu vực phụ trách, cư dân chăm sóc và nhiệm vụ theo ca"
+    >
       <div className="assignment-toolbar">
         <label className="assignment-toolbar__label" htmlFor="assignment-date">
           Ngày phân công
@@ -1291,6 +1340,7 @@ export default function StaffAssignmentPage() {
           id="assignment-date"
           type="date"
           className="assignment-toolbar__date"
+          min={today()}
           value={assignmentDate}
           onChange={(e) => setAssignmentDate(e.target.value)}
         />
@@ -1312,7 +1362,7 @@ export default function StaffAssignmentPage() {
         ))}
       </div>
 
-      <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 20 }}>
+      <div className="tab-content">
         {activeTab === 'area'      && (
           <AreaTab
             staff={staff}
@@ -1333,6 +1383,6 @@ export default function StaffAssignmentPage() {
           <CareTaskTab assignmentDate={assignmentDate} staff={staff} />
         )}
       </div>
-    </div>
+    </AdminPageShell>
   );
 }

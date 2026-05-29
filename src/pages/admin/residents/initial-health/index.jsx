@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import residentService, { RESIDENT_INITIAL_HEALTH_ROUTE_HINT } from '../../../../services/resident.service';
 import { FaEye, FaPen } from 'react-icons/fa';
 import { formatLeaveDate } from '../../../../utils/leaveUtils';
+import AdminPageShell from '../../../../components/admin/AdminPageShell';
 import '../../../../styles/admin/InitialHealthPage.css';
 import '../../../../styles/admin/residentActionIcons.css';
 import { GENDER_LABELS, RESIDENCY_LABELS } from '../_shared/residentLabels';
@@ -221,59 +222,72 @@ export default function InitialHealthPage() {
   const hasRecord = healthData?.initialHealth?.hasInitialHealthRecord;
 
   return (
-    <div className="initial-health-page">
-      <div className="initial-health-page__header">
-        <h1 className="initial-health-page__title">Ghi nhận tình trạng sức khỏe ban đầu</h1>
-        <p className="initial-health-page__subtitle">
+    <AdminPageShell
+      title="Ghi nhận tình trạng sức khỏe ban đầu"
+      subtitle={
+        <>
           Ghi nhận tình trạng sức khỏe của cư dân <strong>khi nhập viện</strong> (khỏe mạnh, yếu, cần chăm 1-1…).
           Bệnh nền và tiền sử trước khi vào viện ghi ở tab khác; dị ứng thuốc ghi ở tab Dị ứng thuốc.
-        </p>
-      </div>
-
-      <form className="initial-health-toolbar" onSubmit={handleSearch}>
-        <input
-          type="text"
-          placeholder="Tìm theo tên hoặc mã cư dân..."
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-        />
-        <select
-          value={statusFilter}
-          onChange={(e) => {
-            setStatusFilter(e.target.value);
-            setPage(1);
-          }}
-        >
-          <option value="admitted">Đang điều trị</option>
-          <option value="pending">Chờ nhập viện</option>
-          <option value="discharged">Đã xuất viện</option>
-          <option value="">Tất cả trạng thái</option>
-        </select>
-        <select
-          value={recordedFilter}
-          onChange={(e) => {
-            setRecordedFilter(e.target.value);
-            setPage(1);
-          }}
-        >
-          <option value="">Tất cả (đã/chưa ghi)</option>
-          <option value="false">Chưa ghi nhận</option>
-          <option value="true">Đã ghi nhận</option>
-        </select>
-        <button type="submit" className="btn btn--primary">
-          Tìm kiếm
-        </button>
+        </>
+      }
+    >
+      <form className="resident-page__filters" onSubmit={handleSearch}>
+        <div className="resident-page__filter-row">
+          <label className="resident-page__filter">
+            <span>Tìm kiếm</span>
+            <input
+              type="text"
+              placeholder="Tên hoặc mã cư dân..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+            />
+          </label>
+          <label className="resident-page__filter">
+            <span>Trạng thái</span>
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setPage(1);
+              }}
+            >
+              <option value="admitted">Đang điều trị</option>
+              <option value="pending">Chờ nhập viện</option>
+              <option value="discharged">Đã xuất viện</option>
+              <option value="">Tất cả trạng thái</option>
+            </select>
+          </label>
+          <label className="resident-page__filter">
+            <span>Ghi nhận</span>
+            <select
+              value={recordedFilter}
+              onChange={(e) => {
+                setRecordedFilter(e.target.value);
+                setPage(1);
+              }}
+            >
+              <option value="">Tất cả (đã/chưa ghi)</option>
+              <option value="false">Chưa ghi nhận</option>
+              <option value="true">Đã ghi nhận</option>
+            </select>
+          </label>
+          <div className="resident-page__filter-actions">
+            <button type="submit" className="resident-page__button resident-page__button--primary">
+              Áp dụng
+            </button>
+          </div>
+        </div>
       </form>
 
-      {listError && <p className="form-error">{listError}</p>}
+      {listError && <div className="resident-page__error">{listError}</div>}
       {usingFallbackApi && (
-        <p className="initial-health-fallback-hint">⚠️ {RESIDENT_INITIAL_HEALTH_ROUTE_HINT}</p>
+        <p className="resident-page__hint-box">⚠️ {RESIDENT_INITIAL_HEALTH_ROUTE_HINT}</p>
       )}
 
-      <div className="data-table-wrap">
-        <table className="data-table">
+      <div className="resident-page__table">
+        <table className="resident-page__table-element">
           <thead>
-            <tr>
+            <tr className="resident-page__table-header">
               <th>Mã</th>
               <th>Họ tên</th>
               <th>Trạng thái ghi</th>
@@ -334,14 +348,14 @@ export default function InitialHealthPage() {
           </tbody>
         </table>
         {!listLoading && totalPages > 1 && (
-          <div className="pagination">
+          <div className="resident-page__pagination" style={{ padding: '12px 16px', borderTop: '1px solid #e2e8f0' }}>
             <span>
               {total} cư dân · Trang {page}/{totalPages}
             </span>
-            <div className="pagination__btns">
+            <div style={{ display: 'flex', gap: 8 }}>
               <button
                 type="button"
-                className="btn btn--ghost btn--sm"
+                className="resident-page__page-btn"
                 disabled={page <= 1}
                 onClick={() => setPage((p) => p - 1)}
               >
@@ -349,7 +363,7 @@ export default function InitialHealthPage() {
               </button>
               <button
                 type="button"
-                className="btn btn--ghost btn--sm"
+                className="resident-page__page-btn"
                 disabled={page >= totalPages}
                 onClick={() => setPage((p) => p + 1)}
               >
@@ -525,6 +539,6 @@ export default function InitialHealthPage() {
           </div>
         </div>
       )}
-    </div>
+    </AdminPageShell>
   );
 }

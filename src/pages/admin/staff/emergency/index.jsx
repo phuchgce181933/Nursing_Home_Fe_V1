@@ -5,8 +5,14 @@ import {
   subscribeEmergencyReadiness,
 } from '../../../../services/readinessRealtime.service';
 import { getLocalDateString } from '../../../../utils/dateUtils';
+import {
+  formatResponsibleFloorLabels,
+  formatTaskSummary,
+} from '../../../../utils/staffAvailabilityDisplay';
 import facilityService from '../../../../services/facility.service';
 import { floorLabel } from '../../../../components/facility/FloorRoomSelect';
+import EmergencyStaffDetailModal from './EmergencyStaffDetailModal';
+import AdminPageShell from '../../../../components/admin/AdminPageShell';
 import '../../../../styles/admin/EmergencyAvailabilityPage.css';
 
 const ROLE_LABELS = { doctor: 'Bác sĩ', nurse: 'Y tá' };
@@ -26,8 +32,6 @@ const LEGACY_AVAIL_CONFIG = {
 };
 
 const AUTO_REFRESH_SECONDS = 30;
-
-const SHIFT_STATUS_VI = { published: 'Đã đăng', confirmed: 'Đã xác nhận' };
 
 const formatCheckDateVi = (iso) => {
   if (!iso) return '';
@@ -60,6 +64,7 @@ export default function EmergencyAvailabilityPage() {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [liveConnected, setLiveConnected] = useState(false);
   const [floorOptions, setFloorOptions] = useState([]);
+  const [detailPerson, setDetailPerson] = useState(null);
 
   const timerRef = useRef(null);
   const countRef = useRef(null);
@@ -193,14 +198,15 @@ export default function EmergencyAvailabilityPage() {
   };
 
   return (
-    <div className="emergency-page">
-      <div className="emergency-page__header">
-        <h1 className="emergency-page__title">Sẵn sàng khẩn cấp</h1>
-        <p className="emergency-page__subtitle">
+    <AdminPageShell
+      title="Sẵn sàng khẩn cấp"
+      subtitle={
+        <>
           Trạng thái bác sĩ/y tá theo ngày đã chọn — ca đã đăng hoặc đã xác nhận; nhiệm vụ chỉ tính khi cùng ngày và còn ca hợp lệ.
           {isToday && ' Cập nhật theo thời gian thực khi xem hôm nay.'}
-        </p>
-      </div>
+        </>
+      }
+    >
 
       {!isToday && (
         <p className="emergency-date-hint">
@@ -277,33 +283,33 @@ export default function EmergencyAvailabilityPage() {
 
       {error && <div className="emergency-error">{error}</div>}
 
-      <div className="data-table-wrap">
-        <table className="data-table">
+      <div className="resident-page__table">
+        <table className="resident-page__table-element">
           <thead>
-            <tr>
+            <tr className="resident-page__table-header">
               <th>Họ tên</th>
               <th>Vai trò</th>
-              <th>Mã NV</th>
-              <th>Ca hiện tại</th>
+              <th>Tầng phụ trách</th>
               <th>Nhiệm vụ</th>
-              <th>Nghỉ phép</th>
               <th>Mức sẵn sàng</th>
+              <th>Thao tác</th>
             </tr>
           </thead>
           <tbody>
             {loading && !data.length && (
               <tr>
-                <td colSpan={7} className="empty-state">Đang tải...</td>
+                <td colSpan={6} className="empty-state">Đang tải...</td>
               </tr>
             )}
             {!loading && filtered.length === 0 && (
               <tr>
-                <td colSpan={7} className="empty-state">Không tìm thấy nhân viên phù hợp</td>
+                <td colSpan={6} className="empty-state">Không tìm thấy nhân viên phù hợp</td>
               </tr>
             )}
             {filtered.map((person) => {
               const cfg = resolveReadiness(person);
-              const shift = person.currentShift;
+              const floorLabel = formatResponsibleFloorLabels(person);
+              const taskLabel = formatTaskSummary(person);
 
               return (
                 <tr key={person._id}>
@@ -318,38 +324,12 @@ export default function EmergencyAvailabilityPage() {
                       {ROLE_LABELS[person.role] || person.role}
                     </span>
                   </td>
-                  <td>{person.staffProfile?.staffCode || '—'}</td>
-                  <td>
-                    {shift ? (
-                      <span
-                        className={person.isOnShift ? 'shift-active' : 'shift-scheduled'}
-                        title={
-                          person.isOnShift
-                            ? 'Đang trong khung giờ ca (hôm nay)'
-                            : 'Có ca đăng/xác nhận trong ngày đã chọn'
-                        }
-                      >
-                        {person.isOnShift ? '✓ ' : '○ '}
-                        {shift.name ? `${shift.name} · ` : ''}
-                        {shift.startTime}–{shift.endTime}
-                        {shift.status && (
-                          <> ({SHIFT_STATUS_VI[shift.status] || shift.status})</>
-                        )}
-                      </span>
-                    ) : (
-                      <span className="shift-inactive">— Không có ca</span>
-                    )}
+                  <td className="emergency-table-cell--wrap" title={floorLabel}>
+                    {floorLabel}
                   </td>
-                  <td
-                    title="Nhiệm vụ chờ/đang làm trên đúng ngày đã chọn, khi nhân viên có ca đăng hoặc xác nhận cùng ngày"
-                  >
+                  <td>
                     <span className={person.hasTasks ? 'task-active' : 'task-inactive'}>
-                      {person.hasTasks ? '✓ Có nhiệm vụ' : '—'}
-                    </span>
-                  </td>
-                  <td>
-                    <span className={person.onLeave ? 'leave-active' : 'leave-inactive'}>
-                      {person.onLeave ? '✓ Đang nghỉ' : '—'}
+                      {taskLabel}
                     </span>
                   </td>
                   <td>
@@ -358,12 +338,30 @@ export default function EmergencyAvailabilityPage() {
                       {cfg.label}
                     </span>
                   </td>
+                  <td>
+                    <button
+                      type="button"
+                      className="emergency-detail-btn"
+                      onClick={() => setDetailPerson(person)}
+                    >
+                      Chi tiết
+                    </button>
+                  </td>
                 </tr>
               );
             })}
           </tbody>
         </table>
       </div>
-    </div>
+
+      {detailPerson && (
+        <EmergencyStaffDetailModal
+          person={detailPerson}
+          readinessConfig={resolveReadiness(detailPerson)}
+          checkDateLabel={formatCheckDateVi(checkDate)}
+          onClose={() => setDetailPerson(null)}
+        />
+      )}
+    </AdminPageShell>
   );
 }

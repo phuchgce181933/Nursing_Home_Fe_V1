@@ -104,6 +104,11 @@ const applyClientFilter = (rows, { role, floorId } = {}) => {
   return filtered;
 };
 
+/**
+ * @param {Object} snapshotValue
+ * @param {Object} [filters]
+ * @returns {import('../types/staffAvailability').StaffAvailabilityResponse}
+ */
 const normalizeSnapshot = (snapshotValue, filters) => {
   const value = snapshotValue || {};
   const staffMap = value.staff && typeof value.staff === 'object' ? value.staff : {};

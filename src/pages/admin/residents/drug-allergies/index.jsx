@@ -3,6 +3,7 @@ import residentService, { RESIDENT_DRUG_ALLERGIES_ROUTE_HINT } from '../../../..
 import ResidentContextBlock from '../../../../components/resident/ResidentContextBlock';
 import { FaEye, FaPen } from 'react-icons/fa';
 import { formatLeaveDate } from '../../../../utils/leaveUtils';
+import AdminPageShell from '../../../../components/admin/AdminPageShell';
 import '../../../../styles/admin/DrugAllergiesPage.css';
 import '../../../../styles/admin/residentActionIcons.css';
 import { GENDER_LABELS, RESIDENCY_LABELS } from '../_shared/residentLabels';
@@ -170,58 +171,67 @@ export default function DrugAllergiesPage() {
   const savedDrugAllergies = detailData?.drugAllergies?.drugAllergies || [];
 
   return (
-    <div className="drug-allergies-page">
-      <div className="drug-allergies-page__header">
-        <h1 className="drug-allergies-page__title">Quản lý dị ứng thuốc</h1>
-        <p className="drug-allergies-page__subtitle">
-          Ghi nhận dị ứng thuốc qua tab riêng (không ghi trên tab sức khỏe ban đầu khi nhập viện).
-        </p>
-      </div>
-
-      <form className="drug-allergies-toolbar" onSubmit={handleSearch}>
-        <input
-          type="text"
-          placeholder="Tìm theo tên hoặc mã cư dân..."
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-        />
-        <select
-          value={statusFilter}
-          onChange={(e) => {
-            setStatusFilter(e.target.value);
-            setPage(1);
-          }}
-        >
-          <option value="admitted">Đang điều trị</option>
-          <option value="pending">Chờ nhập viện</option>
-          <option value="discharged">Đã xuất viện</option>
-          <option value="">Tất cả trạng thái</option>
-        </select>
-        <select
-          value={recordedFilter}
-          onChange={(e) => {
-            setRecordedFilter(e.target.value);
-            setPage(1);
-          }}
-        >
-          <option value="">Tất cả hồ sơ</option>
-          <option value="false">Chưa ghi nhận</option>
-          <option value="true">Đã ghi nhận</option>
-        </select>
-        <button type="submit" className="btn btn--primary">
-          Tìm kiếm
-        </button>
+    <AdminPageShell
+      title="Quản lý dị ứng thuốc"
+      subtitle="Ghi nhận dị ứng thuốc qua tab riêng (không ghi trên tab sức khỏe ban đầu khi nhập viện)."
+    >
+      <form className="resident-page__filters" onSubmit={handleSearch}>
+        <div className="resident-page__filter-row">
+          <label className="resident-page__filter">
+            <span>Tìm kiếm</span>
+            <input
+              type="text"
+              placeholder="Tên hoặc mã cư dân..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+            />
+          </label>
+          <label className="resident-page__filter">
+            <span>Trạng thái</span>
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setPage(1);
+              }}
+            >
+              <option value="admitted">Đang điều trị</option>
+              <option value="pending">Chờ nhập viện</option>
+              <option value="discharged">Đã xuất viện</option>
+              <option value="">Tất cả trạng thái</option>
+            </select>
+          </label>
+          <label className="resident-page__filter">
+            <span>Hồ sơ</span>
+            <select
+              value={recordedFilter}
+              onChange={(e) => {
+                setRecordedFilter(e.target.value);
+                setPage(1);
+              }}
+            >
+              <option value="">Tất cả hồ sơ</option>
+              <option value="false">Chưa ghi nhận</option>
+              <option value="true">Đã ghi nhận</option>
+            </select>
+          </label>
+          <div className="resident-page__filter-actions">
+            <button type="submit" className="resident-page__button resident-page__button--primary">
+              Áp dụng
+            </button>
+          </div>
+        </div>
       </form>
 
-      {listError && <p className="form-error">{listError}</p>}
+      {listError && <div className="resident-page__error">{listError}</div>}
       {showRouteHint && (
-        <p className="drug-allergies-route-hint">⚠️ {RESIDENT_DRUG_ALLERGIES_ROUTE_HINT}</p>
+        <p className="resident-page__hint-box">⚠️ {RESIDENT_DRUG_ALLERGIES_ROUTE_HINT}</p>
       )}
 
-      <div className="data-table-wrap">
-        <table className="data-table">
+      <div className="resident-page__table">
+        <table className="resident-page__table-element">
           <thead>
-            <tr>
+            <tr className="resident-page__table-header">
               <th>Mã</th>
               <th>Họ tên</th>
               <th>Dị ứng thuốc</th>
@@ -416,6 +426,6 @@ export default function DrugAllergiesPage() {
           </div>
         </div>
       )}
-    </div>
+    </AdminPageShell>
   );
 }

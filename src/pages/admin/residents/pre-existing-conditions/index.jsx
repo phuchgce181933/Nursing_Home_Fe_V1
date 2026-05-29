@@ -3,6 +3,7 @@ import residentService, { RESIDENT_PRE_EXISTING_ROUTE_HINT } from '../../../../s
 import ResidentContextBlock from '../../../../components/resident/ResidentContextBlock';
 import { FaEye, FaPen } from 'react-icons/fa';
 import { formatLeaveDate } from '../../../../utils/leaveUtils';
+import AdminPageShell from '../../../../components/admin/AdminPageShell';
 import '../../../../styles/admin/PreExistingConditionsPage.css';
 import '../../../../styles/admin/residentActionIcons.css';
 import { GENDER_LABELS, RESIDENCY_LABELS } from '../_shared/residentLabels';
@@ -209,56 +210,69 @@ export default function PreExistingConditionsPage() {
   const resident = detailData?.resident;
 
   return (
-    <div className="pre-existing-page">
-      <div className="pre-existing-page__header">
-        <h1 className="pre-existing-page__title">Cập nhật bệnh lý nền và tiền sử bệnh</h1>
-        <p className="pre-existing-page__subtitle">
+    <AdminPageShell
+      title="Cập nhật bệnh lý nền và tiền sử bệnh"
+      subtitle={
+        <>
           Ghi nhận bệnh lý và tiền sử <strong>trước khi</strong> cư dân vào viện dưỡng (không phải tình trạng lúc nhập viện).
-        </p>
-      </div>
-
-      <form className="pre-existing-toolbar" onSubmit={handleSearch}>
-        <input
-          type="text"
-          placeholder="Tìm theo tên hoặc mã cư dân..."
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-        />
-        <select
-          value={statusFilter}
-          onChange={(e) => {
-            setStatusFilter(e.target.value);
-            setPage(1);
-          }}
-        >
-          <option value="admitted">Đang điều trị</option>
-          <option value="pending">Chờ nhập viện</option>
-          <option value="discharged">Đã xuất viện</option>
-          <option value="">Tất cả trạng thái</option>
-        </select>
-        <select
-          value={recordedFilter}
-          onChange={(e) => {
-            setRecordedFilter(e.target.value);
-            setPage(1);
-          }}
-        >
-          <option value="">Tất cả hồ sơ</option>
-          <option value="false">Chưa ghi nhận</option>
-          <option value="true">Đã ghi nhận</option>
-        </select>
-        <button type="submit" className="btn btn--primary">
-          Tìm kiếm
-        </button>
+        </>
+      }
+    >
+      <form className="resident-page__filters" onSubmit={handleSearch}>
+        <div className="resident-page__filter-row">
+          <label className="resident-page__filter">
+            <span>Tìm kiếm</span>
+            <input
+              type="text"
+              placeholder="Tên hoặc mã cư dân..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+            />
+          </label>
+          <label className="resident-page__filter">
+            <span>Trạng thái</span>
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setPage(1);
+              }}
+            >
+              <option value="admitted">Đang điều trị</option>
+              <option value="pending">Chờ nhập viện</option>
+              <option value="discharged">Đã xuất viện</option>
+              <option value="">Tất cả trạng thái</option>
+            </select>
+          </label>
+          <label className="resident-page__filter">
+            <span>Hồ sơ</span>
+            <select
+              value={recordedFilter}
+              onChange={(e) => {
+                setRecordedFilter(e.target.value);
+                setPage(1);
+              }}
+            >
+              <option value="">Tất cả hồ sơ</option>
+              <option value="false">Chưa ghi nhận</option>
+              <option value="true">Đã ghi nhận</option>
+            </select>
+          </label>
+          <div className="resident-page__filter-actions">
+            <button type="submit" className="resident-page__button resident-page__button--primary">
+              Áp dụng
+            </button>
+          </div>
+        </div>
       </form>
 
-      {listError && <p className="form-error">{listError}</p>}
-      {showRouteHint && <p className="pre-existing-route-hint">⚠️ {RESIDENT_PRE_EXISTING_ROUTE_HINT}</p>}
+      {listError && <div className="resident-page__error">{listError}</div>}
+      {showRouteHint && <p className="resident-page__hint-box">⚠️ {RESIDENT_PRE_EXISTING_ROUTE_HINT}</p>}
 
-      <div className="data-table-wrap">
-        <table className="data-table">
+      <div className="resident-page__table">
+        <table className="resident-page__table-element">
           <thead>
-            <tr>
+            <tr className="resident-page__table-header">
               <th>Mã</th>
               <th>Họ tên</th>
               <th>Trạng thái hồ sơ</th>
@@ -464,6 +478,6 @@ export default function PreExistingConditionsPage() {
           </div>
         </div>
       )}
-    </div>
+    </AdminPageShell>
   );
 }
