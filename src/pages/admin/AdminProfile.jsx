@@ -163,8 +163,10 @@ function AdminProfile() {
                 </div>
 
                 <div>
-                  <dt>{t('profile.roleCategory')}</dt>
-                  <dd>{user.staffProfile.roleCategory}</dd>
+
+                  <dt>Vai trò hệ thống</dt>
+                  <dd>{user.role}</dd>
+
                 </div>
 
                 <div>

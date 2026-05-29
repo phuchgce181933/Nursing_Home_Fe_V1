@@ -1,89 +1,27 @@
-.pre-existing-page { padding: 24px; }
-
-.pre-existing-page__header { margin-bottom: 24px; }
-.pre-existing-page__title { font-size: 1.5rem; font-weight: 700; color: #1e293b; margin: 0; }
-.pre-existing-page__subtitle { font-size: 0.875rem; color: #64748b; margin: 4px 0 0; }
+/* Page-specific — shell/table: ResidentPage.css */
 
 .pre-existing-status-cell {
-  font-size: 0.8125rem;
+  font-size: 13px;
   line-height: 1.45;
   max-width: 320px;
   color: #475569;
 }
 
-.pre-existing-toolbar {
-  display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; align-items: center;
-}
-.pre-existing-toolbar input,
-.pre-existing-toolbar select {
-  padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px;
-  font-size: 0.875rem; outline: none; background: #fff;
-}
-.pre-existing-toolbar input { flex: 1; min-width: 220px; }
-.pre-existing-toolbar input:focus,
-.pre-existing-toolbar select:focus { border-color: #3b82f6; }
-
-.pre-existing-route-hint {
-  background: #fef9c3; border: 1px solid #fde047; border-radius: 8px;
-  color: #854d0e; font-size: 0.8rem; padding: 10px 14px; margin-bottom: 16px;
-}
-
-.pre-existing-layout {
+.resident-page .pre-existing-layout {
   display: grid;
-  grid-template-columns: 1fr 1.1fr;
-  gap: 24px;
+  grid-template-columns: minmax(280px, 1fr) minmax(320px, 1.1fr);
+  gap: 20px;
   align-items: start;
 }
 
 @media (max-width: 1024px) {
-  .pre-existing-layout { grid-template-columns: 1fr; }
+  .resident-page .pre-existing-layout {
+    grid-template-columns: 1fr;
+  }
 }
 
-.data-table-wrap { background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; }
-.data-table { width: 100%; border-collapse: collapse; }
-.data-table thead { background: #f8fafc; }
-.data-table th {
-  padding: 12px 16px; text-align: left;
-  font-size: 0.75rem; font-weight: 600; color: #64748b;
-  text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #e2e8f0;
-}
-.data-table td { padding: 13px 16px; font-size: 0.875rem; color: #334155; border-bottom: 1px solid #f1f5f9; }
-.data-table tbody tr:last-child td { border-bottom: none; }
-.data-table tbody tr { cursor: pointer; }
-.data-table tbody tr:hover { background: #f8fafc; }
-.data-table tbody tr.is-selected { background: #eff6ff; }
-
-.pre-existing-panel {
-  background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px;
-  min-height: 420px;
-}
-.pre-existing-panel__title { font-size: 1rem; font-weight: 600; color: #1e293b; margin: 0 0 4px; }
-.pre-existing-panel__subtitle { font-size: 0.78rem; color: #64748b; margin: 0 0 16px; }
-.pre-existing-panel__actions { margin-top: 16px; }
-.pre-existing-panel__updated { margin-top: 14px; color: #94a3b8; font-size: 0.8rem; }
-
-.btn { padding: 8px 16px; border-radius: 8px; font-size: 0.875rem; font-weight: 500; cursor: pointer; border: none; }
-.btn--primary { background: #3b82f6; color: #fff; }
-.btn--primary:hover { background: #2563eb; }
-.btn--primary:disabled { opacity: 0.5; cursor: not-allowed; }
-.btn--sm { padding: 4px 12px; font-size: 0.75rem; border-radius: 6px; }
-.btn--ghost { background: #f1f5f9; color: #475569; }
-.btn--ghost:hover { background: #e2e8f0; }
-
-.pagination {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 12px 16px; border-top: 1px solid #e2e8f0; font-size: 0.8rem; color: #64748b;
-}
-.pagination__btns { display: flex; gap: 8px; }
-
-.empty-state { text-align: center; color: #94a3b8; padding: 48px 16px; font-size: 0.9rem; }
-.form-error { color: #dc2626; font-size: 0.8rem; margin-bottom: 10px; }
-.form-success { color: #15803d; font-size: 0.8rem; margin-bottom: 10px; }
-
-.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.form-grid--full { grid-column: 1 / -1; }
-.form-group label { display: block; font-size: 0.8rem; font-weight: 500; color: #475569; margin-bottom: 4px; }
-.form-group textarea {
-  width: 100%; padding: 8px 10px; border: 1px solid #e2e8f0; border-radius: 8px;
-  font-size: 0.875rem; box-sizing: border-box; resize: vertical;
+.pre-existing-panel__updated {
+  margin-top: 14px;
+  color: #94a3b8;
+  font-size: 13px;
 }

@@ -5,19 +5,63 @@ import facilityService from '../../../../services/facility.service';
 import residentService, { RESIDENT_TRANSFER_ROUTE_HINT } from '../../../../services/resident.service';
 import { formatStaffAreasSyncedSummary } from '../../../../utils/staffAreasSynced';
 import { FaEye, FaPen } from 'react-icons/fa';
+import AdminPageShell from '../../../../components/admin/AdminPageShell';
 import '../../../../styles/admin/TransferResidentPage.css';
 import '../../../../styles/admin/residentActionIcons.css';
-import { RESIDENCY_LABELS } from '../_shared/residentLabels';
+import { GENDER_LABELS, RESIDENCY_LABELS } from '../_shared/residentLabels';
 
 const roomText = (room) => {
   if (!room) return '—';
-  return room.roomNumber ? `Phòng ${room.roomNumber}` : room.label || '—';
+  return room.roomNumber ? `Phòng ${room.roomNumber}` : room.label || room.name || '—';
 };
 
 const bedText = (bed) => {
   if (!bed) return '—';
   return bed.bedCode ? `${bed.bedCode}${bed.bedType ? ` (${bed.bedType})` : ''}` : '—';
 };
+
+const buildingText = (building) => {
+  if (!building) return '—';
+  return building.name || building.code || '—';
+};
+
+const floorText = (floor) => {
+  if (!floor) return '—';
+  return floor.name || (floor.floorNumber != null ? `Tầng ${floor.floorNumber}` : floor.label || '—');
+};
+
+const formatDateVi = (value) => {
+  if (!value) return '—';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString('vi-VN');
+};
+
+function DetailRow({ label, value }) {
+  return (
+    <div className="transfer-detail-row">
+      <span className="transfer-detail-row__label">{label}</span>
+      <span className="transfer-detail-row__value">{value ?? '—'}</span>
+    </div>
+  );
+}
+
+function LocationBlock({ assignment, area }) {
+  const room = assignment?.room || area?.room;
+  const floor = assignment?.floor || area?.floor;
+  const building = assignment?.building || area?.building;
+  const bed = assignment?.bed || area?.bed;
+
+  return (
+  <>
+    <DetailRow label="Tòa" value={buildingText(building)} />
+    <DetailRow label="Tầng" value={floorText(floor)} />
+    <DetailRow label="Phòng" value={roomText(room)} />
+    <DetailRow label="Giường" value={bedText(bed)} />
+    {room?.roomType && <DetailRow label="Loại phòng" value={room.roomType} />}
+  </>
+  );
+}
 
 export default function TransferResidentPage() {
   const [residents, setResidents] = useState([]);
@@ -48,6 +92,9 @@ export default function TransferResidentPage() {
   const [staffSyncEmptyNote, setStaffSyncEmptyNote] = useState(false);
   const [showRouteHint, setShowRouteHint] = useState(false);
   const [viewPopup, setViewPopup] = useState(false);
+  const [viewDetail, setViewDetail] = useState(null);
+  const [viewLoading, setViewLoading] = useState(false);
+  const [viewError, setViewError] = useState('');
   const [editPopup, setEditPopup] = useState(false);
 
   const portalPrefix = usePortalPrefix();
@@ -167,11 +214,26 @@ export default function TransferResidentPage() {
     setSearch(searchInput.trim());
   };
 
-  const openViewPopup = (resident) => {
-    setSelectedId(resident._id);
+  const openViewPopup = async (resident) => {
     clearTransferFeedback();
-    setTargetError('');
     setViewPopup(true);
+    setViewDetail(null);
+    setViewError('');
+    setViewLoading(true);
+    try {
+      const data = await residentService.getResidentDetail(resident._id);
+      setViewDetail(data.resident);
+    } catch (e) {
+      setViewError(e.response?.data?.message || e.message || 'Không tải được thông tin cư dân');
+    } finally {
+      setViewLoading(false);
+    }
+  };
+
+  const closeViewPopup = () => {
+    setViewPopup(false);
+    setViewDetail(null);
+    setViewError('');
   };
 
   const openEditPopup = (resident) => {
@@ -221,45 +283,51 @@ export default function TransferResidentPage() {
   };
 
   return (
-    <div className="transfer-page">
-      <div className="transfer-page__header">
-        <h1 className="transfer-page__title">Chuyển cư dân sang phòng khác</h1>
-        <p className="transfer-page__subtitle">
-          Admin/Manager chọn cư dân, chọn tầng đích và giường đích để thực hiện chuyển phòng.
-        </p>
-      </div>
-
-      <form className="transfer-toolbar" onSubmit={handleSearch}>
-        <input
-          type="text"
-          placeholder="Tìm theo tên hoặc mã cư dân..."
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-        />
-        <select
-          value={statusFilter}
-          onChange={(e) => {
-            setStatusFilter(e.target.value);
-            setPage(1);
-          }}
-        >
-          <option value="admitted">Đang điều trị</option>
-          <option value="pending">Chờ nhập viện</option>
-          <option value="discharged">Đã xuất viện</option>
-          <option value="">Tất cả trạng thái</option>
-        </select>
-        <button type="submit" className="btn btn--primary">
-          Tìm kiếm
-        </button>
+    <AdminPageShell
+      title="Chuyển cư dân sang phòng khác"
+      subtitle="Admin/Manager chọn cư dân, chọn tầng đích và giường đích để thực hiện chuyển phòng."
+    >
+      <form className="resident-page__filters" onSubmit={handleSearch}>
+        <div className="resident-page__filter-row">
+          <label className="resident-page__filter">
+            <span>Tìm kiếm</span>
+            <input
+              type="text"
+              placeholder="Tên hoặc mã cư dân..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+            />
+          </label>
+          <label className="resident-page__filter">
+            <span>Trạng thái</span>
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setPage(1);
+              }}
+            >
+              <option value="admitted">Đang điều trị</option>
+              <option value="pending">Chờ nhập viện</option>
+              <option value="discharged">Đã xuất viện</option>
+              <option value="">Tất cả trạng thái</option>
+            </select>
+          </label>
+          <div className="resident-page__filter-actions">
+            <button type="submit" className="resident-page__button resident-page__button--primary">
+              Áp dụng
+            </button>
+          </div>
+        </div>
       </form>
 
-      {listError && <p className="form-error">{listError}</p>}
-      {showRouteHint && <p className="transfer-route-hint">⚠️ {RESIDENT_TRANSFER_ROUTE_HINT}</p>}
+      {listError && <div className="resident-page__error">{listError}</div>}
+      {showRouteHint && <p className="resident-page__hint-box">⚠️ {RESIDENT_TRANSFER_ROUTE_HINT}</p>}
 
-      <div className="data-table-wrap">
-        <table className="data-table">
+      <div className="resident-page__table">
+        <table className="resident-page__table-element">
           <thead>
-            <tr>
+            <tr className="resident-page__table-header">
               <th>Mã</th>
               <th>Họ tên</th>
               <th>Trạng thái</th>
@@ -338,26 +406,50 @@ export default function TransferResidentPage() {
         )}
       </div>
       {viewPopup && (
-        <div className="modal-overlay" onClick={() => setViewPopup(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h2 className="modal__title">Chi tiết vị trí cư dân</h2>
-            {targetLoading ? (
-              <div className="empty-state">Đang tải thông tin...</div>
-            ) : targetError ? (
-              <div className="empty-state">{targetError}</div>
-            ) : (
-              <div className="transfer-card">
-                <h3>Vị trí hiện tại</h3>
-                <p>
-                  <strong>Phòng:</strong> {roomText(targetsData?.currentAssignment?.room)}
-                </p>
-                <p>
-                  <strong>Giường:</strong> {bedText(targetsData?.currentAssignment?.bed)}
-                </p>
-              </div>
+        <div className="modal-overlay" onClick={closeViewPopup}>
+          <div className="modal modal--wide" onClick={(e) => e.stopPropagation()}>
+            <h2 className="modal__title">Chi tiết cư dân</h2>
+            {viewDetail?.fullName && (
+              <p className="transfer-page__subtitle" style={{ marginTop: -8, marginBottom: 16 }}>
+                {viewDetail.fullName}
+                {viewDetail.residentCode ? ` · ${viewDetail.residentCode}` : ''}
+              </p>
+            )}
+            {viewLoading && <div className="empty-state">Đang tải thông tin...</div>}
+            {viewError && <p className="form-error">{viewError}</p>}
+            {!viewLoading && viewDetail && (
+              <>
+                <div className="transfer-card">
+                  <h3>Thông tin cá nhân</h3>
+                  <div className="transfer-detail-grid">
+                    <DetailRow label="Mã cư dân" value={viewDetail.residentCode} />
+                    <DetailRow
+                      label="Trạng thái"
+                      value={RESIDENCY_LABELS[viewDetail.residencyStatus] || viewDetail.residencyStatus}
+                    />
+                    <DetailRow label="Giới tính" value={GENDER_LABELS[viewDetail.gender] || '—'} />
+                    <DetailRow
+                      label="Ngày sinh"
+                      value={
+                        viewDetail.dateOfBirth
+                          ? `${formatDateVi(viewDetail.dateOfBirth)}${viewDetail.age != null ? ` (${viewDetail.age} tuổi)` : ''}`
+                          : '—'
+                      }
+                    />
+                    <DetailRow label="Nhóm máu" value={viewDetail.bloodType} />
+                    <DetailRow label="Ngày nhập viện" value={formatDateVi(viewDetail.admittedAt)} />
+                  </div>
+                </div>
+                <div className="transfer-card">
+                  <h3>Vị trí hiện tại</h3>
+                  <div className="transfer-detail-grid">
+                    <LocationBlock area={viewDetail.area} />
+                  </div>
+                </div>
+              </>
             )}
             <div className="modal__actions">
-              <button type="button" className="btn-cancel" onClick={() => setViewPopup(false)}>
+              <button type="button" className="btn-cancel" onClick={closeViewPopup}>
                 Đóng
               </button>
             </div>
@@ -398,12 +490,9 @@ export default function TransferResidentPage() {
               <>
                 <div className="transfer-card">
                   <h3>Vị trí hiện tại</h3>
-                  <p>
-                    <strong>Phòng:</strong> {roomText(targetsData?.currentAssignment?.room)}
-                  </p>
-                  <p>
-                    <strong>Giường:</strong> {bedText(targetsData?.currentAssignment?.bed)}
-                  </p>
+                  <div className="transfer-detail-grid">
+                    <LocationBlock assignment={targetsData?.currentAssignment} />
+                  </div>
                 </div>
                 <form onSubmit={handleTransfer}>
                   <div className="form-grid">
@@ -472,6 +561,6 @@ export default function TransferResidentPage() {
           </div>
         </div>
       )}
-    </div>
+    </AdminPageShell>
   );
 }

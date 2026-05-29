@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Search, Plus, RefreshCw, Users } from 'lucide-react';
+import AdminPageShell from '../../../../components/admin/AdminPageShell';
 import staffService from '../../../../services/staff.service';
 import useAuth from '../../../../hooks/useAuth';
 import {
@@ -11,11 +13,12 @@ import StaffDetailModal from './StaffDetailModal';
 import StaffEditModal from './StaffEditModal';
 import StaffBanModal from './StaffBanModal';
 import StaffCreateModal from './StaffCreateModal';
+import { staffToEditForm } from '../../../../utils/staffFormSnapshot';
 import './profiles.css';
 
 const emptyEditForm = {
   fullName: '', phone: '', gender: '', dateOfBirth: '',
-  specialty: '', role: 'nurse', roleCategory: '', address: '',
+  specialty: '', role: 'nurse', address: '',
   avatarFile: null, avatarUrl: '', password: '',
 };
 
@@ -37,6 +40,7 @@ export default function StaffManagementPage() {
   const [detailStaff, setDetailStaff] = useState(null);
   const [editStaff, setEditStaff] = useState(null);
   const [editForm, setEditForm] = useState(emptyEditForm);
+  const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState('');
   const [banStaff, setBanStaff] = useState(null);
   const [banLoading, setBanLoading] = useState(false);
@@ -68,24 +72,31 @@ export default function StaffManagementPage() {
   /* ---- View detail ---- */
   const handleView = (s) => setDetailStaff(s);
 
-  /* ---- Edit ---- */
-  const handleEdit = (s) => {
-    if (!canManage(s)) return;
-    setEditStaff(s);
-    setEditForm({
-      fullName: s.fullName || '',
-      phone: s.phone || '',
-      gender: s.gender || '',
-      dateOfBirth: s.dateOfBirth ? s.dateOfBirth.slice(0, 10) : '',
-      specialty: s.staffProfile?.specialty || '',
-      role: s.role || 'nurse',
-      roleCategory: s.staffProfile?.roleCategory || '',
-      address: s.address || '',
-      avatarFile: null,
-      avatarUrl: s.avatarUrl || '',
-      password: '',
-    });
+  const closeEditModal = () => {
+    setEditStaff(null);
+    setEditLoading(false);
     setEditError('');
+    setEditForm(emptyEditForm);
+  };
+
+  /* ---- Edit: pre-fill inputs from list, then refresh full profile from API ---- */
+  const handleEdit = async (s) => {
+    if (!canManage(s)) return;
+    setDetailStaff(null);
+    setEditStaff(s);
+    setEditError('');
+    setEditForm(staffToEditForm(s));
+    setEditLoading(true);
+
+    try {
+      const fresh = await staffService.getById(s._id);
+      setEditStaff(fresh);
+      setEditForm(staffToEditForm(fresh));
+    } catch (e) {
+      setEditError(e.response?.data?.message || 'Không tải đủ hồ sơ — đang dùng dữ liệu từ danh sách');
+    } finally {
+      setEditLoading(false);
+    }
   };
 
   const handleSaveEdit = async () => {
@@ -101,20 +112,15 @@ export default function StaffManagementPage() {
         avatarFile: editForm.avatarFile || undefined,
         password: editForm.password || undefined,
       };
-      const roleChanged =
-        editForm.role !== editStaff.role ||
-        editForm.roleCategory !== (editStaff.staffProfile?.roleCategory || '');
+      const roleChanged = editForm.role !== editStaff.role;
 
       await Promise.all([
         staffService.update(editStaff._id, profileBody),
         roleChanged
-          ? staffService.updateRole(editStaff._id, {
-              role: editForm.role,
-              roleCategory: editForm.roleCategory || undefined,
-            })
+          ? staffService.updateRole(editStaff._id, { role: editForm.role })
           : Promise.resolve(),
       ]);
-      setEditStaff(null);
+      closeEditModal();
       loadStaff();
     } catch (e) {
       setEditError(e.response?.data?.message || 'Lưu thất bại');
@@ -169,48 +175,97 @@ export default function StaffManagementPage() {
     }
   };
 
-  return (
-    <div className="staff-page">
-      {/* Header */}
-      <div className="staff-page__header">
-        <div>
-          <h1 className="staff-page__title">Hồ sơ nhân viên</h1>
-          <p className="staff-page__subtitle">
-            {actorRole === 'manager'
-              ? 'Quản lý nhân viên vận hành (bác sĩ, y tá, chăm sóc). Không tạo hoặc sửa tài khoản admin/quản lý.'
-              : 'Quản lý và phân loại vai trò nhân viên'}
-          </p>
-        </div>
-        <button className="staff-page__btn staff-page__btn--primary" onClick={() => { setCreateError(''); setShowCreate(true); }}>
-          + Thêm nhân viên
-        </button>
-      </div>
+  const activeCount = staff.filter((s) => s.isActive && !s.isBanned).length;
+  const bannedCount = staff.filter((s) => s.isBanned).length;
 
-      {/* Search & filter bar */}
-      <form className="staff-page__search" onSubmit={handleSearch}>
-        <input
-          type="text"
-          placeholder="Tìm tên, email, username..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <select value={filterRole} onChange={(e) => setFilterRole(e.target.value)}>
-          <option value="">Tất cả vai trò</option>
-          {filterRoleOptions.map((r) => (
-            <option key={r.value} value={r.value}>{r.label}</option>
-          ))}
-        </select>
-        <select value={filterBanned} onChange={(e) => setFilterBanned(e.target.value)}>
-          <option value="">Tất cả trạng thái</option>
-          <option value="false">Không bị ban</option>
-          <option value="true">Đang bị ban</option>
-        </select>
-        <button type="submit" className="staff-page__btn staff-page__btn--secondary">
-          Tìm kiếm
-        </button>
+  return (
+    <AdminPageShell
+      title="Hồ sơ nhân viên"
+      subtitle={
+        actorRole === 'manager'
+          ? 'Quản lý nhân viên vận hành (bác sĩ, y tá, chăm sóc). Không tạo hoặc sửa tài khoản admin/quản lý.'
+          : 'Quản lý và phân loại vai trò nhân viên'
+      }
+      actions={
+        <>
+          <button
+            type="button"
+            className="resident-page__button resident-page__button--ghost"
+            onClick={loadStaff}
+            disabled={loading}
+          >
+            <RefreshCw size={16} className={loading ? 'spin' : ''} />
+            Làm mới
+          </button>
+          <button
+            type="button"
+            className="resident-page__button resident-page__button--primary"
+            onClick={() => {
+              setCreateError('');
+              setShowCreate(true);
+            }}
+          >
+            <Plus size={16} />
+            Thêm nhân viên
+          </button>
+        </>
+      }
+      stats={[
+        { label: 'Tổng nhân viên', value: String(staff.length).padStart(2, '0'), icon: <Users size={20} /> },
+        {
+          label: 'Đang làm việc',
+          value: String(activeCount).padStart(2, '0'),
+          icon: <Users size={20} />,
+          iconClass: 'resident-stat__icon--admitted',
+        },
+        {
+          label: 'Đang bị ban',
+          value: String(bannedCount).padStart(2, '0'),
+          icon: <Users size={20} />,
+          iconClass: 'resident-stat__icon--inactive',
+        },
+      ]}
+    >
+      <form className="resident-page__filters" onSubmit={handleSearch}>
+        <div className="resident-page__filter-row">
+          <label className="resident-page__filter">
+            <span>Tìm kiếm</span>
+            <div className="resident-page__filter-input">
+              <Search size={16} />
+              <input
+                type="text"
+                placeholder="Tên, email, username..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+          </label>
+          <label className="resident-page__filter">
+            <span>Vai trò</span>
+            <select value={filterRole} onChange={(e) => setFilterRole(e.target.value)}>
+              <option value="">Tất cả vai trò</option>
+              {filterRoleOptions.map((r) => (
+                <option key={r.value} value={r.value}>{r.label}</option>
+              ))}
+            </select>
+          </label>
+          <label className="resident-page__filter">
+            <span>Trạng thái</span>
+            <select value={filterBanned} onChange={(e) => setFilterBanned(e.target.value)}>
+              <option value="">Tất cả</option>
+              <option value="false">Không bị ban</option>
+              <option value="true">Đang bị ban</option>
+            </select>
+          </label>
+          <div className="resident-page__filter-actions">
+            <button type="submit" className="resident-page__button resident-page__button--primary">
+              Áp dụng
+            </button>
+          </div>
+        </div>
       </form>
 
-      {pageError && <p className="form-error">{pageError}</p>}
+      {pageError && <div className="resident-page__error">{pageError}</div>}
 
       <StaffTable
         staff={staff}
@@ -234,10 +289,11 @@ export default function StaffManagementPage() {
       {/* Edit modal */}
       {editStaff && (
         <StaffEditModal
+          loading={editLoading}
           form={editForm}
           onChange={setEditForm}
           onSave={handleSaveEdit}
-          onClose={() => setEditStaff(null)}
+          onClose={closeEditModal}
           error={editError}
           roleOptions={roleOptions}
         />
@@ -263,6 +319,6 @@ export default function StaffManagementPage() {
           roleOptions={roleOptions}
         />
       )}
-    </div>
+    </AdminPageShell>
   );
 }

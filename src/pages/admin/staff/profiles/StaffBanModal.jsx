@@ -9,7 +9,7 @@ export default function StaffBanModal({ staff, onBan, onUnban, onClose, loading 
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" style={{ maxWidth: 440 }} onClick={(e) => e.stopPropagation()}>
+      <div className="modal staff-profile-modal" onClick={(e) => e.stopPropagation()}>
 
         <div className={`deactivate-modal__icon ${isBanned ? 'deactivate-modal__icon--unban' : ''}`}>
           {isBanned ? '🔓' : '🚫'}

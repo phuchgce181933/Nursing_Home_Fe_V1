@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Search, RefreshCw, Users, Phone } from 'lucide-react';
 import residentService from '../../../../services/resident.service';
 import { formatLeaveDate } from '../../../../utils/leaveUtils';
 import { FaEye } from 'react-icons/fa';
-import '../../../../styles/admin/FamilyManagementPage.css';
+import AdminPageShell from '../../../../components/admin/AdminPageShell';
 import '../../../../styles/admin/residentActionIcons.css';
 import { GENDER_LABELS, RESIDENCY_LABELS } from '../_shared/residentLabels';
 
@@ -266,38 +267,88 @@ export default function FamilyManagementPage() {
   const contacts = familyData?.emergencyContacts ?? [];
   const selectedSummary = residents.find((r) => r._id === selectedId);
 
-  return (
-    <div className="family-page">
-      <div className="family-page__header">
-        <h1 className="family-page__title">Quản lý thông tin thân nhân</h1>
-        <p className="family-page__subtitle">
-          Quản lý liên hệ khẩn cấp và thông tin gia đình của cư dân đang điều trị.
-        </p>
-      </div>
+  const stats = useMemo(() => {
+    const withContacts = residents.filter((r) => (r.emergencyContactCount ?? 0) > 0).length;
+    const noContacts = residents.filter((r) => !(r.emergencyContactCount ?? 0)).length;
+    return { withContacts, noContacts };
+  }, [residents]);
 
-      <form className="family-toolbar" onSubmit={handleSearch}>
-        <input
-          type="text"
-          placeholder="Tìm theo tên hoặc mã cư dân..."
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-        />
-        <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}>
-          <option value="admitted">Đang điều trị</option>
-          <option value="pending">Chờ nhập viện</option>
-          <option value="discharged">Đã xuất viện</option>
-          <option value="">Tất cả trạng thái</option>
-        </select>
-        <button type="submit" className="btn btn--primary">Tìm kiếm</button>
+  return (
+    <AdminPageShell
+      title="Quản lý thông tin thân nhân"
+      subtitle="Quản lý liên hệ khẩn cấp và thông tin gia đình của cư dân đang điều trị."
+      actions={
+        <button
+          type="button"
+          className="resident-page__button resident-page__button--ghost"
+          onClick={() => loadList()}
+          disabled={listLoading}
+        >
+          <RefreshCw size={16} className={listLoading ? 'spin' : ''} />
+          Làm mới
+        </button>
+      }
+      stats={[
+        { label: 'Tổng cư dân', value: String(total).padStart(2, '0'), icon: <Users size={20} /> },
+        {
+          label: 'Đã có liên hệ',
+          value: String(stats.withContacts).padStart(2, '0'),
+          icon: <Phone size={20} />,
+          iconClass: 'resident-stat__icon--admitted',
+        },
+        {
+          label: 'Chưa có liên hệ',
+          value: String(stats.noContacts).padStart(2, '0'),
+          icon: <Phone size={20} />,
+          iconClass: 'resident-stat__icon--pending',
+        },
+      ]}
+    >
+      <form className="resident-page__filters" onSubmit={handleSearch}>
+        <div className="resident-page__filter-row">
+          <label className="resident-page__filter">
+            <span>Tìm kiếm</span>
+            <div className="resident-page__filter-input">
+              <Search size={16} />
+              <input
+                type="text"
+                placeholder="Tên hoặc mã cư dân..."
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+              />
+            </div>
+          </label>
+          <label className="resident-page__filter">
+            <span>Trạng thái</span>
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setPage(1);
+              }}
+            >
+              <option value="admitted">Đang điều trị</option>
+              <option value="pending">Chờ nhập viện</option>
+              <option value="discharged">Đã xuất viện</option>
+              <option value="">Tất cả trạng thái</option>
+            </select>
+          </label>
+          <div className="resident-page__filter-actions">
+            <button type="submit" className="resident-page__button resident-page__button--primary">
+              Áp dụng
+            </button>
+          </div>
+        </div>
       </form>
 
-      {listError && <p className="form-error">{listError}</p>}
+      {listError && <div className="resident-page__error">{listError}</div>}
 
-      <div className="family-layout">
-        <div className="data-table-wrap">
-          <table className="data-table">
+      <div className="resident-page__split">
+        <div>
+          <div className="resident-page__table">
+          <table className="resident-page__table-element">
             <thead>
-              <tr>
+              <tr className="resident-page__table-header">
                 <th>Mã</th>
                 <th>Họ tên</th>
                 <th>Số LH</th>
@@ -306,16 +357,17 @@ export default function FamilyManagementPage() {
             </thead>
             <tbody>
               {listLoading && (
-                <tr><td colSpan={4} className="empty-state">Đang tải...</td></tr>
+                <tr><td colSpan={4} className="resident-page__empty">Đang tải...</td></tr>
               )}
               {!listLoading && residents.length === 0 && (
-                <tr><td colSpan={4} className="empty-state">Không có cư dân nào</td></tr>
+                <tr><td colSpan={4} className="resident-page__empty">Không có cư dân nào</td></tr>
               )}
               {!listLoading && residents.map((r) => (
                 <tr
                   key={r._id}
-                  className={selectedId === r._id ? 'is-selected' : ''}
+                  className={`resident-page__table-row${selectedId === r._id ? ' is-selected' : ''}`}
                   onClick={() => handleSelect(r)}
+                  style={{ cursor: 'pointer' }}
                 >
                   <td style={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>{r.residentCode}</td>
                   <td style={{ fontWeight: 600 }}>{r.fullName}</td>
@@ -334,13 +386,14 @@ export default function FamilyManagementPage() {
               ))}
             </tbody>
           </table>
+          </div>
           {!listLoading && totalPages > 1 && (
-            <div className="pagination">
+            <div className="resident-page__pagination" style={{ marginTop: 12 }}>
               <span>{total} cư dân · Trang {page}/{totalPages}</span>
-              <div className="pagination__btns">
+              <div style={{ display: 'flex', gap: 8 }}>
                 <button
                   type="button"
-                  className="btn btn--ghost btn--sm"
+                  className="resident-page__page-btn"
                   disabled={page <= 1}
                   onClick={() => setPage((p) => p - 1)}
                 >
@@ -348,7 +401,7 @@ export default function FamilyManagementPage() {
                 </button>
                 <button
                   type="button"
-                  className="btn btn--ghost btn--sm"
+                  className="resident-page__page-btn"
                   disabled={page >= totalPages}
                   onClick={() => setPage((p) => p + 1)}
                 >
@@ -359,7 +412,7 @@ export default function FamilyManagementPage() {
           )}
         </div>
 
-        <div className="family-panel">
+        <div className="resident-page__panel">
           {!selectedId ? (
             <div className="empty-state">Chọn cư dân để xem và quản lý liên hệ thân nhân</div>
           ) : detailLoading ? (
@@ -368,8 +421,8 @@ export default function FamilyManagementPage() {
             <div className="empty-state">{detailError}</div>
           ) : (
             <>
-              <h2 className="family-panel__title">Liên hệ khẩn cấp</h2>
-              <p className="family-panel__subtitle">
+              <h2 className="resident-page__panel-title">Liên hệ khẩn cấp</h2>
+              <p className="resident-page__panel-subtitle">
                 {selectedSummary?.fullName || resident?.fullName}
                 {' · '}
                 {selectedSummary?.residentCode || resident?.residentCode}
@@ -396,7 +449,7 @@ export default function FamilyManagementPage() {
                 </span>
                 <button
                   type="button"
-                  className="btn btn--primary btn--sm"
+                  className="resident-page__button resident-page__button--primary resident-page__button--sm"
                   onClick={() => {
                     setContactError('');
                     setContactModal({ mode: 'add' });
@@ -562,6 +615,6 @@ export default function FamilyManagementPage() {
           </div>
         </div>
       )}
-    </div>
+    </AdminPageShell>
   );
 }

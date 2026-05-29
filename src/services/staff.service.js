@@ -89,11 +89,18 @@ const listResidentsAvailable = (userId, params = {}) =>
 const listAssignedResidents = (userId) =>
   axiosClient.get(`/staff/${userId}/residents/assigned`).then((r) => r.data);
 
+/**
+ * @param {Object} [params]
+ * @param {string} [params.date] YYYY-MM-DD
+ * @param {'doctor'|'nurse'} [params.role]
+ * @param {string} [params.floorId]
+ * @returns {Promise<import('../types/staffAvailability').StaffAvailabilityResponse>}
+ */
 const getAvailability = (params = {}) =>
   axiosClient.get('/staff/availability', { params }).then((r) => r.data);
 
 /**
- * GET /api/staff/availability?date= — readinessLevel, hasTasks (same date + shift + active task).
+ * GET /api/staff/availability?date= — readinessLevel, hasTasks, phone, staffCode, specialty, certifications.
  * GET area coverage — confirmed shifts on floor for today.
  */
 const getAreaCoverageStatus = (floorId) =>

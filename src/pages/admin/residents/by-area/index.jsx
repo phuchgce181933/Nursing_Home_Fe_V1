@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Search, RefreshCw, Building2, MapPin } from 'lucide-react';
+import AdminPageShell from '../../../../components/admin/AdminPageShell';
 import facilityService, { getFacilityErrorMessage } from '../../../../services/facility.service';
 import residentService, { RESIDENT_AREA_ROUTE_HINT } from '../../../../services/resident.service';
 import { FaEye } from 'react-icons/fa';
 import { formatLeaveDate } from '../../../../utils/leaveUtils';
-import '../../../../styles/admin/ResidentsByAreaPage.css';
 import '../../../../styles/admin/residentActionIcons.css';
 import { GENDER_LABELS, RESIDENCY_LABELS } from '../_shared/residentLabels';
 import { formatResidentAreaLine, pickDrugAllergiesList } from '../../../../utils/residentArea';
@@ -281,96 +282,140 @@ export default function ResidentsByAreaPage() {
     ? selectedFloor?.rooms || []
     : floorOptions.flatMap((f) => f.rooms || []);
 
+  const pageStats = useMemo(
+    () => [
+      {
+        label: 'Tổng trong tòa',
+        value: String(summary?.totalResidents ?? 0).padStart(2, '0'),
+        icon: <Building2 size={20} />,
+      },
+      {
+        label: 'Số tầng',
+        value: String(summary?.floors?.length ?? 0).padStart(2, '0'),
+        icon: <MapPin size={20} />,
+        iconClass: 'resident-stat__icon--admitted',
+      },
+      {
+        label: 'Đang lọc',
+        value: String(total).padStart(2, '0'),
+        icon: <MapPin size={20} />,
+        iconClass: 'resident-stat__icon--pending',
+      },
+    ],
+    [summary, total]
+  );
+
   return (
-    <div className="residents-area-page">
-      <div className="residents-area-page__header">
-        <h1 className="residents-area-page__title">Xem cư dân theo khu vực</h1>
-        <p className="residents-area-page__subtitle">
-          Lọc theo tòa, tầng, phòng và xem chi tiết hồ sơ cư dân.
-        </p>
-      </div>
-
-      <div className="area-toolbar">
-        <select
-          value={buildingId}
-          onChange={(e) => setBuildingId(e.target.value)}
-          disabled={!buildings.length}
+    <AdminPageShell
+      title="Cư dân theo khu vực"
+      subtitle="Lọc theo tòa, tầng, phòng và xem chi tiết hồ sơ cư dân."
+      actions={
+        <button
+          type="button"
+          className="resident-page__button resident-page__button--ghost"
+          onClick={() => {
+            loadSummary();
+            loadList();
+          }}
+          disabled={listLoading}
         >
-          {!buildings.length && <option value="">— Không có tòa —</option>}
-          {buildings.map((b) => (
-            <option key={b._id} value={b._id}>{b.name || b.code}</option>
-          ))}
-        </select>
-        <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}>
-          <option value="admitted">Đang điều trị</option>
-          <option value="pending">Chờ nhập viện</option>
-          <option value="discharged">Đã xuất viện</option>
-          <option value="">Tất cả trạng thái</option>
-        </select>
-      </div>
-
-      <form className="area-toolbar" onSubmit={handleSearch}>
-        <input
-          type="text"
-          placeholder="Tìm theo tên hoặc mã cư dân..."
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-        />
-        <button type="submit" className="btn btn--primary">Tìm kiếm</button>
-      </form>
-      <div className="area-toolbar">
-        <select value={floorId} onChange={(e) => selectFloor(e.target.value)}>
-          <option value="">Tất cả tầng</option>
-          {floorOptions.map((f) => (
-            <option key={f._id} value={f._id}>
-              {f.label || f.name || `Tầng ${f.floorNumber}`}
-            </option>
-          ))}
-        </select>
-        <select value={roomId} onChange={(e) => setRoomId(e.target.value)}>
-          <option value="">Tất cả phòng</option>
-          {roomOptions.map((r) => (
-            <option key={r._id} value={r._id}>
-              {r.label || `Phòng ${r.roomNumber}`}
-            </option>
-          ))}
-        </select>
-        <button type="button" className="btn btn--ghost" onClick={selectAllBuilding}>
-          Bỏ lọc khu vực
+          <RefreshCw size={16} className={listLoading ? 'spin' : ''} />
+          Làm mới
         </button>
-      </div>
-
-      {summary && (
-        <div className="area-stats">
-          <div className="area-stat">
-            <div className="area-stat__value">{summary.totalResidents ?? 0}</div>
-            <div className="area-stat__label">Tổng cư dân trong tòa</div>
-          </div>
-          <div className="area-stat">
-            <div className="area-stat__value">{summary.floors?.length ?? 0}</div>
-            <div className="area-stat__label">Số tầng</div>
-          </div>
-          <div className="area-stat">
-            <div className="area-stat__value">{total}</div>
-            <div className="area-stat__label">Đang lọc: {activeFilterLabel || '—'}</div>
+      }
+      stats={summary ? pageStats : undefined}
+    >
+      <form className="resident-page__filters" onSubmit={handleSearch}>
+        <div className="resident-page__filter-row">
+          <label className="resident-page__filter">
+            <span>Tòa nhà</span>
+            <select
+              value={buildingId}
+              onChange={(e) => setBuildingId(e.target.value)}
+              disabled={!buildings.length}
+            >
+              {!buildings.length && <option value="">— Không có tòa —</option>}
+              {buildings.map((b) => (
+                <option key={b._id} value={b._id}>{b.name || b.code}</option>
+              ))}
+            </select>
+          </label>
+          <label className="resident-page__filter">
+            <span>Trạng thái</span>
+            <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}>
+              <option value="admitted">Đang điều trị</option>
+              <option value="pending">Chờ nhập viện</option>
+              <option value="discharged">Đã xuất viện</option>
+              <option value="">Tất cả trạng thái</option>
+            </select>
+          </label>
+          <label className="resident-page__filter">
+            <span>Tầng</span>
+            <select value={floorId} onChange={(e) => selectFloor(e.target.value)}>
+              <option value="">Tất cả tầng</option>
+              {floorOptions.map((f) => (
+                <option key={f._id} value={f._id}>
+                  {f.label || f.name || `Tầng ${f.floorNumber}`}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="resident-page__filter">
+            <span>Phòng</span>
+            <select value={roomId} onChange={(e) => setRoomId(e.target.value)}>
+              <option value="">Tất cả phòng</option>
+              {roomOptions.map((r) => (
+                <option key={r._id} value={r._id}>
+                  {r.label || `Phòng ${r.roomNumber}`}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <div className="resident-page__filter-row">
+          <label className="resident-page__filter">
+            <span>Tìm kiếm</span>
+            <div className="resident-page__filter-input">
+              <Search size={16} />
+              <input
+                type="text"
+                placeholder="Tên hoặc mã cư dân..."
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+              />
+            </div>
+          </label>
+          <div className="resident-page__filter-actions">
+            <button type="submit" className="resident-page__button resident-page__button--primary">
+              Áp dụng
+            </button>
+            <button
+              type="button"
+              className="resident-page__button resident-page__button--ghost"
+              onClick={selectAllBuilding}
+            >
+              Bỏ lọc khu vực
+            </button>
           </div>
         </div>
-      )}
+      </form>
 
       {usingFallbackApi && (
-        <p style={{ background: '#fffbeb', border: '1px solid #fde68a', color: '#92400e', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: '0.85rem' }}>
-          ⚠️ {RESIDENT_AREA_ROUTE_HINT}
-        </p>
+        <p className="resident-page__hint-box">⚠️ {RESIDENT_AREA_ROUTE_HINT}</p>
       )}
 
       {(summaryError || listError) && (
-        <p className="form-error">{summaryError || listError}</p>
+        <div className="resident-page__error">{summaryError || listError}</div>
       )}
 
-      <div className="data-table-wrap">
-        <table className="data-table">
+      {summary && activeFilterLabel && (
+        <p className="resident-page__hint">Đang lọc: <strong>{activeFilterLabel}</strong></p>
+      )}
+
+      <div className="resident-page__table">
+        <table className="resident-page__table-element">
           <thead>
-            <tr>
+            <tr className="resident-page__table-header">
               <th>Mã</th>
               <th>Họ tên</th>
               <th>Khu vực</th>
@@ -381,16 +426,16 @@ export default function ResidentsByAreaPage() {
           </thead>
           <tbody>
             {listLoading && (
-              <tr><td colSpan={6} className="empty-state">Đang tải...</td></tr>
+              <tr><td colSpan={6} className="resident-page__empty">Đang tải...</td></tr>
             )}
             {!listLoading && !buildingId && (
-              <tr><td colSpan={6} className="empty-state">Chọn tòa nhà để xem cư dân</td></tr>
+              <tr><td colSpan={6} className="resident-page__empty">Chọn tòa nhà để xem cư dân</td></tr>
             )}
             {!listLoading && buildingId && residents.length === 0 && (
-              <tr><td colSpan={6} className="empty-state">Không có cư dân trong khu vực này</td></tr>
+              <tr><td colSpan={6} className="resident-page__empty">Không có cư dân trong khu vực này</td></tr>
             )}
             {!listLoading && residents.map((r) => (
-              <tr key={r._id}>
+              <tr key={r._id} className="resident-page__table-row">
                 <td style={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>{r.residentCode}</td>
                 <td style={{ fontWeight: 600 }}>{r.fullName}</td>
                 <td>{formatResidentAreaLine(r) || '—'}</td>
@@ -418,30 +463,31 @@ export default function ResidentsByAreaPage() {
             ))}
           </tbody>
         </table>
-        {!listLoading && totalPages > 1 && (
-          <div className="pagination">
-            <span>{total} cư dân · Trang {page}/{totalPages}</span>
-            <div className="pagination__btns">
-              <button
-                type="button"
-                className="btn btn--ghost btn--sm"
-                disabled={page <= 1}
-                onClick={() => setPage((p) => p - 1)}
-              >
-                ← Trước
-              </button>
-              <button
-                type="button"
-                className="btn btn--ghost btn--sm"
-                disabled={page >= totalPages}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                Sau →
-              </button>
-            </div>
-          </div>
-        )}
       </div>
+
+      {!listLoading && totalPages > 1 && (
+        <div className="resident-page__pagination">
+          <span>{total} cư dân · Trang {page}/{totalPages}</span>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              type="button"
+              className="resident-page__page-btn"
+              disabled={page <= 1}
+              onClick={() => setPage((p) => p - 1)}
+            >
+              ← Trước
+            </button>
+            <button
+              type="button"
+              className="resident-page__page-btn"
+              disabled={page >= totalPages}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              Sau →
+            </button>
+          </div>
+        </div>
+      )}
 
       {detailModal && (
         <ResidentDetailModal
@@ -451,6 +497,6 @@ export default function ResidentsByAreaPage() {
           onClose={() => setDetailModal(null)}
         />
       )}
-    </div>
+    </AdminPageShell>
   );
 }

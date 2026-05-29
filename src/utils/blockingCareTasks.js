@@ -22,6 +22,7 @@ export const CARE_TASK_STATUS_LABELS = {
   in_progress: 'Đang làm',
   completed: 'Hoàn thành',
   skipped: 'Bỏ qua',
+  missed: 'Bỏ lỡ',
 };
 
 export function careTaskTypeLabel(value) {
