@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Mail, Phone, Shield, Activity, BadgeCheck, UserCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import authService from '../../services/auth.service';
 import { useAuth } from '../../hooks/useAuth';
@@ -32,6 +33,7 @@ function toDateInput(value) {
 }
 
 function AdminProfile() {
+  const { t } = useTranslation();
   const { user, loading, logout, refreshUser } = useAuth();
   const navigate = useNavigate();
   const [profileForm, setProfileForm] = useState(initialProfileForm);
@@ -53,7 +55,7 @@ function AdminProfile() {
   }, [user]);
 
   if (loading || !user) {
-    return <LoadingSpinner label="Loading profile..." />;
+    return <LoadingSpinner label={t('profile.loadingProfile')} />;
   }
 
   const handleLogout = () => {
@@ -70,10 +72,10 @@ function AdminProfile() {
       await authService.updateProfile(profileForm);
       await refreshUser();
       setMessageType('success');
-      setMessage('Profile updated successfully.');
+      setMessage(t('profile.updateSuccess'));
     } catch (error) {
       setMessageType('error');
-      setMessage(error?.response?.data?.message || 'Unable to update profile.');
+      setMessage(error?.response?.data?.message || t('profile.updateError'));
     } finally {
       setIsSaving(false);
     }
@@ -84,7 +86,7 @@ function AdminProfile() {
 
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
       setMessageType('error');
-      setMessage('Password confirmation does not match.');
+      setMessage(t('profile.passwordMismatch'));
       return;
     }
 
@@ -97,11 +99,11 @@ function AdminProfile() {
         newPassword: passwordForm.newPassword,
       });
       setMessageType('success');
-      setMessage('Password changed successfully.');
+      setMessage(t('profile.passwordChangeSuccess'));
       setPasswordForm(initialPasswordForm);
     } catch (error) {
       setMessageType('error');
-      setMessage(error?.response?.data?.message || 'Unable to change password.');
+      setMessage(error?.response?.data?.message || t('profile.passwordChangeError'));
     } finally {
       setIsSaving(false);
     }
@@ -110,8 +112,8 @@ function AdminProfile() {
   return (
     <div className="profile-page">
       <header className="profile-page__header">
-        <h1 className="profile-page__title">Admin Profile</h1>
-        <p className="profile-page__subtitle">Account and staff information</p>
+        <h1 className="profile-page__title">{t('profile.title')}</h1>
+        <p className="profile-page__subtitle">{t('profile.subtitle')}</p>
       </header>
 
       {message && (
@@ -129,7 +131,7 @@ function AdminProfile() {
 
             <p className={`profile-card__status ${user.isActive ? 'is-active' : 'is-inactive'}`}>
               <BadgeCheck size={16} />
-              {user.isActive ? 'Account is active' : 'Account is inactive'}
+              {user.isActive ? t('profile.accountActive') : t('profile.accountInactive')}
             </p>
 
             <ul className="profile-card__list">
@@ -145,43 +147,43 @@ function AdminProfile() {
 
               <li>
                 <Shield size={16} />
-                <span>Gender: {user.gender || '—'}</span>
+                <span>{t('profile.genderLabel')} {user.gender || '—'}</span>
               </li>
             </ul>
           </section>
 
           <section className="profile-card">
-            <h2 className="profile-card__heading">Staff Profile</h2>
+            <h2 className="profile-card__heading">{t('profile.staffProfileTitle')}</h2>
 
             {user.staffProfile ? (
               <dl className="profile-details">
                 <div>
-                  <dt>Staff Code</dt>
+                  <dt>{t('profile.staffCode')}</dt>
                   <dd>{user.staffProfile.staffCode}</dd>
                 </div>
 
                 <div>
-                  <dt>Role Category</dt>
+                  <dt>{t('profile.roleCategory')}</dt>
                   <dd>{user.staffProfile.roleCategory}</dd>
                 </div>
 
                 <div>
-                  <dt>Specialty</dt>
+                  <dt>{t('profile.specialty')}</dt>
                   <dd>{user.staffProfile.specialty || '—'}</dd>
                 </div>
 
                 <div>
-                  <dt>Responsible Areas</dt>
-                  <dd>{user.staffProfile.responsibleAreaIds?.length || 0} areas</dd>
+                  <dt>{t('profile.responsibleAreas')}</dt>
+                  <dd>{user.staffProfile.responsibleAreaIds?.length || 0} {t('profile.areas')}</dd>
                 </div>
 
                 <div>
-                  <dt>Assigned Residents</dt>
-                  <dd>{user.staffProfile.assignedResidentIds?.length || 0} residents</dd>
+                  <dt>{t('profile.assignedResidents')}</dt>
+                  <dd>{user.staffProfile.assignedResidentIds?.length || 0} {t('profile.residents')}</dd>
                 </div>
               </dl>
             ) : (
-              <p className="profile-card__empty">No staff profile available.</p>
+              <p className="profile-card__empty">{t('profile.staffProfileEmpty')}</p>
             )}
           </section>
         </div>
@@ -190,34 +192,34 @@ function AdminProfile() {
           <section className="profile-card">
             <h2 className="profile-card__heading">
               <Activity size={18} />
-              System Information
+              {t('profile.systemInformation')}
             </h2>
 
             <dl className="profile-details">
               <div>
-                <dt>User ID</dt>
+                <dt>{t('profile.userId')}</dt>
                 <dd>{user._id}</dd>
               </div>
 
               <div>
-                <dt>Created At</dt>
+                <dt>{t('profile.createdAt')}</dt>
                 <dd>{formatDate(user.createdAt)}</dd>
               </div>
 
               <div>
-                <dt>Last Login</dt>
+                <dt>{t('profile.lastLogin')}</dt>
                 <dd>{formatDate(user.lastLoginAt)}</dd>
               </div>
             </dl>
           </section>
 
           <section className="profile-card">
-            <h2 className="profile-card__heading">Update Profile</h2>
+            <h2 className="profile-card__heading">{t('profile.updateProfile')}</h2>
 
             <form className="profile-form" onSubmit={handleProfileSubmit}>
               <div className="profile-form__grid">
                 <label className="profile-form__field">
-                  <span className="profile-form__label">Full Name</span>
+                  <span className="profile-form__label">{t('profile.fullName')}</span>
 
                   <input
                     className="profile-form__input"
@@ -232,7 +234,7 @@ function AdminProfile() {
                 </label>
 
                 <label className="profile-form__field">
-                  <span className="profile-form__label">Phone Number</span>
+                  <span className="profile-form__label">{t('profile.phoneNumber')}</span>
 
                   <input
                     className="profile-form__input"
@@ -247,7 +249,7 @@ function AdminProfile() {
                 </label>
 
                 <label className="profile-form__field">
-                  <span className="profile-form__label">Gender</span>
+                  <span className="profile-form__label">{t('profile.gender')}</span>
 
                   <select
                     className="profile-form__input"
@@ -259,15 +261,15 @@ function AdminProfile() {
                       }))
                     }
                   >
-                    <option value="male">Male</option>
-                    <option value="female">Female</option>
-                    <option value="other">Other</option>
-                    <option value="unknown">Unknown</option>
+                    <option value="male">{t('profile.genderMale')}</option>
+                    <option value="female">{t('profile.genderFemale')}</option>
+                    <option value="other">{t('profile.genderOther')}</option>
+                    <option value="unknown">{t('profile.genderUnknown')}</option>
                   </select>
                 </label>
 
                 <label className="profile-form__field">
-                  <span className="profile-form__label">Date of Birth</span>
+                  <span className="profile-form__label">{t('profile.dateOfBirth')}</span>
 
                   <input
                     className="profile-form__input"
@@ -286,7 +288,7 @@ function AdminProfile() {
                   className="profile-form__field"
                   style={{ gridColumn: '1 / -1' }}
                 >
-                  <span className="profile-form__label">Address</span>
+                  <span className="profile-form__label">{t('profile.address')}</span>
 
                   <input
                     className="profile-form__input"
@@ -307,14 +309,14 @@ function AdminProfile() {
                   className="button button--primary"
                   disabled={isSaving}
                 >
-                  {isSaving ? 'Saving...' : 'Save Profile'}
+                  {isSaving ? t('profile.saving') : t('profile.saveProfile')}
                 </button>
               </div>
             </form>
           </section>
 
           <section className="profile-card">
-            <h2 className="profile-card__heading">Change Password</h2>
+            <h2 className="profile-card__heading">{t('profile.changePassword')}</h2>
 
             <form className="profile-form" onSubmit={handlePasswordSubmit}>
               <div className="profile-form__grid">
@@ -322,7 +324,7 @@ function AdminProfile() {
                   className="profile-form__field"
                   style={{ gridColumn: '1 / -1' }}
                 >
-                  <span className="profile-form__label">Current Password</span>
+                  <span className="profile-form__label">{t('profile.currentPassword')}</span>
 
                   <input
                     className="profile-form__input"
@@ -339,7 +341,7 @@ function AdminProfile() {
                 </label>
 
                 <label className="profile-form__field">
-                  <span className="profile-form__label">New Password</span>
+                  <span className="profile-form__label">{t('profile.newPassword')}</span>
 
                   <input
                     className="profile-form__input"
@@ -356,7 +358,7 @@ function AdminProfile() {
                 </label>
 
                 <label className="profile-form__field">
-                  <span className="profile-form__label">Confirm New Password</span>
+                  <span className="profile-form__label">{t('profile.confirmNewPassword')}</span>
 
                   <input
                     className="profile-form__input"
@@ -379,7 +381,7 @@ function AdminProfile() {
                   className="button button--primary"
                   disabled={isSaving}
                 >
-                  {isSaving ? 'Processing...' : 'Change Password'}
+                  {isSaving ? t('profile.processing') : t('profile.changePasswordButton')}
                 </button>
 
                 <button
@@ -387,7 +389,7 @@ function AdminProfile() {
                   className="button button--secondary"
                   onClick={() => navigate('/forgot-password')}
                 >
-                  Forgot Password
+                  {t('profile.forgotPassword')}
                 </button>
 
                 <button
@@ -395,7 +397,7 @@ function AdminProfile() {
                   className="button button--danger"
                   onClick={handleLogout}
                 >
-                  Logout
+                  {t('profile.logout')}
                 </button>
               </div>
             </form>

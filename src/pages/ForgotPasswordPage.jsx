@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import authService from '../services/auth.service';
 
 function ForgotPasswordPage() {
+  const { t } = useTranslation();
   const [email, setEmail] = useState('');
   const [message, setMessage] = useState('');
   const [isSuccess, setIsSuccess] = useState(false);
@@ -16,10 +18,10 @@ function ForgotPasswordPage() {
     try {
       await authService.forgotPassword(email);
       setIsSuccess(true);
-      setMessage('Nếu email tồn tại, chúng tôi đã gửi hướng dẫn đặt lại mật khẩu. Vui lòng kiểm tra hộp thư của bạn.');
+      setMessage(t('forgotPassword.success'));
     } catch (error) {
       setIsSuccess(false);
-      setMessage(error?.response?.data?.message || 'Không thể gửi yêu cầu đặt lại mật khẩu.');
+      setMessage(error?.response?.data?.message || t('forgotPassword.error'));
     } finally {
       setLoading(false);
     }
@@ -29,10 +31,8 @@ function ForgotPasswordPage() {
     <div className="app-shell">
       <div className="card login-card">
         <header className="login-page__header">
-          <h1 className="login-page__title">Quên mật khẩu</h1>
-          <p className="login-page__subtitle">
-            Nhập email tài khoản để nhận liên kết đặt lại mật khẩu.
-          </p>
+          <h1 className="login-page__title">{t('forgotPassword.title')}</h1>
+          <p className="login-page__subtitle">{t('forgotPassword.subtitle')}</p>
         </header>
 
         {message && (
@@ -43,25 +43,25 @@ function ForgotPasswordPage() {
 
         <form className="login-form" onSubmit={handleSubmit}>
           <div className="login-form__group">
-            <label className="login-form__label">Email</label>
+            <label className="login-form__label">{t('login.email')}</label>
             <input
               type="email"
               className="login-form__input"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
-              placeholder="Nhập email"
+              placeholder={t('login.placeholderEmail')}
               required
             />
           </div>
 
           <button type="submit" className="login-form__button" disabled={loading}>
-            {loading ? 'Đang gửi...' : 'Gửi liên kết đặt lại'}
+            {loading ? t('forgotPassword.sending') : t('forgotPassword.submit')}
           </button>
         </form>
 
         <div style={{ marginTop: 16, textAlign: 'center' }}>
           <Link to="/login" className="button button--secondary" style={{ display: 'inline-block', textDecoration: 'none' }}>
-            Quay lại đăng nhập
+            {t('forgotPassword.back')}
           </Link>
         </div>
       </div>
