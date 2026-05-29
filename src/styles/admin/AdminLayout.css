@@ -1,12 +1,15 @@
 .admin-layout {
   display: flex;
-  min-height: 100vh;
   width: 100%;
+  height: 100vh;
   background: #f1f5f9;
+  overflow: hidden;
 }
 
 .admin-layout__main {
   flex: 1;
+  min-height: 0;
+  height: 100vh;
   overflow-y: auto;
   padding: 24px;
 }
