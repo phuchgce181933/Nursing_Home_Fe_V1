@@ -12,182 +12,107 @@ import {
   ClipboardList,
   MessageSquare,
   Settings,
-} from "lucide-react";
+} from 'lucide-react';
 
 export const sidebarData = [
   {
-    title: "Dashboard",
+    title: 'sidebar.dashboard',
     icon: LayoutDashboard,
-    path: "/admin/dashboard",
+    path: '/admin/dashboard',
   },
-
   {
-    title: "Authentication",
+    title: 'sidebar.authentication',
     icon: Shield,
     children: [
-      {
-        title: "My Profile",
-        path: "/admin/profile",
-      },
-      {
-        title: "Accounts",
-        path: "/admin/accounts",
-      },
+      { title: 'sidebar.myProfile', path: '/admin/profile' },
+      { title: 'sidebar.accounts', path: '/admin/accounts' },
     ],
   },
-
   {
-    title: "Residents",
+    title: 'sidebar.residents',
     icon: Users,
     children: [
-      {
-        title: "Resident List",
-        path: "/admin/residents",
-      },
+      { title: 'sidebar.residents', path: '/admin/residents' },
     ],
   },
-
   {
-    title: "Admission Management",
+    title: 'sidebar.admissionManagement',
     icon: ClipboardList,
     children: [
-      {
-        title: "Admission Requests",
-        path: "/admin/admission-requests",
-      },
-      {
-        title: "Tour Requests",
-        path: "/admin/tour-requests",
-      },
-      {
-        title: "Service Packages",
-        path: "/admin/service-packages",
-      },
-      {
-        title: "Thông tin thân nhân",
-        path: "/admin/residents/family",
-      },
-      {
-        title: "Cư dân theo khu vực",
-        path: "/admin/residents/by-area",
-      },
-      {
-        title: "Sức khỏe ban đầu",
-        path: "/admin/residents/initial-health",
-      },
-      {
-        title: "Bệnh lý nền & tiền sử",
-        path: "/admin/residents/pre-existing-conditions",
-      },
-      {
-        title: "Dị ứng thuốc",
-        path: "/admin/residents/drug-allergies",
-      },
-      {
-        title: "Chuyển phòng cư dân",
-        path: "/admin/residents/transfer-room",
-      },
+      { title: 'sidebar.admissionRequests', path: '/admin/admission-requests' },
+      { title: 'sidebar.tourRequests', path: '/admin/tour-requests' },
+      { title: 'sidebar.servicePackages', path: '/admin/service-packages' },
+      { title: 'sidebar.familyInfo', path: '/admin/residents/family' },
+      { title: 'sidebar.residentsByArea', path: '/admin/residents/by-area' },
+      { title: 'sidebar.initialHealth', path: '/admin/residents/initial-health' },
+      { title: 'sidebar.preExistingConditions', path: '/admin/residents/pre-existing-conditions' },
+      { title: 'sidebar.drugAllergies', path: '/admin/residents/drug-allergies' },
+      { title: 'sidebar.transferResident', path: '/admin/residents/transfer-room' },
     ],
   },
-
-
   {
-    title: "Buildings & Facilities",
+    title: 'sidebar.buildingsFacilities',
     icon: Building2,
     children: [
-      {
-        title: "Floors",
-        path: "/admin/floors",
-      },
-      {
-        title: "Rooms",
-        path: "/admin/rooms",
-      },
-      {
-        title: "Beds",
-        path: "/admin/beds",
-      },
+      { title: 'sidebar.floors', path: '/admin/floors' },
+      { title: 'sidebar.rooms', path: '/admin/rooms' },
+      { title: 'sidebar.beds', path: '/admin/beds' },
     ],
   },
-
   {
-    title: "Staff Management",
+    title: 'sidebar.staffManagement',
     icon: ClipboardList,
     children: [
-      {
-        title: "Hồ sơ nhân viên",
-        path: "/admin/staff/profiles",
-      },
-      {
-        title: "Ca làm việc",
-        path: "/admin/staff/shifts",
-      },
-      {
-        title: "Phân công khu vực",
-        path: "/admin/staff/assignments",
-      },
-      {
-        title: "Sẵn sàng khẩn cấp",
-        path: "/admin/staff/emergency",
-      },
-      {
-        title: "Đơn nghỉ phép",
-        path: "/admin/staff/leave-requests",
-      },
+      { title: 'sidebar.staffProfiles', path: '/admin/staff/profiles' },
+      { title: 'sidebar.shifts', path: '/admin/staff/shifts' },
+      { title: 'sidebar.assignments', path: '/admin/staff/assignments' },
+      { title: 'sidebar.emergencyAvailability', path: '/admin/staff/emergency' },
+      { title: 'sidebar.leaveRequests', path: '/admin/staff/leave-requests' },
     ],
   },
-
   {
-    title: "Health Monitoring",
+    title: 'sidebar.healthMonitoring',
     icon: HeartPulse,
-    path: "/admin/health",
+    path: '/admin/health',
   },
-
   {
-    title: "Medication",
+    title: 'sidebar.medication',
     icon: Pill,
-    path: "/admin/medications",
+    path: '/admin/medications',
   },
-
   {
-    title: "Appointments",
+    title: 'sidebar.appointments',
     icon: Calendar,
-    path: "/admin/appointments",
+    path: '/admin/appointments',
   },
-
   {
-    title: "Activities",
+    title: 'sidebar.activities',
     icon: Activity,
-    path: "/admin/activities",
+    path: '/admin/activities',
   },
-
   {
-    title: "Incidents",
+    title: 'sidebar.incidents',
     icon: FileText,
-    path: "/admin/incidents",
+    path: '/admin/incidents',
   },
-
   {
-    title: "Reports",
+    title: 'sidebar.reports',
     icon: FileText,
-    path: "/admin/reports",
+    path: '/admin/reports',
   },
-
   {
-    title: "Notifications",
+    title: 'sidebar.notifications',
     icon: Bell,
-    path: "/admin/notifications",
+    path: '/admin/notifications',
   },
-
   {
-    title: "Communication",
+    title: 'sidebar.communication',
     icon: MessageSquare,
-    path: "/admin/messages",
+    path: '/admin/messages',
   },
-
   {
-    title: "Settings",
+    title: 'sidebar.settings',
     icon: Settings,
-    path: "/admin/settings",
+    path: '/admin/settings',
   },
 ];
