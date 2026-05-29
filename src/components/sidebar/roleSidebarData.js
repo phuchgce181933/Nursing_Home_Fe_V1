@@ -19,15 +19,58 @@ import {
 
 export const roleSidebarData = {
   doctor: [
-    { title: 'sidebar.doctorDashboard', icon: LayoutDashboard, path: '/doctor/dashboard' },
-    { title: 'sidebar.myProfile', icon: UserCircle, path: '/doctor/profile' },
-    { title: 'sidebar.appointments', icon: Calendar, path: '/doctor/appointments' },
-    { title: 'sidebar.patients', icon: Users, path: '/doctor/patients' },
-    { title: 'sidebar.medication', icon: Pill, path: '/doctor/medications' },
-    { title: 'sidebar.admissionRequests', icon: ClipboardList, path: '/doctor/admission-requests' },
-    { title: 'sidebar.servicePackages', icon: HeartPulse, path: '/doctor/service-packages' },
-    { title: 'sidebar.incidents', icon: FileText, path: '/doctor/incidents' },
-    { title: 'sidebar.messages', icon: MessageSquare, path: '/doctor/messages' },
+
+    {
+      title: 'Dashboard Bác sĩ',
+      icon: LayoutDashboard,
+      path: '/doctor/dashboard',
+    },
+    {
+      title: 'Hồ sơ cá nhân',
+      icon: UserCircle,
+      path: '/doctor/profile',
+    },
+    {
+      title: 'Lịch khám',
+      icon: Calendar,
+      path: '/doctor/appointments',
+    },
+    {
+      title: 'Bệnh nhân',
+      icon: Users,
+      path: '/doctor/patients',
+    },
+    {
+      title: 'Thuốc',
+      icon: Pill,
+      path: '/doctor/medications',
+    },
+    {
+      title: 'Yêu cầu Nhập viện',
+      icon: ClipboardList,
+      path: '/doctor/admission-requests',
+    },
+    {
+      title: 'Gói Dịch vụ',
+      icon: HeartPulse,
+      path: '/doctor/service-packages',
+    },
+    {
+      title: 'Sự cố',
+      icon: FileText,
+      path: '/doctor/incidents',
+    },
+    {
+      title: 'Nghỉ phép',
+      icon: CalendarOff,
+      path: '/doctor/leave',
+    },
+    {
+      title: 'Tin nhắn',
+      icon: MessageSquare,
+      path: '/doctor/messages',
+    },
+
   ],
   nurse: [
     { title: 'sidebar.nurseDashboard', icon: LayoutDashboard, path: '/nurse/dashboard' },

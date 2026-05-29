@@ -2,6 +2,7 @@ import { NavLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { sidebarData } from './sidebarData';
 
+
 function Sidebar({ items = sidebarData }) {
   const { t, i18n } = useTranslation();
 
@@ -40,6 +41,7 @@ function Sidebar({ items = sidebarData }) {
             <option value="en">{t('language.en')}</option>
           </select>
         </div>
+
       </div>
 
       <div className="sidebar__nav">

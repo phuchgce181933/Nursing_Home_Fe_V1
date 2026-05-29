@@ -78,11 +78,12 @@ export default function DrugAllergiesPage() {
     try {
       const data = await residentService.getDrugAllergies(residentId);
       setDetailData(data);
+      if (data._fallback) setShowRouteHint(true);
       setDrugAllergiesInput(joinList(data.drugAllergies?.drugAllergies));
     } catch (e) {
       const status = e?.response?.status;
       setDetailError(e.response?.data?.message || 'Không thể tải thông tin dị ứng thuốc');
-      if (status === 404 || status === 400) setShowRouteHint(true);
+      if (status === 404 || status === 400 || status === 403) setShowRouteHint(true);
       setDetailData(null);
       setDrugAllergiesInput('');
     } finally {
@@ -111,23 +112,31 @@ export default function DrugAllergiesPage() {
   };
 
   const openViewPopup = (resident) => {
-    setSelectedId(resident._id);
+    const residentKey = resident._id || resident.residentCode;
+    setSelectedId(residentKey);
     setPanelMsg('');
     setFormError('');
     setDetailError('');
     setViewPopup(true);
+    loadDetail(residentKey);
   };
 
   const openEditPopup = (resident) => {
-    setSelectedId(resident._id);
+    const residentKey = resident._id || resident.residentCode;
+    setSelectedId(residentKey);
     setPanelMsg('');
     setFormError('');
     setDetailError('');
     setEditPopup(true);
+    loadDetail(residentKey);
   };
 
   const handleSave = async (e) => {
     e.preventDefault();
+    if (!selectedId) {
+      setFormError('Chưa chọn cư dân');
+      return;
+    }
     const drugAllergies = parseCommaList(drugAllergiesInput);
     if (!drugAllergies.length) {
       setFormError('Vui lòng nhập ít nhất một dị ứng thuốc');
@@ -139,12 +148,18 @@ export default function DrugAllergiesPage() {
     setFormError('');
     try {
       const res = await residentService.updateDrugAllergies(selectedId, { drugAllergies });
-      setPanelMsg(res.message || 'Đã cập nhật dị ứng thuốc');
+      if (res._fallback) setShowRouteHint(true);
+      setPanelMsg(
+        res._legacyAllergiesField
+          ? `${res.message || 'Đã lưu'} — nên bật API PUT /residents/:id/drug-allergies trên backend để lưu đúng cột drugAllergies.`
+          : res.message || 'Đã cập nhật dị ứng thuốc'
+      );
       await refreshAfterSave();
+      setEditPopup(false);
     } catch (e) {
       const status = e?.response?.status;
       setFormError(e.response?.data?.message || 'Cập nhật thất bại');
-      if (status === 404 || status === 400) setShowRouteHint(true);
+      if (status === 404 || status === 400 || status === 403) setShowRouteHint(true);
     } finally {
       setSaving(false);
     }
@@ -296,8 +311,18 @@ export default function DrugAllergiesPage() {
             />
             {detailLoading ? (
               <div className="empty-state">Đang tải thông tin...</div>
-            ) : detailError ? (
-              <div className="empty-state">{detailError}</div>
+            ) : detailError && !detailData ? (
+              <div className="empty-state">
+                <p>{detailError}</p>
+                <button
+                  type="button"
+                  className="btn btn--primary"
+                  style={{ marginTop: 12 }}
+                  onClick={() => loadDetail(selectedId)}
+                >
+                  Thử tải lại
+                </button>
+              </div>
             ) : (
               <>
                 <div className="drug-allergies-current">
@@ -323,6 +348,18 @@ export default function DrugAllergiesPage() {
               <button type="button" className="btn-cancel" onClick={() => setViewPopup(false)}>
                 Đóng
               </button>
+              {selectedSummary && (
+                <button
+                  type="button"
+                  className="btn-save"
+                  onClick={() => {
+                    setViewPopup(false);
+                    openEditPopup(selectedSummary);
+                  }}
+                >
+                  Chỉnh sửa
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -339,8 +376,18 @@ export default function DrugAllergiesPage() {
             />
             {detailLoading ? (
               <div className="empty-state">Đang tải thông tin...</div>
-            ) : detailError ? (
-              <div className="empty-state">{detailError}</div>
+            ) : detailError && !detailData ? (
+              <div className="empty-state">
+                <p>{detailError}</p>
+                <button
+                  type="button"
+                  className="btn btn--primary"
+                  style={{ marginTop: 12 }}
+                  onClick={() => loadDetail(selectedId)}
+                >
+                  Thử tải lại
+                </button>
+              </div>
             ) : (
               <>
                 {panelMsg && <p className="form-success">{panelMsg}</p>}

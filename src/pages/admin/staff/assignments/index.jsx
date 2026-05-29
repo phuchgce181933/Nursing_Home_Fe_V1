@@ -3,9 +3,14 @@ import staffService from '../../../../services/staff.service';
 import careTaskService from '../../../../services/careTask.service';
 import facilityService from '../../../../services/facility.service';
 import { floorLabel, roomLabel } from '../../../../components/facility/FloorRoomSelect';
-import { canAssignAreas, canAssignResidents } from '../../../../utils/staffAssignable';
+import { canAssignAreas, canAssignResidents, NON_ASSIGNABLE_ROLES } from '../../../../utils/staffAssignable';
 import { isStaffOnLeaveForAssignment } from '../../../../utils/leaveUtils';
+import { getApiErrorPayload, blockingCareTasksMessage } from '../../../../utils/blockingCareTasks';
+import BlockingCareTasksAlert from '../../../../components/staff/BlockingCareTasksAlert';
 import '../../../../styles/admin/StaffAssignmentPage.css';
+
+const CARE_TASK_TAB_HINT =
+  'Vào tab «Nhiệm vụ chăm sóc» để hoàn thành, bỏ qua hoặc xóa các nhiệm vụ trước khi thử lại.';
 
 const ROLE_LABELS = { doctor: 'Bác sĩ', nurse: 'Y tá', staff: 'Chăm sóc viên', manager: 'Quản lý', admin: 'Admin' };
 
@@ -22,15 +27,22 @@ const CARE_LEVELS = [
   { value: 'medium', label: '🟠 Trung bình' },
   { value: 'high',   label: '🔴 Cao' },
 ];
-const COVERAGE_CONFIG = {
-  fullyStaffed: { label: '🟢 Đủ nhân viên',   cls: 'coverage--full' },
-  understaffed: { label: '🟠 Thiếu nhân viên', cls: 'coverage--under' },
-  noCoverage:   { label: '🔴 Không có phủ sóng', cls: 'coverage--none' },
-};
-
 const today = () => new Date().toISOString().slice(0, 10);
 
+const filterAssignableStaff = (list) =>
+  (list || []).filter(
+    (s) => !NON_ASSIGNABLE_ROLES.includes(String(s.role || '').toLowerCase())
+  );
+
 const SHIFT_STATUS_VI = { published: 'Đã đăng', confirmed: 'Đã xác nhận' };
+/** Ca đủ điều kiện gán nhiệm vụ — khớp backend findShiftsByStaffIdsOnDate / findActiveShiftsForStaffOnDate */
+const ELIGIBLE_SHIFT_STATUSES = ['published', 'confirmed'];
+
+const filterEligibleShifts = (shifts) =>
+  (shifts || []).filter((s) => ELIGIBLE_SHIFT_STATUSES.includes(s.status));
+
+const buildShiftTimeLabel = (shifts) =>
+  shifts.length ? shifts.map((s) => `${s.startTime} – ${s.endTime}`).join(', ') : '';
 
 function formatDateVi(iso) {
   if (!iso) return '';
@@ -117,8 +129,8 @@ function AreaTab({ staff, loading, assignmentDate, onStaffUpdated }) {
   const [saving, setSaving]               = useState(false);
   const [success, setSuccess]           = useState('');
   const [error, setError]               = useState('');
+  const [blockingTasks, setBlockingTasks] = useState([]);
   const [infos, setInfos]               = useState([]);
-  const [coverage, setCoverage]         = useState(null);
 
   const floorLabelMap = useMemo(
     () => Object.fromEntries(floors.map((f) => [f._id, floorLabel(f)])),
@@ -187,7 +199,6 @@ function AreaTab({ staff, loading, assignmentDate, onStaffUpdated }) {
 
   useEffect(() => {
     setSelected(null);
-    setCoverage(null);
   }, [assignmentDate]);
 
   const handleSelect = (s) => {
@@ -195,14 +206,9 @@ function AreaTab({ staff, loading, assignmentDate, onStaffUpdated }) {
     setSelected(s);
     setSuccess('');
     setError('');
+    setBlockingTasks([]);
     setInfos([]);
-    setCoverage(null);
-    const floorIds = (s.staffProfile?.responsibleAreaIds || []).map((f) =>
-      (typeof f === 'object' ? f._id : f).toString()
-    );
-    const roomIds = (s.staffProfile?.responsibleRoomIds || []).map((r) =>
-      (typeof r === 'object' ? r._id : r).toString()
-    );
+    const { floorIds, roomIds } = areaIdsFromProfile(s.staffProfile);
     setSelectedFloorIds(floorIds);
     setSelectedRoomIds(roomIds);
   };
@@ -211,6 +217,7 @@ function AreaTab({ staff, loading, assignmentDate, onStaffUpdated }) {
     if (!selected) return;
     setSaving(true);
     setError('');
+    setBlockingTasks([]);
     setSuccess('');
     setInfos([]);
     try {
@@ -221,13 +228,37 @@ function AreaTab({ staff, loading, assignmentDate, onStaffUpdated }) {
       setSuccess('Đã cập nhật khu vực phụ trách (master data)!');
       const hints = res.info || res.warnings || [];
       if (hints.length) setInfos(hints);
-      if (selectedFloorIds[0]) {
-        const cov = await staffService.getAreaCoverageStatus(selectedFloorIds[0]);
-        setCoverage(cov);
+
+      if (res.staffProfile) {
+        const { floorIds, roomIds } = areaIdsFromProfile(res.staffProfile);
+        setSelected((prev) =>
+          prev ? { ...prev, staffProfile: res.staffProfile } : prev
+        );
+        setSelectedFloorIds(floorIds);
+        setSelectedRoomIds(roomIds);
       }
-      onStaffUpdated?.();
+
+      const pruned = res.residentsPruned;
+      if (pruned?.count > 0) {
+        const names = (pruned.removed || [])
+          .map((r) => {
+            const room = r.roomNumber ? `P.${r.roomNumber}` : '';
+            const label = r.fullName || r.residentCode || '';
+            return [label, room].filter(Boolean).join(' · ');
+          })
+          .filter(Boolean)
+          .join(', ');
+        setInfos((prev) => [
+          ...prev,
+          `Đã tự động gỡ ${pruned.count} cư dân không còn thuộc khu vực phụ trách${names ? `: ${names}` : ''}.`,
+        ]);
+      }
+
+      await onStaffUpdated?.();
     } catch (e) {
-      setError(e.response?.data?.message || 'Lưu thất bại');
+      const { message, blockingTasks: blocked } = getApiErrorPayload(e, 'Lưu thất bại');
+      setBlockingTasks(blocked);
+      setError(blocked.length ? blockingCareTasksMessage(message) : message);
     } finally {
       setSaving(false);
     }
@@ -305,7 +336,15 @@ function AreaTab({ staff, loading, assignmentDate, onStaffUpdated }) {
               Phân công khu vực — <span style={{ color: '#3b82f6' }}>{selected.fullName}</span>
             </div>
             <Alert type="success" msg={success} />
-            <Alert type="error"   msg={error} />
+            {blockingTasks.length > 0 ? (
+              <BlockingCareTasksAlert
+                message={error}
+                tasks={blockingTasks}
+                hint={CARE_TASK_TAB_HINT}
+              />
+            ) : (
+              <Alert type="error" msg={error} />
+            )}
             {infos.map((msg, i) => <Alert key={i} type="warning" msg={`ℹ️ ${msg}`} />)}
 
             <ShiftDetailPanel summary={selected.shiftSummary} assignmentDate={assignmentDate} />
@@ -313,12 +352,6 @@ function AreaTab({ staff, loading, assignmentDate, onStaffUpdated }) {
             <p style={{ fontSize: '0.78rem', color: '#64748b', marginBottom: 12, lineHeight: 1.45 }}>
               Tầng/phòng lưu cố định trên hồ sơ nhân viên (master data). Ca làm việc theo ngày xem ở trên — phân công ca tại mục Quản lý ca làm việc.
             </p>
-
-            {coverage && (
-              <div className={`coverage-badge ${COVERAGE_CONFIG[coverage.coverage]?.cls || ''}`} style={{ marginBottom: 12 }}>
-                {COVERAGE_CONFIG[coverage.coverage]?.label} — {coverage.activeToday}/{coverage.totalAssigned} nhân viên hoạt động hôm nay
-              </div>
-            )}
 
             <div className="form-group" style={{ marginBottom: 14 }}>
               <label>Tầng / Khu vực phụ trách</label>
@@ -373,6 +406,22 @@ function AreaTab({ staff, loading, assignmentDate, onStaffUpdated }) {
   );
 }
 
+function assignedResidentIdsFromProfile(profile) {
+  return (profile?.assignedResidentIds || []).map((r) =>
+    String(typeof r === 'object' ? r._id : r)
+  );
+}
+
+function areaIdsFromProfile(profile) {
+  const floorIds = (profile?.responsibleAreaIds || []).map((f) =>
+    String(typeof f === 'object' ? f._id : f)
+  );
+  const roomIds = (profile?.responsibleRoomIds || []).map((r) =>
+    String(typeof r === 'object' ? r._id : r)
+  );
+  return { floorIds, roomIds };
+}
+
 function residentPickerLabel(r) {
   const room = r.roomId;
   const roomNum = typeof room === 'object' ? room?.roomNumber : '';
@@ -392,11 +441,13 @@ function ResidentTab({ staff, loading, assignmentDate, onStaffUpdated }) {
   const [saving, setSaving]               = useState(false);
   const [success, setSuccess]             = useState('');
   const [error, setError]                 = useState('');
+  const [blockingTasks, setBlockingTasks] = useState([]);
 
   useEffect(() => {
     setSelected(null);
     setResidentOptions([]);
     setSelectedResidentIds([]);
+    setBlockingTasks([]);
   }, [assignmentDate]);
 
   const areaScopeKey = useMemo(() => {
@@ -453,17 +504,50 @@ function ResidentTab({ staff, loading, assignmentDate, onStaffUpdated }) {
     setSelected(s);
     setSuccess('');
     setError('');
-    const ids = (s.staffProfile?.assignedResidentIds || []).map((r) =>
-      (typeof r === 'object' ? r._id : r).toString()
-    );
-    setSelectedResidentIds(ids);
+    setBlockingTasks([]);
+    setSelectedResidentIds(assignedResidentIdsFromProfile(s.staffProfile));
     setResidentSearch('');
   };
 
+  const syncAssignedResidents = async (member) => {
+    try {
+      const res = await staffService.listAssignedResidents(member._id);
+      const assigned = Array.isArray(res.data) ? res.data : [];
+      const ids = assigned.map((r) => String(r._id));
+      setSelectedResidentIds(ids);
+      setSelected((prev) =>
+        prev?._id === member._id
+          ? {
+              ...prev,
+              staffProfile: {
+                ...prev.staffProfile,
+                assignedResidentIds: assigned,
+              },
+            }
+          : prev
+      );
+      return assigned;
+    } catch {
+      const ids = assignedResidentIdsFromProfile(member.staffProfile);
+      setSelectedResidentIds(ids);
+      return null;
+    }
+  };
+
   useEffect(() => {
-    if (!selected?._id) return;
+    if (!selected?._id) return undefined;
+    let cancelled = false;
     const fresh = staff.find((s) => s._id === selected._id) || selected;
-    loadResidentsForStaff(fresh);
+
+    (async () => {
+      setSelected((prev) => (prev?._id === fresh._id ? { ...fresh } : prev));
+      await syncAssignedResidents(fresh);
+      if (!cancelled) await loadResidentsForStaff(fresh);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [selected?._id, areaScopeKey]);
 
   const toggleResident = (id) => {
@@ -492,15 +576,24 @@ function ResidentTab({ staff, loading, assignmentDate, onStaffUpdated }) {
     }
     setSaving(true);
     setError('');
+    setBlockingTasks([]);
     setSuccess('');
     try {
-      await staffService.assignResidents(selected._id, {
+      const res = await staffService.assignResidents(selected._id, {
         residentIds: selectedResidentIds,
       });
       setSuccess('Đã cập nhật danh sách cư dân phụ trách!');
-      onStaffUpdated?.();
+      if (res.staffProfile) {
+        setSelected((prev) =>
+          prev ? { ...prev, staffProfile: res.staffProfile } : prev
+        );
+        setSelectedResidentIds(assignedResidentIdsFromProfile(res.staffProfile));
+      }
+      await onStaffUpdated?.();
     } catch (e) {
-      setError(e.response?.data?.message || 'Lưu thất bại');
+      const { message, blockingTasks: blocked } = getApiErrorPayload(e, 'Lưu thất bại');
+      setBlockingTasks(blocked);
+      setError(blocked.length ? blockingCareTasksMessage(message) : message);
     } finally {
       setSaving(false);
     }
@@ -574,7 +667,15 @@ function ResidentTab({ staff, loading, assignmentDate, onStaffUpdated }) {
               Cư dân phụ trách — <span style={{ color: '#3b82f6' }}>{selected.fullName}</span>
             </div>
             <Alert type="success" msg={success} />
-            <Alert type="error"   msg={error} />
+            {blockingTasks.length > 0 ? (
+              <BlockingCareTasksAlert
+                message={error}
+                tasks={blockingTasks}
+                hint={CARE_TASK_TAB_HINT}
+              />
+            ) : (
+              <Alert type="error" msg={error} />
+            )}
             <ShiftDetailPanel summary={selected.shiftSummary} assignmentDate={assignmentDate} />
 
             <p style={{ fontSize: '0.78rem', color: '#64748b', marginBottom: 12, lineHeight: 1.45 }}>
@@ -671,6 +772,29 @@ const emptyTaskForm = (workDate) => ({
   notes: '',
 });
 
+const buildAssignmentContextFallback = (staffList) => ({
+  taskTypes: TASK_TYPES.map((t) => ({ value: t.value, labelVi: t.label })),
+  careLevels: CARE_LEVELS.map((l) => ({
+    value: l.value,
+    labelVi: l.label.replace(/^[^\s]+\s/, ''),
+  })),
+  staffWithShifts: (staffList || [])
+    .map((s) => {
+      const shiftsOnDate = filterEligibleShifts(s.shiftSummary?.shiftsOnDate);
+      if (!shiftsOnDate.length || !s.staffProfile?._id) return null;
+      if (NON_ASSIGNABLE_ROLES.includes(String(s.role || '').toLowerCase())) return null;
+      return {
+        staffProfileId: s.staffProfile._id,
+        userId: s._id,
+        fullName: s.fullName,
+        role: s.role,
+        shiftTimeLabel: buildShiftTimeLabel(shiftsOnDate),
+        shiftsOnDate,
+      };
+    })
+    .filter(Boolean),
+});
+
 function careResidentOptionLabel(r) {
   return residentPickerLabel(r);
 }
@@ -713,7 +837,12 @@ function CareTaskTab({ assignmentDate, staff }) {
   );
 
   const staffWithShiftsAvailable = useMemo(
-    () => staffWithShifts.filter((s) => !onLeaveByUserId[String(s.userId)]),
+    () =>
+      staffWithShifts.filter(
+        (s) =>
+          !onLeaveByUserId[String(s.userId)]
+          && !NON_ASSIGNABLE_ROLES.includes(String(s.role || '').toLowerCase())
+      ),
     [staffWithShifts, onLeaveByUserId]
   );
 
@@ -725,7 +854,10 @@ function CareTaskTab({ assignmentDate, staff }) {
     [staffWithShiftsAvailable, form.staffProfileId]
   );
 
-  const shiftOptions = selectedStaffEntry?.shiftsOnDate ?? [];
+  const shiftOptions = useMemo(
+    () => filterEligibleShifts(selectedStaffEntry?.shiftsOnDate),
+    [selectedStaffEntry]
+  );
   const selectedShift =
     shiftOptions.find((s) => String(s._id) === String(form.shiftId))
     || shiftOptions[0]
@@ -743,12 +875,18 @@ function CareTaskTab({ assignmentDate, staff }) {
 
   const loadContext = async (workDate) => {
     setCtxLoading(true);
+    setSaveErr('');
     try {
       const data = await careTaskService.getAssignmentContext(workDate);
       setCtx(data);
       return data;
     } catch (e) {
-      setCtx(null);
+      if (e.response?.status === 404) {
+        const fallback = buildAssignmentContextFallback(staff);
+        setCtx(fallback);
+        return fallback;
+      }
+      setCtx(buildAssignmentContextFallback(staff));
       setSaveErr(e.response?.data?.message || 'Không tải được dữ liệu form');
       return null;
     } finally {
@@ -785,11 +923,15 @@ function CareTaskTab({ assignmentDate, staff }) {
     setLoading(true);
     setError('');
     try {
-      const res = await careTaskService.listCareTasks({ workDate: filterDate });
-      const raw = res.data ?? res;
-      setTasks(Array.isArray(raw) ? raw : []);
+      const raw = await careTaskService.listCareTasks({ workDate: filterDate, limit: 100 });
+      setTasks(Array.isArray(raw) ? raw : (raw?.data || []));
     } catch (e) {
-      setError(e.response?.data?.message || 'Tải thất bại');
+      if (e.response?.status === 404) {
+        setTasks([]);
+        setError('');
+      } else {
+        setError(e.response?.data?.message || 'Tải thất bại');
+      }
     } finally {
       setLoading(false);
     }
@@ -815,10 +957,11 @@ function CareTaskTab({ assignmentDate, staff }) {
 
   const handleStaffChange = (profileId) => {
     const entry = staffWithShiftsAvailable.find((s) => String(s.staffProfileId) === String(profileId));
+    const eligible = filterEligibleShifts(entry?.shiftsOnDate);
     setForm((prev) => ({
       ...prev,
       staffProfileId: profileId,
-      shiftId: entry?.shiftsOnDate?.[0]?._id?.toString() || '',
+      shiftId: eligible[0]?._id?.toString() || '',
       residentId: '',
     }));
     loadAssignedResidents(entry?.userId);
@@ -1121,7 +1264,7 @@ export default function StaffAssignmentPage() {
     setLoading(true);
     try {
       const res = await staffService.getAll({ limit: 100, assignmentDate });
-      setStaff(res.data || []);
+      setStaff(filterAssignableStaff(res.data));
     } catch {
       setStaff([]);
     } finally {

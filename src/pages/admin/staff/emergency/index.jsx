@@ -27,6 +27,14 @@ const LEGACY_AVAIL_CONFIG = {
 
 const AUTO_REFRESH_SECONDS = 30;
 
+const SHIFT_STATUS_VI = { published: 'Đã đăng', confirmed: 'Đã xác nhận' };
+
+const formatCheckDateVi = (iso) => {
+  if (!iso) return '';
+  const d = new Date(`${iso}T12:00:00`);
+  return d.toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' });
+};
+
 const resolveReadiness = (person) => {
   if (person.readinessLevel && READINESS_CONFIG[person.readinessLevel]) {
     return {
@@ -189,9 +197,16 @@ export default function EmergencyAvailabilityPage() {
       <div className="emergency-page__header">
         <h1 className="emergency-page__title">Sẵn sàng khẩn cấp</h1>
         <p className="emergency-page__subtitle">
-          Trạng thái bác sĩ/y tá liên kết ca làm việc đã xác nhận - cập nhật theo thời gian thực
+          Trạng thái bác sĩ/y tá theo ngày đã chọn — ca đã đăng hoặc đã xác nhận; nhiệm vụ chỉ tính khi cùng ngày và còn ca hợp lệ.
+          {isToday && ' Cập nhật theo thời gian thực khi xem hôm nay.'}
         </p>
       </div>
+
+      {!isToday && (
+        <p className="emergency-date-hint">
+          Đang xem ngày <strong>{formatCheckDateVi(checkDate)}</strong>. Đổi ngày để so sánh — nhiệm vụ ngày khác không hiển thị ở đây.
+        </p>
+      )}
 
       <div className="emergency-banner">
         <span style={{ fontSize: '1.2rem' }}>🚨</span>
@@ -305,17 +320,29 @@ export default function EmergencyAvailabilityPage() {
                   </td>
                   <td>{person.staffProfile?.staffCode || '—'}</td>
                   <td>
-                    {person.isOnShift && shift ? (
-                      <span className="shift-active">
-                        ✓ {shift.name ? `${shift.name} · ` : ''}{shift.startTime}-{shift.endTime}
+                    {shift ? (
+                      <span
+                        className={person.isOnShift ? 'shift-active' : 'shift-scheduled'}
+                        title={
+                          person.isOnShift
+                            ? 'Đang trong khung giờ ca (hôm nay)'
+                            : 'Có ca đăng/xác nhận trong ngày đã chọn'
+                        }
+                      >
+                        {person.isOnShift ? '✓ ' : '○ '}
+                        {shift.name ? `${shift.name} · ` : ''}
+                        {shift.startTime}–{shift.endTime}
+                        {shift.status && (
+                          <> ({SHIFT_STATUS_VI[shift.status] || shift.status})</>
+                        )}
                       </span>
-                    ) : person.onShift ? (
-                      <span className="shift-active">✓ Đang trực</span>
                     ) : (
                       <span className="shift-inactive">— Không có ca</span>
                     )}
                   </td>
-                  <td>
+                  <td
+                    title="Nhiệm vụ chờ/đang làm trên đúng ngày đã chọn, khi nhân viên có ca đăng hoặc xác nhận cùng ngày"
+                  >
                     <span className={person.hasTasks ? 'task-active' : 'task-inactive'}>
                       {person.hasTasks ? '✓ Có nhiệm vụ' : '—'}
                     </span>

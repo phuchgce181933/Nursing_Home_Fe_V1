@@ -97,6 +97,7 @@ export default function PreExistingConditionsPage() {
     try {
       const data = await residentService.getPreExistingConditions(residentId);
       setDetailData(data);
+      if (data._fallback) setShowRouteHint(true);
       setForm({
         chronicConditions: joinList(data.preExistingConditions?.chronicConditions),
         medicalHistory: joinList(data.preExistingConditions?.medicalHistory),
@@ -105,7 +106,7 @@ export default function PreExistingConditionsPage() {
       const status = e?.response?.status;
       const message = e.response?.data?.message || 'Không thể tải bệnh lý nền và tiền sử bệnh';
       setDetailError(message);
-      if (status === 404 || status === 400) setShowRouteHint(true);
+      if (status === 404 || status === 400 || status === 403) setShowRouteHint(true);
       setDetailData(null);
       setForm(emptyForm());
     } finally {
@@ -134,19 +135,23 @@ export default function PreExistingConditionsPage() {
   };
 
   const openViewPopup = (resident) => {
-    setSelectedId(resident._id);
+    const residentKey = resident._id || resident.residentCode;
+    setSelectedId(residentKey);
     setPanelMsg('');
     setFormError('');
     setDetailError('');
     setViewPopup(true);
+    loadDetail(residentKey);
   };
 
   const openEditPopup = (resident) => {
-    setSelectedId(resident._id);
+    const residentKey = resident._id || resident.residentCode;
+    setSelectedId(residentKey);
     setPanelMsg('');
     setFormError('');
     setDetailError('');
     setEditPopup(true);
+    loadDetail(residentKey);
   };
 
   const setField = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
@@ -162,6 +167,10 @@ export default function PreExistingConditionsPage() {
 
   const handleSave = async (e) => {
     e.preventDefault();
+    if (!selectedId) {
+      setFormError('Chưa chọn cư dân');
+      return;
+    }
     const error = validateForm();
     if (error) {
       setFormError(error);
@@ -179,12 +188,18 @@ export default function PreExistingConditionsPage() {
       if (historyList.length) payload.medicalHistory = historyList;
 
       const res = await residentService.updatePreExistingConditions(selectedId, payload);
-      setPanelMsg(res.message || 'Đã cập nhật bệnh lý nền và tiền sử bệnh');
+      if (res._fallback) setShowRouteHint(true);
+      setPanelMsg(
+        res._partialMedicalHistory
+          ? `${res.message || 'Đã lưu một phần'} — vui lòng bật API PUT /residents/:id/pre-existing-conditions trên backend để lưu tiền sử bệnh.`
+          : res.message || 'Đã cập nhật bệnh lý nền và tiền sử bệnh'
+      );
       await refreshAfterSave();
+      setEditPopup(false);
     } catch (e) {
       const status = e?.response?.status;
       setFormError(e.response?.data?.message || 'Cập nhật thất bại');
-      if (status === 404 || status === 400) setShowRouteHint(true);
+      if (status === 404 || status === 400 || status === 403) setShowRouteHint(true);
     } finally {
       setSaving(false);
     }
@@ -333,8 +348,18 @@ export default function PreExistingConditionsPage() {
             />
             {detailLoading ? (
               <div className="empty-state">Đang tải thông tin...</div>
-            ) : detailError ? (
-              <div className="empty-state">{detailError}</div>
+            ) : detailError && !detailData ? (
+              <div className="empty-state">
+                <p>{detailError}</p>
+                <button
+                  type="button"
+                  className="btn btn--primary"
+                  style={{ marginTop: 12 }}
+                  onClick={() => loadDetail(selectedId)}
+                >
+                  Thử tải lại
+                </button>
+              </div>
             ) : (
               <>
                 <div className="detail-row">
@@ -360,6 +385,18 @@ export default function PreExistingConditionsPage() {
               <button type="button" className="btn-cancel" onClick={() => setViewPopup(false)}>
                 Đóng
               </button>
+              {selectedSummary && (
+                <button
+                  type="button"
+                  className="btn-save"
+                  onClick={() => {
+                    setViewPopup(false);
+                    openEditPopup(selectedSummary);
+                  }}
+                >
+                  Chỉnh sửa
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -376,8 +413,18 @@ export default function PreExistingConditionsPage() {
             />
             {detailLoading ? (
               <div className="empty-state">Đang tải thông tin...</div>
-            ) : detailError ? (
-              <div className="empty-state">{detailError}</div>
+            ) : detailError && !detailData ? (
+              <div className="empty-state">
+                <p>{detailError}</p>
+                <button
+                  type="button"
+                  className="btn btn--primary"
+                  style={{ marginTop: 12 }}
+                  onClick={() => loadDetail(selectedId)}
+                >
+                  Thử tải lại
+                </button>
+              </div>
             ) : (
               <>
                 {panelMsg && <p className="form-success">{panelMsg}</p>}

@@ -89,7 +89,9 @@ export default function InitialHealthPage() {
         initialHealthCondition: h.initialHealthCondition || '',
       });
     } catch (e) {
+      const status = e?.response?.status;
       setDetailError(e.response?.data?.message || 'Không thể tải thông tin sức khỏe');
+      if (status === 404 || status === 403) setUsingFallbackApi(true);
       setHealthData(null);
       setForm(emptyForm());
     } finally {
@@ -135,6 +137,10 @@ export default function InitialHealthPage() {
 
   const handleSave = async (e) => {
     e.preventDefault();
+    if (!selectedId) {
+      setFormError('Chưa chọn cư dân');
+      return;
+    }
     const err = validateForm();
     if (err) {
       setFormError(err);
@@ -150,10 +156,14 @@ export default function InitialHealthPage() {
       if (form.bloodType) payload.bloodType = form.bloodType;
 
       const res = await residentService.recordInitialHealth(selectedId, payload);
+      if (res._fallback) setUsingFallbackApi(true);
       setPanelMsg(res.message || 'Đã lưu tình trạng sức khỏe ban đầu');
       await refreshAfterSave();
+      setEditPopup(false);
     } catch (e) {
+      const status = e?.response?.status;
       setFormError(e.response?.data?.message || 'Lưu thất bại');
+      if (status === 404 || status === 405 || status === 403) setUsingFallbackApi(true);
     } finally {
       setSaving(false);
     }
@@ -172,9 +182,11 @@ export default function InitialHealthPage() {
       });
       return;
     }
+    const residentKey = r._id || r.residentCode;
     setViewPopup({ loading: true, error: '', summary: r, resident: null, initialHealth: null });
     try {
-      const data = await residentService.getInitialHealth(r._id);
+      const data = await residentService.getInitialHealth(residentKey);
+      if (data._fallback) setUsingFallbackApi(true);
       setViewPopup({
         loading: false,
         error: '',
@@ -192,13 +204,16 @@ export default function InitialHealthPage() {
       });
     }
   };
+
   const openEditPopup = (r, e) => {
     e?.stopPropagation();
-    setSelectedId(r._id);
+    const residentKey = r._id || r.residentCode;
+    setSelectedId(residentKey);
     setPanelMsg('');
     setFormError('');
     setDetailError('');
     setEditPopup(true);
+    loadDetail(residentKey);
   };
 
   const selectedSummary = residents.find((r) => r._id === selectedId);
@@ -409,16 +424,17 @@ export default function InitialHealthPage() {
               <button type="button" className="btn-cancel" onClick={() => setViewPopup(null)}>
                 Đóng
               </button>
-              {!viewPopup.loading && viewPopup.summary && !viewPopup.notRecorded && (
+              {!viewPopup.loading && viewPopup.summary && (
                 <button
                   type="button"
                   className="btn-save"
                   onClick={() => {
-                    handleSelect(viewPopup.summary);
+                    const summary = viewPopup.summary;
                     setViewPopup(null);
+                    openEditPopup(summary);
                   }}
                 >
-                  Chỉnh sửa
+                  {viewPopup.notRecorded ? 'Ghi nhận' : 'Chỉnh sửa'}
                 </button>
               )}
             </div>
@@ -433,8 +449,18 @@ export default function InitialHealthPage() {
             </h2>
             {detailLoading ? (
               <div className="empty-state">Đang tải thông tin...</div>
-            ) : detailError ? (
-              <div className="empty-state">{detailError}</div>
+            ) : detailError && !healthData ? (
+              <div className="empty-state">
+                <p>{detailError}</p>
+                <button
+                  type="button"
+                  className="btn btn--primary"
+                  style={{ marginTop: 12 }}
+                  onClick={() => loadDetail(selectedId)}
+                >
+                  Thử tải lại
+                </button>
+              </div>
             ) : (
               <>
                 <p className="initial-health-panel__subtitle">

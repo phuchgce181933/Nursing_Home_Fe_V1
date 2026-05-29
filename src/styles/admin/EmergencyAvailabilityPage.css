@@ -2,7 +2,18 @@
 
 .emergency-page__header { margin-bottom: 24px; }
 .emergency-page__title { font-size: 1.5rem; font-weight: 700; color: #1e293b; margin: 0; }
-.emergency-page__subtitle { font-size: 0.875rem; color: #64748b; margin: 4px 0 0; }
+.emergency-page__subtitle { font-size: 0.875rem; color: #64748b; margin: 4px 0 0; line-height: 1.45; }
+
+.emergency-date-hint {
+  font-size: 0.8rem;
+  color: #475569;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin: 0 0 16px;
+  line-height: 1.45;
+}
 
 /* Alert banner */
 .emergency-banner {
@@ -138,6 +149,7 @@
 }
 
 .shift-active { color: #166534; font-weight: 600; }
+.shift-scheduled { color: #1d4ed8; font-weight: 500; font-size: 0.82rem; }
 .shift-inactive { color: #94a3b8; }
 .task-active { color: #a16207; font-weight: 600; }
 .task-inactive { color: #94a3b8; }

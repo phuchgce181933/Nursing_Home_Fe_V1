@@ -1,5 +1,7 @@
 import axiosClient from '../api/axiosClient';
 
+const unwrap = (payload) => payload?.data ?? payload;
+
 const getAll = (params = {}) =>
   axiosClient.get('/staff', { params }).then((r) => r.data);
 
@@ -59,7 +61,7 @@ const create = (data) => {
  * Blocks removing a floor when staff has upcoming shifts on that floor.
  */
 const assignAreas = (id, data) =>
-  axiosClient.put(`/staff/${id}/areas`, data).then((r) => r.data);
+  axiosClient.put(`/staff/${id}/areas`, data).then((r) => unwrap(r.data));
 
 /**
  * PUT /api/staff/:id/residents — residentIds: string[] or comma-separated string.
@@ -73,7 +75,7 @@ const assignResidents = (id, data) => {
         ? residentIds
         : [],
   };
-  return axiosClient.put(`/staff/${id}/residents`, payload).then((r) => r.data);
+  return axiosClient.put(`/staff/${id}/residents`, payload).then((r) => unwrap(r.data));
 };
 
 /**
@@ -91,8 +93,8 @@ const getAvailability = (params = {}) =>
   axiosClient.get('/staff/availability', { params }).then((r) => r.data);
 
 /**
- * Get area coverage status for a floor (only confirmed shifts on that floor count as active).
- * Returns { coverage: 'fullyStaffed'|'understaffed'|'noCoverage', totalAssigned, activeToday, staff[] }
+ * GET /api/staff/availability?date= — readinessLevel, hasTasks (same date + shift + active task).
+ * GET area coverage — confirmed shifts on floor for today.
  */
 const getAreaCoverageStatus = (floorId) =>
   axiosClient.get(`/staff/floors/${floorId}/coverage`).then((r) => r.data);

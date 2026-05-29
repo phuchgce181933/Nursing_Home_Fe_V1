@@ -21,23 +21,40 @@ const getById = (id) =>
   axiosClient.get(`/leave-requests/${id}`).then(unwrap);
 
 /**
- * Approve a leave request. Auto-cancels shifts in leave period.
- * Response includes cancelledShifts { count, shifts } when shifts were cancelled.
+ * GET /api/leave-requests/:id/replacement-candidates (pending only, admin/manager)
+ * Returns { requester, shiftsToCover, candidates[] }
  */
-const approve = (id, reviewNote = '') =>
-  axiosClient.put(`/leave-requests/${id}/approve`, { reviewNote }).then(unwrap);
+const getReplacementCandidates = (id) =>
+  axiosClient.get(`/leave-requests/${id}/replacement-candidates`).then(unwrap);
 
 /**
- * Reject a leave request. reviewNote is REQUIRED by backend.
+ * Approve — replacementStaffProfileId required when requester has shifts in leave period.
+ * Response: reassignedShifts, reassignedCareTasks, request (with replacement populated)
+ */
+const approve = (id, { reviewNote = '', replacementStaffProfileId } = {}) => {
+  const body = { reviewNote };
+  if (replacementStaffProfileId) {
+    body.replacementStaffProfileId = replacementStaffProfileId;
+  }
+  return axiosClient.put(`/leave-requests/${id}/approve`, body).then(unwrap);
+};
+
+/**
+ * Reject — reviewNote is REQUIRED.
  */
 const reject = (id, reviewNote) =>
   axiosClient.put(`/leave-requests/${id}/reject`, { reviewNote }).then(unwrap);
 
-/**
- * Cancel own pending leave request. DELETE /api/leave-requests/:id
- */
 const cancel = (id) =>
   axiosClient.delete(`/leave-requests/${id}`).then(unwrap);
 
-const leaveRequestService = { submit, getAll, getById, approve, reject, cancel };
+const leaveRequestService = {
+  submit,
+  getAll,
+  getById,
+  getReplacementCandidates,
+  approve,
+  reject,
+  cancel,
+};
 export default leaveRequestService;

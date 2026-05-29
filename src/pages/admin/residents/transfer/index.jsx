@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { usePortalPrefix } from '../../../../hooks/usePortalPrefix';
 import facilityService from '../../../../services/facility.service';
 import residentService, { RESIDENT_TRANSFER_ROUTE_HINT } from '../../../../services/resident.service';
+import { formatStaffAreasSyncedSummary } from '../../../../utils/staffAreasSynced';
 import { FaEye, FaPen } from 'react-icons/fa';
 import '../../../../styles/admin/TransferResidentPage.css';
 import '../../../../styles/admin/residentActionIcons.css';
@@ -41,9 +44,20 @@ export default function TransferResidentPage() {
   const [targetBedId, setTargetBedId] = useState('');
   const [saving, setSaving] = useState(false);
   const [panelMsg, setPanelMsg] = useState('');
+  const [staffSyncNotice, setStaffSyncNotice] = useState(null);
+  const [staffSyncEmptyNote, setStaffSyncEmptyNote] = useState(false);
   const [showRouteHint, setShowRouteHint] = useState(false);
   const [viewPopup, setViewPopup] = useState(false);
   const [editPopup, setEditPopup] = useState(false);
+
+  const portalPrefix = usePortalPrefix();
+  const assignmentsPath = `${portalPrefix}/staff/assignments`;
+
+  const clearTransferFeedback = () => {
+    setPanelMsg('');
+    setStaffSyncNotice(null);
+    setStaffSyncEmptyNote(false);
+  };
 
   const loadList = useCallback(async ({ silent = false } = {}) => {
     if (!silent) setListLoading(true);
@@ -155,14 +169,14 @@ export default function TransferResidentPage() {
 
   const openViewPopup = (resident) => {
     setSelectedId(resident._id);
-    setPanelMsg('');
+    clearTransferFeedback();
     setTargetError('');
     setViewPopup(true);
   };
 
   const openEditPopup = (resident) => {
     setSelectedId(resident._id);
-    setPanelMsg('');
+    clearTransferFeedback();
     setTargetError('');
     setEditPopup(true);
   };
@@ -175,13 +189,27 @@ export default function TransferResidentPage() {
     }
     setSaving(true);
     setTargetError('');
-    setPanelMsg('');
+    clearTransferFeedback();
     try {
       const res = await residentService.transferResidentToRoom(selectedId, {
         targetRoomId,
         targetBedId,
       });
       setPanelMsg(res.message || 'Đã chuyển cư dân sang phòng mới');
+
+      const synced = res.staffAreasSynced;
+      const summary = formatStaffAreasSyncedSummary(synced, {
+        floors,
+        transferTargets: targetsData?.targets || [],
+      });
+      if (summary) {
+        setStaffSyncNotice(summary);
+        setStaffSyncEmptyNote(false);
+      } else if (Array.isArray(synced) && synced.length === 0) {
+        setStaffSyncNotice(null);
+        setStaffSyncEmptyNote(true);
+      }
+
       await refreshAfterTransfer();
     } catch (e) {
       const status = e?.response?.status;
@@ -409,6 +437,27 @@ export default function TransferResidentPage() {
                     </div>
                   </div>
                   {panelMsg && <p className="form-success">{panelMsg}</p>}
+                  {staffSyncNotice && (
+                    <div className="transfer-staff-sync" role="status">
+                      <p className="transfer-staff-sync__title">{staffSyncNotice.title}</p>
+                      <ul className="transfer-staff-sync__list">
+                        {staffSyncNotice.lines.map((line) => (
+                          <li key={line}>{line}</li>
+                        ))}
+                      </ul>
+                      <Link className="transfer-staff-sync__link" to={assignmentsPath}>
+                        Xem phân công nhân viên
+                      </Link>
+                    </div>
+                  )}
+                  {staffSyncEmptyNote && !staffSyncNotice && (
+                    <div className="transfer-staff-sync" role="status">
+                      <p className="transfer-staff-sync__muted">
+                        Không có nhân viên nào được gán cư dân này — không cần đồng bộ khu vực
+                        phụ trách.
+                      </p>
+                    </div>
+                  )}
                   <div className="modal__actions">
                     <button type="button" className="btn-cancel" onClick={() => setEditPopup(false)}>
                       Đóng

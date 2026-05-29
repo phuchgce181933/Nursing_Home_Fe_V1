@@ -2,6 +2,7 @@ import {
   LayoutDashboard,
   Users,
   ClipboardList,
+  UserCircle,
 } from 'lucide-react';
 
 /** Sidebar cho role manager — vận hành cư dân + quản lý nhân sự (trừ tạo admin/manager). */
@@ -10,6 +11,11 @@ export const managerSidebarData = [
     title: 'Dashboard',
     icon: LayoutDashboard,
     path: '/manager/dashboard',
+  },
+  {
+    title: 'Hồ sơ cá nhân',
+    icon: UserCircle,
+    path: '/manager/profile',
   },
   {
     title: 'Cư dân',
