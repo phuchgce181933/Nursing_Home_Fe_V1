@@ -1,5 +1,30 @@
 @import "tailwindcss";
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap');
+
+/* Shared Styles */
+@import './styles/shared/common.css';
+@import './styles/shared/LoginForm.css';
+@import './styles/shared/HomePage.css';
+
+/* Admin Styles */
+@import './styles/admin/AdminLayout.css';
+@import './styles/manager/ManagerLayout.css';
+@import './styles/admin/Sidebar.css';
+@import './styles/admin/DashboardPage.css';
+@import './styles/admin/ResidentPage.css';
+@import './styles/admin/ProfilePage.css';
+@import './styles/admin/AdminAdmissionRequestsPage.css';
+
+/* Family Styles */
+@import './styles/family/SubmitAdmissionPage.css';
+@import './styles/family/AdmissionRequestsHistoryPage.css';
+@import './styles/family/SubmitFacilityTourPage.css';
+@import './styles/family/FacilityTourHistoryPage.css';
+
+/* Medication Styles (Doctor + Nurse) */
+@import './styles/medications/MedicationPage.css';
+
+/* Pharmacist Styles */
+@import './styles/pharmacist/PharmacyPage.css';
 
 @theme {
   --color-navy-deep: #1B365D;
@@ -15,28 +40,6 @@
   --color-outline-variant: #c4c6cf;
   --color-outline: #74777f;
 }
-
-/* Shared Styles */
-@import './styles/shared/common.css';
-@import './styles/shared/LoginForm.css';
-@import './styles/shared/HomePage.css';
-
-/* Admin Styles */
-@import './styles/admin/AdminLayout.css';
-@import './styles/admin/Sidebar.css';
-@import './styles/admin/DashboardPage.css';
-@import './styles/admin/ResidentPage.css';
-@import './styles/admin/ProfilePage.css';
-@import './styles/admin/AdminAdmissionRequestsPage.css';
-
-/* Family Styles */
-@import './styles/family/SubmitAdmissionPage.css';
-@import './styles/family/AdmissionRequestsHistoryPage.css';
-@import './styles/family/SubmitFacilityTourPage.css';
-@import './styles/family/FacilityTourHistoryPage.css';
-
-/* Medication Styles (Doctor + Nurse) */
-@import './styles/medications/MedicationPage.css';
 
 * {
   margin: 0;

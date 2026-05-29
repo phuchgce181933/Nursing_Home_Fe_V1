@@ -1,11 +1,12 @@
 import { NavLink } from "react-router-dom";
 import { sidebarData } from "./sidebarData";
 
-function Sidebar({ items = sidebarData }) {
+function Sidebar({ items = sidebarData, brandTitle = 'Nursing Home', brandSubtitle = '' }) {
   return (
     <aside className="sidebar">
       <div className="sidebar__header">
-        <h1 className="sidebar__logo">Nursing Home</h1>
+        <h1 className="sidebar__logo">{brandTitle}</h1>
+        {brandSubtitle ? <span className="sidebar__logo-sub">{brandSubtitle}</span> : null}
       </div>
 
       <div className="sidebar__nav">

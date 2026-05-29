@@ -14,7 +14,6 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import pharmacyService from '../../services/pharmacy.service';
-import '../../styles/pharmacist/PharmacyPage.css';
 
 const TABS = [
   { id: 'overview', label: 'Overview', icon: Activity },

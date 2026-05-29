@@ -6,11 +6,13 @@ import { formatLeaveDate } from '../../../../utils/leaveUtils';
 import '../../../../styles/admin/ResidentsByAreaPage.css';
 import '../../../../styles/admin/residentActionIcons.css';
 import { GENDER_LABELS, RESIDENCY_LABELS } from '../_shared/residentLabels';
+import { formatResidentAreaLine, pickDrugAllergiesList } from '../../../../utils/residentArea';
 
 function ResidentDetailModal({ loading, error, resident, onClose }) {
   if (!loading && !error && !resident) return null;
 
   const area = resident?.area;
+  const drugAllergiesList = pickDrugAllergiesList(resident);
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -92,34 +94,19 @@ function ResidentDetailModal({ loading, error, resident, onClose }) {
               )}
             </div>
 
-            {resident.drugAllergies != null && (
-              <>
-                <div className="modal__section">Dị ứng thuốc</div>
-                <div className="detail-row">
-                  <strong>Thuốc dị ứng:</strong>
-                  {resident.drugAllergies?.length ? (
-                    <div className="detail-tags">
-                      {resident.drugAllergies.map((d) => (
-                        <span key={d} className="detail-tag">{d}</span>
-                      ))}
-                    </div>
-                  ) : (
-                    'Không có'
-                  )}
+            <div className="modal__section">Dị ứng thuốc</div>
+            <div className="detail-row">
+              <strong>Thuốc dị ứng:</strong>
+              {drugAllergiesList.length ? (
+                <div className="detail-tags">
+                  {drugAllergiesList.map((d) => (
+                    <span key={d} className="detail-tag">{d}</span>
+                  ))}
                 </div>
-              </>
-            )}
-            {!resident.drugAllergies &&
-              resident.allergies?.length > 0 && (
-                <div className="detail-row detail-row--muted">
-                  <strong>Dị ứng (dữ liệu cũ):</strong>
-                  <div className="detail-tags">
-                    {resident.allergies.map((a) => (
-                      <span key={a} className="detail-tag detail-tag--legacy">{a}</span>
-                    ))}
-                  </div>
-                </div>
+              ) : (
+                <span className="detail-row--muted">Chưa ghi nhận dị ứng thuốc</span>
               )}
+            </div>
 
             <div className="modal__section">Khác</div>
             <div className="detail-row"><strong>CCCD:</strong> {resident.citizenId || '—'}</div>
@@ -387,25 +374,31 @@ export default function ResidentsByAreaPage() {
               <th>Mã</th>
               <th>Họ tên</th>
               <th>Khu vực</th>
+              <th>Dị ứng thuốc</th>
               <th>Trạng thái</th>
               <th>Thao tác</th>
             </tr>
           </thead>
           <tbody>
             {listLoading && (
-              <tr><td colSpan={5} className="empty-state">Đang tải...</td></tr>
+              <tr><td colSpan={6} className="empty-state">Đang tải...</td></tr>
             )}
             {!listLoading && !buildingId && (
-              <tr><td colSpan={5} className="empty-state">Chọn tòa nhà để xem cư dân</td></tr>
+              <tr><td colSpan={6} className="empty-state">Chọn tòa nhà để xem cư dân</td></tr>
             )}
             {!listLoading && buildingId && residents.length === 0 && (
-              <tr><td colSpan={5} className="empty-state">Không có cư dân trong khu vực này</td></tr>
+              <tr><td colSpan={6} className="empty-state">Không có cư dân trong khu vực này</td></tr>
             )}
             {!listLoading && residents.map((r) => (
               <tr key={r._id}>
                 <td style={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>{r.residentCode}</td>
                 <td style={{ fontWeight: 600 }}>{r.fullName}</td>
-                <td>{r.floor?.label || r.room?.label || '—'}</td>
+                <td>{formatResidentAreaLine(r) || '—'}</td>
+                <td>
+                  {r.hasDrugAllergiesRecord
+                    ? `Đã ghi (${r.drugAllergiesCount ?? pickDrugAllergiesList(r).length ?? 0})`
+                    : 'Chưa ghi'}
+                </td>
                 <td>
                   <span className={`residency-badge residency-badge--${r.residencyStatus || 'default'}`}>
                     {RESIDENCY_LABELS[r.residencyStatus] || r.residencyStatus || '—'}

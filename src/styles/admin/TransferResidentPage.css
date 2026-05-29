@@ -19,6 +19,39 @@
   color: #854d0e; font-size: 0.8rem; padding: 10px 14px; margin-bottom: 16px;
 }
 
+.transfer-staff-sync {
+  background: #ecfdf5;
+  border: 1px solid #6ee7b7;
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  font-size: 0.85rem;
+  color: #065f46;
+}
+.transfer-staff-sync__title {
+  font-weight: 600;
+  margin: 0 0 6px;
+}
+.transfer-staff-sync__list {
+  margin: 0 0 10px;
+  padding-left: 1.1rem;
+  line-height: 1.45;
+}
+.transfer-staff-sync__list li { margin: 2px 0; }
+.transfer-staff-sync__muted {
+  margin: 0 0 10px;
+  color: #047857;
+  font-size: 0.8rem;
+}
+.transfer-staff-sync__link {
+  display: inline-block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #047857;
+  text-decoration: underline;
+}
+.transfer-staff-sync__link:hover { color: #065f46; }
+
 .transfer-layout {
   display: grid;
   grid-template-columns: 1fr 1.1fr;

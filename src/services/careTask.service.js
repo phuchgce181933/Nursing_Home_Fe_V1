@@ -2,37 +2,37 @@ import axiosClient from '../api/axiosClient';
 
 const unwrapData = (r) => r.data?.data ?? r.data;
 
-/** GET /api/care-tasks/assignment-context?workDate=YYYY-MM-DD */
+const BASE = '/staff/care-tasks';
+
+/** GET /api/staff/care-tasks/assignment-context?workDate=YYYY-MM-DD (optional — may 404) */
 const getAssignmentContext = (workDate) =>
   axiosClient
-    .get('/care-tasks/assignment-context', { params: { workDate } })
+    .get(`${BASE}/assignment-context`, { params: { workDate } })
     .then(unwrapData);
 
-// GET /api/care-tasks
+/** GET /api/staff/care-tasks?workDate=YYYY-MM-DD */
 const listCareTasks = (params = {}) =>
-  axiosClient.get('/care-tasks', { params }).then((r) => r.data);
+  axiosClient.get(BASE, { params }).then(unwrapData);
 
-// GET /api/care-tasks/:id
+/** GET /api/staff/care-tasks/:id */
 const getCareTask = (id) =>
-  axiosClient.get(`/care-tasks/${id}`).then((r) => r.data);
+  axiosClient.get(`${BASE}/${id}`).then(unwrapData);
 
-// GET /api/care-tasks/by-shift/:shiftId
+/** GET /api/staff/care-tasks/by-shift/:shiftId */
 const getCareTasksByShift = (shiftId) =>
-  axiosClient.get(`/care-tasks/by-shift/${shiftId}`).then((r) => r.data);
+  axiosClient.get(`${BASE}/by-shift/${shiftId}`).then(unwrapData);
 
-// POST /api/care-tasks
-// Required: staffProfileId, residentId, taskType, careLevel, workDate
+/** POST /api/staff/care-tasks */
 const createCareTask = (data) =>
-  axiosClient.post('/care-tasks', data).then(unwrapData);
+  axiosClient.post(BASE, data).then(unwrapData);
 
-// PUT /api/care-tasks/:id/status
-// status: in_progress | completed | skipped
+/** PUT /api/staff/care-tasks/:id/status */
 const updateCareTaskStatus = (id, status, notes = '') =>
-  axiosClient.put(`/care-tasks/${id}/status`, { status, notes }).then((r) => r.data);
+  axiosClient.put(`${BASE}/${id}/status`, { status, notes }).then(unwrapData);
 
-// DELETE /api/care-tasks/:id  (only pending tasks)
+/** DELETE /api/staff/care-tasks/:id */
 const deleteCareTask = (id) =>
-  axiosClient.delete(`/care-tasks/${id}`).then((r) => r.data);
+  axiosClient.delete(`${BASE}/${id}`).then(unwrapData);
 
 const careTaskService = {
   getAssignmentContext,

@@ -7,7 +7,6 @@ export const CONFLICT_LABEL = {
   LEAVE_CONFLICT: 'Trùng ngày nghỉ',
   MAX_DAILY_HOURS: 'Vượt 12h/ngày',
   MULTIPLE_AREAS: 'Trùng giờ khác khu vực',
-  NIGHT_SHIFT_CONTINUOUS: '3 ca đêm liên tiếp',
   ROLE_MISMATCH: 'Vai trò không phù hợp',
   STAFF_NOT_ASSIGNABLE: 'Không phân công ca (Admin/Quản lý)',
   PAST_DATE: 'Ngày trong quá khứ',

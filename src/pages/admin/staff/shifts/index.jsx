@@ -11,27 +11,97 @@ import {
 import { getLocalDateString, getUtcDateString } from '../../../../utils/dateUtils';
 import { canAssignShift } from '../../../../utils/staffAssignable';
 import { isStaffOnLeaveForAssignment } from '../../../../utils/leaveUtils';
+import { getApiErrorPayload, blockingCareTasksMessage } from '../../../../utils/blockingCareTasks';
+import BlockingCareTasksAlert from '../../../../components/staff/BlockingCareTasksAlert';
 import '../../../../styles/admin/ShiftManagementPage.css';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const SHIFT_TYPES = [
-  { value: 'morning',   label: 'Ca sáng' },
-  { value: 'afternoon', label: 'Ca chiều' },
-  { value: 'night',     label: 'Ca đêm' },
-  { value: 'on_call',   label: 'Ca trực' },
+  { value: 'morning',   label: 'Ca ngày' },
+  { value: 'afternoon', label: 'Ca chiều/tối' },
+  { value: 'night',     label: 'Ca đêm/sáng sớm' },
 ];
 
-const TEMPLATE_STATUS_LABELS = { active: 'Hoạt động', inactive: 'Tạm dừng' };
-const SHIFT_STATUS_LABELS    = { draft: 'Nháp', published: 'Đã đăng', confirmed: 'Đã xác nhận', completed: 'Hoàn thành', cancelled: 'Đã hủy' };
+const SHIFT_STATUS_LABELS = { draft: 'Nháp', published: 'Đã đăng', confirmed: 'Đã xác nhận', completed: 'Hoàn thành', cancelled: 'Đã hủy' };
 
+/** Backend wraps payloads as { success, data }; list endpoints nest arrays under data.data */
+const unwrapApiData = (res) => res?.data ?? res;
+
+const parseTemplateList = (res) => {
+  const body = unwrapApiData(res);
+  if (Array.isArray(body)) return { templates: body, totalHoursPerDay: null };
+  return {
+    templates: body.data || [],
+    totalHoursPerDay: body.totalHoursPerDay ?? null,
+  };
+};
+
+const parseShiftList = (res) => {
+  const body = unwrapApiData(res);
+  if (Array.isArray(body)) return { shifts: body, totalHours: null };
+  return {
+    shifts: body.data || [],
+    totalHours: body.totalHours ?? null,
+  };
+};
+
+const templateHours = (t) => t?.totalHours ?? t?.durationHours;
+
+const addDays = (dateStr, delta) => {
+  const d = new Date(`${dateStr}T12:00:00`);
+  d.setDate(d.getDate() + delta);
+  return getLocalDateString(d);
+};
+
+const formatScheduleDayHeader = (dateStr) => {
+  const d = new Date(`${dateStr}T12:00:00`);
+  const weekday = d.toLocaleDateString('vi-VN', { weekday: 'long' }).toUpperCase();
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  return `${weekday}, ${day}/${month}/${year}`;
+};
+
+const sortTemplatesByStart = (templates) =>
+  [...templates].sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''));
+
+const getShiftTemplateId = (shift) =>
+  String(shift.shiftTemplateId?._id || shift.shiftTemplateId || '');
+
+const shiftsForTemplate = (dayShifts, templateId) =>
+  dayShifts.filter(
+    (s) => getShiftTemplateId(s) === String(templateId) && s.status !== 'cancelled'
+  );
+
+const getStaffDisplayName = (shift) => {
+  const staff = shift.assignedStaffId;
+  return staff?.userId?.fullName || staff?.staffCode || null;
+};
 
 const today = () => getLocalDateString();
 
-const buildShiftPayload = (form) => {
-  const { floorId: _f, roomId: _r, ...rest } = form;
-  return rest;
+const buildShiftPayload = (form, { isUpdate = false } = {}) => {
+  if (isUpdate) {
+    const payload = { changeReason: form.changeReason };
+    if (form.shiftTemplateId) payload.shiftTemplateId = form.shiftTemplateId;
+    if (form.workDate) payload.workDate = form.workDate;
+    if (form.assignedStaffId) payload.assignedStaffId = form.assignedStaffId;
+    if (form.taskDescription !== undefined) payload.taskDescription = form.taskDescription;
+    if (form.notes !== undefined) payload.notes = form.notes;
+    return payload;
+  }
+
+  const payload = {
+    shiftTemplateId: form.shiftTemplateId,
+    workDate: form.workDate,
+    assignedStaffId: form.assignedStaffId,
+  };
+  if (form.taskDescription) payload.taskDescription = form.taskDescription;
+  if (form.notes) payload.notes = form.notes;
+  return payload;
 };
+
 const utcToday = () => getUtcDateString();
 const nextWeek = () => {
   const d = new Date();
@@ -39,8 +109,7 @@ const nextWeek = () => {
   return getLocalDateString(d);
 };
 
-const emptyTemplate = { name: '', shiftCode: '', shiftType: 'morning', startTime: '07:00', endTime: '15:00', colorLabel: '#607D8B', minStaff: 1, description: '' };
-const emptyShift    = { name: '', startTime: '', endTime: '', workDate: today(), assignedStaffId: '', shiftTemplateId: '', taskDescription: '', notes: '' };
+const emptyShift = { shiftTemplateId: '', workDate: today(), assignedStaffId: '', taskDescription: '', notes: '' };
 
 function useAssignableStaffForDate(workDate) {
   const [staff, setStaff] = useState([]);
@@ -100,8 +169,8 @@ function useConflictPreview(form, { excludeId } = {}) {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const { assignedStaffId, workDate, startTime, endTime, shiftTemplateId } = form;
-    if (!assignedStaffId || !workDate || !startTime || !endTime) {
+    const { assignedStaffId, workDate, shiftTemplateId } = form;
+    if (!assignedStaffId || !workDate || !shiftTemplateId) {
       setPreview([]);
       return undefined;
     }
@@ -112,10 +181,8 @@ function useConflictPreview(form, { excludeId } = {}) {
         const res = await shiftService.checkConflicts({
           assignedStaffId,
           workDate,
-          startTime,
-          endTime,
+          shiftTemplateId,
           excludeId,
-          shiftTemplateId: shiftTemplateId || undefined,
         });
         setPreview(res.conflicts || []);
       } catch {
@@ -129,8 +196,6 @@ function useConflictPreview(form, { excludeId } = {}) {
   }, [
     form.assignedStaffId,
     form.workDate,
-    form.startTime,
-    form.endTime,
     form.shiftTemplateId,
     excludeId,
   ]);
@@ -142,140 +207,64 @@ function StatusBadge({ value, map, prefix }) {
   return <span className={`status-badge status-badge--${prefix}-${value}`}>{map[value] || value}</span>;
 }
 
-// ── Tab 1: Mẫu ca làm việc (Templates) ───────────────────────────────────────
-
-function TemplateFormModal({ initial, onSave, onClose }) {
-  // Merge with emptyTemplate so fields missing from old DB records get defaults
-  const [form, setForm] = useState({ ...emptyTemplate, ...(initial || {}) });
-  const [error, setError] = useState('');
-  const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
-
-  const handleSave = async () => {
-    setError('');
-    try {
-      await onSave(form);
-      onClose();
-    } catch (e) {
-      setError(e.response?.data?.message || e.message || 'Lỗi');
-    }
-  };
-
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h2 className="modal__title">{initial ? 'Sửa mẫu ca' : 'Tạo mẫu ca mới'}</h2>
-        {error && <p className="form-error">{error}</p>}
-        <div className="form-grid">
-          <div className="form-group form-grid--full">
-            <label>Tên ca *</label>
-            <input value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="Ca Sáng A" />
-          </div>
-          <div className="form-group">
-            <label>Mã ca (shiftCode) *</label>
-            <input value={form.shiftCode} onChange={(e) => set('shiftCode', e.target.value.toUpperCase())} placeholder="S1" />
-          </div>
-          <div className="form-group">
-            <label>Loại ca *</label>
-            <select value={form.shiftType} onChange={(e) => set('shiftType', e.target.value)}>
-              {SHIFT_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-            </select>
-          </div>
-          <div className="form-group">
-            <label>Giờ bắt đầu *</label>
-            <input type="time" value={form.startTime} onChange={(e) => set('startTime', e.target.value)} />
-          </div>
-          <div className="form-group">
-            <label>Giờ kết thúc *</label>
-            <input type="time" value={form.endTime} onChange={(e) => set('endTime', e.target.value)} />
-          </div>
-          <div className="form-group">
-            <label>Màu hiển thị</label>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <input type="color" value={form.colorLabel} onChange={(e) => set('colorLabel', e.target.value)} style={{ width: 40, height: 34, padding: 2, border: '1px solid #e2e8f0', borderRadius: 6, cursor: 'pointer' }} />
-              <input value={form.colorLabel} onChange={(e) => set('colorLabel', e.target.value)} style={{ flex: 1 }} />
-            </div>
-          </div>
-          <div className="form-group">
-            <label>Nhân viên tối thiểu/ca</label>
-            <input type="number" min={1} value={form.minStaff} onChange={(e) => set('minStaff', +e.target.value)} />
-          </div>
-          <div className="form-group form-grid--full">
-            <label>Mô tả</label>
-            <input value={form.description} onChange={(e) => set('description', e.target.value)} placeholder="Mô tả ngắn gọn về ca..." />
-          </div>
-        </div>
-        <div className="modal__actions">
-          <button className="btn-cancel" onClick={onClose}>Hủy</button>
-          <button className="btn-save" onClick={handleSave}>Lưu</button>
-        </div>
-      </div>
-    </div>
-  );
-}
+// ── Tab 1: Mẫu ca làm việc (read-only system shifts) ─────────────────────────
 
 function TemplatesTab() {
   const [templates, setTemplates] = useState([]);
+  const [totalHoursPerDay, setTotalHoursPerDay] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [filterStatus, setFilterStatus] = useState('');
-  const [editTarget, setEditTarget] = useState(null);
-  const [showCreate, setShowCreate] = useState(false);
 
   const load = async () => {
-    setLoading(true); setError('');
+    setLoading(true);
+    setError('');
     try {
-      const res = await shiftService.getTemplates(filterStatus ? { status: filterStatus } : {});
-      const raw = res.data || res;
-      setTemplates(Array.isArray(raw) ? raw : (raw.data || []));
-    } catch (e) { setError(e.response?.data?.message || 'Tải thất bại'); }
-    finally { setLoading(false); }
+      const res = await shiftService.getTemplates();
+      const { templates: list, totalHoursPerDay: dayTotal } = parseTemplateList(res);
+      setTemplates(list);
+      setTotalHoursPerDay(dayTotal);
+    } catch (e) {
+      setError(e.response?.data?.message || 'Tải thất bại');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  useEffect(() => { load(); }, [filterStatus]);
-
-  const handleCreate = async (form) => {
-    await shiftService.createTemplate(form);
-    load();
-  };
-
-  const handleUpdate = async (form) => {
-    const res = await shiftService.updateTemplate(editTarget._id, form);
-    if (res.warning) alert(`⚠️ ${res.warning}`);
-    load();
-  };
-
-  const handleToggleStatus = async (t) => {
-    const next = t.status === 'active' ? 'inactive' : 'active';
-    try { await shiftService.updateTemplateStatus(t._id, next); load(); }
-    catch (e) { alert(e.response?.data?.message || 'Thất bại'); }
-  };
-
-  const handleDelete = async (t) => {
-    if (!confirm(`Xóa mẫu ca "${t.name}"?`)) return;
-    try { await shiftService.deleteTemplate(t._id); load(); }
-    catch (e) { alert(e.response?.data?.message || 'Thất bại'); }
-  };
+  useEffect(() => { load(); }, []);
 
   return (
     <div>
-      <div className="tab-toolbar">
-        <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
-          <option value="">Tất cả trạng thái</option>
-          {Object.entries(TEMPLATE_STATUS_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-        </select>
-        <button className="btn-primary" onClick={() => setShowCreate(true)}>+ Tạo mẫu ca</button>
-      </div>
+      <p style={{ marginBottom: 12, fontSize: '0.85rem', color: '#64748b' }}>
+        3 ca mặc định hệ thống — Ca Đêm/Sáng sớm (00:00–08:00), Ca Ngày (08:00–16:00), Ca Chiều/Tối (16:00–00:00).
+        {totalHoursPerDay != null && (
+          <> Tổng <strong>{totalHoursPerDay}h</strong>/ngày.</>
+        )}
+        {' '}Giờ ca được lấy tự động khi phân công.
+      </p>
 
       {error && <p className="form-error">{error}</p>}
 
       {loading ? <p className="loading-text">Đang tải...</p> : (
         <table className="data-table">
-          <thead><tr><th>Mã</th><th>Tên ca</th><th>Loại</th><th>Giờ</th><th>Thời lượng</th><th>Min NV</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
+          <thead>
+            <tr>
+              <th>Mã</th>
+              <th>Tên ca</th>
+              <th>Loại</th>
+              <th>Giờ</th>
+              <th>Thời lượng</th>
+              <th>Mô tả</th>
+            </tr>
+          </thead>
           <tbody>
-            {templates.length === 0 && <tr><td colSpan={8} className="empty-row">Chưa có mẫu ca nào</td></tr>}
+            {templates.length === 0 && <tr><td colSpan={6} className="empty-row">Chưa có mẫu ca nào</td></tr>}
             {templates.map((t) => (
               <tr key={t._id}>
-                <td><span style={{ fontFamily: 'monospace', background: '#f1f5f9', padding: '2px 6px', borderRadius: 4 }}>{t.shiftCode}</span></td>
+                <td>
+                  <span style={{ fontFamily: 'monospace', background: '#f1f5f9', padding: '2px 6px', borderRadius: 4 }}>
+                    {t.shiftCode}
+                  </span>
+                </td>
                 <td>
                   <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: t.colorLabel || '#607D8B', marginRight: 6 }} />
                   {t.name}
@@ -283,29 +272,12 @@ function TemplatesTab() {
                 </td>
                 <td>{SHIFT_TYPES.find((x) => x.value === t.shiftType)?.label || t.shiftType}</td>
                 <td>{t.startTime} – {t.endTime}</td>
-                <td>{t.durationHours != null ? `${t.durationHours}h` : '—'}</td>
-                <td>{t.minStaff}</td>
-                <td><StatusBadge value={t.status} map={TEMPLATE_STATUS_LABELS} prefix="tpl" /></td>
-                <td className="action-cell">
-                  <button className="action-btn action-btn--edit" onClick={() => setEditTarget(t)}>Sửa</button>
-                  <button className="action-btn action-btn--secondary" onClick={() => handleToggleStatus(t)}>
-                    {t.status === 'active' ? 'Tắt' : 'Bật'}
-                  </button>
-                  <button className="action-btn action-btn--danger" onClick={() => handleDelete(t)}>Xóa</button>
-                </td>
+                <td>{templateHours(t) != null ? `${templateHours(t)}h` : '—'}</td>
+                <td style={{ fontSize: '0.8rem', color: '#64748b' }}>{t.description || '—'}</td>
               </tr>
             ))}
           </tbody>
         </table>
-      )}
-
-      {showCreate && <TemplateFormModal onSave={handleCreate} onClose={() => setShowCreate(false)} />}
-      {editTarget && (
-        <TemplateFormModal
-          initial={editTarget}
-          onSave={handleUpdate}
-          onClose={() => setEditTarget(null)}
-        />
       )}
     </div>
   );
@@ -318,7 +290,6 @@ function CreateShiftModal({ templates, onSave, onClose }) {
   const { staff, loading: staffLoading } = useAssignableStaffForDate(form.workDate);
   const [conflicts, setConflicts] = useState([]);
   const [error, setError] = useState('');
-  const [overrideTime, setOverrideTime] = useState(false);
   const { preview, loading: previewLoading } = useConflictPreview(form);
   const set = (k, v) => {
     setConflicts([]);
@@ -330,16 +301,21 @@ function CreateShiftModal({ templates, onSave, onClose }) {
     : null;
 
   const handleTemplateSelect = (id) => {
-    const t = templates.find((x) => x._id === id);
-    setOverrideTime(false);
     setConflicts([]);
-    if (t) setForm((p) => ({ ...p, shiftTemplateId: id, name: t.name, startTime: t.startTime, endTime: t.endTime }));
-    else setForm((p) => ({ ...p, shiftTemplateId: '', startTime: '', endTime: '', name: '' }));
+    setForm((p) => ({ ...p, shiftTemplateId: id }));
   };
 
   const handleSave = async () => {
     setError('');
     setConflicts([]);
+    if (!form.shiftTemplateId) {
+      setError('Vui lòng chọn ca làm việc');
+      return;
+    }
+    if (!form.assignedStaffId) {
+      setError('Vui lòng chọn nhân viên');
+      return;
+    }
     try {
       const payload = buildShiftPayload(form);
       const res = await onSave(payload);
@@ -372,44 +348,29 @@ function CreateShiftModal({ templates, onSave, onClose }) {
           }
         />
         <div className="form-grid">
-          {/* Template selector */}
           <div className="form-group form-grid--full">
-            <label>Mẫu ca</label>
+            <label>Ca làm việc *</label>
             <select value={form.shiftTemplateId} onChange={(e) => handleTemplateSelect(e.target.value)}>
-              <option value="">— Ca tự do (nhập thủ công) —</option>
-              {templates.filter((t) => t.status === 'active').map((t) => (
+              <option value="">— Chọn ca —</option>
+              {templates.map((t) => (
                 <option key={t._id} value={t._id}>{t.shiftCode} — {t.name} ({t.startTime}–{t.endTime})</option>
               ))}
             </select>
           </div>
 
-          {/* Template info card */}
           {selectedTemplate && (
             <div className="form-grid--full" style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 8, padding: '10px 14px', fontSize: '0.8rem', color: '#0369a1' }}>
               <div style={{ fontWeight: 600, marginBottom: 4 }}>
                 <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: selectedTemplate.colorLabel || '#607D8B', marginRight: 6 }} />
                 {selectedTemplate.name} · {selectedTemplate.shiftCode}
               </div>
-              <div>🕐 {selectedTemplate.startTime} – {selectedTemplate.endTime} &nbsp;·&nbsp; ⏱ {selectedTemplate.durationHours}h &nbsp;·&nbsp; 👥 min {selectedTemplate.minStaff} NV</div>
-              <div style={{ marginTop: 6 }}>
-                <button
-                  type="button"
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0369a1', textDecoration: 'underline', fontSize: '0.78rem', padding: 0 }}
-                  onClick={() => setOverrideTime((v) => !v)}
-                >
-                  {overrideTime ? '↩ Dùng giờ từ mẫu' : '✏️ Ghi đè giờ cho ca này'}
-                </button>
-              </div>
+              <div>🕐 {selectedTemplate.startTime} – {selectedTemplate.endTime} &nbsp;·&nbsp; ⏱ {templateHours(selectedTemplate)}h</div>
+              {selectedTemplate.crossesMidnight && (
+                <div style={{ marginTop: 4, fontSize: '0.75rem' }}>🌙 Ca qua ngày (kết thúc sáng hôm sau)</div>
+              )}
             </div>
           )}
 
-          {/* Tên ca */}
-          <div className="form-group form-grid--full">
-            <label>Tên ca *</label>
-            <input value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="Ca sáng A1..." />
-          </div>
-
-          {/* Staff */}
           <div className="form-group form-grid--full">
             <label>Nhân viên *</label>
             <select
@@ -439,30 +400,18 @@ function CreateShiftModal({ templates, onSave, onClose }) {
             <small className="field-hint">Ngày tính theo UTC (khớp quy tắc PAST_DATE trên server)</small>
           </div>
 
-          {/* Time: shown as read-only when template selected and not overriding */}
-          {(!selectedTemplate || overrideTime) ? (
-            <>
-              <div className="form-group">
-                <label>Giờ bắt đầu *</label>
-                <input type="time" value={form.startTime} onChange={(e) => set('startTime', e.target.value)} />
-              </div>
-              <div className="form-group">
-                <label>Giờ kết thúc *</label>
-                <input type="time" value={form.endTime} onChange={(e) => set('endTime', e.target.value)} />
-              </div>
-            </>
-          ) : (
+          {selectedTemplate && (
             <>
               <div className="form-group">
                 <label>Giờ bắt đầu</label>
                 <div style={{ padding: '8px 12px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: '0.875rem', color: '#475569' }}>
-                  🕐 {form.startTime} <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>(từ mẫu)</span>
+                  🕐 {selectedTemplate.startTime} <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>(từ mẫu)</span>
                 </div>
               </div>
               <div className="form-group">
                 <label>Giờ kết thúc</label>
                 <div style={{ padding: '8px 12px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: '0.875rem', color: '#475569' }}>
-                  🕐 {form.endTime} <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>(từ mẫu)</span>
+                  🕐 {selectedTemplate.endTime} <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>(từ mẫu)</span>
                 </div>
               </div>
             </>
@@ -486,15 +435,12 @@ function CreateShiftModal({ templates, onSave, onClose }) {
   );
 }
 
-function UpdateShiftModal({ shift, onSave, onClose }) {
+function UpdateShiftModal({ shift, templates, onSave, onClose }) {
   const currentStaff = shift.assignedStaffId;
   const currentUserId = currentStaff?.userId?._id || currentStaff?.userId || '';
   const templateId = shift.shiftTemplateId?._id || shift.shiftTemplateId || '';
 
   const [form, setForm] = useState({
-    name:            shift.name || '',
-    startTime:       shift.startTime || '',
-    endTime:         shift.endTime || '',
     workDate:        shift.workDate ? shift.workDate.slice(0, 10) : '',
     assignedStaffId: currentUserId?.toString() || '',
     shiftTemplateId: templateId?.toString() || '',
@@ -511,12 +457,23 @@ function UpdateShiftModal({ shift, onSave, onClose }) {
     setForm((p) => ({ ...p, [k]: v }));
   };
 
+  const selectedTemplate = form.shiftTemplateId
+    ? templates.find((x) => x._id === form.shiftTemplateId)
+    : null;
+
   const handleSave = async () => {
     setError('');
     setConflicts([]);
-    if (!form.changeReason.trim()) { setError('Bắt buộc nhập lý do thay đổi'); return; }
+    if (!form.shiftTemplateId) {
+      setError('Vui lòng chọn ca làm việc');
+      return;
+    }
+    if (!form.changeReason.trim()) {
+      setError('Bắt buộc nhập lý do thay đổi');
+      return;
+    }
     try {
-      const payload = buildShiftPayload(form);
+      const payload = buildShiftPayload(form, { isUpdate: true });
       const res = await onSave(shift._id, payload);
       const c = res.conflicts || [];
       setConflicts(c);
@@ -548,9 +505,25 @@ function UpdateShiftModal({ shift, onSave, onClose }) {
         />
         <div className="form-grid">
           <div className="form-group form-grid--full">
-            <label>Tên ca</label>
-            <input value={form.name} onChange={(e) => set('name', e.target.value)} />
+            <label>Ca làm việc *</label>
+            <select value={form.shiftTemplateId} onChange={(e) => set('shiftTemplateId', e.target.value)}>
+              <option value="">— Chọn ca —</option>
+              {templates.map((t) => (
+                <option key={t._id} value={t._id}>{t.shiftCode} — {t.name} ({t.startTime}–{t.endTime})</option>
+              ))}
+            </select>
           </div>
+
+          {selectedTemplate && (
+            <div className="form-grid--full" style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 8, padding: '10px 14px', fontSize: '0.8rem', color: '#0369a1' }}>
+              <div style={{ fontWeight: 600, marginBottom: 4 }}>
+                <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: selectedTemplate.colorLabel || '#607D8B', marginRight: 6 }} />
+                {selectedTemplate.name} · {selectedTemplate.shiftCode}
+              </div>
+              <div>🕐 {selectedTemplate.startTime} – {selectedTemplate.endTime} &nbsp;·&nbsp; ⏱ {templateHours(selectedTemplate)}h</div>
+            </div>
+          )}
+
           <div className="form-group form-grid--full">
             <label>Nhân viên</label>
             <select
@@ -576,17 +549,13 @@ function UpdateShiftModal({ shift, onSave, onClose }) {
             <label>Ngày làm việc</label>
             <input type="date" min={utcToday()} value={form.workDate} onChange={(e) => set('workDate', e.target.value)} />
           </div>
-          <div className="form-group">
-            <label>Giờ bắt đầu</label>
-            <input type="time" value={form.startTime} onChange={(e) => set('startTime', e.target.value)} />
-          </div>
-          <div className="form-group">
-            <label>Giờ kết thúc</label>
-            <input type="time" value={form.endTime} onChange={(e) => set('endTime', e.target.value)} />
-          </div>
           <div className="form-group form-grid--full">
             <label>Mô tả công việc</label>
             <input value={form.taskDescription} onChange={(e) => set('taskDescription', e.target.value)} />
+          </div>
+          <div className="form-group form-grid--full">
+            <label>Ghi chú</label>
+            <input value={form.notes} onChange={(e) => set('notes', e.target.value)} />
           </div>
           <div className="form-group form-grid--full">
             <label>Lý do thay đổi *</label>
@@ -609,6 +578,7 @@ function UpdateShiftModal({ shift, onSave, onClose }) {
 
 function AssignTab() {
   const [shifts, setShifts]               = useState([]);
+  const [listTotalHours, setListTotalHours] = useState(null);
   const [templates, setTemplates]         = useState([]);
   const [loading, setLoading]             = useState(false);
   const [error, setError]                 = useState('');
@@ -618,24 +588,27 @@ function AssignTab() {
   const [showCreate, setShowCreate]       = useState(false);
   const [editShift, setEditShift]         = useState(null);
   const [actionConflicts, setActConflicts] = useState([]);
+  const [blockingTasks, setBlockingTasks] = useState([]);
 
   const loadTemplates = async () => {
-      const res = await shiftService.getTemplates();
-      const raw = res.data || res;
-      setTemplates(Array.isArray(raw) ? raw : (raw.data || []));
+    const res = await shiftService.getTemplates();
+    const { templates: list } = parseTemplateList(res);
+    setTemplates(list);
   };
 
   const load = async () => {
-    setLoading(true); setError('');
+    setLoading(true);
+    setError('');
+    setBlockingTasks([]);
     try {
       const res = await shiftService.listShifts({
         status: filterStatus || undefined,
         fromDate: filterFrom,
         toDate: filterTo,
       });
-      // Backend returns { data: [], total, page } — extract the array
-      const raw = res.data || res;
-      setShifts(Array.isArray(raw) ? raw : (raw.data || []));
+      const { shifts: list, totalHours } = parseShiftList(res);
+      setShifts(list);
+      setListTotalHours(totalHours);
     } catch (e) { setError(e.response?.data?.message || 'Tải thất bại'); }
     finally { setLoading(false); }
   };
@@ -682,14 +655,36 @@ function AssignTab() {
   const handleCancel = async (s) => {
     const reason = prompt('Lý do hủy ca:');
     if (reason === null) return;
-    try { await shiftService.cancelShift(s._id, reason); load(); }
-    catch (e) { alert(e.response?.data?.message || 'Thất bại'); }
+    setBlockingTasks([]);
+    try {
+      await shiftService.cancelShift(s._id, reason);
+      load();
+    } catch (e) {
+      const { message, blockingTasks: blocked } = getApiErrorPayload(e, 'Hủy ca thất bại');
+      if (blocked.length) {
+        setBlockingTasks(blocked);
+        setError(blockingCareTasksMessage(message));
+      } else {
+        alert(message);
+      }
+    }
   };
 
   const handleDelete = async (id) => {
     if (!confirm('Xóa ca nháp này?')) return;
-    try { await shiftService.deleteShift(id); load(); }
-    catch (e) { alert(e.response?.data?.message || 'Thất bại'); }
+    setBlockingTasks([]);
+    try {
+      await shiftService.deleteShift(id);
+      load();
+    } catch (e) {
+      const { message, blockingTasks: blocked } = getApiErrorPayload(e, 'Xóa ca thất bại');
+      if (blocked.length) {
+        setBlockingTasks(blocked);
+        setError(blockingCareTasksMessage(message));
+      } else {
+        alert(message);
+      }
+    }
   };
 
   const handleUpdate = async (id, form) => {
@@ -721,9 +716,19 @@ function AssignTab() {
       <p style={{ marginBottom: 12, fontSize: '0.8rem', color: '#64748b' }}>
         Chỉ ca <strong>Đã xác nhận</strong> mới được tính vào trang Sẵn sàng khẩn cấp.
         Phân công tầng/phòng cho nhân viên ở tab <strong>Phân công khu vực</strong>.
+        {listTotalHours != null && shifts.length > 0 && (
+          <> Tổng giờ trong khoảng lọc: <strong>{listTotalHours}h</strong>.</>
+        )}
       </p>
 
-      {error && <p className="form-error">{error}</p>}
+      {error && !blockingTasks.length && <p className="form-error">{error}</p>}
+      {blockingTasks.length > 0 && (
+        <BlockingCareTasksAlert
+          message={error}
+          tasks={blockingTasks}
+          hint="Hoàn thành, bỏ qua hoặc xóa các nhiệm vụ ở trang Phân công nhân viên → Nhiệm vụ chăm sóc, rồi thử hủy/xóa ca lại."
+        />
+      )}
       {actionConflicts.length > 0 && (
         <ConflictList
           conflicts={actionConflicts}
@@ -733,12 +738,13 @@ function AssignTab() {
 
       {loading ? <p className="loading-text">Đang tải...</p> : (
         <table className="data-table">
-          <thead><tr><th>Tên ca</th><th>Nhân viên</th><th>Ngày</th><th>Giờ</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
+          <thead><tr><th>Tên ca</th><th>Nhân viên</th><th>Ngày</th><th>Giờ</th><th>Thời lượng</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
           <tbody>
-            {shifts.length === 0 && <tr><td colSpan={6} className="empty-row">Không có ca nào trong khoảng thời gian này</td></tr>}
+            {shifts.length === 0 && <tr><td colSpan={7} className="empty-row">Không có ca nào trong khoảng thời gian này</td></tr>}
             {shifts.map((s) => {
               const staffObj  = s.assignedStaffId;
               const staffName = staffObj?.userId?.fullName || staffObj?.staffCode || '—';
+              const hours = s.totalHours ?? templateHours(s.shiftTemplateId);
               return (
                 <tr key={s._id}>
                   <td>
@@ -750,6 +756,7 @@ function AssignTab() {
                   <td>{staffName}</td>
                   <td>{new Date(s.workDate).toLocaleDateString('vi-VN')}</td>
                   <td>{s.startTime} – {s.endTime}</td>
+                  <td>{hours != null ? `${hours}h` : '—'}</td>
                   <td><StatusBadge value={s.status} map={SHIFT_STATUS_LABELS} prefix="shift" /></td>
                   <td className="action-cell">
                     {canPublish(s) && <button className="action-btn action-btn--publish" onClick={() => handlePublish(s._id)}>Đăng</button>}
@@ -766,85 +773,151 @@ function AssignTab() {
       )}
 
       {showCreate && <CreateShiftModal templates={templates} onSave={handleCreate} onClose={() => setShowCreate(false)} />}
-      {editShift && <UpdateShiftModal shift={editShift} onSave={handleUpdate} onClose={() => setEditShift(null)} />}
+      {editShift && <UpdateShiftModal shift={editShift} templates={templates} onSave={handleUpdate} onClose={() => setEditShift(null)} />}
     </div>
   );
 }
 
-// ── Tab 3: Lịch làm việc (Schedule view) ─────────────────────────────────────
+// ── Tab 3: Lịch làm việc (Schedule view — 3 cột / 1 ngày) ───────────────────
+
+function ScheduleDayBoard({ date, templates, shifts }) {
+  const sortedTemplates = sortTemplatesByStart(templates);
+
+  return (
+    <div className="schedule-day">
+      <div className="schedule-day__header">{formatScheduleDayHeader(date)}</div>
+      <div className="schedule-columns">
+        {sortedTemplates.map((template) => {
+          const columnShifts = shiftsForTemplate(shifts, template._id);
+          const accent = template.colorLabel || '#607D8B';
+
+          return (
+            <div
+              key={template._id}
+              className="schedule-column"
+              style={{ borderTopColor: accent }}
+            >
+              <div className="schedule-column__head">
+                <div className="schedule-column__title">{template.name}</div>
+                <div className="schedule-column__time">
+                  {template.startTime} – {template.endTime}
+                  {templateHours(template) != null && (
+                    <span className="schedule-column__hours"> · {templateHours(template)}h</span>
+                  )}
+                </div>
+              </div>
+              <div className="schedule-column__body">
+                {columnShifts.length === 0 ? (
+                  <div className="schedule-column__row schedule-column__row--empty">
+                    <span className="schedule-column__row-index">1</span>
+                    <span className="schedule-column__row-name">Chưa phân công</span>
+                  </div>
+                ) : (
+                  columnShifts.map((s, i) => (
+                    <div key={s._id} className="schedule-column__row">
+                      <span className="schedule-column__row-index">{i + 1}</span>
+                      <span className="schedule-column__row-name">
+                        {getStaffDisplayName(s) || '—'}
+                      </span>
+                      <StatusBadge value={s.status} map={SHIFT_STATUS_LABELS} prefix="shift" />
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 function ScheduleTab() {
   const [shifts, setShifts] = useState([]);
+  const [templates, setTemplates] = useState([]);
+  const [scheduleTotalHours, setScheduleTotalHours] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [fromDate, setFromDate] = useState(today());
-  const [toDate, setToDate] = useState(nextWeek());
+  const [selectedDate, setSelectedDate] = useState(today());
 
-  const load = async () => {
-    if (!fromDate || !toDate) return;
-    setLoading(true); setError('');
+  const loadTemplates = async () => {
     try {
-      const res = await shiftService.getSchedule(fromDate, toDate);
-      const raw = res.data || res;
-      setShifts(Array.isArray(raw) ? raw : (raw.data || []));
-    } catch (e) { setError(e.response?.data?.message || 'Tải thất bại'); }
-    finally { setLoading(false); }
+      const res = await shiftService.getTemplates();
+      const { templates: list } = parseTemplateList(res);
+      setTemplates(sortTemplatesByStart(list));
+    } catch {
+      setTemplates([]);
+    }
   };
 
-  useEffect(() => { load(); }, [fromDate, toDate]);
+  const load = async () => {
+    if (!selectedDate) return;
+    setLoading(true);
+    setError('');
+    try {
+      const res = await shiftService.getSchedule(selectedDate, selectedDate);
+      const { shifts: list, totalHours } = parseShiftList(res);
+      setShifts(list);
+      setScheduleTotalHours(totalHours);
+    } catch (e) {
+      setError(e.response?.data?.message || 'Tải thất bại');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  // Group by workDate
-  const grouped = shifts.reduce((acc, s) => {
-    const d = s.workDate?.slice(0, 10) || '?';
-    if (!acc[d]) acc[d] = [];
-    acc[d].push(s);
-    return acc;
-  }, {});
+  useEffect(() => {
+    loadTemplates();
+  }, []);
 
-  const sortedDates = Object.keys(grouped).sort();
+  useEffect(() => {
+    load();
+  }, [selectedDate]);
 
   return (
     <div>
-      <div className="tab-toolbar">
-        <label style={{ fontSize: '0.8rem', color: '#64748b' }}>Từ</label>
-        <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
-        <label style={{ fontSize: '0.8rem', color: '#64748b' }}>Đến</label>
-        <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
-        <button className="btn-secondary" onClick={load}>Xem lịch</button>
+      <div className="tab-toolbar schedule-toolbar">
+        <button
+          type="button"
+          className="btn-secondary"
+          onClick={() => setSelectedDate(addDays(selectedDate, -1))}
+        >
+          ← Hôm qua
+        </button>
+        <button type="button" className="btn-secondary" onClick={() => setSelectedDate(today())}>
+          Hôm nay
+        </button>
+        <input
+          type="date"
+          value={selectedDate}
+          onChange={(e) => setSelectedDate(e.target.value)}
+          aria-label="Chọn ngày"
+        />
+        <button
+          type="button"
+          className="btn-secondary"
+          onClick={() => setSelectedDate(addDays(selectedDate, 1))}
+        >
+          Ngày mai →
+        </button>
       </div>
 
       {error && <p className="form-error">{error}</p>}
       {loading && <p className="loading-text">Đang tải...</p>}
 
-      {!loading && sortedDates.length === 0 && (
-        <p style={{ color: '#94a3b8', textAlign: 'center', padding: 40 }}>Không có ca nào trong khoảng thời gian này</p>
+      {!loading && scheduleTotalHours != null && (
+        <p className="schedule-summary">
+          Tổng giờ ca trong ngày: <strong>{scheduleTotalHours}h</strong>
+        </p>
       )}
 
-      {sortedDates.map((date) => (
-        <div key={date} className="schedule-day">
-          <div className="schedule-day__header">
-            {new Date(date + 'T00:00:00').toLocaleDateString('vi-VN', { weekday: 'long', year: 'numeric', month: '2-digit', day: '2-digit' })}
-            <span style={{ marginLeft: 8, fontSize: '0.75rem', color: '#94a3b8' }}>{grouped[date].length} ca</span>
-          </div>
-          <div className="schedule-day__grid">
-            {grouped[date].map((s) => {
-              const staff = s.assignedStaffId;
-              const staffName = staff?.userId?.fullName || staff?.staffCode || '—';
-              const color = s.shiftTemplateId?.colorLabel || '#607D8B';
-              return (
-                <div key={s._id} className="schedule-card" style={{ borderLeftColor: color }}>
-                  <div className="schedule-card__name">{s.name}</div>
-                  <div className="schedule-card__time">{s.startTime} – {s.endTime}</div>
-                  <div className="schedule-card__staff">{staffName}</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
-                    <StatusBadge value={s.status} map={SHIFT_STATUS_LABELS} prefix="shift" />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      ))}
+      {!loading && templates.length > 0 && (
+        <ScheduleDayBoard date={selectedDate} templates={templates} shifts={shifts} />
+      )}
+
+      {!loading && templates.length === 0 && !error && (
+        <p className="loading-text">Không tải được mẫu ca hệ thống</p>
+      )}
     </div>
   );
 }
@@ -864,7 +937,7 @@ export default function ShiftManagementPage() {
     <div className="shift-page">
       <div className="shift-page__header">
         <h1 className="shift-page__title">Quản lý ca làm việc</h1>
-        <p className="shift-page__subtitle">Tạo mẫu ca → Phân công → Kiểm tra xung đột → Xem lịch</p>
+        <p className="shift-page__subtitle">3 ca cố định (DAWN · DAY · EVENING) → Phân công → Kiểm tra xung đột → Xem lịch</p>
       </div>
 
       <div className="tabs">

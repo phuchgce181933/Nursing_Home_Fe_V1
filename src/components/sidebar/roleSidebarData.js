@@ -60,6 +60,11 @@ export const roleSidebarData = {
       path: '/doctor/incidents',
     },
     {
+      title: 'Nghỉ phép',
+      icon: CalendarOff,
+      path: '/doctor/leave',
+    },
+    {
       title: 'Tin nhắn',
       icon: MessageSquare,
       path: '/doctor/messages',

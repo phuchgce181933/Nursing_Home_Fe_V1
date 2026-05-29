@@ -49,9 +49,25 @@ export function hasAssignedArea(resident) {
 export function formatResidentAreaLine(resident) {
   const { building, floor, room, bed } = formatResidentArea(resident);
   const parts = [];
-  if (building) parts.push(`Tòa ${building}`);
-  if (floor) parts.push(floor);
+  if (floor) {
+    parts.push(floor);
+  } else if (building) {
+    const b = String(building).trim();
+    parts.push(/^tòa\b/i.test(b) ? b : `Tòa ${b}`);
+  }
   if (room) parts.push(room);
   if (bed) parts.push(`Giường ${bed}`);
   return parts.length ? parts.join(' · ') : null;
+}
+
+/** drugAllergies column first; legacy allergies field as fallback */
+export function pickDrugAllergiesList(resident) {
+  if (!resident) return [];
+  if (Array.isArray(resident.drugAllergies)) {
+    return resident.drugAllergies.map((s) => String(s).trim()).filter(Boolean);
+  }
+  if (Array.isArray(resident.allergies)) {
+    return resident.allergies.map((s) => String(s).trim()).filter(Boolean);
+  }
+  return [];
 }
