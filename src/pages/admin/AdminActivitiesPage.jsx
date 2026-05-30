@@ -6,12 +6,12 @@ import residentService from '../../services/resident.service';
 import '../../styles/admin/AdminAdmissionRequestsPage.css';
 
 const STATUS_OPTIONS = [
-  { value: '', label: 'All Statuses' },
-  { value: 'draft', label: 'Draft' },
-  { value: 'scheduled', label: 'Scheduled' },
-  { value: 'ongoing', label: 'Ongoing' },
-  { value: 'completed', label: 'Completed' },
-  { value: 'cancelled', label: 'Cancelled' },
+  { value: '', label: 'Tất cả trạng thái' },
+  { value: 'draft', label: 'Nháp' },
+  { value: 'scheduled', label: 'Đã lên lịch' },
+  { value: 'ongoing', label: 'Đang diễn ra' },
+  { value: 'completed', label: 'Đã hoàn thành' },
+  { value: 'cancelled', label: 'Đã huỷ' },
 ];
 
 const toInputDateTimeLocal = (isoString) => {
@@ -200,11 +200,11 @@ export default function AdminActivitiesPage() {
     if (e) e.preventDefault();
     setFormError(null);
     if (!form.title.trim()) {
-      setFormError('Title is required');
+      setFormError('Tiêu đề là bắt buộc');
       return;
     }
     if (!form.scheduledAt) {
-      setFormError('Scheduled date/time is required');
+      setFormError('Ngày/giờ lên lịch là bắt buộc');
       return;
     }
 
@@ -246,7 +246,7 @@ export default function AdminActivitiesPage() {
         <div>
           <h1>
             <CalendarDays size={26} />
-            Activity Management
+            Quản lý hoạt động
           </h1>
           <p>Quản lý hoạt động cho cư dân: tạo, chỉnh sửa, xóa, và cập nhật trạng thái.</p>
         </div>
@@ -260,19 +260,19 @@ export default function AdminActivitiesPage() {
           className="adm-btn-refresh"
         >
           <Plus size={16} />
-          {isCreating ? 'Close Form' : 'Create Activity'}
+          {isCreating ? 'Đóng form' : 'Tạo hoạt động'}
         </button>
       </div>
 
       <div className="adm-filter-panel">
         <form onSubmit={handleApplyFilters} className="adm-filter-grid">
           <div>
-            <label className="text-sm font-semibold">Search</label>
+            <label className="text-sm font-semibold">Tìm kiếm</label>
             <div className="adm-filter-input-wrapper">
               <Search className="adm-filter-input-icon" size={14} />
               <input
                 type="text"
-                placeholder="Search title, category..."
+                placeholder="Tìm theo tiêu đề, danh mục..."
                 className="adm-filter-input"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -281,7 +281,7 @@ export default function AdminActivitiesPage() {
           </div>
 
           <div>
-            <label className="text-sm font-semibold">Status</label>
+            <label className="text-sm font-semibold">Trạng thái</label>
             <select
               className="adm-filter-select"
               value={status}
@@ -296,7 +296,7 @@ export default function AdminActivitiesPage() {
           </div>
 
           <div>
-            <label className="text-sm font-semibold">From</label>
+            <label className="text-sm font-semibold">Từ ngày</label>
             <input
               type="date"
               className="adm-filter-select"
@@ -306,7 +306,7 @@ export default function AdminActivitiesPage() {
           </div>
 
           <div>
-            <label className="text-sm font-semibold">To</label>
+            <label className="text-sm font-semibold">Đến ngày</label>
             <input
               type="date"
               className="adm-filter-select"
@@ -317,10 +317,10 @@ export default function AdminActivitiesPage() {
 
           <div className="flex items-end gap-3" style={{ alignSelf: 'end' }}>
             <button type="button" className="adm-btn-refresh" onClick={handleResetFilters}>
-              <RefreshCw size={14} /> Reset
+              <RefreshCw size={14} /> Đặt lại
             </button>
             <button type="submit" className="adm-btn-refresh">
-              <Filter size={14} /> Apply
+              <Filter size={14} /> Áp dụng
             </button>
           </div>
         </form>
@@ -329,11 +329,11 @@ export default function AdminActivitiesPage() {
       {isCreating && (
         <div className="adm-filter-panel" style={{ marginBottom: '28px' }}>
           <h2 style={{ marginBottom: '12px', fontSize: '18px', fontWeight: 700 }}>
-            {editingId ? 'Edit Activity' : 'Create Activity'}
+            {editingId ? 'Chỉnh sửa hoạt động' : 'Tạo hoạt động'}
           </h2>
           <form onSubmit={handleSubmit} className="adm-filter-grid">
             <div>
-              <label className="text-sm font-semibold">Title</label>
+              <label className="text-sm font-semibold">Tiêu đề</label>
               <input
                 type="text"
                 className="adm-filter-input"
@@ -342,7 +342,7 @@ export default function AdminActivitiesPage() {
               />
             </div>
             <div>
-              <label className="text-sm font-semibold">Category</label>
+              <label className="text-sm font-semibold">Danh mục</label>
               <input
                 type="text"
                 className="adm-filter-input"
@@ -351,7 +351,7 @@ export default function AdminActivitiesPage() {
               />
             </div>
             <div>
-              <label className="text-sm font-semibold">Scheduled At</label>
+              <label className="text-sm font-semibold">Lên lịch lúc</label>
               <input
                 type="datetime-local"
                 className="adm-filter-input"
@@ -360,7 +360,7 @@ export default function AdminActivitiesPage() {
               />
             </div>
             <div>
-              <label className="text-sm font-semibold">Duration (minutes)</label>
+              <label className="text-sm font-semibold">Thời lượng (phút)</label>
               <input
                 type="number"
                 min="1"
@@ -370,7 +370,7 @@ export default function AdminActivitiesPage() {
               />
             </div>
             <div>
-              <label className="text-sm font-semibold">Location</label>
+              <label className="text-sm font-semibold">Địa điểm</label>
               <input
                 type="text"
                 className="adm-filter-input"
@@ -379,14 +379,14 @@ export default function AdminActivitiesPage() {
               />
             </div>
             <div>
-              <label className="text-sm font-semibold">Organizer Staff</label>
+              <label className="text-sm font-semibold">Nhân viên tổ chức</label>
               <select
                 className="adm-filter-select"
                 value={form.organizerStaffId}
                 onChange={(e) => setForm({ ...form, organizerStaffId: e.target.value })}
                 disabled={optionsLoading}
               >
-                <option value="">Select organizer staff</option>
+                <option value="">Chọn nhân viên tổ chức</option>
                 {staffOptions.map((staff) => (
                   <option key={staff._id} value={staff._id}>
                     {staff.fullName || staff.email} {staff.role ? `(${staff.role})` : ''}
@@ -395,7 +395,7 @@ export default function AdminActivitiesPage() {
               </select>
             </div>
             <div>
-              <label className="text-sm font-semibold">Participants</label>
+              <label className="text-sm font-semibold">Người tham gia</label>
               <select
                 className="adm-filter-select"
                 multiple
@@ -411,13 +411,13 @@ export default function AdminActivitiesPage() {
               >
                 {residents.map((resident) => (
                   <option key={resident._id} value={resident._id}>
-                    {resident.fullName || 'Unnamed resident'}{resident.residentCode ? ` (${resident.residentCode})` : ''}
+                    {resident.fullName || 'Cư dân chưa đặt tên'}{resident.residentCode ? ` (${resident.residentCode})` : ''}
                   </option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="text-sm font-semibold">Status</label>
+              <label className="text-sm font-semibold">Trạng thái</label>
               <select
                 className="adm-filter-select"
                 value={form.status}
@@ -431,7 +431,7 @@ export default function AdminActivitiesPage() {
               </select>
             </div>
             <div style={{ gridColumn: 'span 3' }}>
-              <label className="text-sm font-semibold">Description</label>
+              <label className="text-sm font-semibold">Mô tả</label>
               <textarea
                 rows="3"
                 className="adm-filter-input"
@@ -445,10 +445,10 @@ export default function AdminActivitiesPage() {
             )}
             <div style={{ gridColumn: 'span 3', display: 'flex', gap: '12px' }}>
               <button type="button" className="adm-btn-refresh" onClick={() => { resetForm(); setIsCreating(false); }}>
-                Cancel
+                Huỷ
               </button>
               <button type="submit" className="adm-btn-refresh" disabled={submitting}>
-                {editingId ? 'Save Changes' : 'Create Activity'}
+                {editingId ? 'Lưu thay đổi' : 'Tạo hoạt động'}
               </button>
             </div>
           </form>
@@ -460,25 +460,25 @@ export default function AdminActivitiesPage() {
           <table className="adm-table">
             <thead>
               <tr>
-                <th>Title</th>
-                <th>Category</th>
-                <th>Scheduled</th>
-                <th>Status</th>
-                <th>Participants</th>
-                <th>Actions</th>
+                <th>Tiêu đề</th>
+                <th>Danh mục</th>
+                <th>Lên lịch lúc</th>
+                <th>Trạng thái</th>
+                <th>Người tham gia</th>
+                <th>Hành động</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
                   <td colSpan="6" style={{ textAlign: 'center', padding: '24px' }}>
-                    Loading activities...
+                    Đang tải hoạt động...
                   </td>
                 </tr>
               ) : activities.length === 0 ? (
                 <tr>
                   <td colSpan="6" style={{ textAlign: 'center', padding: '24px' }}>
-                    No activities found.
+                    Không tìm thấy hoạt động nào.
                   </td>
                 </tr>
               ) : (
@@ -528,7 +528,7 @@ export default function AdminActivitiesPage() {
 
       <div className="adm-header" style={{ marginTop: '18px', justifyContent: 'space-between' }}>
         <span>
-          Showing page {page} of {totalPages} — {total} activities
+          Trang {page} / {totalPages} — {total} hoạt động
         </span>
         <div style={{ display: 'flex', gap: '10px' }}>
           <button
@@ -537,7 +537,7 @@ export default function AdminActivitiesPage() {
             disabled={page <= 1}
             onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
           >
-            Prev
+            Trước
           </button>
           <button
             type="button"
@@ -545,7 +545,7 @@ export default function AdminActivitiesPage() {
             disabled={page >= totalPages}
             onClick={() => setPage((prev) => Math.min(prev + 1, totalPages))}
           >
-            Next
+            Tiếp
           </button>
         </div>
       </div>
