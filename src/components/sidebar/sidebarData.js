@@ -96,7 +96,7 @@ export const sidebarData = [
     path: '/admin/incidents',
   },
   {
-    title: 'sidebar.reports',
+    title: 'Báo cáo',
     icon: FileText,
     path: '/admin/reports',
   },
