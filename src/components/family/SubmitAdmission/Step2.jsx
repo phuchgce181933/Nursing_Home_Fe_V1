@@ -16,18 +16,18 @@ export default function Step2({ data = {}, onChange, errors = {}, touched = {}, 
     <div className="sap-section">
       <div className="sap-section__heading">
         <HeartPulse size={16} />
-        Medical Information
+        Thông tin y tế
       </div>
 
       <div className="sap-grid-2">
         <div className="sap-field">
-          <label className="sap-label">Blood Type</label>
+          <label className="sap-label">Nhóm máu</label>
           <select
             className="sap-select"
             value={data.bloodType ?? ''}
             onChange={(e) => onChange('bloodType', e.target.value)}
           >
-            <option value="">Select Blood Type</option>
+            <option value="">Chọn nhóm máu</option>
             {BLOOD_TYPES.map((bt) => (
               <option key={bt} value={bt}>
                 {bt}
@@ -37,17 +37,17 @@ export default function Step2({ data = {}, onChange, errors = {}, touched = {}, 
         </div>
 
         <div className="sap-field">
-          <label className="sap-label">Allergies</label>
+          <label className="sap-label">Dị ứng</label>
           <TagInput
             tags={data.allergies ?? []}
             onAdd={(v) => onChange('allergies', [...(data.allergies ?? []), v])}
             onRemove={(v) => onChange('allergies', (data.allergies ?? []).filter((x) => x !== v))}
-            placeholder="Enter allergy and press Enter (e.g., Penicillin)..."
+            placeholder="Nhập tác nhân dị ứng rồi bấm Enter (ví dụ: Penicillin)..."
           />
         </div>
 
         <div className="sap-field sap-field--full">
-          <label className="sap-label">Chronic Conditions</label>
+          <label className="sap-label">Bệnh lý mãn tính</label>
           <ChronicSelector
             selected={data.chronicConditions ?? []}
             onChange={(v) => onChange('chronicConditions', v)}
@@ -55,10 +55,10 @@ export default function Step2({ data = {}, onChange, errors = {}, touched = {}, 
         </div>
 
         <div className="sap-field sap-field--full">
-          <label className="sap-label">Current Health Summary</label>
+          <label className="sap-label">Tóm tắt sức khỏe hiện tại</label>
           <textarea
             rows={4}
-            placeholder="Describe basic health status, mobility, dietary assistance, etc..."
+            placeholder="Mô tả trạng thái sức khỏe cơ bản, khả năng vận động, hỗ trợ ăn uống, v.v..."
             {...textareaField('healthCondition')}
           />
           {touched.healthCondition && errors.healthCondition && (

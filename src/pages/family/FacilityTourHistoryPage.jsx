@@ -20,7 +20,7 @@ const formatEnglishDate = (dateStr) => {
   try {
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return dateStr;
-    return d.toLocaleDateString('en-US', {
+    return d.toLocaleDateString('vi-VN', {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
@@ -48,15 +48,15 @@ const getStatusBadgeClass = (status) => {
 const getStatusLabel = (status) => {
   switch (status) {
     case 'pending':
-      return 'Pending';
+      return 'Chờ duyệt';
     case 'confirmed':
-      return 'Confirmed';
+      return 'Đã xác nhận';
     case 'completed':
-      return 'Completed';
+      return 'Đã hoàn tất';
     case 'cancelled':
-      return 'Cancelled';
+      return 'Đã hủy';
     default:
-      return status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Pending';
+      return status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Chờ duyệt';
   }
 };
 
@@ -164,9 +164,9 @@ export default function FacilityTourHistoryPage() {
         {/* Header Section */}
         <div className="arh-header">
           <div className="arh-header__title-group">
-            <h1 className="arh-header__title">Facility Tours History</h1>
+            <h1 className="arh-header__title">Lịch sử Đăng ký Tham quan</h1>
             <p className="arh-header__subtitle">
-              Manage and track your scheduled visits to An Nhiên Care Home.
+              Quản lý và theo dõi các lịch hẹn tham quan của bạn tại Viện dưỡng lão An Nhiên.
             </p>
           </div>
           <button
@@ -174,7 +174,7 @@ export default function FacilityTourHistoryPage() {
             onClick={() => navigate('/family/facility-tours/new')}
           >
             <Plus size={16} />
-            Schedule New Tour
+            Đặt lịch tham quan mới
           </button>
         </div>
 
@@ -186,7 +186,7 @@ export default function FacilityTourHistoryPage() {
               <div className="arh-stat-card__icon-box arh-stat-card__icon-box--pending">
                 <Clock size={20} />
               </div>
-              <span className="arh-stat-card__label">Active Bookings</span>
+              <span className="arh-stat-card__label">Lịch hẹn hoạt động</span>
             </div>
             <div className="arh-stat-card__value">
               {String(stats.active).padStart(2, '0')}
@@ -199,7 +199,7 @@ export default function FacilityTourHistoryPage() {
               <div className="arh-stat-card__icon-box arh-stat-card__icon-box--completed">
                 <CheckCircle size={20} />
               </div>
-              <span className="arh-stat-card__label">Completed Tours</span>
+              <span className="arh-stat-card__label">Lịch hẹn đã hoàn tất</span>
             </div>
             <div className="arh-stat-card__value">
               {String(stats.completed).padStart(2, '0')}
@@ -212,7 +212,7 @@ export default function FacilityTourHistoryPage() {
               <div className="arh-stat-card__icon-box arh-stat-card__icon-box--appointment">
                 <Calendar size={20} />
               </div>
-              <span className="arh-stat-card__label">Total Scheduled</span>
+              <span className="arh-stat-card__label">Tổng lượt đặt lịch</span>
             </div>
             <div className="arh-stat-card__value">
               {String(stats.total).padStart(2, '0')}
@@ -227,7 +227,7 @@ export default function FacilityTourHistoryPage() {
             <Search className="arh-filters__icon" size={16} />
             <input
               type="text"
-              placeholder="Search by contact name..."
+              placeholder="Tìm kiếm theo tên liên hệ..."
               className="arh-filters__input"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -244,11 +244,11 @@ export default function FacilityTourHistoryPage() {
                 setPage(1);
               }}
             >
-              <option value="">All Statuses</option>
-              <option value="pending">Pending Review</option>
-              <option value="confirmed">Approved & Confirmed</option>
-              <option value="completed">Completed</option>
-              <option value="cancelled">Cancelled</option>
+              <option value="">Tất cả trạng thái</option>
+              <option value="pending">Chờ duyệt</option>
+              <option value="confirmed">Đã xác nhận</option>
+              <option value="completed">Đã hoàn tất</option>
+              <option value="cancelled">Đã hủy</option>
             </select>
           </div>
 
@@ -271,18 +271,18 @@ export default function FacilityTourHistoryPage() {
           {loading ? (
             <div className="arh-loading">
               <Loader2 size={32} className="arh-spinner" />
-              <span>Loading facility tour history...</span>
+              <span>Đang tải lịch sử đăng ký tham quan...</span>
             </div>
           ) : tours.length === 0 ? (
             <div className="arh-empty">
               <Inbox size={48} className="arh-empty__icon" />
-              <h4>No Tour Requests Found</h4>
-              <p>You haven't scheduled any visits or no requests match the current filters.</p>
+              <h4>Không tìm thấy yêu cầu tham quan nào</h4>
+              <p>Bạn chưa đăng ký lịch hẹn tham quan nào hoặc không có yêu cầu nào khớp với bộ lọc hiện tại.</p>
               <button
                 className="arh-btn arh-btn--primary mt-4"
                 onClick={() => navigate('/family/facility-tours/new')}
               >
-                Schedule New Tour
+                Đặt lịch tham quan mới
               </button>
             </div>
           ) : (
@@ -292,13 +292,13 @@ export default function FacilityTourHistoryPage() {
                 <table className="arh-table">
                   <thead>
                     <tr>
-                      <th>Contact Person</th>
-                      <th>Contact Phone</th>
-                      <th>Preferred Date</th>
-                      <th>Time Slot</th>
-                      <th>Visitors</th>
-                      <th>Status</th>
-                      <th className="text-right">Actions</th>
+                      <th>Người liên hệ</th>
+                      <th>Số điện thoại</th>
+                      <th>Ngày mong muốn</th>
+                      <th>Khung giờ</th>
+                      <th>Khách</th>
+                      <th>Trạng thái</th>
+                      <th className="text-right">Hành động</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -319,7 +319,7 @@ export default function FacilityTourHistoryPage() {
                         <td className="text-right">
                           <button
                             className="arh-action-btn"
-                            title="View Detail"
+                            title="Xem chi tiết"
                             onClick={() => handleOpenDetail(t)}
                           >
                             <Eye size={16} />
@@ -344,15 +344,15 @@ export default function FacilityTourHistoryPage() {
 
                     <div className="arh-mobile-card__body">
                       <div className="arh-mobile-card__row">
-                        <span>Date:</span>
+                        <span>Ngày:</span>
                         <strong>{formatEnglishDate(t.preferredDate)}</strong>
                       </div>
                       <div className="arh-mobile-card__row">
-                        <span>Time Slot:</span>
+                        <span>Khung giờ:</span>
                         <strong>{t.preferredTimeSlot || 'N/A'}</strong>
                       </div>
                       <div className="arh-mobile-card__row">
-                        <span>Visitors:</span>
+                        <span>Khách:</span>
                         <strong>{t.numberOfVisitors}</strong>
                       </div>
                     </div>
@@ -363,7 +363,7 @@ export default function FacilityTourHistoryPage() {
                         onClick={() => handleOpenDetail(t)}
                       >
                         <Eye size={16} />
-                        View Full Details
+                        Xem chi tiết lịch hẹn
                       </button>
                     </div>
                   </div>
@@ -374,7 +374,7 @@ export default function FacilityTourHistoryPage() {
               {totalPages > 1 && (
                 <div className="arh-pagination">
                   <span className="arh-pagination__total">
-                    Showing <strong>{tours.length}</strong> of <strong>{total}</strong> requests
+                    Hiển thị <strong>{tours.length}</strong> trên <strong>{total}</strong> yêu cầu
                   </span>
 
                   <div className="arh-pagination__controls">

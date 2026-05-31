@@ -15,7 +15,7 @@
 }
 
 .cap-header h1 {
-  font-size: 26px;
+  font-size: 22px;
   font-weight: 700;
   color: #1b365d;
   display: flex;
@@ -25,7 +25,7 @@
 }
 
 .cap-header p {
-  font-size: 14px;
+  font-size: 13px;
   color: #64748b;
   margin: 0;
 }
@@ -38,7 +38,7 @@
   border: 1px solid #e2e8f0;
   padding: 8px 16px;
   border-radius: 10px;
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 600;
   color: #475569;
   cursor: pointer;
@@ -56,9 +56,9 @@
   gap: 8px;
   background-color: #1b365d;
   border: none;
-  padding: 10px 20px;
+  padding: 8px 18px;
   border-radius: 20px;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: #ffffff;
   cursor: pointer;
@@ -85,14 +85,14 @@
   gap: 16px;
   background-color: #ffffff;
   border: 1px solid #f1f5f9;
-  padding: 18px;
+  padding: 16px;
   border-radius: 12px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
 }
 
 .cap-stat-icon {
-  width: 44px;
-  height: 44px;
+  width: 40px;
+  height: 40px;
   border-radius: 10px;
   display: flex;
   align-items: center;
@@ -100,7 +100,7 @@
 }
 
 .cap-stat-label {
-  font-size: 12.5px;
+  font-size: 11.5px;
   font-weight: 500;
   color: #64748b;
   display: block;
@@ -108,7 +108,7 @@
 }
 
 .cap-stat-value {
-  font-size: 22px;
+  font-size: 18px;
   font-weight: 700;
   color: #1e293b;
   display: block;
@@ -118,7 +118,7 @@
 .cap-filter-panel {
   background-color: #ffffff;
   border: 1px solid #f1f5f9;
-  padding: 20px;
+  padding: 18px;
   border-radius: 12px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
   margin-bottom: 24px;
@@ -146,10 +146,10 @@
 
 .cap-filter-input {
   width: 100%;
-  padding: 10px 12px 10px 38px;
+  padding: 8px 12px 8px 36px;
   border: 1px solid #cbd5e1;
   border-radius: 10px;
-  font-size: 13.5px;
+  font-size: 13px;
   outline: none;
   transition: all 0.2s ease;
 }
@@ -161,10 +161,10 @@
 
 .cap-filter-select {
   width: 100%;
-  padding: 10px 12px;
+  padding: 8px 12px;
   border: 1px solid #cbd5e1;
   border-radius: 10px;
-  font-size: 13.5px;
+  font-size: 13px;
   outline: none;
   background-color: #ffffff;
   cursor: pointer;
@@ -181,7 +181,7 @@
   justify-content: space-between;
   align-items: center;
   border-top: 1px dashed #e2e8f0;
-  padding-top: 16px;
+  padding-top: 14px;
 }
 
 .cap-filter-date-group {
@@ -191,7 +191,7 @@
 }
 
 .cap-date-title {
-  font-size: 12.5px;
+  font-size: 11.5px;
   font-weight: 600;
   color: #475569;
   display: flex;
@@ -200,10 +200,10 @@
 }
 
 .cap-date-input {
-  padding: 8px 12px;
+  padding: 6px 10px;
   border: 1px solid #cbd5e1;
   border-radius: 8px;
-  font-size: 13px;
+  font-size: 12px;
   outline: none;
 }
 
@@ -215,9 +215,9 @@
 .cap-btn-clear {
   background-color: transparent;
   border: 1px solid #cbd5e1;
-  padding: 8px 16px;
+  padding: 6px 14px;
   border-radius: 20px;
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 600;
   color: #475569;
   cursor: pointer;
@@ -232,9 +232,9 @@
 .cap-btn-apply {
   background-color: #1b365d;
   border: none;
-  padding: 8px 18px;
+  padding: 6px 16px;
   border-radius: 20px;
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 600;
   color: #ffffff;
   cursor: pointer;
@@ -267,8 +267,8 @@
 
 .cap-table th {
   background-color: #f8fafc;
-  padding: 14px 18px;
-  font-size: 12.5px;
+  padding: 10px 14px;
+  font-size: 11.5px;
   font-weight: 600;
   color: #475569;
   border-bottom: 1px solid #e2e8f0;
@@ -277,8 +277,8 @@
 }
 
 .cap-table td {
-  padding: 16px 18px;
-  font-size: 13.5px;
+  padding: 12px 14px;
+  font-size: 12.5px;
   color: #334155;
   border-bottom: 1px solid #f1f5f9;
 }
@@ -300,11 +300,11 @@
 .cap-resident-name {
   font-weight: 600;
   color: #1e293b;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .cap-resident-code {
-  font-size: 11.5px;
+  font-size: 11px;
   color: #64748b;
   font-family: monospace;
 }
@@ -317,7 +317,7 @@
   background-color: #f1f5f9;
   border: 1px solid #e2e8f0;
   border-radius: 6px;
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 500;
   color: #334155;
   margin-top: 4px;
@@ -335,7 +335,7 @@
   align-items: center;
   padding: 4px 10px;
   border-radius: 20px;
-  font-size: 11.5px;
+  font-size: 10.5px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -364,8 +364,8 @@
 .cap-btn-action {
   background-color: #f1f5f9;
   border: 1px solid #e2e8f0;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border-radius: 8px;
   display: inline-flex;
   align-items: center;
@@ -408,14 +408,14 @@
 }
 
 .cap-modal__title {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 700;
   color: #1b365d;
   margin: 0 0 8px 0;
 }
 
 .cap-modal__text {
-  font-size: 13.5px;
+  font-size: 12.5px;
   color: #64748b;
   margin-bottom: 20px;
   line-height: 1.5;
@@ -427,7 +427,7 @@
 
 .cap-form-label {
   display: block;
-  font-size: 12.5px;
+  font-size: 11.5px;
   font-weight: 600;
   color: #475569;
   margin-bottom: 6px;
@@ -438,7 +438,7 @@
   padding: 10px 12px;
   border: 1px solid #cbd5e1;
   border-radius: 8px;
-  font-size: 13.5px;
+  font-size: 13px;
   outline: none;
 }
 
@@ -470,7 +470,7 @@
   flex: 1;
   padding: 10px;
   border-radius: 20px;
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;

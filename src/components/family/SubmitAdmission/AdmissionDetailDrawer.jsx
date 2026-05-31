@@ -25,7 +25,7 @@ const formatEnglishDate = (dateStr) => {
   try {
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return dateStr;
-    return d.toLocaleDateString('en-US', {
+    return d.toLocaleDateString('vi-VN', {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
@@ -40,71 +40,71 @@ const formatTime = (dateStr) => {
   try {
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return '';
-    return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+    return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false });
   } catch (e) {
     return '';
   }
 };
 
 const formatRelationship = (rel) => {
-  if (!rel) return 'Guardian';
+  if (!rel) return 'Người giám hộ';
   const mapping = {
-    child: 'Child',
-    spouse: 'Spouse',
-    sibling: 'Sibling',
-    grandchild: 'Grandchild',
-    parent: 'Parent',
-    other: 'Other',
-    con_cai: 'Child',
-    vo_chong: 'Spouse',
-    anh_chi_em: 'Sibling',
-    chau: 'Grandchild',
-    bo_me: 'Parent',
-    khac: 'Other',
-    bo: 'Father',
-    me: 'Mother',
-    con: 'Child'
+    child: 'Con cái',
+    spouse: 'Vợ/Chồng',
+    sibling: 'Anh/Chị/Em',
+    grandchild: 'Cháu',
+    parent: 'Cha mẹ',
+    other: 'Khác',
+    con_cai: 'Con cái',
+    vo_chong: 'Vợ/Chồng',
+    anh_chi_em: 'Anh/Chị/Em',
+    chau: 'Cháu',
+    bo_me: 'Cha mẹ',
+    khac: 'Khác',
+    bo: 'Cha',
+    me: 'Mẹ',
+    con: 'Con cái'
   };
   const normalized = rel.toLowerCase().replace(/_/g, ' ').trim();
   if (mapping[normalized]) return mapping[normalized];
   if (mapping[rel]) return mapping[rel];
-  return rel.split(/[\s_]+/).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+  return rel;
 };
 
 const formatGender = (gender) => {
-  if (!gender) return 'Unknown';
+  if (!gender) return 'Không rõ';
   const mapping = {
-    male: 'Male',
-    female: 'Female',
-    other: 'Other',
-    unknown: 'Unknown'
+    male: 'Nam',
+    female: 'Nữ',
+    other: 'Khác',
+    unknown: 'Không rõ'
   };
   return mapping[gender.toLowerCase()] || gender;
 };
 
 const formatBloodType = (blood) => {
-  if (!blood || blood.toLowerCase() === 'unknown') return 'Unknown';
+  if (!blood || blood.toLowerCase() === 'unknown') return 'Chưa xác định';
   return blood;
 };
 
 const formatAdmissionReason = (reason) => {
-  if (!reason) return 'Not recorded';
+  if (!reason) return 'Chưa ghi nhận';
   const mapping = {
-    long_term_care: 'Long-term Care',
-    short_term_rehab: 'Short-term Rehabilitation',
-    daycare: 'Daycare',
-    palliative_care: 'Palliative Care',
-    assisted_living: 'Assisted Living',
-    memory_care: 'Memory Care',
-    'chăm sóc dài hạn': 'Long-term Care',
-    'điều trị phục hồi chức năng': 'Short-term Rehabilitation',
-    'nghỉ dưỡng ngắn hạn': 'Short-term Rehabilitation',
-    'khác': 'Other'
+    long_term_care: 'Chăm sóc dài hạn',
+    short_term_rehab: 'Phục hồi chức năng ngắn hạn',
+    daycare: 'Bán trú',
+    palliative_care: 'Chăm sóc giảm nhẹ',
+    assisted_living: 'Hỗ trợ sinh hoạt',
+    memory_care: 'Chăm sóc đặc biệt trí tuệ',
+    'chăm sóc dài hạn': 'Chăm sóc dài hạn',
+    'điều trị phục hồi chức năng': 'Phục hồi chức năng',
+    'nghỉ dưỡng ngắn hạn': 'Phục hồi chức năng ngắn hạn',
+    'khác': 'Khác'
   };
   const normalized = reason.toLowerCase().replace(/_/g, ' ').trim();
   if (mapping[reason]) return mapping[reason];
   if (mapping[normalized]) return mapping[normalized];
-  return reason.charAt(0).toUpperCase() + reason.slice(1);
+  return reason;
 };
 
 const getCalendarDay = (dateStr) => {
@@ -123,7 +123,7 @@ const getCalendarMonth = (dateStr) => {
   try {
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return '';
-    return d.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+    return 'THÁNG ' + (d.getMonth() + 1);
   } catch (e) {
     return '';
   }
@@ -134,7 +134,7 @@ const formatDayOfWeek = (dateStr) => {
   try {
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return '';
-    return d.toLocaleDateString('en-US', { weekday: 'long' });
+    return d.toLocaleDateString('vi-VN', { weekday: 'long' });
   } catch (e) {
     return '';
   }
@@ -704,50 +704,50 @@ export default function AdmissionDetailDrawer({
     const steps = [
       {
         key: 'new_request',
-        title: 'New Request',
-        statusText: `Submitted`,
+        title: 'Yêu cầu mới',
+        statusText: `Đã gửi`,
         date: `${formatEnglishDate(admission.createdAt)} - ${formatTime(admission.createdAt)}`,
         isDone: true,
         isActive: false,
       },
       {
         key: 'consulting',
-        title: 'Consultation',
+        title: 'Tư vấn tiếp nhận',
         statusText: ['consulting', 'assessing', 'contracting', 'checked_in'].includes(admission.status)
-          ? 'Completed'
-          : 'Pending',
+          ? 'Đã hoàn thành'
+          : 'Đang chờ',
         date: admission.consultedAt
           ? `${formatEnglishDate(admission.consultedAt)}`
           : admission.consultationScheduledAt
-            ? `Scheduled: ${formatEnglishDate(admission.consultationScheduledAt)}`
+            ? `Lịch hẹn: ${formatEnglishDate(admission.consultationScheduledAt)}`
             : '',
         isDone: ['assessing', 'contracting', 'checked_in'].includes(admission.status) || !!admission.consultedAt,
         isActive: admission.status === 'consulting',
       },
       {
         key: 'assessing',
-        title: 'Medical Assessment',
+        title: 'Đánh giá y tế',
         statusText: ['assessing', 'contracting', 'checked_in'].includes(admission.status)
-          ? (admission.eligibilityStatus === 'eligible' ? 'Completed (Eligible)' : admission.eligibilityStatus === 'not_eligible' ? 'Completed (Ineligible)' : 'In Progress')
-          : 'Pending',
+          ? (admission.eligibilityStatus === 'eligible' ? 'Đã duyệt (Đủ điều kiện)' : admission.eligibilityStatus === 'not_eligible' ? 'Từ chối (Không đủ điều kiện)' : 'Đang tiến hành')
+          : 'Đang chờ',
         date: admission.assessedAt ? `${formatEnglishDate(admission.assessedAt)}` : '',
         isDone: ['contracting', 'checked_in'].includes(admission.status) && admission.eligibilityStatus === 'eligible',
         isActive: admission.status === 'assessing',
       },
       {
         key: 'contracting',
-        title: 'Contract Signing',
+        title: 'Ký hợp đồng',
         statusText: ['contracting', 'checked_in'].includes(admission.status)
-          ? (admission.status === 'checked_in' ? 'Completed' : 'In Progress')
-          : 'Pending',
+          ? (admission.status === 'checked_in' ? 'Đã hoàn thành' : 'Đang làm hợp đồng')
+          : 'Đang chờ',
         date: admission.contractSignedAt ? `${formatEnglishDate(admission.contractSignedAt)}` : '',
         isDone: admission.status === 'checked_in',
         isActive: admission.status === 'contracting',
       },
       {
         key: 'checked_in',
-        title: 'Admission / Check-in',
-        statusText: admission.status === 'checked_in' ? 'Completed' : 'Pending',
+        title: 'Nhập viện / Nhận phòng',
+        statusText: admission.status === 'checked_in' ? 'Đã hoàn thành' : 'Đang chờ',
         date: admission.checkInAt ? `${formatEnglishDate(admission.checkInAt)}` : '',
         isDone: admission.status === 'checked_in',
         isActive: false,
@@ -763,8 +763,8 @@ export default function AdmissionDetailDrawer({
   const scheduledDate = appt?.scheduledStartAt || admission?.initialAssessmentScheduledAt || admission?.consultationScheduledAt;
   const appointmentNotes = appt
     ? `Thời gian khám đầu vào do Admin chỉ định`
-    : (admission?.initialAssessmentNotes || admission?.consultationNotes || 'At Assessment Room, Block A');
-  const appointmentTitle = appt ? 'LỊCH KHÁM LÂM SÀNG ĐẦU VÀO' : (admission?.initialAssessmentScheduledAt ? 'HEALTH ASSESSMENT APPOINTMENT' : 'CONSULTATION APPOINTMENT');
+    : (admission?.initialAssessmentNotes || admission?.consultationNotes || 'Tại Phòng đánh giá y tế, Tòa A');
+  const appointmentTitle = appt ? 'LỊCH KHÁM LÂM SÀNG ĐẦU VÀO' : (admission?.initialAssessmentScheduledAt ? 'LỊCH HẸN ĐÁNH GIÁ SỨC KHỎE' : 'LỊCH HẸN TƯ VẤN TIẾP NHẬN');
   const doctor = appt?.doctor;
   const nurse = appt?.nurse;
 
@@ -1147,7 +1147,7 @@ export default function AdmissionDetailDrawer({
                   </div>
                   {admission.notes && (
                     <div className="arh-detail-item" style={{ gridColumn: 'span 2' }}>
-                      <p className="arh-detail-item__label">Additional Notes</p>
+                      <p className="arh-detail-item__label">Ghi chú thêm</p>
                       <p className="arh-detail-item__value" style={{ fontSize: '12px', color: '#64748b' }}>
                         {admission.notes}
                       </p>
@@ -1163,7 +1163,7 @@ export default function AdmissionDetailDrawer({
               ) && (
                 <div className="arh-detail-card font-sans" style={{ borderLeft: '4px solid #1B365D', background: 'rgba(27, 54, 93, 0.02)' }}>
                   <h5 className="arh-drawer__section-title" style={{ color: '#1B365D' }}>
-                    <Activity size={16} /> WORKFLOW ACTIONS
+                    <Activity size={16} /> HÀNH ĐỘNG QUY TRÌNH
                   </h5>
                   <div className="flex flex-wrap gap-2 pt-2">
                     {/* 2. Pre-admission Consultation (Doctor & Nurse roles) */}
@@ -1174,7 +1174,7 @@ export default function AdmissionDetailDrawer({
                         className="adm-btn-apply"
                         style={{ padding: '8px 16px', fontSize: '12px', borderRadius: '10px', boxShadow: 'none', background: '#1B365D' }}
                       >
-                        Record Consultation
+                        Ghi nhận tư vấn
                       </button>
                     )}
 
@@ -1191,7 +1191,7 @@ export default function AdmissionDetailDrawer({
                         className="adm-btn-apply"
                         style={{ padding: '8px 16px', fontSize: '12px', borderRadius: '10px', boxShadow: 'none', background: '#1B365D' }}
                       >
-                        Evaluate Eligibility
+                        Đánh giá điều kiện
                       </button>
                     )}
 
@@ -1206,7 +1206,7 @@ export default function AdmissionDetailDrawer({
                         className="adm-btn-apply"
                         style={{ padding: '8px 16px', fontSize: '12px', borderRadius: '10px', boxShadow: 'none', background: '#1B365D' }}
                       >
-                        Assign Service Package
+                        Giao gói dịch vụ
                       </button>
                     )}
 
@@ -1230,7 +1230,7 @@ export default function AdmissionDetailDrawer({
                         className="adm-btn-apply"
                         style={{ padding: '8px 16px', fontSize: '12px', borderRadius: '10px', boxShadow: 'none', background: '#1B365D' }}
                       >
-                        {admission.contractNumber ? 'Edit Contract' : 'Create Contract'}
+                        {admission.contractNumber ? 'Sửa hợp đồng' : 'Tạo hợp đồng'}
                       </button>
                     )}
 
@@ -1246,7 +1246,7 @@ export default function AdmissionDetailDrawer({
                         className="adm-btn-apply"
                         style={{ padding: '8px 16px', fontSize: '12px', borderRadius: '10px', boxShadow: 'none', background: '#1B365D' }}
                       >
-                        Check-in Resident
+                        Nhận phòng cư dân
                       </button>
                     )}
                   </div>
@@ -1265,7 +1265,7 @@ export default function AdmissionDetailDrawer({
                   className="arh-drawer__btn arh-drawer__btn--cancel flex-1"
                   onClick={() => setShowRejectModal(true)}
                 >
-                  Reject Request
+                  Từ chối yêu cầu
                 </button>
               )}
               {isApprovable && (
@@ -1274,7 +1274,7 @@ export default function AdmissionDetailDrawer({
                   style={{ background: '#1B365D' }}
                   onClick={() => setShowApproveModal(true)}
                 >
-                  Approve Request
+                  Duyệt yêu cầu
                 </button>
               )}
               {!isApprovable && !isRejectable && (
@@ -1282,7 +1282,7 @@ export default function AdmissionDetailDrawer({
                   className="arh-drawer__btn arh-drawer__btn--primary w-full"
                   onClick={onClose}
                 >
-                  Close Details
+                  Đóng chi tiết
                 </button>
               )}
             </div>
@@ -1292,14 +1292,14 @@ export default function AdmissionDetailDrawer({
               onClick={() => setShowCancelModal(true)}
             >
               <XCircle size={18} />
-              Cancel Admission Request
+              Hủy yêu cầu tiếp nhận
             </button>
           ) : (
             <button
               className="arh-drawer__btn arh-drawer__btn--primary w-full"
               onClick={onClose}
             >
-              Close Details
+              Đóng chi tiết
             </button>
           )}
         </div>
@@ -1315,9 +1315,9 @@ export default function AdmissionDetailDrawer({
             className="arh-modal"
             onClick={(e) => e.stopPropagation()}
           >
-            <h4 className="arh-modal__title">Confirm Request Cancellation</h4>
+            <h4 className="arh-modal__title">Xác nhận hủy yêu cầu tiếp nhận</h4>
             <p className="arh-modal__text">
-              Are you sure you want to cancel the admission request for{' '}
+              Bạn có chắc chắn muốn hủy yêu cầu tiếp nhận cho{' '}
               <strong className="text-slate-800">{admission?.applicant?.fullName}</strong>? This action will immediately terminate the entire consultation process and cannot be undone.
             </p>
             {modalError && (

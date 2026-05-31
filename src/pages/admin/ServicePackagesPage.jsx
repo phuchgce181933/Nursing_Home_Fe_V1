@@ -1,27 +1,29 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Search, Loader2, Grid, List, Activity, Check, CheckCircle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../hooks/useAuth';
 import servicePackageService from '../../services/servicePackage.service';
 import '../../styles/admin/ServicePackagesPage.css'; // Premium care plans styling sheet
 
-const TIER_OPTIONS = [
-  { value: '', label: 'All Tiers' },
-  { value: 'basic', label: 'Basic Level' },
-  { value: 'standard', label: 'Standard Level' },
-  { value: 'premium', label: 'Premium Level' },
-  { value: 'vip', label: 'VIP Level' },
-];
-
-const ACTIVE_OPTIONS = [
-  { value: '', label: 'All Statuses' },
-  { value: 'true', label: 'Active Packages' },
-  { value: 'false', label: 'Inactive Packages' },
-];
-
 export default function ServicePackagesPage() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const isAdmin = ['admin', 'manager'].includes(user?.role);
   const rolePrefix = isAdmin ? 'admin' : 'medical';
+
+  const TIER_OPTIONS = [
+    { value: '', label: t('admin.servicePackages.allTiers', 'All Tiers') },
+    { value: 'basic', label: t('admin.servicePackages.tierBasic', 'Basic Level') },
+    { value: 'standard', label: t('admin.servicePackages.tierStandard', 'Standard Level') },
+    { value: 'premium', label: t('admin.servicePackages.tierPremium', 'Premium Level') },
+    { value: 'vip', label: t('admin.servicePackages.tierVip', 'VIP Level') },
+  ];
+
+  const ACTIVE_OPTIONS = [
+    { value: '', label: t('admin.servicePackages.colStatus', 'All Statuses') },
+    { value: 'true', label: t('admin.servicePackages.activePackages', 'Active Packages') },
+    { value: 'false', label: t('admin.servicePackages.inactivePackages', 'Inactive Packages') },
+  ];
 
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -308,11 +310,11 @@ export default function ServicePackagesPage() {
       {/* Top Banner Header */}
       <div className="sp-header">
         <div>
-          <h1>Care Service Packages</h1>
+          <h1>{t('admin.servicePackages.title', 'Care Service Packages')}</h1>
           <p>
             {isAdmin
-              ? 'Configure, manage, and monitor residential care packages for elderly residents.'
-              : 'Review standard medical and care service packages.'}
+              ? t('admin.servicePackages.subtitleAdmin', 'Configure, manage, and monitor residential care packages for elderly residents.')
+              : t('admin.servicePackages.subtitleMedical', 'Review standard medical and care service packages.')}
           </p>
         </div>
         {isAdmin && (
@@ -324,7 +326,7 @@ export default function ServicePackagesPage() {
             className="sp-btn-edit"
             style={{ borderRadius: '12px', padding: '12px 24px' }}
           >
-            Create New Package
+            {t('admin.servicePackages.createNew', 'Create New Package')}
           </button>
         )}
       </div>
@@ -336,7 +338,7 @@ export default function ServicePackagesPage() {
             <Activity size={20} />
           </div>
           <div className="sp-stat-info">
-            <span className="sp-stat-label">Total Care Plans</span>
+            <span className="sp-stat-label">{t('admin.servicePackages.totalPlans', 'Total Care Plans')}</span>
             <span className="sp-stat-value">{stats.totalPlans}</span>
           </div>
         </div>
@@ -346,7 +348,7 @@ export default function ServicePackagesPage() {
             <CheckCircle size={20} />
           </div>
           <div className="sp-stat-info">
-            <span className="sp-stat-label">Active Plans</span>
+            <span className="sp-stat-label">{t('admin.servicePackages.activePlans', 'Active Plans')}</span>
             <span className="sp-stat-value">{stats.activePlans}</span>
           </div>
         </div>
@@ -356,7 +358,7 @@ export default function ServicePackagesPage() {
             <span className="font-bold text-xs">VIP</span>
           </div>
           <div className="sp-stat-info">
-            <span className="sp-stat-label">VIP & Premium</span>
+            <span className="sp-stat-label">{t('admin.servicePackages.vipPremium', 'VIP & Premium')}</span>
             <span className="sp-stat-value">{stats.vipPremiumPlans}</span>
           </div>
         </div>
@@ -371,7 +373,7 @@ export default function ServicePackagesPage() {
                 <Search className="adm-filter-input-icon" size={16} />
                 <input
                   type="text"
-                  placeholder="Search name or package code..."
+                  placeholder={t('admin.servicePackages.searchPlaceholder', 'Search name or package code...')}
                   className="adm-filter-input"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
@@ -414,14 +416,14 @@ export default function ServicePackagesPage() {
                 className="adm-btn-clear"
                 style={{ padding: '10px 18px' }}
               >
-                Reset
+                {t('admin.servicePackages.reset', 'Reset')}
               </button>
               <button
                 type="submit"
                 className="adm-btn-apply"
                 style={{ padding: '10px 20px', background: '#1B365D' }}
               >
-                Apply Filters
+                {t('admin.servicePackages.applyFilters', 'Apply Filters')}
               </button>
             </div>
           </form>
@@ -432,18 +434,18 @@ export default function ServicePackagesPage() {
           <button
             onClick={() => setViewType('grid')}
             className={`sp-toggle-btn ${viewType === 'grid' ? 'is-active' : ''}`}
-            title="Grid View"
+            title={t('admin.servicePackages.gridCard', 'Grid Card')}
           >
             <Grid size={15} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'text-bottom' }} />
-            Grid Card
+            {t('admin.servicePackages.gridCard', 'Grid Card')}
           </button>
           <button
             onClick={() => setViewType('table')}
             className={`sp-toggle-btn ${viewType === 'table' ? 'is-active' : ''}`}
-            title="Table View"
+            title={t('admin.servicePackages.tableRows', 'Table Rows')}
           >
             <List size={15} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'text-bottom' }} />
-            Table Rows
+            {t('admin.servicePackages.tableRows', 'Table Rows')}
           </button>
         </div>
       </div>
@@ -458,11 +460,11 @@ export default function ServicePackagesPage() {
       {loading && data.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-slate-400">
           <Loader2 className="animate-spin text-indigo-600 mb-3" size={32} />
-          <p>Loading care service packages...</p>
+          <p>{t('admin.servicePackages.loading', 'Loading care service packages...')}</p>
         </div>
       ) : data.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-slate-400 bg-white border border-slate-100 rounded-2xl">
-          <p className="font-medium">No service packages found matching filters.</p>
+          <p className="font-medium">{t('admin.servicePackages.noPackages', 'No service packages found matching filters.')}</p>
         </div>
       ) : viewType === 'grid' ? (
         /* GORGEOUS PREMIUM CARE PLANS GRID VIEW */
@@ -474,16 +476,16 @@ export default function ServicePackagesPage() {
                 <div className="sp-card__title-row">
                   <span className="sp-card__title">{pkg.name}</span>
                   <span className={`sp-tier-tag ${getTierTagClass(pkg.tier)}`}>
-                    {pkg.tier}
+                    {t(`admin.servicePackages.tier${pkg.tier.charAt(0).toUpperCase() + pkg.tier.slice(1)}`, pkg.tier)}
                   </span>
                 </div>
               </div>
 
               <div className="sp-card__body">
-                <span className="sp-card__price-label">Pricing Rate</span>
+                <span className="sp-card__price-label">{t('admin.servicePackages.pricingRate', 'Pricing Rate')}</span>
                 <p className="sp-card__price">
                   {pkg.monthlyPrice?.toLocaleString() || 0}
-                  <span>VND / month</span>
+                  <span>{t('admin.servicePackages.vndMonth', 'VND / month')}</span>
                 </p>
 
                 <p className="sp-card__desc">
@@ -492,7 +494,7 @@ export default function ServicePackagesPage() {
 
                 <div className="sp-card__divider" />
 
-                <span className="sp-card__services-title">Services Included</span>
+                <span className="sp-card__services-title">{t('admin.servicePackages.servicesIncluded', 'Services Included')}</span>
                 <div className="sp-card__services-list">
                   {pkg.services && pkg.services.slice(0, 4).map((s, idx) => (
                     <div key={idx} className="sp-card__service-item">
@@ -502,7 +504,7 @@ export default function ServicePackagesPage() {
                   ))}
                   {pkg.services && pkg.services.length > 4 && (
                     <span className="text-[11.5px] text-[#2D6A4F] font-bold italic mt-1 pl-5">
-                      +{pkg.services.length - 4} other clinical features
+                      +{pkg.services.length - 4} {t('admin.servicePackages.otherClinical', 'other clinical features')}
                     </span>
                   )}
                 </div>
@@ -513,7 +515,7 @@ export default function ServicePackagesPage() {
                   onClick={() => handleOpenDetail(pkg._id)}
                   className="sp-btn-view"
                 >
-                  View Details
+                  {t('admin.servicePackages.viewDetails', 'View Details')}
                 </button>
                 {isAdmin && pkg.isActive && (
                   <>
@@ -521,13 +523,13 @@ export default function ServicePackagesPage() {
                       onClick={() => handleOpenEdit(pkg)}
                       className="sp-btn-edit"
                     >
-                      Edit
+                      {t('admin.servicePackages.edit', 'Edit')}
                     </button>
                     <button
                       onClick={() => handleDeletePackage(pkg._id, pkg.name)}
                       className="sp-btn-deactivate"
                     >
-                      Deactivate
+                      {t('admin.servicePackages.deactivate', 'Deactivate')}
                     </button>
                   </>
                 )}
@@ -542,12 +544,12 @@ export default function ServicePackagesPage() {
             <table className="adm-table">
               <thead>
                 <tr>
-                  <th>Code</th>
-                  <th>Name & Tier</th>
-                  <th>Price / Month</th>
-                  <th>Services Included</th>
-                  <th>Status</th>
-                  <th>Actions</th>
+                  <th>{t('admin.servicePackages.colCode', 'Code')}</th>
+                  <th>{t('admin.servicePackages.colName', 'Name & Tier')}</th>
+                  <th>{t('admin.servicePackages.colPrice', 'Price / Month')}</th>
+                  <th>{t('admin.servicePackages.colServices', 'Services Included')}</th>
+                  <th>{t('admin.servicePackages.colStatus', 'Status')}</th>
+                  <th>{t('admin.servicePackages.colActions', 'Actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -566,7 +568,7 @@ export default function ServicePackagesPage() {
                       <div className="flex items-center gap-2">
                         <span>{pkg.name}</span>
                         <span className={`sp-tier-tag ${getTierTagClass(pkg.tier)}`}>
-                          {pkg.tier}
+                          {t(`admin.servicePackages.tier${pkg.tier.charAt(0).toUpperCase() + pkg.tier.slice(1)}`, pkg.tier)}
                         </span>
                       </div>
                     </td>
@@ -579,15 +581,15 @@ export default function ServicePackagesPage() {
                       <div className="flex flex-wrap gap-1">
                         {pkg.services && pkg.services.slice(0, 3).map((s, idx) => (
                           <span
-                            key={idx}
-                            className="bg-slate-100 text-slate-600 text-[10px] px-1.5 py-0.5 rounded font-medium"
+                              key={idx}
+                              className="bg-slate-100 text-slate-600 text-[10px] px-1.5 py-0.5 rounded font-medium"
                           >
                             {s}
                           </span>
                         ))}
                         {pkg.services && pkg.services.length > 3 && (
                           <span className="text-[10px] text-slate-400 font-bold italic ml-1">
-                            +{pkg.services.length - 3} more
+                            +{pkg.services.length - 3} {t('admin.servicePackages.otherClinical', 'more')}
                           </span>
                         )}
                       </div>
@@ -600,7 +602,7 @@ export default function ServicePackagesPage() {
                             : 'status-badge-custom-adm--cancelled'
                         }`}
                       >
-                        {pkg.isActive ? 'Active' : 'Inactive'}
+                        {pkg.isActive ? t('admin.servicePackages.active', 'Active') : t('admin.servicePackages.inactive', 'Inactive')}
                       </span>
                     </td>
                     <td>
@@ -610,7 +612,7 @@ export default function ServicePackagesPage() {
                           className="sp-btn-view"
                           style={{ padding: '6px 12px', fontSize: '12px', borderRadius: '8px' }}
                         >
-                          View
+                          {t('admin.servicePackages.viewDetails', 'View')}
                         </button>
                         {isAdmin && pkg.isActive && (
                           <>
@@ -619,7 +621,7 @@ export default function ServicePackagesPage() {
                               className="sp-btn-edit"
                               style={{ padding: '6px 12px', fontSize: '12px', borderRadius: '8px' }}
                             >
-                              Edit
+                              {t('admin.servicePackages.edit', 'Edit')}
                             </button>
                             <button
                               onClick={() => handleDeletePackage(pkg._id, pkg.name)}
