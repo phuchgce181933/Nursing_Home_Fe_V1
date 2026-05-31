@@ -333,10 +333,7 @@ export default function AdmissionDetailDrawer({
     if (!admissionId) return;
     try {
       setApproving(true);
-      const matchedPkg = packages.find(p => p.name === selectedPackage);
       await admissionService.adminApproveAdmission(admissionId, {
-        servicePackageId: matchedPkg?._id || undefined,
-        assignedServicePackage: selectedPackage || undefined,
         notes: adminNotes.trim() || undefined,
       });
       setShowApproveModal(false);
@@ -965,18 +962,6 @@ export default function AdmissionDetailDrawer({
                     <Activity size={16} /> WORKFLOW ACTIONS
                   </h5>
                   <div className="flex flex-wrap gap-2 pt-2">
-                    {/* 1. Assign Consultant (Admin/Manager role) */}
-                    {isAdminRole && admission.status !== 'cancelled' && admission.status !== 'checked_in' && (
-                      <button
-                        type="button"
-                        onClick={() => setShowAssignModal(true)}
-                        className="adm-btn-apply"
-                        style={{ padding: '8px 16px', fontSize: '12px', borderRadius: '10px', boxShadow: 'none', background: '#1B365D' }}
-                      >
-                        Assign Consultant
-                      </button>
-                    )}
-
                     {/* 2. Pre-admission Consultation (Doctor & Nurse roles) */}
                     {isDoctorOrNurseRole && ['new_request', 'consulting'].includes(admission.status) && (
                       <button
@@ -986,18 +971,6 @@ export default function AdmissionDetailDrawer({
                         style={{ padding: '8px 16px', fontSize: '12px', borderRadius: '10px', boxShadow: 'none', background: '#1B365D' }}
                       >
                         Record Consultation
-                      </button>
-                    )}
-
-                    {/* 3. Initial Assessment Scheduling (Doctor & Nurse roles) */}
-                    {isDoctorOrNurseRole && ['new_request', 'consulting', 'assessing'].includes(admission.status) && (
-                      <button
-                        type="button"
-                        onClick={() => setShowScheduleModal(true)}
-                        className="adm-btn-apply"
-                        style={{ padding: '8px 16px', fontSize: '12px', borderRadius: '10px', boxShadow: 'none', background: '#1B365D' }}
-                      >
-                        Schedule Assessment
                       </button>
                     )}
 
@@ -1206,80 +1179,7 @@ export default function AdmissionDetailDrawer({
               </div>
             )}
 
-            <div className="mb-4 relative">
-              <label className="block text-xs font-semibold text-slate-500 mb-2 font-sans tracking-wide">
-                Assign Care Service Package <span className="text-slate-400 font-normal italic text-[11px] ml-1">(optional)</span>
-              </label>
-              {loadingPackages ? (
-                <div className="flex items-center gap-2 py-2.5 text-xs text-slate-400">
-                  <Loader2 size={14} className="animate-spin" />
-                  <span>Loading active care packages...</span>
-                </div>
-              ) : (
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setIsOpenPackageDropdown(!isOpenPackageDropdown);
-                    }}
-                    className="w-full px-4 py-2.5 text-sm rounded-xl border border-slate-200 bg-white shadow-sm flex justify-between items-center cursor-pointer hover:border-slate-300 transition-all font-sans text-left"
-                    style={{ minHeight: '42px', fontFamily: "'Inter', sans-serif" }}
-                  >
-                    <span className="text-slate-700 font-medium">
-                      {selectedPackage || '-- No Care Package Assignment --'}
-                    </span>
-                    <span className="text-slate-400 text-xs transition-transform duration-200" style={{ transform: isOpenPackageDropdown ? 'rotate(180deg)' : 'rotate(0deg)' }}>
-                      ▼
-                    </span>
-                  </button>
 
-                  {isOpenPackageDropdown && (
-                    <div
-                      className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-xl z-[1100] max-h-60 overflow-y-auto animate-fade-in"
-                      style={{ fontFamily: "'Inter', sans-serif", boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05)' }}
-                    >
-                      <div
-                        className="px-4 py-2 hover:bg-slate-50 cursor-pointer text-[10px] text-slate-400 font-bold border-b border-slate-100 transition-all uppercase tracking-wider text-center"
-                        onClick={() => {
-                          setSelectedPackage('');
-                          setIsOpenPackageDropdown(false);
-                        }}
-                      >
-                        -- Leave Empty (No Care Package) --
-                      </div>
-                      {packages.map((pkg) => (
-                        <div
-                          key={pkg._id}
-                          className="px-4 py-2 hover:bg-[#1B365D]/5 cursor-pointer border-b border-slate-100 last:border-b-0 flex flex-col gap-1 transition-all"
-                          onClick={() => {
-                            setSelectedPackage(pkg.name);
-                            setIsOpenPackageDropdown(false);
-                          }}
-                        >
-                          {/* Hàng 1: Tên dịch vụ bên trái, Tag Tier bên phải */}
-                          <div className="flex justify-between items-center w-full">
-                            <span className="text-[13px] font-medium text-[#1B365D] tracking-wide">
-                              {pkg.name}
-                            </span>
-                            <span className="font-medium uppercase text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-md text-[9px] tracking-wider border border-emerald-100 flex-shrink-0">
-                              {pkg.tier}
-                            </span>
-                          </div>
-
-                          {/* Hàng 2: Giá tiền nằm dưới, căn phải */}
-                          <div className="flex justify-end w-full">
-                            <span className="font-medium text-[#1B365D]/80 text-[11.5px] bg-slate-50 px-1.5 py-0.5 rounded-md border border-slate-100">
-                              {pkg.monthlyPrice?.toLocaleString()} VND / month
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
 
             <div className="mb-4">
               <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
