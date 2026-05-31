@@ -44,6 +44,7 @@ import ServicePackagesPage from '../pages/admin/ServicePackagesPage';
 import PharmacyPage from '../pages/pharmacist/PharmacyPage';
 import AdminActivitiesPage from '../pages/admin/AdminActivitiesPage';
 import AdminReportsPage from '../pages/admin/AdminReportsPage';
+import CareAppointmentsPage from '../pages/admin/appointments';
 import DoctorDashboardPage from '../pages/doctor/DoctorDashboardPage';
 import NurseDashboardPage from '../pages/nurse/NurseDashboardPage';
 import MedicationPage from '../pages/nurse/MedicationPage';
@@ -98,6 +99,7 @@ function AppRoutes() {
         <Route path="profile" element={<AdminProfile />} />
         <Route path="accounts" element={<AdminAccountsPage />} />
         <Route path="admission-requests" element={<AdminAdmissionRequestsPage />} />
+        <Route path="appointments" element={<CareAppointmentsPage />} />
         <Route path="tour-requests" element={<AdminTourRequestsPage />} />
         <Route path="service-packages" element={<ServicePackagesPage />} />
         <Route path="medications" element={<PharmacyPage />} />
@@ -144,7 +146,7 @@ function AppRoutes() {
         <Route path="profile" element={<ProfilePage />} />
         <Route path="admission-requests" element={<AdminAdmissionRequestsPage />} />
         <Route path="service-packages" element={<ServicePackagesPage />} />
-        <Route path="appointments" element={<PlaceholderPage title="Lịch khám" />} />
+        <Route path="appointments" element={<CareAppointmentsPage />} />
         <Route path="patients" element={<PlaceholderPage title="Danh sách bệnh nhân" />} />
         <Route path="medications" element={<DoctorMedicationPage />} />
         <Route path="leave" element={<LeaveRequestPage />} />
