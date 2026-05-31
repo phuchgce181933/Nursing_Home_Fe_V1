@@ -26,11 +26,15 @@ const getFloor = (floorId) =>
 const listRoomsByFloor = (floorId) =>
   axiosClient.get(`/facilities/floors/${floorId}/rooms`).then(unwrap);
 
+const listAvailableBedsByRoom = (roomId) =>
+  axiosClient.get(`/facilities/rooms/${roomId}/beds`).then(unwrap);
+
 const facilityService = {
   listBuildings,
   listFloors,
   getFloor,
   listRoomsByFloor,
+  listAvailableBedsByRoom,
 };
 
 export default facilityService;

@@ -13,10 +13,12 @@ import {
   XCircle,
   Activity,
   CheckCircle,
+  UserCheck,
 } from 'lucide-react';
 import { useAuth } from '../../../hooks/useAuth';
 import admissionService from '../../../services/admission.service';
 import servicePackageService from '../../../services/servicePackage.service';
+import facilityService from '../../../services/facility.service';
 
 const formatEnglishDate = (dateStr) => {
   if (!dateStr) return 'N/A';
@@ -225,6 +227,22 @@ export default function AdmissionDetailDrawer({
   const [assignedRoomHex, setAssignedRoomHex] = useState('');
   const [checkingIn, setCheckingIn] = useState(false);
 
+  // States for facility drilldown check-in dropdowns
+  const [selectedBuildingId, setSelectedBuildingId] = useState('');
+  const [selectedFloorId, setSelectedFloorId] = useState('');
+  const [selectedRoomId, setSelectedRoomId] = useState('');
+  const [selectedBedId, setSelectedBedId] = useState('');
+
+  const [buildings, setBuildings] = useState([]);
+  const [floors, setFloors] = useState([]);
+  const [rooms, setRooms] = useState([]);
+  const [beds, setBeds] = useState([]);
+
+  const [loadingBuildings, setLoadingBuildings] = useState(false);
+  const [loadingFloors, setLoadingFloors] = useState(false);
+  const [loadingRooms, setLoadingRooms] = useState(false);
+  const [loadingBeds, setLoadingBeds] = useState(false);
+
   // Reset modal error when any modal state changes
   useEffect(() => {
     setModalError(null);
@@ -301,6 +319,111 @@ export default function AdmissionDetailDrawer({
       fetchStaff();
     }
   }, [showAssignModal]);
+
+  // Load buildings when check-in modal is shown
+  useEffect(() => {
+    if (showCheckInModal) {
+      const fetchBuildings = async () => {
+        try {
+          setLoadingBuildings(true);
+          const res = await facilityService.listBuildings();
+          setBuildings(res || []);
+        } catch (err) {
+          console.error('Failed to fetch buildings:', err);
+        } finally {
+          setLoadingBuildings(false);
+        }
+      };
+      fetchBuildings();
+    } else {
+      setSelectedBuildingId('');
+      setSelectedFloorId('');
+      setSelectedRoomId('');
+      setSelectedBedId('');
+      setBuildings([]);
+      setFloors([]);
+      setRooms([]);
+      setBeds([]);
+    }
+  }, [showCheckInModal]);
+
+  // Load floors when selectedBuildingId changes
+  useEffect(() => {
+    if (selectedBuildingId) {
+      const fetchFloors = async () => {
+        try {
+          setLoadingFloors(true);
+          const res = await facilityService.listFloors({ buildingId: selectedBuildingId });
+          setFloors(res || []);
+          setSelectedFloorId('');
+          setSelectedRoomId('');
+          setSelectedBedId('');
+          setRooms([]);
+          setBeds([]);
+        } catch (err) {
+          console.error('Failed to fetch floors:', err);
+        } finally {
+          setLoadingFloors(false);
+        }
+      };
+      fetchFloors();
+    } else {
+      setFloors([]);
+      setSelectedFloorId('');
+      setSelectedRoomId('');
+      setSelectedBedId('');
+      setRooms([]);
+      setBeds([]);
+    }
+  }, [selectedBuildingId]);
+
+  // Load rooms when selectedFloorId changes
+  useEffect(() => {
+    if (selectedFloorId) {
+      const fetchRooms = async () => {
+        try {
+          setLoadingRooms(true);
+          const res = await facilityService.listRoomsByFloor(selectedFloorId);
+          setRooms(res || []);
+          setSelectedRoomId('');
+          setSelectedBedId('');
+          setBeds([]);
+        } catch (err) {
+          console.error('Failed to fetch rooms:', err);
+        } finally {
+          setLoadingRooms(false);
+        }
+      };
+      fetchRooms();
+    } else {
+      setRooms([]);
+      setSelectedRoomId('');
+      setSelectedBedId('');
+      setBeds([]);
+    }
+  }, [selectedFloorId]);
+
+  // Load beds when selectedRoomId changes
+  useEffect(() => {
+    if (selectedRoomId) {
+      const fetchBeds = async () => {
+        try {
+          setLoadingBeds(true);
+          const res = await facilityService.listAvailableBedsByRoom(selectedRoomId);
+          setBeds(res || []);
+          setSelectedBedId('');
+        } catch (err) {
+          console.error('Failed to fetch beds:', err);
+        } finally {
+          setLoadingBeds(false);
+        }
+      };
+      fetchBeds();
+    } else {
+      setBeds([]);
+      setSelectedBedId('');
+    }
+  }, [selectedRoomId]);
 
   if (!isOpen) return null;
 
@@ -538,12 +661,14 @@ export default function AdmissionDetailDrawer({
     try {
       setCheckingIn(true);
       await admissionService.adminCheckInResident(admissionId, {
-        bedId: assignedBedHex.trim() || undefined,
-        roomId: assignedRoomHex.trim() || undefined,
+        bedId: selectedBedId || undefined,
+        roomId: selectedRoomId || undefined,
       });
       setShowCheckInModal(false);
-      setAssignedBedHex('');
-      setAssignedRoomHex('');
+      setSelectedBuildingId('');
+      setSelectedFloorId('');
+      setSelectedRoomId('');
+      setSelectedBedId('');
       if (onCancelSuccess) onCancelSuccess();
       const res = await admissionService.adminGetAdmissionDetail(admissionId);
       setAdmission(res?.admission || null);
@@ -634,9 +759,14 @@ export default function AdmissionDetailDrawer({
 
   const timelineSteps = getTimelineSteps();
 
-  const scheduledDate = admission?.initialAssessmentScheduledAt || admission?.consultationScheduledAt;
-  const appointmentNotes = admission?.initialAssessmentNotes || admission?.consultationNotes || 'At Assessment Room, Block A';
-  const appointmentTitle = admission?.initialAssessmentScheduledAt ? 'HEALTH ASSESSMENT APPOINTMENT' : 'CONSULTATION APPOINTMENT';
+  const appt = admission?.assignedCareAppointment;
+  const scheduledDate = appt?.scheduledStartAt || admission?.initialAssessmentScheduledAt || admission?.consultationScheduledAt;
+  const appointmentNotes = appt
+    ? `Thời gian khám đầu vào do Admin chỉ định`
+    : (admission?.initialAssessmentNotes || admission?.consultationNotes || 'At Assessment Room, Block A');
+  const appointmentTitle = appt ? 'LỊCH KHÁM LÂM SÀNG ĐẦU VÀO' : (admission?.initialAssessmentScheduledAt ? 'HEALTH ASSESSMENT APPOINTMENT' : 'CONSULTATION APPOINTMENT');
+  const doctor = appt?.doctor;
+  const nurse = appt?.nurse;
 
   const getStepIcon = (key) => {
     switch (key) {
@@ -892,17 +1022,91 @@ export default function AdmissionDetailDrawer({
                 </div>
               )}
 
+              {/* Assigned Medical Staff Card */}
+              {appt && (doctor || nurse) && (
+                <div className="arh-detail-card" style={{ borderLeft: '4px solid #1B365D', background: 'rgba(27, 54, 93, 0.03)' }}>
+                  <h5 className="arh-drawer__section-title" style={{ color: '#1B365D' }}>
+                    <UserCheck size={16} /> ASSIGNED MEDICAL STAFF
+                  </h5>
+                  <div className="arh-detail-grid mt-3">
+                    {doctor && (
+                      <div className="arh-detail-item">
+                        <p className="arh-detail-item__label" style={{ color: '#1B365D' }}>Assigned Doctor</p>
+                        <p className="arh-detail-item__value" style={{ fontWeight: 'bold' }}>{doctor.fullName}</p>
+                        {doctor.email && <p className="text-[11px] text-slate-400 font-normal">{doctor.email}</p>}
+                      </div>
+                    )}
+                    {nurse && (
+                      <div className="arh-detail-item">
+                        <p className="arh-detail-item__label" style={{ color: '#1B365D' }}>Assigned Nurse</p>
+                        <p className="arh-detail-item__value" style={{ fontWeight: 'bold' }}>{nurse.fullName}</p>
+                        {nurse.email && <p className="text-[11px] text-slate-400 font-normal">{nurse.email}</p>}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Service Package Card (if assigned) */}
-              {admission.assignedServicePackage && (
+              {(admission.servicePackageId || admission.assignedServicePackage) && (
                 <div className="arh-detail-card" style={{ borderLeft: '4px solid #2D6A4F', background: 'rgba(45, 106, 79, 0.03)' }}>
                   <h5 className="arh-drawer__section-title" style={{ color: '#2D6A4F' }}>
                     <CheckCircle size={16} /> ASSIGNED SERVICE PACKAGE
                   </h5>
                   <div className="mt-2 text-[13.5px] font-bold text-[#1B365D]">
-                    {admission.assignedServicePackage}
+                    {admission.servicePackageId?.name || admission.assignedServicePackage}
+                  </div>
+                  {admission.servicePackageId?.tier && (
+                    <div className="text-xs text-slate-500 mt-1 font-medium">
+                      Phân hạng: <span className="font-bold text-[#2D6A4F] uppercase">{admission.servicePackageId.tier}</span> • Đơn giá: <span className="font-bold text-[#1B365D]">{admission.servicePackageId.monthlyPrice?.toLocaleString()} VND/tháng</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Contract & Accommodation Details Card */}
+              {(admission.status === 'checked_in' || admission.status === 'contracting' || admission.contractNumber || admission.assignedBed || admission.assignedRoom || admission.assignedBedId || admission.assignedRoomId) && (
+                <div className="arh-detail-card font-sans" style={{ borderLeft: '4px solid #4F46E5', background: 'rgba(79, 70, 229, 0.03)' }}>
+                  <h5 className="arh-drawer__section-title" style={{ color: '#4F46E5' }}>
+                    <CheckCircle size={16} /> HỢP ĐỒNG & THÔNG TIN LƯU TRÚ
+                  </h5>
+                  <div className="arh-detail-grid mt-3">
+                    <div className="arh-detail-item">
+                      <p className="arh-detail-item__label" style={{ color: '#4F46E5' }}>Số hợp đồng</p>
+                      <p className="arh-detail-item__value font-bold" style={{ color: admission.contractNumber ? '#1E1B4B' : '#94a3b8' }}>
+                        {admission.contractNumber || 'Chưa lập hợp đồng'}
+                      </p>
+                    </div>
+                    <div className="arh-detail-item">
+                      <p className="arh-detail-item__label" style={{ color: '#4F46E5' }}>Thời hạn hợp đồng</p>
+                      <p className="arh-detail-item__value" style={{ color: admission.contractStartDate ? '#1E1B4B' : '#94a3b8' }}>
+                        {admission.contractStartDate ? formatEnglishDate(admission.contractStartDate) : 'N/A'} - {admission.contractEndDate ? formatEnglishDate(admission.contractEndDate) : 'N/A'}
+                      </p>
+                    </div>
+                    {admission.contractTerms && (
+                      <div className="arh-detail-item" style={{ gridColumn: 'span 2' }}>
+                        <p className="arh-detail-item__label" style={{ color: '#4F46E5' }}>Điều khoản hợp đồng</p>
+                        <p className="arh-detail-item__value" style={{ whiteSpace: 'pre-line', fontSize: '12px', color: '#475569', background: '#fff', padding: '8px', borderRadius: '8px', border: '1px solid rgba(79, 70, 229, 0.1)', marginTop: '4px' }}>
+                          {admission.contractTerms}
+                        </p>
+                      </div>
+                    )}
+                    <div className="arh-detail-item">
+                      <p className="arh-detail-item__label" style={{ color: '#4F46E5' }}>Phòng ở</p>
+                      <p className="arh-detail-item__value font-bold" style={{ color: (admission.assignedRoom?.roomNumber || admission.assignedRoom || admission.assignedRoomId) ? '#1E1B4B' : '#94a3b8' }}>
+                        {admission.assignedRoom?.roomNumber || admission.assignedRoom || admission.assignedRoomId ? `Phòng ${admission.assignedRoom?.roomNumber || admission.assignedRoom || admission.assignedRoomId}` : 'Chưa phân phòng'}
+                      </p>
+                    </div>
+                    <div className="arh-detail-item">
+                      <p className="arh-detail-item__label" style={{ color: '#4F46E5' }}>Giường số</p>
+                      <p className="arh-detail-item__value font-bold" style={{ color: (admission.assignedBed?.bedCode || admission.assignedBed || admission.assignedBedId) ? '#1E1B4B' : '#94a3b8' }}>
+                        {admission.assignedBed?.bedCode || admission.assignedBed || admission.assignedBedId ? `Giường ${admission.assignedBed?.bedCode || admission.assignedBed || admission.assignedBedId}` : 'Chưa phân giường'}
+                      </p>
+                    </div>
                   </div>
                 </div>
               )}
+
 
               {/* Extra Admission details */}
               <div className="arh-detail-card">
@@ -991,8 +1195,8 @@ export default function AdmissionDetailDrawer({
                       </button>
                     )}
 
-                    {/* 5. Assign Service Package (Admin/Manager role) */}
-                    {isAdminRole && ['assessing', 'contracting'].includes(admission.status) && (
+                    {/* 5. Assign Service Package (Admin/Manager role) - Only when doctor confirmed (contracting status) and package is not assigned yet */}
+                    {isAdminRole && admission.status === 'contracting' && (!admission.servicePackageId && !admission.assignedServicePackage) && (
                       <button
                         type="button"
                         onClick={() => {
@@ -1006,8 +1210,8 @@ export default function AdmissionDetailDrawer({
                       </button>
                     )}
 
-                    {/* 6. Create Admission Contract (Admin/Manager role) */}
-                    {isAdminRole && ['assessing', 'contracting'].includes(admission.status) && (
+                    {/* 6. Create Admission Contract (Admin/Manager role) - Only after package is assigned and contract is not created yet */}
+                    {isAdminRole && admission.status === 'contracting' && (admission.servicePackageId || admission.assignedServicePackage) && !admission.contractNumber && (
                       <button
                         type="button"
                         onClick={() => {
@@ -1030,8 +1234,8 @@ export default function AdmissionDetailDrawer({
                       </button>
                     )}
 
-                    {/* 7. Check-in Resident (Admin/Manager role) */}
-                    {isAdminRole && admission.status === 'contracting' && (
+                    {/* 7. Check-in Resident (Admin/Manager role) - Only after contract is created */}
+                    {isAdminRole && admission.status === 'contracting' && (admission.servicePackageId || admission.assignedServicePackage) && admission.contractNumber && (
                       <button
                         type="button"
                         onClick={() => {
@@ -1810,41 +2014,112 @@ export default function AdmissionDetailDrawer({
               <div className="grid grid-cols-2 gap-3 mb-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
-                    Assigned Bed ID (ObjectId)
+                    Select Building (Tòa nhà)
                   </label>
-                  <input
-                    type="text"
-                    className="adm-filter-input"
-                    style={{ paddingLeft: '14px' }}
-                    placeholder="Optional Bed ObjectId"
-                    value={assignedBedHex}
-                    onChange={(e) => setAssignedBedHex(e.target.value)}
-                  />
-                  <p className="text-[10px] text-slate-400 mt-1 italic leading-normal">
-                    Format: 24-char hex string. Leave empty if no specific bed is assigned yet.
-                  </p>
+                  {loadingBuildings ? (
+                    <div className="flex items-center gap-1.5 text-xs text-slate-400 py-2 font-medium">
+                      <Loader2 size={12} className="animate-spin" /> Loading buildings...
+                    </div>
+                  ) : (
+                    <select
+                      className="adm-filter-select w-full"
+                      value={selectedBuildingId}
+                      onChange={(e) => setSelectedBuildingId(e.target.value)}
+                    >
+                      <option value="">-- Chọn tòa nhà --</option>
+                      {buildings.map((b) => (
+                        <option key={b._id} value={b._id}>
+                          {b.name} ({b.code})
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
+
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
-                    Assigned Room ID (ObjectId)
+                    Select Floor (Tầng)
                   </label>
-                  <input
-                    type="text"
-                    className="adm-filter-input"
-                    style={{ paddingLeft: '14px' }}
-                    placeholder="Optional Room ObjectId"
-                    value={assignedRoomHex}
-                    onChange={(e) => setAssignedRoomHex(e.target.value)}
-                  />
-                  <p className="text-[10px] text-slate-400 mt-1 italic leading-normal">
-                    Format: 24-char hex string. Leave empty if no specific room is assigned yet.
-                  </p>
+                  {loadingFloors ? (
+                    <div className="flex items-center gap-1.5 text-xs text-slate-400 py-2 font-medium">
+                      <Loader2 size={12} className="animate-spin" /> Loading floors...
+                    </div>
+                  ) : (
+                    <select
+                      className="adm-filter-select w-full"
+                      value={selectedFloorId}
+                      onChange={(e) => setSelectedFloorId(e.target.value)}
+                      disabled={!selectedBuildingId}
+                    >
+                      <option value="">-- Chọn tầng --</option>
+                      {floors.map((f) => (
+                        <option key={f._id} value={f._id}>
+                          {f.label || `Tầng ${f.floorNumber}`}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
+                    Select Room (Phòng ở)
+                  </label>
+                  {loadingRooms ? (
+                    <div className="flex items-center gap-1.5 text-xs text-slate-400 py-2 font-medium">
+                      <Loader2 size={12} className="animate-spin" /> Loading rooms...
+                    </div>
+                  ) : (
+                    <select
+                      className="adm-filter-select w-full"
+                      value={selectedRoomId}
+                      onChange={(e) => setSelectedRoomId(e.target.value)}
+                      disabled={!selectedFloorId}
+                    >
+                      <option value="">-- Chọn phòng --</option>
+                      {rooms.map((r) => (
+                        <option key={r._id} value={r._id}>
+                          {r.label || `Phòng ${r.roomNumber}`}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
+                    Select Bed (Giường số)
+                  </label>
+                  {loadingBeds ? (
+                    <div className="flex items-center gap-1.5 text-xs text-slate-400 py-2 font-medium">
+                      <Loader2 size={12} className="animate-spin" /> Loading beds...
+                    </div>
+                  ) : (
+                    <select
+                      className="adm-filter-select w-full"
+                      value={selectedBedId}
+                      onChange={(e) => setSelectedBedId(e.target.value)}
+                      disabled={!selectedRoomId}
+                    >
+                      <option value="">-- Chọn giường --</option>
+                      {beds.map((b) => (
+                        <option key={b._id} value={b._id}>
+                          Giường {b.bedCode} ({b.bedType})
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  {selectedRoomId && beds.length === 0 && !loadingBeds && (
+                    <p className="text-[10.5px] text-red-500 mt-1 font-semibold italic">
+                      * Không còn giường trống trong phòng này
+                    </p>
+                  )}
                 </div>
               </div>
 
               <div className="bg-slate-50 border border-slate-100 p-3 rounded-xl mb-4">
                 <p className="text-xs text-[#1B365D] font-medium leading-relaxed">
-                  <strong>Business Rule Note:</strong> Bed and Room ObjectIds must be valid 24-character hexadecimal strings if entered. Leave them empty to proceed with general check-in (both default to <code>null</code>).
+                  <strong>Quy tắc nhận phòng:</strong> Hãy chọn lần lượt Tòa nhà ➔ Tầng ➔ Phòng ➔ Giường trống để phân bổ chỗ lưu trú cho cư dân. Để trống để nhận phòng chung (nhận phòng không chỉ định giường).
                 </p>
               </div>
 
@@ -1855,8 +2130,10 @@ export default function AdmissionDetailDrawer({
                   style={{ borderRadius: '20px', padding: '10px 24px' }}
                   onClick={() => {
                     setShowCheckInModal(false);
-                    setAssignedBedHex('');
-                    setAssignedRoomHex('');
+                    setSelectedBuildingId('');
+                    setSelectedFloorId('');
+                    setSelectedRoomId('');
+                    setSelectedBedId('');
                   }}
                   disabled={checkingIn}
                 >

@@ -21,6 +21,8 @@ import { useAuth } from '../../../hooks/useAuth';
 import careAppointmentService from '../../../services/careAppointment.service';
 import staffService from '../../../services/staff.service';
 import residentService from '../../../services/resident.service';
+import admissionService from '../../../services/admission.service';
+import medicalRecordService from '../../../services/medicalRecord.service';
 import '../../../styles/admin/CareAppointmentsPage.css';
 
 const STATUS_OPTIONS = [
@@ -141,6 +143,30 @@ export default function CareAppointmentsPage() {
   const [targetApptStatus, setTargetApptStatus] = useState('');
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [statusError, setStatusError] = useState(null);
+
+  // Clinical Wizard state
+  const [showWizardModal, setShowWizardModal] = useState(false);
+  const [wizardStep, setWizardStep] = useState(1);
+  const [activeAdmission, setActiveAdmission] = useState(null);
+  const [loadingAdmission, setLoadingAdmission] = useState(false);
+
+  const initialWizardValues = {
+    heightCm: '',
+    weightKg: '',
+    bloodPressureSystolic: '',
+    bloodPressureDiastolic: '',
+    pulse: '',
+    temperatureCelsius: '',
+    oxygenSaturation: '',
+    bloodSugar: '',
+    bloodType: 'unknown',
+    summary: '',
+    consultationNotes: '',
+    assessmentResult: '',
+    eligibilityStatus: 'eligible',
+    rejectionReason: '',
+  };
+  const [wizardValues, setWizardValues] = useState(initialWizardValues);
 
   // Fetch care appointments
   const fetchAppointments = useCallback(async () => {
@@ -361,15 +387,73 @@ export default function CareAppointmentsPage() {
     }
   };
 
-  // Open Status modal (for medical staff)
-  const handleOpenStatus = (appt) => {
+  // Open Status modal (for medical staff) or launch Clinical Wizard if clinical exam
+  const handleOpenStatus = async (appt) => {
     setSelectedAppt(appt);
     setTargetApptStatus(appt.status);
     setStatusError(null);
-    setShowStatusModal(true);
+
+    if (appt.appointmentType === 'Khám lâm sàng đầu vào') {
+      setLoadingAdmission(true);
+      try {
+        // Fetch the active or completed admission request for this resident using residentId filter
+        const residentIdStr = appt.residentId?._id || appt.residentId;
+        const residentIdParam = typeof residentIdStr === 'object' ? String(residentIdStr) : residentIdStr;
+        const res = await admissionService.adminGetAdmissionList({
+          residentId: residentIdParam,
+          status: 'assessing,contracting,checked_in,cancelled',
+          limit: 1,
+        });
+
+        // Fetch latest measured vitals if available
+        let vitals = null;
+        try {
+          const vitalsRes = await medicalRecordService.getVitalsHistory(residentIdParam, { limit: 1 });
+          if (vitalsRes?.data && vitalsRes.data.length > 0) {
+            vitals = vitalsRes.data[0];
+          }
+        } catch (vErr) {
+          console.error('Failed to load vitals history:', vErr);
+        }
+
+        if (res?.data && res.data.length > 0) {
+          const adm = res.data[0];
+          setActiveAdmission(adm);
+          setWizardValues({
+            heightCm: vitals?.heightCm || '',
+            weightKg: vitals?.weightKg || '',
+            bloodPressureSystolic: vitals?.bloodPressureSystolic || '',
+            bloodPressureDiastolic: vitals?.bloodPressureDiastolic || '',
+            pulse: vitals?.pulse || '',
+            temperatureCelsius: vitals?.temperatureCelsius || '',
+            oxygenSaturation: vitals?.oxygenSaturation || '',
+            bloodSugar: vitals?.bloodSugar || '',
+            bloodType: adm.applicant?.bloodType || vitals?.bloodType || 'unknown',
+            summary: vitals?.summary || adm.applicant?.initialHealthCondition || '',
+            consultationNotes: adm.consultationNotes || '',
+            assessmentResult: adm.assessmentResult || '',
+            eligibilityStatus: adm.eligibilityStatus || 'eligible',
+            rejectionReason: adm.rejectionReason || '',
+          });
+        } else {
+          setActiveAdmission(null);
+          setWizardValues(initialWizardValues);
+        }
+        setWizardStep(1);
+        setShowWizardModal(true);
+      } catch (err) {
+        console.error('Failed to load admission details for clinical wizard:', err);
+        setStatusError('Không thể tải thông tin hồ sơ nhập viện của cư dân này.');
+        setShowStatusModal(true);
+      } finally {
+        setLoadingAdmission(false);
+      }
+    } else {
+      setShowStatusModal(true);
+    }
   };
 
-  // Handle Update Status (Doctor/Nurse role)
+  // Handle Update Status (Doctor/Nurse role) for normal appointments
   const handleUpdateStatus = async (e) => {
     if (e) e.preventDefault();
     if (!selectedAppt) return;
@@ -385,6 +469,67 @@ export default function CareAppointmentsPage() {
     } catch (err) {
       console.error('Failed to update appointment status:', err);
       const errMsg = err.response?.data?.message || 'An error occurred while updating status.';
+      setStatusError(errMsg);
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
+  // Handle clinical wizard form submission (vital signs + consultation + eligibility assessment)
+  const handleWizardSubmit = async (e) => {
+    if (e) e.preventDefault();
+    if (!selectedAppt) return;
+
+    setUpdatingStatus(true);
+    setStatusError(null);
+
+    try {
+      const residentId = selectedAppt.residentId?._id || selectedAppt.residentId;
+      const admissionId = activeAdmission?._id;
+
+      // 1. Save vital signs (UC-9)
+      const vitalsBody = {
+        heightCm: wizardValues.heightCm ? parseFloat(wizardValues.heightCm) : undefined,
+        weightKg: wizardValues.weightKg ? parseFloat(wizardValues.weightKg) : undefined,
+        bloodPressureSystolic: wizardValues.bloodPressureSystolic ? parseInt(wizardValues.bloodPressureSystolic, 10) : undefined,
+        bloodPressureDiastolic: wizardValues.bloodPressureDiastolic ? parseInt(wizardValues.bloodPressureDiastolic, 10) : undefined,
+        pulse: wizardValues.pulse ? parseInt(wizardValues.pulse, 10) : undefined,
+        temperatureCelsius: wizardValues.temperatureCelsius ? parseFloat(wizardValues.temperatureCelsius) : undefined,
+        oxygenSaturation: wizardValues.oxygenSaturation ? parseInt(wizardValues.oxygenSaturation, 10) : undefined,
+        bloodSugar: wizardValues.bloodSugar ? parseFloat(wizardValues.bloodSugar) : undefined,
+        bloodType: wizardValues.bloodType !== 'unknown' ? wizardValues.bloodType : undefined,
+        summary: wizardValues.summary.trim() || undefined,
+      };
+
+      await medicalRecordService.recordVitals(residentId, vitalsBody);
+
+      // 2. Call Pre-admission Consultation API if admission request is present (UC-6.16)
+      if (admissionId) {
+        await admissionService.medicalRecordConsultation(admissionId, {
+          consultationNotes: wizardValues.consultationNotes.trim() || 'Đã thực hiện thăm khám lâm sàng.',
+          notes: wizardValues.summary.trim() || undefined,
+        });
+
+        // 3. Evaluate Eligibility if Bác sĩ role (UC-6.19)
+        if (userRole === 'doctor') {
+          await admissionService.medicalEvaluateEligibility(admissionId, {
+            eligibilityStatus: wizardValues.eligibilityStatus,
+            assessmentResult: wizardValues.assessmentResult.trim() || 'Đã kiểm tra các chỉ số sinh tồn lâm sàng.',
+            rejectionReason: wizardValues.eligibilityStatus === 'not_eligible' ? (wizardValues.rejectionReason.trim() || undefined) : undefined,
+            notes: wizardValues.summary.trim() || undefined,
+          });
+        }
+      }
+
+      // 4. Set appointment status to completed
+      await careAppointmentService.updateStatus(selectedAppt._id, 'completed');
+
+      setShowWizardModal(false);
+      setSelectedAppt(null);
+      fetchAppointments();
+    } catch (err) {
+      console.error('Failed to complete clinical wizard:', err);
+      const errMsg = err.response?.data?.message || 'Có lỗi xảy ra trong quá trình lưu hồ sơ khám lâm sàng.';
       setStatusError(errMsg);
     } finally {
       setUpdatingStatus(false);
@@ -635,10 +780,10 @@ export default function CareAppointmentsPage() {
                           <button
                             onClick={() => handleOpenStatus(row)}
                             className="cap-btn-action"
-                            title="Cập nhật trạng thái"
-                            disabled={['completed', 'cancelled'].includes(row.status)}
+                            title={row.status === 'completed' ? "Xem kết quả thăm khám" : "Cập nhật trạng thái"}
+                            disabled={row.status === 'cancelled'}
                           >
-                            <Activity size={14} />
+                            {row.status === 'completed' ? <Eye size={14} /> : <Activity size={14} />}
                           </button>
                         )}
                       </div>
@@ -958,6 +1103,379 @@ export default function CareAppointmentsPage() {
                   )}
                 </button>
               </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 4: CLINICAL CHECK-UP WIZARD MODAL (QUY TRÌNH KHÁM LÂM SÀNG ĐẦU VÀO) */}
+      {showWizardModal && selectedAppt && (
+        <div className="cap-modal-backdrop" onClick={() => !updatingStatus && setShowWizardModal(false)}>
+          <div className="cap-modal" style={{ maxWidth: '650px', width: '90%' }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h4 className="cap-modal__title" style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                <Activity className="text-[#1b365d]" size={20} />
+                Thăm Khám Lâm Sàng Đầu Vào
+              </h4>
+              <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 'bold' }}>
+                Bước {wizardStep} / 3
+              </span>
+            </div>
+
+            {/* Step indicator progress bar */}
+            <div style={{ display: 'flex', gap: '4px', height: '4px', marginBottom: '20px', backgroundColor: '#e2e8f0', borderRadius: '2px', overflow: 'hidden' }}>
+              <div style={{ flex: 1, backgroundColor: wizardStep >= 1 ? '#1b365d' : '#e2e8f0' }} />
+              <div style={{ flex: 1, backgroundColor: wizardStep >= 2 ? '#1b365d' : '#e2e8f0' }} />
+              <div style={{ flex: 1, backgroundColor: wizardStep >= 3 ? '#1b365d' : '#e2e8f0' }} />
+            </div>
+
+            {statusError && (
+              <div className="cap-error-banner">
+                <AlertCircle size={16} />
+                <span>{statusError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleWizardSubmit}>
+              {/* STEP 1: Applicant Profile View */}
+              {wizardStep === 1 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div style={{ backgroundColor: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                    <h5 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: '700', color: '#1b365d' }}>
+                      Hồ sơ sức khỏe người cao tuổi
+                    </h5>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '13px' }}>
+                      <div>
+                        <span style={{ color: '#64748b', display: 'block' }}>Họ và tên:</span>
+                        <strong style={{ color: '#1e293b' }}>{selectedAppt.residentId?.fullName || activeAdmission?.applicant?.fullName}</strong>
+                      </div>
+                      <div>
+                        <span style={{ color: '#64748b', display: 'block' }}>Mã cư dân:</span>
+                        <strong style={{ color: '#1e293b' }}>#{selectedAppt.residentId?.residentCode || 'N/A'}</strong>
+                      </div>
+                      <div>
+                        <span style={{ color: '#64748b', display: 'block' }}>Ngày sinh:</span>
+                        <strong style={{ color: '#1e293b' }}>
+                          {activeAdmission?.applicant?.dateOfBirth
+                            ? new Date(activeAdmission.applicant.dateOfBirth).toLocaleDateString('vi-VN')
+                            : 'Chưa cập nhật'}
+                        </strong>
+                      </div>
+                      <div>
+                        <span style={{ color: '#64748b', display: 'block' }}>Giới tính:</span>
+                        <strong style={{ color: '#1e293b' }}>
+                          {activeAdmission?.applicant?.gender === 'male' ? 'Nam'
+                            : activeAdmission?.applicant?.gender === 'female' ? 'Nữ' : 'N/A'}
+                        </strong>
+                      </div>
+                      <div>
+                        <span style={{ color: '#64748b', display: 'block' }}>Nhóm máu:</span>
+                        <strong style={{ color: '#1e293b' }}>{activeAdmission?.applicant?.bloodType || 'N/A'}</strong>
+                      </div>
+                      <div>
+                        <span style={{ color: '#64748b', display: 'block' }}>Địa chỉ:</span>
+                        <strong style={{ color: '#1e293b' }}>{activeAdmission?.applicant?.personalAddress || 'N/A'}</strong>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div>
+                      <span style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '6px' }}>
+                        Dị ứng (Allergies):
+                      </span>
+                      {activeAdmission?.applicant?.allergies && activeAdmission.applicant.allergies.length > 0 ? (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                          {activeAdmission.applicant.allergies.map((alg, index) => (
+                            <span key={index} style={{ backgroundColor: '#fef2f2', color: '#b91c1c', border: '1px solid #fee2e2', padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600' }}>
+                              {alg}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span style={{ fontSize: '13px', color: '#94a3b8', fontStyle: 'italic' }}>Không ghi nhận dị ứng</span>
+                      )}
+                    </div>
+
+                    <div>
+                      <span style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '6px' }}>
+                        Bệnh lý nền (Chronic Conditions):
+                      </span>
+                      {activeAdmission?.applicant?.chronicConditions && activeAdmission.applicant.chronicConditions.length > 0 ? (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                          {activeAdmission.applicant.chronicConditions.map((cond, index) => (
+                            <span key={index} style={{ backgroundColor: '#fffbeb', color: '#d97706', border: '1px solid #fef3c7', padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600' }}>
+                              {cond}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span style={{ fontSize: '13px', color: '#94a3b8', fontStyle: 'italic' }}>Không ghi nhận bệnh nền</span>
+                      )}
+                    </div>
+
+                    <div>
+                      <span style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '6px' }}>
+                        Tình trạng sức khỏe ban đầu (do gia đình khai báo):
+                      </span>
+                      <div style={{ backgroundColor: '#f1f5f9', padding: '10px 14px', borderRadius: '8px', borderLeft: '3px solid #64748b', fontSize: '13px', color: '#334155', fontStyle: 'italic', lineHeight: '1.4' }}>
+                        "{activeAdmission?.applicant?.initialHealthCondition || 'Chưa ghi nhận thông tin mô tả chi tiết'}"
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="cap-modal-footer">
+                    <button type="button" className="cap-modal-btn-cancel" onClick={() => setShowWizardModal(false)}>
+                      {selectedAppt?.status === 'completed' ? 'Đóng' : 'Hủy'}
+                    </button>
+                    <button type="button" className="cap-modal-btn-submit" onClick={() => setWizardStep(2)}>
+                      Tiếp tục: Đo sinh hiệu
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 2: Record Vitals & Indicators */}
+              {wizardStep === 2 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div className="cap-form-group" style={{ marginBottom: 0 }}>
+                      <label className="cap-form-label">Chiều cao (cm) *</label>
+                      <input
+                        type="number"
+                        className="cap-form-input"
+                        placeholder="Ví dụ: 165"
+                        value={wizardValues.heightCm}
+                        onChange={(e) => setWizardValues(prev => ({ ...prev, heightCm: e.target.value }))}
+                        required
+                        min="0"
+                        disabled={selectedAppt?.status === 'completed'}
+                      />
+                    </div>
+                    <div className="cap-form-group" style={{ marginBottom: 0 }}>
+                      <label className="cap-form-label">Cân nặng (kg) *</label>
+                      <input
+                        type="number"
+                        className="cap-form-input"
+                        placeholder="Ví dụ: 60"
+                        value={wizardValues.weightKg}
+                        onChange={(e) => setWizardValues(prev => ({ ...prev, weightKg: e.target.value }))}
+                        required
+                        min="0"
+                        disabled={selectedAppt?.status === 'completed'}
+                      />
+                    </div>
+                    <div className="cap-form-group" style={{ marginBottom: 0 }}>
+                      <label className="cap-form-label">Huyết áp Systolic (Tối đa)</label>
+                      <input
+                        type="number"
+                        className="cap-form-input"
+                        placeholder="Ví dụ: 120"
+                        value={wizardValues.bloodPressureSystolic}
+                        onChange={(e) => setWizardValues(prev => ({ ...prev, bloodPressureSystolic: e.target.value }))}
+                        disabled={selectedAppt?.status === 'completed'}
+                      />
+                    </div>
+                    <div className="cap-form-group" style={{ marginBottom: 0 }}>
+                      <label className="cap-form-label">Huyết áp Diastolic (Tối thiểu)</label>
+                      <input
+                        type="number"
+                        className="cap-form-input"
+                        placeholder="Ví dụ: 80"
+                        value={wizardValues.bloodPressureDiastolic}
+                        onChange={(e) => setWizardValues(prev => ({ ...prev, bloodPressureDiastolic: e.target.value }))}
+                        disabled={selectedAppt?.status === 'completed'}
+                      />
+                    </div>
+                    <div className="cap-form-group" style={{ marginBottom: 0 }}>
+                      <label className="cap-form-label">Nhịp tim (lần/phút)</label>
+                      <input
+                        type="number"
+                        className="cap-form-input"
+                        placeholder="Ví dụ: 75"
+                        value={wizardValues.pulse}
+                        onChange={(e) => setWizardValues(prev => ({ ...prev, pulse: e.target.value }))}
+                        disabled={selectedAppt?.status === 'completed'}
+                      />
+                    </div>
+                    <div className="cap-form-group" style={{ marginBottom: 0 }}>
+                      <label className="cap-form-label">Nhiệt độ (°C) *</label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        className="cap-form-input"
+                        placeholder="Ví dụ: 36.5"
+                        value={wizardValues.temperatureCelsius}
+                        onChange={(e) => setWizardValues(prev => ({ ...prev, temperatureCelsius: e.target.value }))}
+                        required
+                        disabled={selectedAppt?.status === 'completed'}
+                      />
+                    </div>
+                    <div className="cap-form-group" style={{ marginBottom: 0 }}>
+                      <label className="cap-form-label">Nồng độ Oxy SPO2 (%)</label>
+                      <input
+                        type="number"
+                        className="cap-form-input"
+                        placeholder="Ví dụ: 98"
+                        value={wizardValues.oxygenSaturation}
+                        onChange={(e) => setWizardValues(prev => ({ ...prev, oxygenSaturation: e.target.value }))}
+                        disabled={selectedAppt?.status === 'completed'}
+                      />
+                    </div>
+                    <div className="cap-form-group" style={{ marginBottom: 0 }}>
+                      <label className="cap-form-label">Đường huyết (mg/dL)</label>
+                      <input
+                        type="number"
+                        className="cap-form-input"
+                        placeholder="Ví dụ: 100"
+                        value={wizardValues.bloodSugar}
+                        onChange={(e) => setWizardValues(prev => ({ ...prev, bloodSugar: e.target.value }))}
+                        disabled={selectedAppt?.status === 'completed'}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="cap-form-group">
+                    <label className="cap-form-label">Nhóm máu</label>
+                    <select
+                      className="cap-filter-select"
+                      value={wizardValues.bloodType}
+                      onChange={(e) => setWizardValues(prev => ({ ...prev, bloodType: e.target.value }))}
+                      disabled={selectedAppt?.status === 'completed'}
+                    >
+                      <option value="unknown">Chưa rõ (Unknown)</option>
+                      <option value="A+">A+</option>
+                      <option value="A-">A-</option>
+                      <option value="B+">B+</option>
+                      <option value="B-">B-</option>
+                      <option value="AB+">AB+</option>
+                      <option value="AB-">AB-</option>
+                      <option value="O+">O+</option>
+                      <option value="O-">O-</option>
+                    </select>
+                  </div>
+
+                  <div className="cap-form-group">
+                    <label className="cap-form-label">Tóm tắt tình trạng/Kết luận lâm sàng ban đầu</label>
+                    <textarea
+                      className="cap-form-input"
+                      placeholder="Mô tả tóm tắt tình trạng sinh hiệu, chẩn đoán sơ bộ..."
+                      style={{ minHeight: '60px', fontFamily: 'inherit' }}
+                      value={wizardValues.summary}
+                      onChange={(e) => setWizardValues(prev => ({ ...prev, summary: e.target.value }))}
+                      disabled={selectedAppt?.status === 'completed'}
+                    />
+                  </div>
+
+                  <div className="cap-modal-footer">
+                    <button type="button" className="cap-modal-btn-cancel" onClick={() => setWizardStep(1)}>
+                      Quay lại
+                    </button>
+                    <button type="button" className="cap-modal-btn-submit" onClick={() => setWizardStep(3)}>
+                      Tiếp tục: Đánh giá nhập viện
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 3: Pre-admission Consultation & Eligibility Evaluation */}
+              {wizardStep === 3 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div className="cap-form-group">
+                    <label className="cap-form-label">Nội dung tư vấn trước nhập viện *</label>
+                    <textarea
+                      className="cap-form-input"
+                      placeholder="Ghi chú nội dung tư vấn chăm sóc, chế độ hoạt động phù hợp..."
+                      style={{ minHeight: '80px', fontFamily: 'inherit' }}
+                      value={wizardValues.consultationNotes}
+                      onChange={(e) => setWizardValues(prev => ({ ...prev, consultationNotes: e.target.value }))}
+                      required
+                      disabled={selectedAppt?.status === 'completed'}
+                    />
+                  </div>
+
+                  <div className="cap-form-group">
+                    <label className="cap-form-label">Kết quả đánh giá chi tiết *</label>
+                    <textarea
+                      className="cap-form-input"
+                      placeholder="Kết luận kiểm tra thể trạng chi tiết trước khi xét điều kiện..."
+                      style={{ minHeight: '80px', fontFamily: 'inherit' }}
+                      value={wizardValues.assessmentResult}
+                      onChange={(e) => setWizardValues(prev => ({ ...prev, assessmentResult: e.target.value }))}
+                      required
+                      disabled={selectedAppt?.status === 'completed'}
+                    />
+                  </div>
+
+                  <div className="cap-form-group">
+                    <label className="cap-form-label">Đánh giá điều kiện nhập viện *</label>
+                    {userRole === 'doctor' ? (
+                      <select
+                        className="cap-filter-select"
+                        value={wizardValues.eligibilityStatus}
+                        onChange={(e) => setWizardValues(prev => ({ ...prev, eligibilityStatus: e.target.value }))}
+                        required
+                        disabled={selectedAppt?.status === 'completed'}
+                      >
+                        <option value="eligible">Đủ điều kiện nhập viện (Eligible)</option>
+                        <option value="not_eligible">Không đủ điều kiện (Ineligible)</option>
+                      </select>
+                    ) : (
+                      <div>
+                        <select
+                          className="cap-filter-select"
+                          value={wizardValues.eligibilityStatus}
+                          disabled
+                          style={{ backgroundColor: '#f1f5f9', cursor: 'not-allowed' }}
+                        >
+                          <option value="eligible">Đủ điều kiện nhập viện (Eligible)</option>
+                          <option value="not_eligible">Không đủ điều kiện (Ineligible)</option>
+                        </select>
+                        <p style={{ fontSize: '11px', color: '#b45309', marginTop: '6px', fontWeight: '500' }}>
+                          * Chỉ Bác sĩ mới được quyền đánh giá điều kiện nhập viện. Vai trò Điều dưỡng hiện tại bị hạn chế.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {wizardValues.eligibilityStatus === 'not_eligible' && (
+                    <div className="cap-form-group">
+                      <label className="cap-form-label">Lý do từ chối nhập viện *</label>
+                      <textarea
+                        className="cap-form-input"
+                        placeholder="Nêu rõ lý do người cao tuổi không đủ điều kiện gia nhập viện..."
+                        style={{ minHeight: '60px', fontFamily: 'inherit' }}
+                        value={wizardValues.rejectionReason}
+                        onChange={(e) => setWizardValues(prev => ({ ...prev, rejectionReason: e.target.value }))}
+                        required={wizardValues.eligibilityStatus === 'not_eligible'}
+                        disabled={selectedAppt?.status === 'completed'}
+                      />
+                    </div>
+                  )}
+
+                  <div className="cap-modal-footer">
+                    <button type="button" className="cap-modal-btn-cancel" onClick={() => setWizardStep(2)} disabled={updatingStatus}>
+                      Quay lại
+                    </button>
+                    {selectedAppt?.status === 'completed' ? (
+                      <button type="button" className="cap-modal-btn-submit" onClick={() => setShowWizardModal(false)}>
+                        Đóng
+                      </button>
+                    ) : (
+                      <button type="submit" className="cap-modal-btn-submit" disabled={updatingStatus}>
+                        {updatingStatus ? (
+                          <>
+                            <Loader2 className="animate-spin mr-1" size={13} />
+                            Đang lưu hồ sơ...
+                          </>
+                        ) : (
+                          'Hoàn Thành Thăm Khám'
+                        )}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
             </form>
           </div>
         </div>
