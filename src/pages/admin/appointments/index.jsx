@@ -585,20 +585,20 @@ export default function CareAppointmentsPage() {
                       {row.appointmentType}
                     </td>
                     <td>
-                      {row.doctorStaffId?.fullName ? (
+                      {(row.doctorStaffId?.userId?.fullName || row.doctorStaffId?.fullName) ? (
                         <div className="cap-staff-badge">
                           <User size={12} />
-                          {row.doctorStaffId.fullName}
+                          {row.doctorStaffId.userId?.fullName || row.doctorStaffId.fullName}
                         </div>
                       ) : (
                         <div className="cap-staff-badge is-unassigned">Chưa chỉ định</div>
                       )}
                     </td>
                     <td>
-                      {row.nurseStaffId?.fullName ? (
+                      {(row.nurseStaffId?.userId?.fullName || row.nurseStaffId?.fullName) ? (
                         <div className="cap-staff-badge">
                           <User size={12} />
-                          {row.nurseStaffId.fullName}
+                          {row.nurseStaffId.userId?.fullName || row.nurseStaffId.fullName}
                         </div>
                       ) : (
                         <div className="cap-staff-badge is-unassigned">Chưa chỉ định</div>
@@ -722,7 +722,7 @@ export default function CareAppointmentsPage() {
                       ))}
                       {selectedAppt.doctorStaffId && !availableDoctors.some(d => d._id === (selectedAppt.doctorStaffId._id || selectedAppt.doctorStaffId)) && (
                         <option key={selectedAppt.doctorStaffId._id || selectedAppt.doctorStaffId} value={selectedAppt.doctorStaffId._id || selectedAppt.doctorStaffId}>
-                          {selectedAppt.doctorStaffId.fullName || 'Bác sĩ hiện tại'} (Không trong ca trực)
+                          {selectedAppt.doctorStaffId.userId?.fullName || selectedAppt.doctorStaffId.fullName || 'Bác sĩ hiện tại'} (Không trong ca trực)
                         </option>
                       )}
                     </>
@@ -750,7 +750,7 @@ export default function CareAppointmentsPage() {
                       ))}
                       {selectedAppt.nurseStaffId && !availableNurses.some(n => n._id === (selectedAppt.nurseStaffId._id || selectedAppt.nurseStaffId)) && (
                         <option key={selectedAppt.nurseStaffId._id || selectedAppt.nurseStaffId} value={selectedAppt.nurseStaffId._id || selectedAppt.nurseStaffId}>
-                          {selectedAppt.nurseStaffId.fullName || 'Y tá hiện tại'} (Không trong ca trực)
+                          {selectedAppt.nurseStaffId.userId?.fullName || selectedAppt.nurseStaffId.fullName || 'Y tá hiện tại'} (Không trong ca trực)
                         </option>
                       )}
                     </>
