@@ -19,28 +19,28 @@ import admissionService from '../../services/admission.service';
 import AdmissionDetailDrawer from '../../components/family/SubmitAdmission/AdmissionDetailDrawer';
 
 const STATUS_OPTIONS = [
-  { value: '', label: 'All Statuses' },
-  { value: 'new_request', label: 'New Request' },
-  { value: 'consulting', label: 'Consulting' },
-  { value: 'assessing', label: 'Assessing' },
-  { value: 'contracting', label: 'Contracting' },
-  { value: 'checked_in', label: 'Checked In' },
-  { value: 'cancelled', label: 'Cancelled' },
+  { value: '', label: 'Tất cả trạng thái' },
+  { value: 'new_request', label: 'Yêu cầu mới' },
+  { value: 'consulting', label: 'Đang tư vấn' },
+  { value: 'assessing', label: 'Đang đánh giá' },
+  { value: 'contracting', label: 'Ký hợp đồng' },
+  { value: 'checked_in', label: 'Đã nhận vào ở' },
+  { value: 'cancelled', label: 'Đã huỷ' },
 ];
 
 const ELIGIBILITY_OPTIONS = [
-  { value: '', label: 'All Eligibility' },
-  { value: 'pending', label: 'Pending Assessment' },
-  { value: 'eligible', label: 'Eligible' },
-  { value: 'not_eligible', label: 'Ineligible' },
+  { value: '', label: 'Tất cả điều kiện' },
+  { value: 'pending', label: 'Chờ đánh giá' },
+  { value: 'eligible', label: 'Đủ điều kiện' },
+  { value: 'not_eligible', label: 'Không đủ điều kiện' },
 ];
 
-const formatEnglishDate = (dateStr) => {
+const formatViDate = (dateStr) => {
   if (!dateStr) return 'N/A';
   try {
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return dateStr;
-    return d.toLocaleDateString('en-US', {
+    return d.toLocaleDateString('vi-VN', {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
@@ -72,17 +72,17 @@ const getStatusBadgeClass = (status) => {
 const getStatusLabel = (status) => {
   switch (status) {
     case 'new_request':
-      return 'New Request';
+      return 'Yêu cầu mới';
     case 'consulting':
-      return 'Consulting';
+      return 'Đang tư vấn';
     case 'assessing':
-      return 'Assessing';
+      return 'Đang đánh giá';
     case 'contracting':
-      return 'Contracting';
+      return 'Ký hợp đồng';
     case 'checked_in':
-      return 'Checked In';
+      return 'Đã nhận vào ở';
     case 'cancelled':
-      return 'Cancelled';
+      return 'Đã huỷ';
     default:
       return status;
   }
@@ -102,11 +102,11 @@ const getEligibilityBadgeClass = (eligibility) => {
 const getEligibilityLabel = (eligibility) => {
   switch (eligibility) {
     case 'eligible':
-      return 'Eligible';
+      return 'Đủ điều kiện';
     case 'not_eligible':
-      return 'Ineligible';
+      return 'Không đủ điều kiện';
     default:
-      return 'Pending';
+      return 'Chờ đánh giá';
   }
 };
 
@@ -183,7 +183,7 @@ export default function AdminAdmissionRequestsPage() {
       }
     } catch (err) {
       console.error('Failed to load admission requests:', err);
-      setError('Could not retrieve admission requests. Please check your credentials or network connection.');
+      setError('Không thể tải danh sách yêu cầu nhập viện. Vui lòng kiểm tra kết nối mạng.');
     } finally {
       setLoading(false);
     }
@@ -235,10 +235,10 @@ export default function AdminAdmissionRequestsPage() {
         <div>
           <h1>
             <ClipboardList className="text-emerald-sage" size={26} />
-            Admission Requests
+            Yêu cầu nhập viện
           </h1>
           <p>
-            Review, evaluate, approve, and track family admission requests for elderly residents.
+            Xem xét, đánh giá, duyệt và theo dõi các yêu cầu nhập viện từ gia đình cư dân.
           </p>
         </div>
         <button
@@ -247,7 +247,7 @@ export default function AdminAdmissionRequestsPage() {
           className="adm-btn-refresh"
         >
           <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          Reload Data
+          Tải lại
         </button>
       </div>
 
@@ -259,7 +259,7 @@ export default function AdminAdmissionRequestsPage() {
             <ClipboardList size={22} />
           </div>
           <div>
-            <span className="adm-stat-label">Total Requests</span>
+            <span className="adm-stat-label">Tổng yêu cầu</span>
             <span className="adm-stat-value">{total}</span>
           </div>
         </div>
@@ -270,7 +270,7 @@ export default function AdminAdmissionRequestsPage() {
             <Clock size={22} />
           </div>
           <div>
-            <span className="adm-stat-label">New Requests</span>
+            <span className="adm-stat-label">Yêu cầu mới</span>
             <span className="adm-stat-value">{data.filter(x => x.status === 'new_request').length}</span>
           </div>
         </div>
@@ -281,7 +281,7 @@ export default function AdminAdmissionRequestsPage() {
             <Activity size={22} />
           </div>
           <div>
-            <span className="adm-stat-label">In Processing</span>
+            <span className="adm-stat-label">Đang xử lý</span>
             <span className="adm-stat-value">
               {data.filter(x => ['consulting', 'assessing', 'contracting'].includes(x.status)).length}
             </span>
@@ -294,7 +294,7 @@ export default function AdminAdmissionRequestsPage() {
             <UserCheck size={22} />
           </div>
           <div>
-            <span className="adm-stat-label">Admitted</span>
+            <span className="adm-stat-label">Đã nhận vào ở</span>
             <span className="adm-stat-value">{data.filter(x => x.status === 'checked_in').length}</span>
           </div>
         </div>
@@ -312,7 +312,7 @@ export default function AdminAdmissionRequestsPage() {
                 <input
                   type="text"
                   className="adm-filter-input"
-                  placeholder="Search code, relative name, phone..."
+                  placeholder="Tìm mã yêu cầu, tên người thân, số điện thoại..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
@@ -354,7 +354,7 @@ export default function AdminAdmissionRequestsPage() {
           <div className="adm-filter-row-secondary">
             <div className="adm-filter-date-group">
               <span className="adm-date-title">
-                <Calendar size={13} className="text-slate-400" /> Submitted Range:
+                <Calendar size={13} className="text-slate-400" /> Khoảng ngày gửi:
               </span>
               
               <input
@@ -363,7 +363,7 @@ export default function AdminAdmissionRequestsPage() {
                 value={from}
                 onChange={(e) => setFrom(e.target.value)}
               />
-              <span className="text-slate-400 text-xs font-semibold">to</span>
+              <span className="text-slate-400 text-xs font-semibold">đến</span>
               <input
                 type="date"
                 className="adm-date-input"
@@ -378,13 +378,13 @@ export default function AdminAdmissionRequestsPage() {
                 onClick={handleResetFilters}
                 className="adm-btn-clear"
               >
-                Clear Filters
+                Xoá bộ lọc
               </button>
               <button
                 type="submit"
                 className="adm-btn-apply"
               >
-                Apply Filters
+                Áp dụng
               </button>
             </div>
           </div>
@@ -396,18 +396,18 @@ export default function AdminAdmissionRequestsPage() {
         {loading && data.length === 0 ? (
           <div className="p-16 flex flex-col items-center justify-center bg-white" style={{ minHeight: '300px' }}>
             <RefreshCw className="animate-spin text-emerald-sage mb-3" size={32} />
-            <p className="text-slate-500 text-sm">Retrieving admission dossiers...</p>
+            <p className="text-slate-500 text-sm">Đang tải danh sách yêu cầu nhập viện...</p>
           </div>
         ) : error ? (
           <div className="p-10 flex flex-col items-center justify-center text-center bg-white" style={{ minHeight: '300px' }}>
             <AlertCircle className="text-red-500 mb-3" size={36} />
-            <p className="text-slate-800 font-bold mb-1">An error occurred</p>
+            <p className="text-slate-800 font-bold mb-1">Đã xảy ra lỗi</p>
             <p className="text-slate-500 text-sm max-w-md">{error}</p>
             <button
               onClick={fetchRequests}
               className="mt-4 px-5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm rounded-xl font-semibold transition-all"
             >
-              Try Again
+              Thử lại
             </button>
           </div>
         ) : data.length === 0 ? (
@@ -415,9 +415,9 @@ export default function AdminAdmissionRequestsPage() {
             <div className="bg-slate-50 p-4 rounded-full text-slate-400 mb-3" style={{ width: 'fit-content' }}>
               <ClipboardList size={30} />
             </div>
-            <p className="text-slate-700 font-bold mb-1">No Admission Requests Found</p>
+            <p className="text-slate-700 font-bold mb-1">Không tìm thấy yêu cầu nhập viện</p>
             <p className="text-slate-400 text-xs max-w-sm">
-              We couldn't find any admission requests matching your search or filters.
+              Không có yêu cầu nhập viện nào khớp với từ khoá hoặc bộ lọc của bạn.
             </p>
           </div>
         ) : (
@@ -425,14 +425,14 @@ export default function AdminAdmissionRequestsPage() {
             <table className="adm-table">
               <thead>
                 <tr>
-                  <th>Request Code</th>
-                  <th>Elderly Resident</th>
-                  <th>Primary Contact</th>
-                  <th>Preferred Date</th>
-                  <th>Submitted Date</th>
-                  <th style={{ textAlign: 'center' }}>Medical Assessment</th>
-                  <th style={{ textAlign: 'center' }}>Status</th>
-                  <th style={{ textAlign: 'center' }}>Actions</th>
+                  <th>Mã yêu cầu</th>
+                  <th>Cư dân</th>
+                  <th>Người liên hệ</th>
+                  <th>Ngày mong muốn</th>
+                  <th>Ngày gửi</th>
+                  <th style={{ textAlign: 'center' }}>Đánh giá y tế</th>
+                  <th style={{ textAlign: 'center' }}>Trạng thái</th>
+                  <th style={{ textAlign: 'center' }}>Thao tác</th>
                 </tr>
               </thead>
               <tbody>
@@ -448,13 +448,13 @@ export default function AdminAdmissionRequestsPage() {
                     <td>
                       <div className="cell-resident-name">{row.applicant?.fullName || 'N/A'}</div>
                       <div className="cell-resident-meta">
-                        {row.applicant?.gender === 'male' ? 'MALE' : row.applicant?.gender === 'female' ? 'FEMALE' : row.applicant?.gender || 'N/A'}
-                        {row.applicant?.dateOfBirth ? ` • ${new Date().getFullYear() - new Date(row.applicant.dateOfBirth).getFullYear()} years old` : ''}
+                        {row.applicant?.gender === 'male' ? 'NAM' : row.applicant?.gender === 'female' ? 'NỮ' : row.applicant?.gender || 'N/A'}
+                        {row.applicant?.dateOfBirth ? ` • ${new Date().getFullYear() - new Date(row.applicant.dateOfBirth).getFullYear()} tuổi` : ''}
                       </div>
                     </td>
                     <td>
                       <div className="cell-contact-name">
-                        {row.familyAccount?.fullName || row.requestedByName || 'Relative'}
+                        {row.familyAccount?.fullName || row.requestedByName || 'Người thân'}
                         {row.familyAccount?.username && (
                           <span className="text-[11px] text-slate-400 font-normal ml-1.5">
                             (@{row.familyAccount.username})
@@ -466,10 +466,10 @@ export default function AdminAdmissionRequestsPage() {
                       </div>
                     </td>
                     <td style={{ fontWeight: '500', color: '#475569' }}>
-                      {formatEnglishDate(row.preferredAdmissionDate)}
+                      {formatViDate(row.preferredAdmissionDate)}
                     </td>
                     <td className="cell-date">
-                      {formatEnglishDate(row.createdAt)}
+                      {formatViDate(row.createdAt)}
                     </td>
                     <td style={{ textAlign: 'center' }}>
                       <span className={`assess-badge-adm ${getEligibilityBadgeClass(row.eligibilityStatus)}`}>
@@ -485,7 +485,7 @@ export default function AdminAdmissionRequestsPage() {
                       <button
                         onClick={() => handleOpenDetails(row._id)}
                         className="adm-btn-action"
-                        title="View details"
+                        title="Xem chi tiết"
                       >
                         <Eye size={14} />
                       </button>
@@ -501,9 +501,9 @@ export default function AdminAdmissionRequestsPage() {
         {total > 0 && (
           <div className="adm-pagination-footer">
             <div className="pagination-info">
-              Showing <span>{(page - 1) * limit + 1}</span> to{' '}
-              <span>{Math.min(page * limit, total)}</span> of{' '}
-              <span>{total}</span> dossiers
+              Hiển thị <span>{(page - 1) * limit + 1}</span> đến{' '}
+              <span>{Math.min(page * limit, total)}</span> trong{' '}
+              <span>{total}</span> yêu cầu
             </div>
 
             <div className="pagination-controls">
@@ -516,7 +516,7 @@ export default function AdminAdmissionRequestsPage() {
               </button>
               
               <div className="page-indicator">
-                Page {page} / {totalPages}
+                Trang {page} / {totalPages}
               </div>
 
               <button

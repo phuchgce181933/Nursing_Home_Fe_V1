@@ -16,12 +16,12 @@ import {
 } from 'lucide-react';
 import facilityTourService from '../../../services/facilityTour.service';
 
-const formatEnglishDate = (dateStr) => {
+const formatViDate = (dateStr) => {
   if (!dateStr) return 'N/A';
   try {
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return dateStr;
-    return d.toLocaleDateString('en-US', {
+    return d.toLocaleDateString('vi-VN', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
@@ -35,35 +35,35 @@ const getStatusTheme = (status) => {
   switch (status) {
     case 'pending':
       return {
-        label: 'Pending Review',
+        label: 'Chờ xét duyệt',
         bg: 'bg-slate-100',
         text: 'text-slate-600',
         dot: 'bg-slate-400',
       };
     case 'confirmed':
       return {
-        label: 'Approved & Confirmed',
+        label: 'Đã duyệt & Xác nhận',
         bg: 'bg-emerald-50 text-emerald-700',
         text: 'text-emerald-700',
         dot: 'bg-emerald-500',
       };
     case 'completed':
       return {
-        label: 'Completed',
+        label: 'Đã hoàn thành',
         bg: 'bg-sky-50 text-sky-700',
         text: 'text-sky-700',
         dot: 'bg-sky-500',
       };
     case 'cancelled':
       return {
-        label: 'Cancelled / Rejected',
+        label: 'Đã huỷ / Từ chối',
         bg: 'bg-red-50 text-error',
         text: 'text-error',
         dot: 'bg-error',
       };
     default:
       return {
-        label: status || 'Unknown',
+        label: status || 'Không xác định',
         bg: 'bg-slate-100',
         text: 'text-slate-600',
         dot: 'bg-slate-400',
@@ -83,7 +83,6 @@ export default function AdminTourDetailDrawer({ isOpen, onClose, tourId, onActio
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Administrative action states
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [confirmedTimeSlot, setConfirmedTimeSlot] = useState('');
   const [customTimeSlot, setCustomTimeSlot] = useState('');
@@ -95,7 +94,6 @@ export default function AdminTourDetailDrawer({ isOpen, onClose, tourId, onActio
   const [rejectionReason, setRejectionReason] = useState('');
   const [rejecting, setRejecting] = useState(false);
 
-  // Fetch tour detail when opened or tourId changed
   useEffect(() => {
     if (!isOpen || !tourId) return;
 
@@ -105,8 +103,7 @@ export default function AdminTourDetailDrawer({ isOpen, onClose, tourId, onActio
         setError(null);
         const res = await facilityTourService.adminGetTourDetail(tourId);
         setTour(res?.tour || null);
-        
-        // Initialize default confirmed time slot
+
         if (res?.tour) {
           const preSlot = res.tour.preferredTimeSlot;
           if (TIME_SLOTS_OPTIONS.includes(preSlot)) {
@@ -120,7 +117,7 @@ export default function AdminTourDetailDrawer({ isOpen, onClose, tourId, onActio
         }
       } catch (err) {
         console.error('Failed to fetch admin tour details:', err);
-        setError('Could not connect to the server to load tour request details.');
+        setError('Không thể kết nối máy chủ để tải thông tin yêu cầu tham quan.');
       } finally {
         setLoading(false);
       }
@@ -142,19 +139,18 @@ export default function AdminTourDetailDrawer({ isOpen, onClose, tourId, onActio
         confirmedTimeSlot: finalSlot || undefined,
         adminNotes: adminNotes.trim() || undefined,
       });
-      
+
       setShowApproveModal(false);
       setAdminNotes('');
       if (onActionSuccess) {
         onActionSuccess();
       }
-      
-      // Re-fetch detail
+
       const res = await facilityTourService.adminGetTourDetail(tourId);
       setTour(res?.tour || null);
     } catch (err) {
       console.error('Failed to approve tour request:', err);
-      alert(err.response?.data?.message || 'An error occurred while approving the tour request. Please try again.');
+      alert(err.response?.data?.message || 'Đã xảy ra lỗi khi duyệt yêu cầu tham quan. Vui lòng thử lại.');
     } finally {
       setApproving(false);
     }
@@ -169,19 +165,18 @@ export default function AdminTourDetailDrawer({ isOpen, onClose, tourId, onActio
       await facilityTourService.adminRejectTour(tourId, {
         rejectionReason: rejectionReason.trim(),
       });
-      
+
       setShowRejectModal(false);
       setRejectionReason('');
       if (onActionSuccess) {
         onActionSuccess();
       }
-      
-      // Re-fetch detail
+
       const res = await facilityTourService.adminGetTourDetail(tourId);
       setTour(res?.tour || null);
     } catch (err) {
       console.error('Failed to reject tour request:', err);
-      alert(err.response?.data?.message || 'An error occurred while rejecting the tour request.');
+      alert(err.response?.data?.message || 'Đã xảy ra lỗi khi từ chối yêu cầu tham quan.');
     } finally {
       setRejecting(false);
     }
@@ -197,9 +192,9 @@ export default function AdminTourDetailDrawer({ isOpen, onClose, tourId, onActio
         {/* Drawer Header */}
         <div className="ftd-drawer__header">
           <div className="ftd-drawer__header-title">
-            <h3>Administrative Tour Details</h3>
+            <h3>Chi tiết tour - Quản trị</h3>
             <span className="ftd-drawer__header-subtitle">
-              Reference ID: {tour ? `#${tour._id.substring(18).toUpperCase()}` : ''}
+              Mã tham chiếu: {tour ? `#${tour._id.substring(18).toUpperCase()}` : ''}
             </span>
           </div>
           <button className="ftd-drawer__close" onClick={onClose}>
@@ -212,26 +207,26 @@ export default function AdminTourDetailDrawer({ isOpen, onClose, tourId, onActio
           {loading ? (
             <div className="flex flex-col items-center justify-center py-20 text-slate-500">
               <Loader2 className="animate-spin text-emerald-700 mb-3" size={32} />
-              <p className="text-sm font-semibold">Retrieving tour requirement details...</p>
+              <p className="text-sm font-semibold">Đang tải thông tin yêu cầu tham quan...</p>
             </div>
           ) : error ? (
             <div className="p-6 text-center">
               <AlertCircle className="text-red-500 mx-auto mb-3" size={36} />
-              <p className="text-sm font-bold text-slate-800 mb-1">Load Failed</p>
+              <p className="text-sm font-bold text-slate-800 mb-1">Tải thất bại</p>
               <p className="text-xs text-slate-500 mb-4">{error}</p>
               <button onClick={onClose} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs font-semibold text-slate-700 transition-all">
-                Close Drawer
+                Đóng
               </button>
             </div>
           ) : !tour ? (
-            <p className="p-6 text-center text-slate-400 text-xs">No tour requests found.</p>
+            <p className="p-6 text-center text-slate-400 text-xs">Không tìm thấy yêu cầu tham quan.</p>
           ) : (
             <>
               {/* Status Banner */}
               <div className="ftd-drawer__section">
                 <div className={`ftd-status-banner ftd-status-banner--${tour.status}`}>
                   <div className="ftd-status-banner__info">
-                    <span className="ftd-status-banner__label">Current Status</span>
+                    <span className="ftd-status-banner__label">Trạng thái hiện tại</span>
                     <span className="ftd-status-banner__value">{theme?.label}</span>
                   </div>
                   <div className={`ftd-status-banner__dot ftd-status-banner__dot--${tour.status} animate-pulse`} />
@@ -240,7 +235,7 @@ export default function AdminTourDetailDrawer({ isOpen, onClose, tourId, onActio
 
               {/* Family Account info */}
               <div className="ftd-drawer__section">
-                <div className="ftd-drawer__section-title">Family Account Profile</div>
+                <div className="ftd-drawer__section-title">Thông tin tài khoản gia đình</div>
                 <div className="ftd-detail-card">
                   <div className="ftd-detail-card__header-row">
                     <div className="ftd-detail-card__avatar" style={{ backgroundColor: '#eff6ff', color: '#2563eb' }}>
@@ -248,9 +243,9 @@ export default function AdminTourDetailDrawer({ isOpen, onClose, tourId, onActio
                     </div>
                     <div>
                       <div className="ftd-detail-card__name">
-                        {tour.familyAccount?.fullName || 'Registered User'}
+                        {tour.familyAccount?.fullName || 'Người dùng đã đăng ký'}
                       </div>
-                      <div className="ftd-detail-card__subtitle">Family Member Account</div>
+                      <div className="ftd-detail-card__subtitle">Tài khoản thành viên gia đình</div>
                     </div>
                   </div>
                   <div className="ftd-detail-list">
@@ -272,7 +267,7 @@ export default function AdminTourDetailDrawer({ isOpen, onClose, tourId, onActio
 
               {/* Visitor Contact Info */}
               <div className="ftd-drawer__section">
-                <div className="ftd-drawer__section-title">Visitor Contact Info</div>
+                <div className="ftd-drawer__section-title">Thông tin liên hệ khách tham quan</div>
                 <div className="ftd-detail-card">
                   <div className="ftd-detail-card__header-row">
                     <div className="ftd-detail-card__avatar">
@@ -280,7 +275,7 @@ export default function AdminTourDetailDrawer({ isOpen, onClose, tourId, onActio
                     </div>
                     <div>
                       <div className="ftd-detail-card__name">{tour.contactName}</div>
-                      <div className="ftd-detail-card__subtitle">Contact Person</div>
+                      <div className="ftd-detail-card__subtitle">Người liên hệ</div>
                     </div>
                   </div>
 
@@ -298,7 +293,7 @@ export default function AdminTourDetailDrawer({ isOpen, onClose, tourId, onActio
                     <div className="ftd-detail-list__item">
                       <Users size={14} className="ftd-detail-list__icon" />
                       <span className="ftd-detail-list__text">
-                        {tour.numberOfVisitors} visitor{tour.numberOfVisitors > 1 ? 's' : ''}
+                        {tour.numberOfVisitors} người tham quan
                       </span>
                     </div>
                   </div>
@@ -307,15 +302,15 @@ export default function AdminTourDetailDrawer({ isOpen, onClose, tourId, onActio
 
               {/* Preferred Schedule Card */}
               <div className="ftd-drawer__section">
-                <div className="ftd-drawer__section-title">Preferred Schedule</div>
+                <div className="ftd-drawer__section-title">Lịch mong muốn</div>
                 <div className="ftd-detail-card">
                   <div className="ftd-schedule-grid">
                     <div className="ftd-schedule-item">
                       <Calendar size={14} className="ftd-schedule-item__icon" />
                       <div className="ftd-schedule-item__content">
-                        <span className="ftd-schedule-item__label">Date</span>
+                        <span className="ftd-schedule-item__label">Ngày</span>
                         <span className="ftd-schedule-item__value">
-                          {formatEnglishDate(tour.preferredDate)}
+                          {formatViDate(tour.preferredDate)}
                         </span>
                       </div>
                     </div>
@@ -324,7 +319,7 @@ export default function AdminTourDetailDrawer({ isOpen, onClose, tourId, onActio
                       <div className="ftd-schedule-item">
                         <Clock size={14} className="ftd-schedule-item__icon" />
                         <div className="ftd-schedule-item__content">
-                          <span className="ftd-schedule-item__label">Time Slot</span>
+                          <span className="ftd-schedule-item__label">Khung giờ</span>
                           <span className="ftd-schedule-item__value">
                             {tour.preferredTimeSlot}
                           </span>
@@ -335,7 +330,7 @@ export default function AdminTourDetailDrawer({ isOpen, onClose, tourId, onActio
 
                   {tour.notes && (
                     <div className="ftd-notes-section">
-                      <span className="ftd-notes-section__label">Family Notes</span>
+                      <span className="ftd-notes-section__label">Ghi chú của gia đình</span>
                       <p className="ftd-notes-section__text">
                         "{tour.notes}"
                       </p>
@@ -347,12 +342,12 @@ export default function AdminTourDetailDrawer({ isOpen, onClose, tourId, onActio
               {/* Approved/Confirmed Schedule widget */}
               {tour.status === 'confirmed' && (
                 <div className="ftd-drawer__section">
-                  <div className="ftd-drawer__section-title">Confirmed Appointment</div>
+                  <div className="ftd-drawer__section-title">Lịch hẹn đã xác nhận</div>
                   <div className="ftd-detail-card ftd-detail-card--appointment">
                     <div className="ftd-appointment-card__row">
                       <div className="ftd-cal-widget flex-shrink-0">
                         <div className="ftd-cal-widget__month">
-                          {tour.preferredDate ? new Date(tour.preferredDate).toLocaleDateString('en-US', { month: 'short' }).toUpperCase() : 'VISIT'}
+                          {tour.preferredDate ? new Date(tour.preferredDate).toLocaleDateString('vi-VN', { month: 'short' }).toUpperCase() : 'THĂM'}
                         </div>
                         <div className="ftd-cal-widget__day">
                           {tour.preferredDate ? new Date(tour.preferredDate).getDate() : '??'}
@@ -364,14 +359,14 @@ export default function AdminTourDetailDrawer({ isOpen, onClose, tourId, onActio
 
                       <div>
                         <div className="ftd-appointment-card__title" style={{ color: '#2d6a4f' }}>
-                          Appointment is Confirmed!
+                          Lịch hẹn đã được xác nhận!
                         </div>
                         <div className="ftd-appointment-card__subtitle" style={{ fontWeight: '600' }}>
-                          Time Slot: {tour.confirmedTimeSlot || tour.preferredTimeSlot || 'N/A'}
+                          Khung giờ: {tour.confirmedTimeSlot || tour.preferredTimeSlot || 'N/A'}
                         </div>
                         {tour.adminNotes && (
                           <div className="ftd-appointment-card__admin-notes mt-2 p-2 bg-white/70 rounded border border-emerald-100">
-                            <strong>Admin Notes:</strong> "{tour.adminNotes}"
+                            <strong>Ghi chú quản trị:</strong> "{tour.adminNotes}"
                           </div>
                         )}
                       </div>
@@ -383,19 +378,19 @@ export default function AdminTourDetailDrawer({ isOpen, onClose, tourId, onActio
               {/* Cancellation/Rejection widget */}
               {(tour.cancellationReason || tour.rejectionReason) && (
                 <div className="ftd-drawer__section">
-                  <div className="ftd-drawer__section-title">Cancellation Details</div>
+                  <div className="ftd-drawer__section-title">Chi tiết huỷ/từ chối</div>
                   <div className="ftd-detail-card ftd-detail-card--health-alert" style={{ borderColor: '#fecaca', backgroundColor: '#fef2f2' }}>
                     <div className="ftd-cancellation-card__row flex items-start gap-3">
                       <XCircle className="text-red-500 flex-shrink-0 mt-0.5" size={18} />
                       <div>
                         <div className="ftd-cancellation-card__title text-red-800 font-bold" style={{ fontSize: '13.5px' }}>
-                          {tour.rejectionReason ? 'Rejected by Staff' : 'Cancelled by Family'}
+                          {tour.rejectionReason ? 'Bị từ chối bởi nhân viên' : 'Đã huỷ bởi gia đình'}
                         </div>
                         <p className="ftd-cancellation-card__text text-red-700 italic mt-1 font-medium" style={{ fontSize: '12.5px' }}>
                           "{tour.cancellationReason || tour.rejectionReason}"
                         </p>
                         <div className="text-[11px] text-red-500 mt-2">
-                          Date: {formatEnglishDate(tour.cancelledAt || tour.rejectedAt)}
+                          Ngày: {formatViDate(tour.cancelledAt || tour.rejectedAt)}
                         </div>
                       </div>
                     </div>
@@ -414,19 +409,19 @@ export default function AdminTourDetailDrawer({ isOpen, onClose, tourId, onActio
                 className="ftd-btn ftd-btn--danger-outline flex-1 flex justify-center items-center gap-1.5"
                 onClick={() => setShowRejectModal(true)}
               >
-                Reject Tour
+                Từ chối
               </button>
               <button
                 className="ftd-btn ftd-btn--primary flex-1 flex justify-center items-center gap-1.5"
                 style={{ backgroundColor: '#1B365D' }}
                 onClick={() => setShowApproveModal(true)}
               >
-                Approve Tour
+                Duyệt tour
               </button>
             </div>
           ) : (
             <button className="ftd-btn ftd-btn--primary w-full" onClick={onClose}>
-              Close Details
+              Đóng
             </button>
           )}
         </div>
@@ -436,18 +431,17 @@ export default function AdminTourDetailDrawer({ isOpen, onClose, tourId, onActio
       {showApproveModal && (
         <div className="arh-modal-backdrop" onClick={() => setShowApproveModal(false)}>
           <div className="arh-modal" onClick={(e) => e.stopPropagation()}>
-            <h4 className="arh-modal__title">Approve Facility Tour Request</h4>
+            <h4 className="arh-modal__title">Duyệt yêu cầu tham quan</h4>
             <p className="arh-modal__text">
-              Confirm the tour schedule for <strong className="text-slate-800">{tour?.contactName}</strong> on <strong className="text-emerald-700">{formatEnglishDate(tour?.preferredDate)}</strong>.
+              Xác nhận lịch tham quan cho <strong className="text-slate-800">{tour?.contactName}</strong> vào ngày <strong className="text-emerald-700">{formatViDate(tour?.preferredDate)}</strong>.
             </p>
 
             <form onSubmit={handleApproveSubmit}>
-              {/* Confirmed Time Slot Option Selector */}
               <div className="mb-4">
                 <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">
-                  Confirmed Time Slot
+                  Khung giờ xác nhận
                 </label>
-                
+
                 {!isCustomSlot ? (
                   <div className="flex flex-col gap-2">
                     <select
@@ -468,7 +462,7 @@ export default function AdminTourDetailDrawer({ isOpen, onClose, tourId, onActio
                           {slot}
                         </option>
                       ))}
-                      <option value="custom">-- Custom Time Slot --</option>
+                      <option value="custom">-- Khung giờ tuỳ chỉnh --</option>
                     </select>
                   </div>
                 ) : (
@@ -476,7 +470,7 @@ export default function AdminTourDetailDrawer({ isOpen, onClose, tourId, onActio
                     <input
                       type="text"
                       className="w-full px-4 py-2.5 text-sm rounded-xl border border-slate-200 bg-white shadow-sm font-sans"
-                      placeholder="e.g., 09:30 - 11:30"
+                      placeholder="vd: 09:30 - 11:30"
                       value={customTimeSlot}
                       onChange={(e) => setCustomTimeSlot(e.target.value)}
                       required
@@ -489,27 +483,25 @@ export default function AdminTourDetailDrawer({ isOpen, onClose, tourId, onActio
                         setConfirmedTimeSlot(TIME_SLOTS_OPTIONS[0]);
                       }}
                     >
-                      Choose from list
+                      Chọn từ danh sách
                     </button>
                   </div>
                 )}
               </div>
 
-              {/* Admin Notes */}
               <div className="mb-5">
                 <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">
-                  Administrative Notes <span className="text-slate-400 font-normal italic text-[11px] ml-1">(optional)</span>
+                  Ghi chú quản trị <span className="text-slate-400 font-normal italic text-[11px] ml-1">(tùy chọn)</span>
                 </label>
                 <textarea
                   className="arh-modal__textarea"
                   style={{ minHeight: '80px' }}
-                  placeholder="Provide meeting point, responsible receptionist, or guidelines for the visitor..."
+                  placeholder="Địa điểm gặp mặt, nhân viên tiếp đón, hoặc hướng dẫn cho khách tham quan..."
                   value={adminNotes}
                   onChange={(e) => setAdminNotes(e.target.value)}
                 />
               </div>
 
-              {/* Footer buttons */}
               <div className="flex gap-3 pt-2">
                 <button
                   type="button"
@@ -521,7 +513,7 @@ export default function AdminTourDetailDrawer({ isOpen, onClose, tourId, onActio
                   }}
                   disabled={approving}
                 >
-                  Cancel
+                  Huỷ
                 </button>
                 <button
                   type="submit"
@@ -530,7 +522,7 @@ export default function AdminTourDetailDrawer({ isOpen, onClose, tourId, onActio
                   disabled={approving}
                 >
                   {approving && <Loader2 className="animate-spin mr-1" size={13} />}
-                  Confirm Approval
+                  Xác nhận duyệt
                 </button>
               </div>
             </form>
@@ -542,20 +534,20 @@ export default function AdminTourDetailDrawer({ isOpen, onClose, tourId, onActio
       {showRejectModal && (
         <div className="arh-modal-backdrop" onClick={() => setShowRejectModal(false)}>
           <div className="arh-modal" onClick={(e) => e.stopPropagation()}>
-            <h4 className="arh-modal__title text-red-800">Reject Tour Request</h4>
+            <h4 className="arh-modal__title text-red-800">Từ chối yêu cầu tham quan</h4>
             <p className="arh-modal__text">
-              Are you sure you want to reject the tour request from <strong className="text-slate-800">{tour?.contactName}</strong>? Please provide a reason below. This will notify the family account.
+              Bạn có chắc muốn từ chối yêu cầu tham quan của <strong className="text-slate-800">{tour?.contactName}</strong>? Vui lòng cung cấp lý do bên dưới. Tài khoản gia đình sẽ được thông báo.
             </p>
 
             <form onSubmit={handleRejectSubmit}>
               <div className="mb-5">
                 <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
-                  Rejection Reason <span className="text-red-500">*</span>
+                  Lý do từ chối <span className="text-red-500">*</span>
                 </label>
                 <textarea
                   className="arh-modal__textarea"
                   style={{ minHeight: '100px', borderColor: '#fca5a5' }}
-                  placeholder="State the reason clearly (e.g., Nursing home fully booked on this date, construction work active in block A...)"
+                  placeholder="Nêu rõ lý do (vd: Cơ sở đã hết chỗ vào ngày này, đang có công trình xây dựng tại khu A...)"
                   value={rejectionReason}
                   onChange={(e) => setRejectionReason(e.target.value)}
                   required
@@ -573,7 +565,7 @@ export default function AdminTourDetailDrawer({ isOpen, onClose, tourId, onActio
                   }}
                   disabled={rejecting}
                 >
-                  Cancel
+                  Huỷ
                 </button>
                 <button
                   type="submit"
@@ -582,7 +574,7 @@ export default function AdminTourDetailDrawer({ isOpen, onClose, tourId, onActio
                   disabled={rejecting || !rejectionReason.trim()}
                 >
                   {rejecting && <Loader2 className="animate-spin mr-1" size={13} />}
-                  Confirm Rejection
+                  Xác nhận từ chối
                 </button>
               </div>
             </form>

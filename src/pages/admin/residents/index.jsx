@@ -15,15 +15,15 @@ import residentService from '../../../services/resident.service';
 import '../../../styles/admin/ResidentPage.css';
 
 const GENDERS = [
-  { value: '', label: 'All Genders' },
-  { value: 'male', label: 'Male' },
-  { value: 'female', label: 'Female' },
-  { value: 'other', label: 'Other' },
-  { value: 'unknown', label: 'Unknown' },
+  { value: '', label: 'Tất cả giới tính' },
+  { value: 'male', label: 'Nam' },
+  { value: 'female', label: 'Nữ' },
+  { value: 'other', label: 'Khác' },
+  { value: 'unknown', label: 'Không xác định' },
 ];
 
 const BLOOD_TYPES = [
-  { value: '', label: 'All Blood Types' },
+  { value: '', label: 'Tất cả nhóm máu' },
   { value: 'A+', label: 'A+' },
   { value: 'A-', label: 'A-' },
   { value: 'B+', label: 'B+' },
@@ -32,16 +32,16 @@ const BLOOD_TYPES = [
   { value: 'AB-', label: 'AB-' },
   { value: 'O+', label: 'O+' },
   { value: 'O-', label: 'O-' },
-  { value: 'unknown', label: 'Unknown' },
+  { value: 'unknown', label: 'Không xác định' },
 ];
 
 const RESIDENCY_STATUSES = [
-  { value: '', label: 'All Statuses' },
-  { value: 'pending', label: 'Pending' },
-  { value: 'admitted', label: 'Admitted' },
-  { value: 'discharged', label: 'Discharged' },
-  { value: 'transferred', label: 'Transferred' },
-  { value: 'inactive', label: 'Inactive' },
+  { value: '', label: 'Tất cả trạng thái' },
+  { value: 'pending', label: 'Chờ xử lý' },
+  { value: 'admitted', label: 'Đã nhận vào ở' },
+  { value: 'discharged', label: 'Đã xuất viện' },
+  { value: 'transferred', label: 'Đã chuyển viện' },
+  { value: 'inactive', label: 'Không hoạt động' },
 ];
 
 const formatDateTime = (value) => {
@@ -93,7 +93,7 @@ const buildContactsPayload = (contacts) => {
     if (!hasAny) continue;
 
     if (!fullName || !relationship || !phone) {
-      return { error: 'Each emergency contact must include full name, relationship, and phone.' };
+      return { error: 'Mỗi liên hệ khẩn cấp phải có họ tên, quan hệ và số điện thoại.' };
     }
 
     payload.push({
@@ -204,7 +204,7 @@ function ResidentPage({ defaultMode }) {
       setTotalPages(res?.totalPages || 1);
     } catch (err) {
       console.error('Failed to load residents:', err);
-      setError('Could not retrieve residents. Please check your credentials or network connection.');
+      setError('Không thể tải danh sách cư dân. Vui lòng kiểm tra quyền truy cập hoặc kết nối mạng.');
     } finally {
       setLoading(false);
     }
@@ -258,7 +258,7 @@ function ResidentPage({ defaultMode }) {
         );
       } catch (err) {
         console.error('Failed to load resident details:', err);
-        setDetailError('Could not load resident details.');
+        setDetailError('Không thể tải thông tin chi tiết cư dân.');
       } finally {
         setDetailLoading(false);
       }
@@ -324,7 +324,7 @@ function ResidentPage({ defaultMode }) {
   const handleCreateResident = async (event) => {
     if (event) event.preventDefault();
     if (!createForm.fullName.trim()) {
-      setCreateError('Full name is required.');
+      setCreateError('Họ tên là bắt buộc.');
       return;
     }
 
@@ -363,7 +363,7 @@ function ResidentPage({ defaultMode }) {
       fetchResidents();
     } catch (err) {
       console.error('Failed to create resident:', err);
-      setCreateError(err.response?.data?.message || 'Failed to create resident.');
+      setCreateError(err.response?.data?.message || 'Không thể tạo hồ sơ cư dân.');
     } finally {
       setCreating(false);
     }
@@ -373,7 +373,7 @@ function ResidentPage({ defaultMode }) {
     if (event) event.preventDefault();
     if (!selectedResidentId) return;
     if (!personalForm.fullName.trim()) {
-      setPersonalError('Full name is required.');
+      setPersonalError('Họ tên là bắt buộc.');
       return;
     }
 
@@ -400,7 +400,7 @@ function ResidentPage({ defaultMode }) {
       fetchResidents();
     } catch (err) {
       console.error('Failed to update personal info:', err);
-      setPersonalError(err.response?.data?.message || 'Failed to update personal info.');
+      setPersonalError(err.response?.data?.message || 'Không thể cập nhật thông tin cá nhân.');
     } finally {
       setPersonalSaving(false);
     }
@@ -428,7 +428,7 @@ function ResidentPage({ defaultMode }) {
       fetchResidents();
     } catch (err) {
       console.error('Failed to update family info:', err);
-      setFamilyError(err.response?.data?.message || 'Failed to update family info.');
+      setFamilyError(err.response?.data?.message || 'Không thể cập nhật thông tin gia đình.');
     } finally {
       setFamilySaving(false);
     }
@@ -457,9 +457,9 @@ function ResidentPage({ defaultMode }) {
     <div className="resident-page">
       <div className="resident-page__header">
         <div>
-          <h1 className="resident-page__title">Resident Management</h1>
+          <h1 className="resident-page__title">Quản lý cư dân</h1>
           <p className="resident-page__subtitle">
-            Search, review, and update resident profiles with medical and family records.
+            Tìm kiếm, xem và cập nhật hồ sơ cư dân cùng thông tin y tế và gia đình.
           </p>
         </div>
         <div className="resident-page__actions">
@@ -469,14 +469,14 @@ function ResidentPage({ defaultMode }) {
             disabled={loading}
           >
             <RefreshCw size={16} className={loading ? 'spin' : ''} />
-            Refresh
+            Làm mới
           </button>
           <button
             className="resident-page__button resident-page__button--primary"
             onClick={handleOpenCreate}
           >
             <Plus size={16} />
-            Add Resident
+            Thêm cư dân
           </button>
         </div>
       </div>
@@ -487,7 +487,7 @@ function ResidentPage({ defaultMode }) {
             <Users size={20} />
           </div>
           <div>
-            <span>Total Residents</span>
+            <span>Tổng cư dân</span>
             <strong>{String(total).padStart(2, '0')}</strong>
           </div>
         </div>
@@ -496,7 +496,7 @@ function ResidentPage({ defaultMode }) {
             <Home size={20} />
           </div>
           <div>
-            <span>Admitted</span>
+            <span>Đã nhận vào ở</span>
             <strong>{String(stats.admittedCount).padStart(2, '0')}</strong>
           </div>
         </div>
@@ -505,7 +505,7 @@ function ResidentPage({ defaultMode }) {
             <HeartPulse size={20} />
           </div>
           <div>
-            <span>Pending</span>
+            <span>Chờ xử lý</span>
             <strong>{String(stats.pendingCount).padStart(2, '0')}</strong>
           </div>
         </div>
@@ -514,7 +514,7 @@ function ResidentPage({ defaultMode }) {
             <Users size={20} />
           </div>
           <div>
-            <span>Inactive</span>
+            <span>Không hoạt động</span>
             <strong>{String(stats.inactiveCount).padStart(2, '0')}</strong>
           </div>
         </div>
@@ -523,20 +523,20 @@ function ResidentPage({ defaultMode }) {
       <form className="resident-page__filters" onSubmit={handleApplyFilters}>
         <div className="resident-page__filter-row">
           <label className="resident-page__filter">
-            <span>Search</span>
+            <span>Tìm kiếm</span>
             <div className="resident-page__filter-input">
               <Search size={16} />
               <input
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search by code, name, citizen ID"
+                placeholder="Tìm theo mã, họ tên, CCCD"
               />
             </div>
           </label>
 
           <label className="resident-page__filter">
-            <span>Status</span>
+            <span>Trạng thái</span>
             <select value={residencyStatus} onChange={(e) => setResidencyStatus(e.target.value)}>
               {RESIDENCY_STATUSES.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -547,7 +547,7 @@ function ResidentPage({ defaultMode }) {
           </label>
 
           <label className="resident-page__filter">
-            <span>Gender</span>
+            <span>Giới tính</span>
             <select value={gender} onChange={(e) => setGender(e.target.value)}>
               {GENDERS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -558,7 +558,7 @@ function ResidentPage({ defaultMode }) {
           </label>
 
           <label className="resident-page__filter">
-            <span>Blood Type</span>
+            <span>Nhóm máu</span>
             <select value={bloodType} onChange={(e) => setBloodType(e.target.value)}>
               {BLOOD_TYPES.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -571,7 +571,7 @@ function ResidentPage({ defaultMode }) {
 
         <div className="resident-page__filter-row">
           <label className="resident-page__filter">
-            <span>Admitted From</span>
+            <span>Nhận vào từ ngày</span>
             <input
               type="date"
               value={admittedFrom}
@@ -580,7 +580,7 @@ function ResidentPage({ defaultMode }) {
           </label>
 
           <label className="resident-page__filter">
-            <span>Admitted To</span>
+            <span>Nhận vào đến ngày</span>
             <input
               type="date"
               value={admittedTo}
@@ -590,14 +590,14 @@ function ResidentPage({ defaultMode }) {
 
           <div className="resident-page__filter-actions">
             <button className="resident-page__button resident-page__button--primary" type="submit">
-              Apply Filters
+              Áp dụng bộ lọc
             </button>
             <button
               className="resident-page__button resident-page__button--ghost"
               type="button"
               onClick={handleResetFilters}
             >
-              Reset
+              Đặt lại
             </button>
           </div>
         </div>
@@ -609,20 +609,20 @@ function ResidentPage({ defaultMode }) {
         <table className="resident-page__table-element">
           <thead>
             <tr className="resident-page__table-header">
-              <th>Code</th>
-              <th>Name</th>
-              <th>Status</th>
-              <th>Room</th>
-              <th>Bed</th>
-              <th>Admitted At</th>
-              <th>Actions</th>
+              <th>Mã</th>
+              <th>Họ tên</th>
+              <th>Trạng thái</th>
+              <th>Phòng</th>
+              <th>Giường</th>
+              <th>Ngày nhận vào</th>
+              <th>Hành động</th>
             </tr>
           </thead>
           <tbody>
             {loading && (
               <tr>
                 <td colSpan="7" className="resident-page__empty">
-                  Loading residents...
+                  Đang tải danh sách cư dân...
                 </td>
               </tr>
             )}
@@ -630,7 +630,7 @@ function ResidentPage({ defaultMode }) {
             {!loading && residents.length === 0 && (
               <tr>
                 <td colSpan="7" className="resident-page__empty">
-                  No residents found.
+                  Không tìm thấy cư dân nào.
                 </td>
               </tr>
             )}
@@ -642,7 +642,7 @@ function ResidentPage({ defaultMode }) {
                   <td>
                     <div className="resident-page__name">
                       <strong>{resident.fullName}</strong>
-                      <span>{resident.citizenId || 'No ID'}</span>
+                      <span>{resident.citizenId || 'Chưa có CCCD'}</span>
                     </div>
                   </td>
                   <td>
@@ -654,8 +654,8 @@ function ResidentPage({ defaultMode }) {
                       {resident.residencyStatus || 'pending'}
                     </span>
                   </td>
-                  <td>{resident.room?.roomCode || 'Unassigned'}</td>
-                  <td>{resident.bed?.bedCode || 'Unassigned'}</td>
+                  <td>{resident.room?.roomCode || 'Chưa phân công'}</td>
+                  <td>{resident.bed?.bedCode || 'Chưa phân công'}</td>
                   <td>{formatDateTime(resident.admittedAt)}</td>
                   <td>
                     <button
@@ -663,7 +663,7 @@ function ResidentPage({ defaultMode }) {
                       onClick={() => handleOpenDetail(resident._id)}
                     >
                       <Eye size={16} />
-                      View
+                      Xem
                     </button>
                   </td>
                 </tr>
@@ -679,17 +679,17 @@ function ResidentPage({ defaultMode }) {
           disabled={page <= 1}
         >
           <ChevronLeft size={16} />
-          Prev
+          Trước
         </button>
         <span>
-          Page {page} of {totalPages}
+          Trang {page} / {totalPages}
         </span>
         <button
           className="resident-page__page-btn"
           onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
           disabled={page >= totalPages}
         >
-          Next
+          Tiếp
           <ChevronRight size={16} />
         </button>
       </div>
@@ -699,8 +699,8 @@ function ResidentPage({ defaultMode }) {
           <div className="resident-modal__content">
             <div className="resident-modal__header">
               <div>
-                <h2>Create Resident Profile</h2>
-                <p>Enter personal and family details to open a new record.</p>
+                <h2>Tạo hồ sơ cư dân</h2>
+                <p>Nhập thông tin cá nhân và gia đình để mở hồ sơ mới.</p>
               </div>
               <button className="resident-modal__close" onClick={handleCloseCreate}>
                 <X size={18} />
@@ -710,29 +710,29 @@ function ResidentPage({ defaultMode }) {
             <form className="resident-modal__body" onSubmit={handleCreateResident}>
               <div className="resident-form-grid">
                 <label>
-                  Full Name *
+                  Họ tên *
                   <input
                     type="text"
                     value={createForm.fullName}
                     onChange={(e) =>
                       setCreateForm((prev) => ({ ...prev, fullName: e.target.value }))
                     }
-                    placeholder="Enter resident name"
+                    placeholder="Nhập họ tên cư dân"
                   />
                 </label>
                 <label>
-                  Resident Code
+                  Mã cư dân
                   <input
                     type="text"
                     value={createForm.residentCode}
                     onChange={(e) =>
                       setCreateForm((prev) => ({ ...prev, residentCode: e.target.value }))
                     }
-                    placeholder="Auto-generated if blank"
+                    placeholder="Tự động tạo nếu để trống"
                   />
                 </label>
                 <label>
-                  Date of Birth
+                  Ngày sinh
                   <input
                     type="date"
                     value={createForm.dateOfBirth}
@@ -742,7 +742,7 @@ function ResidentPage({ defaultMode }) {
                   />
                 </label>
                 <label>
-                  Gender
+                  Giới tính
                   <select
                     value={createForm.gender}
                     onChange={(e) =>
@@ -757,7 +757,7 @@ function ResidentPage({ defaultMode }) {
                   </select>
                 </label>
                 <label>
-                  Citizen ID
+                  CCCD
                   <input
                     type="text"
                     value={createForm.citizenId}
@@ -767,7 +767,7 @@ function ResidentPage({ defaultMode }) {
                   />
                 </label>
                 <label>
-                  Insurance Number
+                  Số bảo hiểm
                   <input
                     type="text"
                     value={createForm.insuranceNumber}
@@ -777,7 +777,7 @@ function ResidentPage({ defaultMode }) {
                   />
                 </label>
                 <label>
-                  Blood Type
+                  Nhóm máu
                   <select
                     value={createForm.bloodType}
                     onChange={(e) =>
@@ -792,7 +792,7 @@ function ResidentPage({ defaultMode }) {
                   </select>
                 </label>
                 <label className="full">
-                  Address
+                  Địa chỉ
                   <input
                     type="text"
                     value={createForm.personalAddress}
@@ -802,7 +802,7 @@ function ResidentPage({ defaultMode }) {
                   />
                 </label>
                 <label>
-                  Residency Status
+                  Trạng thái cư trú
                   <select
                     value={createForm.residencyStatus}
                     onChange={(e) =>
@@ -817,7 +817,7 @@ function ResidentPage({ defaultMode }) {
                   </select>
                 </label>
                 <label>
-                  Admitted At
+                  Ngày nhận vào
                   <input
                     type="datetime-local"
                     value={createForm.admittedAt}
@@ -827,7 +827,7 @@ function ResidentPage({ defaultMode }) {
                   />
                 </label>
                 <label>
-                  Discharged At
+                  Ngày xuất viện
                   <input
                     type="datetime-local"
                     value={createForm.dischargedAt}
@@ -837,7 +837,7 @@ function ResidentPage({ defaultMode }) {
                   />
                 </label>
                 <label>
-                  Service Package
+                  Gói dịch vụ
                   <input
                     type="text"
                     value={createForm.servicePackage}
@@ -847,7 +847,7 @@ function ResidentPage({ defaultMode }) {
                   />
                 </label>
                 <label className="full">
-                  Allergies (one per line)
+                  Dị ứng (mỗi dòng một mục)
                   <textarea
                     rows="3"
                     value={createForm.allergies}
@@ -857,7 +857,7 @@ function ResidentPage({ defaultMode }) {
                   />
                 </label>
                 <label className="full">
-                  Chronic Conditions (one per line)
+                  Bệnh mãn tính (mỗi dòng một mục)
                   <textarea
                     rows="3"
                     value={createForm.chronicConditions}
@@ -867,7 +867,7 @@ function ResidentPage({ defaultMode }) {
                   />
                 </label>
                 <label className="full">
-                  Initial Health Condition
+                  Tình trạng sức khỏe ban đầu
                   <textarea
                     rows="3"
                     value={createForm.initialHealthCondition}
@@ -880,23 +880,23 @@ function ResidentPage({ defaultMode }) {
 
               <div className="resident-form-section">
                 <div className="resident-form-section__header">
-                  <h3>Emergency Contacts</h3>
+                  <h3>Liên hệ khẩn cấp</h3>
                   <button
                     type="button"
                     className="resident-page__button resident-page__button--ghost"
                     onClick={() => addContactRow(setCreateContacts, createContacts)}
                   >
-                    Add Contact
+                    Thêm liên hệ
                   </button>
                 </div>
                 {createContacts.length === 0 && (
-                  <p className="resident-form-empty">No contacts added yet.</p>
+                  <p className="resident-form-empty">Chưa có liên hệ nào.</p>
                 )}
                 {createContacts.map((contact, index) => (
                   <div key={`create-contact-${index}`} className="resident-contact-row">
                     <input
                       type="text"
-                      placeholder="Full name"
+                      placeholder="Họ tên"
                       value={contact.fullName}
                       onChange={(e) =>
                         updateContact(index, 'fullName', e.target.value, setCreateContacts, createContacts)
@@ -904,7 +904,7 @@ function ResidentPage({ defaultMode }) {
                     />
                     <input
                       type="text"
-                      placeholder="Relationship"
+                      placeholder="Quan hệ"
                       value={contact.relationship}
                       onChange={(e) =>
                         updateContact(index, 'relationship', e.target.value, setCreateContacts, createContacts)
@@ -912,7 +912,7 @@ function ResidentPage({ defaultMode }) {
                     />
                     <input
                       type="text"
-                      placeholder="Phone"
+                      placeholder="Điện thoại"
                       value={contact.phone}
                       onChange={(e) =>
                         updateContact(index, 'phone', e.target.value, setCreateContacts, createContacts)
@@ -928,7 +928,7 @@ function ResidentPage({ defaultMode }) {
                     />
                     <input
                       type="text"
-                      placeholder="Address"
+                      placeholder="Địa chỉ"
                       value={contact.address}
                       onChange={(e) =>
                         updateContact(index, 'address', e.target.value, setCreateContacts, createContacts)
@@ -942,26 +942,26 @@ function ResidentPage({ defaultMode }) {
                           updateContact(index, 'isPrimary', e.target.checked, setCreateContacts, createContacts)
                         }
                       />
-                      Primary
+                      Liên hệ chính
                     </label>
                     <button
                       type="button"
                       className="resident-contact-row__remove"
                       onClick={() => removeContact(index, setCreateContacts, createContacts)}
                     >
-                      Remove
+                      Xóa
                     </button>
                   </div>
                 ))}
               </div>
 
               <div className="resident-form-section">
-                <h3>Family Portal Account IDs (one per line)</h3>
+                <h3>ID tài khoản gia đình (mỗi dòng một ID)</h3>
                 <textarea
                   rows="3"
                   value={createFamilyIds}
                   onChange={(e) => setCreateFamilyIds(e.target.value)}
-                  placeholder="Paste user IDs of family accounts"
+                  placeholder="Dán ID tài khoản thành viên gia đình vào đây"
                 />
               </div>
 
@@ -973,14 +973,14 @@ function ResidentPage({ defaultMode }) {
                   className="resident-page__button resident-page__button--ghost"
                   onClick={handleCloseCreate}
                 >
-                  Cancel
+                  Huỷ
                 </button>
                 <button
                   type="submit"
                   className="resident-page__button resident-page__button--primary"
                   disabled={creating}
                 >
-                  {creating ? 'Creating...' : 'Create Resident'}
+                  {creating ? 'Đang tạo...' : 'Tạo cư dân'}
                 </button>
               </div>
             </form>
@@ -993,15 +993,15 @@ function ResidentPage({ defaultMode }) {
           <div className="resident-modal__content resident-modal__content--wide">
             <div className="resident-modal__header">
               <div>
-                <h2>Resident Profile</h2>
-                <p>Review and update personal or family information.</p>
+                <h2>Hồ sơ cư dân</h2>
+                <p>Xem và cập nhật thông tin cá nhân hoặc gia đình.</p>
               </div>
               <button className="resident-modal__close" onClick={handleCloseDetail}>
                 <X size={18} />
               </button>
             </div>
 
-            {detailLoading && <p className="resident-form-empty">Loading details...</p>}
+            {detailLoading && <p className="resident-form-empty">Đang tải thông tin...</p>}
             {detailError && <p className="resident-form-error">{detailError}</p>}
 
             {!detailLoading && selectedResident && (
@@ -1012,36 +1012,36 @@ function ResidentPage({ defaultMode }) {
                     <p>{selectedResident.residentCode}</p>
                   </div>
                   <div>
-                    <span>Status</span>
+                    <span>Trạng thái</span>
                     <strong>{selectedResident.residencyStatus}</strong>
                   </div>
                   <div>
-                    <span>Room / Bed</span>
+                    <span>Phòng / Giường</span>
                     <strong>
-                      {selectedResident.room?.roomCode || 'Unassigned'} /{' '}
-                      {selectedResident.bed?.bedCode || 'Unassigned'}
+                      {selectedResident.room?.roomCode || 'Chưa phân công'} /{' '}
+                      {selectedResident.bed?.bedCode || 'Chưa phân công'}
                     </strong>
                   </div>
                   <div>
-                    <span>Admitted At</span>
+                    <span>Ngày nhận vào</span>
                     <strong>{formatDateTime(selectedResident.admittedAt)}</strong>
                   </div>
                 </div>
 
                 <form className="resident-form-section" onSubmit={handleSavePersonalInfo}>
                   <div className="resident-form-section__header">
-                    <h3>Personal Information</h3>
+                    <h3>Thông tin cá nhân</h3>
                     <button
                       className="resident-page__button resident-page__button--primary"
                       type="submit"
                       disabled={personalSaving}
                     >
-                      {personalSaving ? 'Saving...' : 'Save Personal Info'}
+                      {personalSaving ? 'Đang lưu...' : 'Lưu thông tin cá nhân'}
                     </button>
                   </div>
                   <div className="resident-form-grid">
                     <label>
-                      Full Name *
+                      Họ tên *
                       <input
                         type="text"
                         value={personalForm.fullName}
@@ -1051,7 +1051,7 @@ function ResidentPage({ defaultMode }) {
                       />
                     </label>
                     <label>
-                      Date of Birth
+                      Ngày sinh
                       <input
                         type="date"
                         value={personalForm.dateOfBirth}
@@ -1061,7 +1061,7 @@ function ResidentPage({ defaultMode }) {
                       />
                     </label>
                     <label>
-                      Gender
+                      Giới tính
                       <select
                         value={personalForm.gender}
                         onChange={(e) =>
@@ -1076,7 +1076,7 @@ function ResidentPage({ defaultMode }) {
                       </select>
                     </label>
                     <label>
-                      Citizen ID
+                      CCCD
                       <input
                         type="text"
                         value={personalForm.citizenId}
@@ -1086,7 +1086,7 @@ function ResidentPage({ defaultMode }) {
                       />
                     </label>
                     <label>
-                      Insurance Number
+                      Số bảo hiểm
                       <input
                         type="text"
                         value={personalForm.insuranceNumber}
@@ -1096,7 +1096,7 @@ function ResidentPage({ defaultMode }) {
                       />
                     </label>
                     <label>
-                      Blood Type
+                      Nhóm máu
                       <select
                         value={personalForm.bloodType}
                         onChange={(e) =>
@@ -1111,7 +1111,7 @@ function ResidentPage({ defaultMode }) {
                       </select>
                     </label>
                     <label className="full">
-                      Address
+                      Địa chỉ
                       <input
                         type="text"
                         value={personalForm.personalAddress}
@@ -1121,7 +1121,7 @@ function ResidentPage({ defaultMode }) {
                       />
                     </label>
                     <label className="full">
-                      Allergies (one per line)
+                      Dị ứng (mỗi dòng một mục)
                       <textarea
                         rows="3"
                         value={personalForm.allergies}
@@ -1131,7 +1131,7 @@ function ResidentPage({ defaultMode }) {
                       />
                     </label>
                     <label className="full">
-                      Chronic Conditions (one per line)
+                      Bệnh mãn tính (mỗi dòng một mục)
                       <textarea
                         rows="3"
                         value={personalForm.chronicConditions}
@@ -1141,7 +1141,7 @@ function ResidentPage({ defaultMode }) {
                       />
                     </label>
                     <label className="full">
-                      Initial Health Condition
+                      Tình trạng sức khỏe ban đầu
                       <textarea
                         rows="3"
                         value={personalForm.initialHealthCondition}
@@ -1156,35 +1156,35 @@ function ResidentPage({ defaultMode }) {
 
                 <form className="resident-form-section" onSubmit={handleSaveFamilyInfo}>
                   <div className="resident-form-section__header">
-                    <h3>Family Information</h3>
+                    <h3>Thông tin gia đình</h3>
                     <button
                       className="resident-page__button resident-page__button--primary"
                       type="submit"
                       disabled={familySaving}
                     >
-                      {familySaving ? 'Saving...' : 'Save Family Info'}
+                      {familySaving ? 'Đang lưu...' : 'Lưu thông tin gia đình'}
                     </button>
                   </div>
 
                   <div className="resident-form-section__header sub">
-                    <h4>Emergency Contacts</h4>
+                    <h4>Liên hệ khẩn cấp</h4>
                     <button
                       type="button"
                       className="resident-page__button resident-page__button--ghost"
                       onClick={() => addContactRow(setFamilyContacts, familyContacts)}
                     >
-                      Add Contact
+                      Thêm liên hệ
                     </button>
                   </div>
 
                   {familyContacts.length === 0 && (
-                    <p className="resident-form-empty">No contacts added yet.</p>
+                    <p className="resident-form-empty">Chưa có liên hệ nào.</p>
                   )}
                   {familyContacts.map((contact, index) => (
                     <div key={`family-contact-${index}`} className="resident-contact-row">
                       <input
                         type="text"
-                        placeholder="Full name"
+                        placeholder="Họ tên"
                         value={contact.fullName || ''}
                         onChange={(e) =>
                           updateContact(index, 'fullName', e.target.value, setFamilyContacts, familyContacts)
@@ -1192,7 +1192,7 @@ function ResidentPage({ defaultMode }) {
                       />
                       <input
                         type="text"
-                        placeholder="Relationship"
+                        placeholder="Quan hệ"
                         value={contact.relationship || ''}
                         onChange={(e) =>
                           updateContact(index, 'relationship', e.target.value, setFamilyContacts, familyContacts)
@@ -1200,7 +1200,7 @@ function ResidentPage({ defaultMode }) {
                       />
                       <input
                         type="text"
-                        placeholder="Phone"
+                        placeholder="Điện thoại"
                         value={contact.phone || ''}
                         onChange={(e) =>
                           updateContact(index, 'phone', e.target.value, setFamilyContacts, familyContacts)
@@ -1216,7 +1216,7 @@ function ResidentPage({ defaultMode }) {
                       />
                       <input
                         type="text"
-                        placeholder="Address"
+                        placeholder="Địa chỉ"
                         value={contact.address || ''}
                         onChange={(e) =>
                           updateContact(index, 'address', e.target.value, setFamilyContacts, familyContacts)
@@ -1230,25 +1230,25 @@ function ResidentPage({ defaultMode }) {
                             updateContact(index, 'isPrimary', e.target.checked, setFamilyContacts, familyContacts)
                           }
                         />
-                        Primary
+                        Liên hệ chính
                       </label>
                       <button
                         type="button"
                         className="resident-contact-row__remove"
                         onClick={() => removeContact(index, setFamilyContacts, familyContacts)}
                       >
-                        Remove
+                        Xóa
                       </button>
                     </div>
                   ))}
 
                   <div className="resident-form-section">
-                    <h4>Family Portal Account IDs (one per line)</h4>
+                    <h4>ID tài khoản gia đình (mỗi dòng một ID)</h4>
                     <textarea
                       rows="3"
                       value={familyIds}
                       onChange={(e) => setFamilyIds(e.target.value)}
-                      placeholder="Paste user IDs of family accounts"
+                      placeholder="Dán ID tài khoản thành viên gia đình vào đây"
                     />
                   </div>
 

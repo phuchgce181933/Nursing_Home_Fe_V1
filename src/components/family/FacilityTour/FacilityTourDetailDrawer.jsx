@@ -15,12 +15,12 @@ import {
 } from 'lucide-react';
 import facilityTourService from '../../../services/facilityTour.service';
 
-const formatEnglishDate = (dateStr) => {
+const formatViDate = (dateStr) => {
   if (!dateStr) return 'N/A';
   try {
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return dateStr;
-    return d.toLocaleDateString('en-US', {
+    return d.toLocaleDateString('vi-VN', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
@@ -34,28 +34,28 @@ const getStatusTheme = (status) => {
   switch (status) {
     case 'pending':
       return {
-        label: 'Pending Review',
+        label: 'Chờ xét duyệt',
         bg: 'bg-slate-100',
         text: 'text-slate-600',
         dot: 'bg-slate-400',
       };
     case 'confirmed':
       return {
-        label: 'Approved & Confirmed',
+        label: 'Đã duyệt & Xác nhận',
         bg: 'bg-emerald-50 text-emerald-700',
         text: 'text-emerald-700',
         dot: 'bg-emerald-500',
       };
     case 'completed':
       return {
-        label: 'Completed',
+        label: 'Đã hoàn thành',
         bg: 'bg-sky-50 text-sky-700',
         text: 'text-sky-700',
         dot: 'bg-sky-500',
       };
     case 'cancelled':
       return {
-        label: 'Cancelled',
+        label: 'Đã huỷ',
         bg: 'bg-red-50 text-error',
         text: 'text-error',
         dot: 'bg-error',
@@ -96,47 +96,46 @@ export default function FacilityTourDetailDrawer({ isOpen, onClose, tour, onCanc
       setCancelReason('');
       onClose();
     } catch (err) {
-      const msg = err?.response?.data?.message || err?.message || 'Failed to cancel the tour request.';
+      const msg = err?.response?.data?.message || err?.message || 'Không thể huỷ yêu cầu tham quan.';
       setCancelError(msg);
     } finally {
       setCancelling(false);
     }
   };
 
-  // Timeline node definitions
   const isCancelled = tour.status === 'cancelled';
-  
+
   const steps = [
     {
       key: 'submitted',
-      title: 'Request Submitted',
-      desc: `Scheduled on ${formatEnglishDate(tour.createdAt)}`,
+      title: 'Yêu cầu đã gửi',
+      desc: `Đã gửi vào ngày ${formatViDate(tour.createdAt)}`,
       isDone: true,
       isActive: false,
     },
     {
       key: 'pending',
-      title: 'Reviewing Details',
-      desc: 'Our staff is reviewing the request',
+      title: 'Đang xem xét',
+      desc: 'Nhân viên đang xem xét yêu cầu',
       isDone: tour.status !== 'pending',
       isActive: tour.status === 'pending',
     },
     {
       key: 'confirmed',
-      title: isCancelled ? 'Request Cancelled' : 'Tour Approved & Confirmed',
+      title: isCancelled ? 'Yêu cầu đã bị huỷ' : 'Đã duyệt & Xác nhận',
       desc: isCancelled
-        ? `Cancelled on ${formatEnglishDate(tour.cancelledAt || tour.rejectedAt)}`
+        ? `Đã huỷ vào ngày ${formatViDate(tour.cancelledAt || tour.rejectedAt)}`
         : tour.status === 'confirmed' || tour.status === 'completed'
-        ? `Confirmed for ${formatEnglishDate(tour.preferredDate)}`
-        : 'Waiting for approval',
+        ? `Xác nhận cho ngày ${formatViDate(tour.preferredDate)}`
+        : 'Chờ phê duyệt',
       isDone: tour.status === 'completed' || (isCancelled && true),
       isActive: tour.status === 'confirmed' || (isCancelled && true),
       isError: isCancelled,
     },
     {
       key: 'completed',
-      title: 'Tour Completed',
-      desc: tour.status === 'completed' ? 'Hope you had a great visit!' : 'Pending tour visit',
+      title: 'Tour đã hoàn thành',
+      desc: tour.status === 'completed' ? 'Chúc bạn có chuyến thăm tuyệt vời!' : 'Chờ đến ngày tham quan',
       isDone: tour.status === 'completed',
       isActive: tour.status === 'completed',
       hide: isCancelled,
@@ -151,8 +150,8 @@ export default function FacilityTourDetailDrawer({ isOpen, onClose, tour, onCanc
         {/* Drawer Header */}
         <div className="ftd-drawer__header">
           <div className="ftd-drawer__header-title">
-            <h3>Facility Tour Details</h3>
-            <span className="ftd-drawer__header-subtitle">Request Reference</span>
+            <h3>Chi tiết tour tham quan</h3>
+            <span className="ftd-drawer__header-subtitle">Mã tham chiếu yêu cầu</span>
           </div>
           <button className="ftd-drawer__close" onClick={onClose}>
             <X size={20} />
@@ -165,7 +164,7 @@ export default function FacilityTourDetailDrawer({ isOpen, onClose, tour, onCanc
           <div className="ftd-drawer__section">
             <div className={`ftd-status-banner ftd-status-banner--${tour.status}`}>
               <div className="ftd-status-banner__info">
-                <span className="ftd-status-banner__label">Current Status</span>
+                <span className="ftd-status-banner__label">Trạng thái hiện tại</span>
                 <span className="ftd-status-banner__value">{theme.label}</span>
               </div>
               <div className={`ftd-status-banner__dot ftd-status-banner__dot--${tour.status} animate-pulse`} />
@@ -174,7 +173,7 @@ export default function FacilityTourDetailDrawer({ isOpen, onClose, tour, onCanc
 
           {/* Visitor Details Card */}
           <div className="ftd-drawer__section">
-            <div className="ftd-drawer__section-title">Visitor Information</div>
+            <div className="ftd-drawer__section-title">Thông tin khách tham quan</div>
             <div className="ftd-detail-card">
               <div className="ftd-detail-card__header-row">
                 <div className="ftd-detail-card__avatar">
@@ -182,7 +181,7 @@ export default function FacilityTourDetailDrawer({ isOpen, onClose, tour, onCanc
                 </div>
                 <div>
                   <div className="ftd-detail-card__name">{tour.contactName}</div>
-                  <div className="ftd-detail-card__subtitle">Main Contact Person</div>
+                  <div className="ftd-detail-card__subtitle">Người liên hệ chính</div>
                 </div>
               </div>
 
@@ -200,7 +199,7 @@ export default function FacilityTourDetailDrawer({ isOpen, onClose, tour, onCanc
                 <div className="ftd-detail-list__item">
                   <Users size={15} className="ftd-detail-list__icon" />
                   <span className="ftd-detail-list__text">
-                    {tour.numberOfVisitors} visitor{tour.numberOfVisitors > 1 ? 's' : ''}
+                    {tour.numberOfVisitors} người tham quan
                   </span>
                 </div>
               </div>
@@ -209,15 +208,15 @@ export default function FacilityTourDetailDrawer({ isOpen, onClose, tour, onCanc
 
           {/* Schedule Details Card */}
           <div className="ftd-drawer__section">
-            <div className="ftd-drawer__section-title">Preferred Schedule</div>
+            <div className="ftd-drawer__section-title">Lịch mong muốn</div>
             <div className="ftd-detail-card">
               <div className="ftd-schedule-grid">
                 <div className="ftd-schedule-item">
                   <Calendar size={15} className="ftd-schedule-item__icon" />
                   <div className="ftd-schedule-item__content">
-                    <span className="ftd-schedule-item__label">Date</span>
+                    <span className="ftd-schedule-item__label">Ngày</span>
                     <span className="ftd-schedule-item__value">
-                      {formatEnglishDate(tour.preferredDate)}
+                      {formatViDate(tour.preferredDate)}
                     </span>
                   </div>
                 </div>
@@ -226,7 +225,7 @@ export default function FacilityTourDetailDrawer({ isOpen, onClose, tour, onCanc
                   <div className="ftd-schedule-item">
                     <Clock size={15} className="ftd-schedule-item__icon" />
                     <div className="ftd-schedule-item__content">
-                      <span className="ftd-schedule-item__label">Time Slot</span>
+                      <span className="ftd-schedule-item__label">Khung giờ</span>
                       <span className="ftd-schedule-item__value">
                         {tour.preferredTimeSlot}
                       </span>
@@ -237,7 +236,7 @@ export default function FacilityTourDetailDrawer({ isOpen, onClose, tour, onCanc
 
               {tour.notes && (
                 <div className="ftd-notes-section">
-                  <span className="ftd-notes-section__label">Family Notes</span>
+                  <span className="ftd-notes-section__label">Ghi chú của gia đình</span>
                   <p className="ftd-notes-section__text">
                     "{tour.notes}"
                   </p>
@@ -249,13 +248,13 @@ export default function FacilityTourDetailDrawer({ isOpen, onClose, tour, onCanc
           {/* Confirmed Schedule Widget */}
           {tour.status === 'confirmed' && (
             <div className="ftd-drawer__section">
-              <div className="ftd-drawer__section-title">Confirmed Appointment</div>
+              <div className="ftd-drawer__section-title">Lịch hẹn đã xác nhận</div>
               <div className="ftd-detail-card ftd-detail-card--appointment">
                 <div className="ftd-appointment-card__row">
                   {/* Calendar Widget */}
                   <div className="ftd-cal-widget flex-shrink-0">
                     <div className="ftd-cal-widget__month">
-                      {tour.preferredDate ? new Date(tour.preferredDate).toLocaleDateString('en-US', { month: 'short' }).toUpperCase() : 'VISIT'}
+                      {tour.preferredDate ? new Date(tour.preferredDate).toLocaleDateString('vi-VN', { month: 'short' }).toUpperCase() : 'THĂM'}
                     </div>
                     <div className="ftd-cal-widget__day">
                       {tour.preferredDate ? new Date(tour.preferredDate).getDate() : '??'}
@@ -266,13 +265,13 @@ export default function FacilityTourDetailDrawer({ isOpen, onClose, tour, onCanc
                   </div>
 
                   <div>
-                    <div className="ftd-appointment-card__title">Your visit is confirmed!</div>
+                    <div className="ftd-appointment-card__title">Chuyến thăm của bạn đã được xác nhận!</div>
                     <div className="ftd-appointment-card__subtitle">
-                      Time Slot: {tour.confirmedTimeSlot || tour.preferredTimeSlot || 'N/A'}
+                      Khung giờ: {tour.confirmedTimeSlot || tour.preferredTimeSlot || 'N/A'}
                     </div>
                     {tour.adminNotes && (
                       <div className="ftd-appointment-card__admin-notes">
-                        <strong>Staff Notes:</strong> "{tour.adminNotes}"
+                        <strong>Ghi chú nhân viên:</strong> "{tour.adminNotes}"
                       </div>
                     )}
                   </div>
@@ -284,13 +283,13 @@ export default function FacilityTourDetailDrawer({ isOpen, onClose, tour, onCanc
           {/* Rejection / Cancellation Widget */}
           {(tour.cancellationReason || tour.rejectionReason) && (
             <div className="ftd-drawer__section">
-              <div className="ftd-drawer__section-title">Cancellation Details</div>
+              <div className="ftd-drawer__section-title">Chi tiết huỷ/từ chối</div>
               <div className="ftd-detail-card ftd-detail-card--health-alert">
                 <div className="ftd-cancellation-card__row">
                   <XCircle className="ftd-cancellation-card__icon" size={16} />
                   <div>
                     <div className="ftd-cancellation-card__title">
-                      {tour.rejectionReason ? 'Rejected by Staff' : 'Cancelled by Family'}
+                      {tour.rejectionReason ? 'Bị từ chối bởi nhân viên' : 'Đã huỷ bởi gia đình'}
                     </div>
                     <p className="ftd-cancellation-card__text">
                       "{tour.cancellationReason || tour.rejectionReason}"
@@ -303,7 +302,7 @@ export default function FacilityTourDetailDrawer({ isOpen, onClose, tour, onCanc
 
           {/* Timeline Stepper */}
           <div className="ftd-drawer__section">
-            <div className="ftd-drawer__section-title">Tour Progression</div>
+            <div className="ftd-drawer__section-title">Tiến trình tour</div>
             <div className="ftd-timeline">
               {steps.map((s, idx) => (
                 <div key={s.key} className="ftd-timeline__node">
@@ -343,12 +342,12 @@ export default function FacilityTourDetailDrawer({ isOpen, onClose, tour, onCanc
           {showCancelConfirm ? (
             <form onSubmit={handleCancelSubmit} className="w-full flex flex-col gap-3.5">
               <span className="ftd-cancel-label">
-                Provide a reason to cancel the request:
+                Vui lòng cho biết lý do huỷ yêu cầu:
               </span>
               <div>
                 <textarea
                   className="ftd-cancel-textarea"
-                  placeholder="Tell us why you need to cancel..."
+                  placeholder="Cho chúng tôi biết lý do bạn cần huỷ..."
                   value={cancelReason}
                   onChange={(e) => setCancelReason(e.target.value)}
                   required
@@ -372,10 +371,10 @@ export default function FacilityTourDetailDrawer({ isOpen, onClose, tour, onCanc
                   {cancelling ? (
                     <>
                       <Loader2 size={14} className="animate-spin" />
-                      Cancelling...
+                      Đang huỷ...
                     </>
                   ) : (
-                    'Confirm Cancel'
+                    'Xác nhận huỷ'
                   )}
                 </button>
                 <button
@@ -384,7 +383,7 @@ export default function FacilityTourDetailDrawer({ isOpen, onClose, tour, onCanc
                   onClick={() => setShowCancelConfirm(false)}
                   disabled={cancelling}
                 >
-                  Back
+                  Quay lại
                 </button>
               </div>
             </form>
@@ -395,7 +394,7 @@ export default function FacilityTourDetailDrawer({ isOpen, onClose, tour, onCanc
                   className="ftd-btn ftd-btn--danger-outline"
                   onClick={() => setShowCancelConfirm(true)}
                 >
-                  Cancel Request
+                  Huỷ yêu cầu
                 </button>
               )}
               <button
@@ -406,7 +405,7 @@ export default function FacilityTourDetailDrawer({ isOpen, onClose, tour, onCanc
                 }`}
                 onClick={onClose}
               >
-                Close Details
+                Đóng
               </button>
             </div>
           )}
