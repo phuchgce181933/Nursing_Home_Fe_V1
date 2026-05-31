@@ -4,12 +4,12 @@ import { Search, Plus, Eye, Inbox, Loader2, Calendar, ChevronLeft, ChevronRight,
 import admissionService from '../../services/admission.service';
 import AdmissionDetailDrawer from '../../components/family/SubmitAdmission/AdmissionDetailDrawer';
 
-const formatEnglishDate = (dateStr) => {
+const formatViDate = (dateStr) => {
   if (!dateStr) return 'N/A';
   try {
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return dateStr;
-    return d.toLocaleDateString('en-US', {
+    return d.toLocaleDateString('vi-VN', {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
@@ -41,19 +41,19 @@ const getStatusBadgeClass = (status) => {
 const getStatusLabel = (status) => {
   switch (status) {
     case 'new_request':
-      return 'Pending';
+      return 'Yêu cầu mới';
     case 'consulting':
-      return 'Consulting';
+      return 'Đang tư vấn';
     case 'assessing':
-      return 'Assessing';
+      return 'Đang đánh giá';
     case 'contracting':
-      return 'Contracting';
+      return 'Ký hợp đồng';
     case 'checked_in':
-      return 'Completed';
+      return 'Đã nhận vào ở';
     case 'cancelled':
-      return 'Cancelled';
+      return 'Đã huỷ';
     default:
-      return status ? status.charAt(0).toUpperCase() + status.slice(1) : 'New';
+      return status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Mới';
   }
 };
 
@@ -72,12 +72,12 @@ const getEligibilityBadgeClass = (status) => {
 const getEligibilityLabel = (status) => {
   switch (status) {
     case 'eligible':
-      return 'Eligible';
+      return 'Đủ điều kiện';
     case 'not_eligible':
-      return 'Not Eligible';
+      return 'Không đủ điều kiện';
     case 'pending':
     default:
-      return 'Pending';
+      return 'Chờ đánh giá';
   }
 };
 export default function AdmissionRequestsHistoryPage() {
@@ -190,9 +190,9 @@ export default function AdmissionRequestsHistoryPage() {
         {/* Header Section */}
         <div className="arh-header">
           <div className="arh-header__title-group">
-            <h1 className="arh-header__title">Request History</h1>
+            <h1 className="arh-header__title">Lịch sử yêu cầu nhập viện</h1>
             <p className="arh-header__subtitle">
-              Manage and track admission and care requests for your relatives.
+              Quản lý và theo dõi các yêu cầu nhập viện cho người thân của bạn.
             </p>
           </div>
           <button
@@ -200,7 +200,7 @@ export default function AdmissionRequestsHistoryPage() {
             onClick={() => navigate('/family/admission-requests/new')}
           >
             <Plus size={16} />
-            Submit New Request
+            Gửi yêu cầu mới
           </button>
         </div>
 
@@ -212,7 +212,7 @@ export default function AdmissionRequestsHistoryPage() {
               <div className="arh-stat-card__icon-box arh-stat-card__icon-box--pending">
                 <Clock size={20} />
               </div>
-              <span className="arh-stat-card__label">Active Requests</span>
+              <span className="arh-stat-card__label">Yêu cầu đang xử lý</span>
             </div>
             <div className="arh-stat-card__value">
               {String(stats.active).padStart(2, '0')}
@@ -225,7 +225,7 @@ export default function AdmissionRequestsHistoryPage() {
               <div className="arh-stat-card__icon-box arh-stat-card__icon-box--completed">
                 <CheckCircle size={20} />
               </div>
-              <span className="arh-stat-card__label">Completed Admissions</span>
+              <span className="arh-stat-card__label">Đã nhận vào ở</span>
             </div>
             <div className="arh-stat-card__value">
               {String(stats.completed).padStart(2, '0')}
@@ -238,7 +238,7 @@ export default function AdmissionRequestsHistoryPage() {
               <div className="arh-stat-card__icon-box arh-stat-card__icon-box--appointment">
                 <Calendar size={20} />
               </div>
-              <span className="arh-stat-card__label">Upcoming Appointments</span>
+              <span className="arh-stat-card__label">Lịch hẹn sắp tới</span>
             </div>
             <div className="arh-stat-card__value">
               {String(stats.appointments).padStart(2, '0')}
@@ -253,7 +253,7 @@ export default function AdmissionRequestsHistoryPage() {
             <input
               type="text"
               className="arh-filters__input"
-              placeholder="Search by request code, relative's name or ID..."
+              placeholder="Tìm mã yêu cầu, tên người thân hoặc CMND..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -268,13 +268,13 @@ export default function AdmissionRequestsHistoryPage() {
                 setPage(1);
               }}
             >
-              <option value="">All Statuses</option>
-              <option value="new_request">Pending</option>
-              <option value="consulting">Consulting</option>
-              <option value="assessing">Assessing</option>
-              <option value="contracting">Contracting</option>
-              <option value="checked_in">Completed</option>
-              <option value="cancelled">Cancelled</option>
+              <option value="">Tất cả trạng thái</option>
+              <option value="new_request">Yêu cầu mới</option>
+              <option value="consulting">Đang tư vấn</option>
+              <option value="assessing">Đang đánh giá</option>
+              <option value="contracting">Ký hợp đồng</option>
+              <option value="checked_in">Đã nhận vào ở</option>
+              <option value="cancelled">Đã huỷ</option>
             </select>
           </div>
 
@@ -287,7 +287,7 @@ export default function AdmissionRequestsHistoryPage() {
                 setDateStr(e.target.value);
                 setPage(1);
               }}
-              title="Filter by sent date"
+              title="Lọc theo ngày gửi"
             />
           </div>
         </div>
@@ -297,14 +297,14 @@ export default function AdmissionRequestsHistoryPage() {
           {loading ? (
             <div className="arh-loading-box">
               <Loader2 className="arh-loading-spinner" size={32} />
-              <p className="arh-loading-text">Loading request history...</p>
+              <p className="arh-loading-text">Đang tải lịch sử yêu cầu...</p>
             </div>
           ) : admissions.length === 0 ? (
             <div className="arh-empty-box">
               <Inbox size={48} className="arh-empty-icon" />
-              <p className="arh-empty-text">No admission requests found.</p>
+              <p className="arh-empty-text">Không tìm thấy yêu cầu nhập viện.</p>
               <p className="text-xs max-w-sm text-slate-400 mt-1">
-                Try changing your search keywords or filtering by another status.
+                Thử thay đổi từ khoá tìm kiếm hoặc lọc theo trạng thái khác.
               </p>
             </div>
           ) : (
@@ -313,13 +313,13 @@ export default function AdmissionRequestsHistoryPage() {
                 <table className="arh-table">
                   <thead>
                     <tr>
-                      <th>Request Code</th>
-                      <th>Relative</th>
-                      <th>Sent Date</th>
-                      <th>Preferred Date</th>
-                      <th>Status</th>
-                      <th>Medical Assessment</th>
-                      <th className="text-center">Actions</th>
+                      <th>Mã yêu cầu</th>
+                      <th>Người thân</th>
+                      <th>Ngày gửi</th>
+                      <th>Ngày mong muốn</th>
+                      <th>Trạng thái</th>
+                      <th>Đánh giá y tế</th>
+                      <th className="text-center">Thao tác</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -340,12 +340,12 @@ export default function AdmissionRequestsHistoryPage() {
                           </div>
                         </td>
                         <td>
-                          {formatEnglishDate(adm.createdAt)}
+                          {formatViDate(adm.createdAt)}
                         </td>
                         <td className="font-medium">
                           <div className="flex items-center gap-1.5">
                             <Calendar size={13} className="text-slate-400" />
-                            {formatEnglishDate(adm.preferredAdmissionDate)}
+                            {formatViDate(adm.preferredAdmissionDate)}
                           </div>
                         </td>
                         <td>
@@ -362,7 +362,7 @@ export default function AdmissionRequestsHistoryPage() {
                           <button
                             className="arh-btn--action"
                             onClick={() => handleOpenDetail(adm._id || adm.id)}
-                            title="View Details"
+                            title="Xem chi tiết"
                           >
                             <Eye size={18} />
                           </button>
@@ -376,14 +376,14 @@ export default function AdmissionRequestsHistoryPage() {
               {/* Pagination block */}
               <div className="arh-pagination">
                 <span className="arh-pagination__info">
-                  Showing {Math.min((page - 1) * limit + 1, total)} - {Math.min(page * limit, total)} of {total} requests
+                  Hiển thị {Math.min((page - 1) * limit + 1, total)} - {Math.min(page * limit, total)} trong {total} yêu cầu
                 </span>
                 <div className="arh-pagination__controls">
                   <button
                     className="arh-pagination__btn"
                     onClick={() => setPage((p) => Math.max(p - 1, 1))}
                     disabled={page === 1}
-                    title="Previous Page"
+                    title="Trang trước"
                   >
                     <ChevronLeft size={16} />
                   </button>
@@ -404,7 +404,7 @@ export default function AdmissionRequestsHistoryPage() {
                     className="arh-pagination__btn"
                     onClick={() => setPage((p) => Math.min(p + 1, totalPages))}
                     disabled={page === totalPages}
-                    title="Next Page"
+                    title="Trang sau"
                   >
                     <ChevronRight size={16} />
                   </button>

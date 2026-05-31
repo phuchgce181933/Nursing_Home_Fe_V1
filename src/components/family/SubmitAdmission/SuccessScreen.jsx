@@ -9,12 +9,12 @@ import {
   Share2,
 } from 'lucide-react';
 
-const formatEnglishDate = (dateStr) => {
+const formatViDate = (dateStr) => {
   if (!dateStr) return '';
   try {
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return dateStr;
-    return d.toLocaleDateString('en-US', {
+    return d.toLocaleDateString('vi-VN', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
@@ -37,9 +37,9 @@ export default function SuccessScreen({ submittedData = {}, formData = {}, navig
         </div>
 
         {/* success message */}
-        <h2 className="sap-success__title">Request Submitted Successfully!</h2>
+        <h2 className="sap-success__title">Yêu cầu đã được gửi thành công!</h2>
         <p className="sap-success__desc">
-          Thank you for choosing <strong>An Nhien Care Home</strong>. Our advisory team will review your application and contact you within the next <strong>24 hours</strong>.
+          Cảm ơn bạn đã chọn <strong>An Nhiên Care Home</strong>. Đội ngũ tư vấn của chúng tôi sẽ xem xét đơn và liên hệ với bạn trong vòng <strong>24 giờ</strong> tới.
         </p>
 
         {/* detail cards row */}
@@ -49,7 +49,7 @@ export default function SuccessScreen({ submittedData = {}, formData = {}, navig
               <User size={20} />
             </div>
             <div className="sap-success__summary-card-info">
-              <span className="sap-success__summary-card-label">RESIDENT</span>
+              <span className="sap-success__summary-card-label">CƯ DÂN</span>
               <span className="sap-success__summary-card-value">{patientName}</span>
             </div>
           </div>
@@ -59,9 +59,9 @@ export default function SuccessScreen({ submittedData = {}, formData = {}, navig
               <Calendar size={20} />
             </div>
             <div className="sap-success__summary-card-info">
-              <span className="sap-success__summary-card-label">PREFERRED DATE</span>
+              <span className="sap-success__summary-card-label">NGÀY MONG MUỐN</span>
               <span className="sap-success__summary-card-value">
-                {rawPrefDate ? formatEnglishDate(rawPrefDate) : 'Not specified'}
+                {rawPrefDate ? formatViDate(rawPrefDate) : 'Chưa xác định'}
               </span>
             </div>
           </div>
@@ -73,9 +73,9 @@ export default function SuccessScreen({ submittedData = {}, formData = {}, navig
             <Info size={18} />
           </div>
           <div className="sap-success__advice-content">
-            <h4 className="sap-success__advice-title">Next Steps</h4>
+            <h4 className="sap-success__advice-title">Các bước tiếp theo</h4>
             <p className="sap-success__advice-text">
-              Please prepare the resident's identification documents and most recent medical records to facilitate our upcoming consultation.
+              Vui lòng chuẩn bị giấy tờ tùy thân và hồ sơ y tế gần nhất của cư dân để hỗ trợ buổi tư vấn sắp tới.
             </p>
           </div>
         </div>
@@ -88,7 +88,7 @@ export default function SuccessScreen({ submittedData = {}, formData = {}, navig
             onClick={() => navigate('/family/admission-requests')}
           >
             <History size={16} />
-            View Request History
+            Xem lịch sử yêu cầu
           </button>
           <button
             type="button"
@@ -96,7 +96,7 @@ export default function SuccessScreen({ submittedData = {}, formData = {}, navig
             onClick={() => navigate('/family/dashboard')}
           >
             <Home size={16} />
-            Back to Dashboard
+            Về trang tổng quan
           </button>
         </div>
 
@@ -108,19 +108,19 @@ export default function SuccessScreen({ submittedData = {}, formData = {}, navig
           <div className="sap-success__hotline-left">
             <img
               src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=120&h=120"
-              alt="Support Staff Avatar"
+              alt="Ảnh nhân viên hỗ trợ"
               className="sap-success__hotline-avatar"
             />
             <div className="sap-success__hotline-text">
-              <span className="sap-success__hotline-label">Need Urgent Support?</span>
+              <span className="sap-success__hotline-label">Cần hỗ trợ khẩn cấp?</span>
               <span className="sap-success__hotline-number">Hotline: 1900 8888</span>
             </div>
           </div>
           <div className="sap-success__hotline-actions">
-            <button type="button" className="sap-success__hotline-icon-btn" aria-label="Send support message">
+            <button type="button" className="sap-success__hotline-icon-btn" aria-label="Gửi tin nhắn hỗ trợ">
               <MessageSquare size={18} />
             </button>
-            <button type="button" className="sap-success__hotline-icon-btn" aria-label="Share information">
+            <button type="button" className="sap-success__hotline-icon-btn" aria-label="Chia sẻ thông tin">
               <Share2 size={18} />
             </button>
           </div>

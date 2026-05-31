@@ -23,19 +23,19 @@ import '../../styles/admin/AdminAdmissionRequestsPage.css';
 import '../../styles/family/FacilityTourHistoryPage.css';
 
 const STATUS_OPTIONS = [
-  { value: '', label: 'All Statuses' },
-  { value: 'pending', label: 'Pending Review' },
-  { value: 'confirmed', label: 'Approved & Confirmed' },
-  { value: 'completed', label: 'Completed' },
-  { value: 'cancelled', label: 'Cancelled / Rejected' },
+  { value: '', label: 'Tất cả trạng thái' },
+  { value: 'pending', label: 'Chờ xét duyệt' },
+  { value: 'confirmed', label: 'Đã duyệt & Xác nhận' },
+  { value: 'completed', label: 'Đã hoàn thành' },
+  { value: 'cancelled', label: 'Đã huỷ / Từ chối' },
 ];
 
-const formatEnglishDate = (dateStr) => {
+const formatViDate = (dateStr) => {
   if (!dateStr) return 'N/A';
   try {
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return dateStr;
-    return d.toLocaleDateString('en-US', {
+    return d.toLocaleDateString('vi-VN', {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
@@ -63,15 +63,15 @@ const getStatusBadgeClass = (status) => {
 const getStatusLabel = (status) => {
   switch (status) {
     case 'pending':
-      return 'Pending Review';
+      return 'Chờ xét duyệt';
     case 'confirmed':
-      return 'Confirmed';
+      return 'Đã xác nhận';
     case 'completed':
-      return 'Completed';
+      return 'Đã hoàn thành';
     case 'cancelled':
-      return 'Cancelled';
+      return 'Đã huỷ';
     default:
-      return status || 'Unknown';
+      return status || 'Không xác định';
   }
 };
 
@@ -144,7 +144,7 @@ export default function AdminTourRequestsPage() {
       }
     } catch (err) {
       console.error('Failed to load facility tour requests:', err);
-      setError('Could not retrieve facility tour requests. Please check your credentials or network connection.');
+      setError('Không thể tải danh sách yêu cầu tham quan. Vui lòng kiểm tra kết nối mạng.');
     } finally {
       setLoading(false);
     }
@@ -194,10 +194,10 @@ export default function AdminTourRequestsPage() {
         <div>
           <h1>
             <Calendar className="text-emerald-sage" size={26} />
-            Tour Booking Requests
+            Yêu cầu tham quan cơ sở
           </h1>
           <p>
-            Manage facility visitations, approve time slots, and consult with family member accounts.
+            Quản lý lịch thăm quan, duyệt khung giờ và tư vấn với tài khoản thành viên gia đình.
           </p>
         </div>
         <button
@@ -206,7 +206,7 @@ export default function AdminTourRequestsPage() {
           className="adm-btn-refresh"
         >
           <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          Reload Data
+          Tải lại
         </button>
       </div>
 
@@ -218,7 +218,7 @@ export default function AdminTourRequestsPage() {
             <ClipboardList size={22} />
           </div>
           <div>
-            <span className="adm-stat-label">Total Requests</span>
+            <span className="adm-stat-label">Tổng yêu cầu</span>
             <span className="adm-stat-value">{total}</span>
           </div>
         </div>
@@ -229,7 +229,7 @@ export default function AdminTourRequestsPage() {
             <Clock size={22} />
           </div>
           <div>
-            <span className="adm-stat-label">Pending Review</span>
+            <span className="adm-stat-label">Chờ xét duyệt</span>
             <span className="adm-stat-value">{data.filter(x => x.status === 'pending').length}</span>
           </div>
         </div>
@@ -240,7 +240,7 @@ export default function AdminTourRequestsPage() {
             <CheckCircle size={22} />
           </div>
           <div>
-            <span className="adm-stat-label">Confirmed Tours</span>
+            <span className="adm-stat-label">Đã xác nhận</span>
             <span className="adm-stat-value">{data.filter(x => x.status === 'confirmed').length}</span>
           </div>
         </div>
@@ -251,7 +251,7 @@ export default function AdminTourRequestsPage() {
             <Users size={22} />
           </div>
           <div>
-            <span className="adm-stat-label">Completed Tours</span>
+            <span className="adm-stat-label">Đã hoàn thành</span>
             <span className="adm-stat-value">{data.filter(x => x.status === 'completed').length}</span>
           </div>
         </div>
@@ -268,7 +268,7 @@ export default function AdminTourRequestsPage() {
                 <input
                   type="text"
                   className="adm-filter-input"
-                  placeholder="Search contact name, phone, or email..."
+                  placeholder="Tìm tên liên hệ, số điện thoại, email..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
@@ -295,7 +295,7 @@ export default function AdminTourRequestsPage() {
           <div className="adm-filter-row-secondary">
             <div className="adm-filter-date-group">
               <span className="adm-date-title">
-                <Calendar size={13} className="text-slate-400" /> Preferred Date Range:
+                <Calendar size={13} className="text-slate-400" /> Khoảng ngày mong muốn:
               </span>
 
               <input
@@ -319,13 +319,13 @@ export default function AdminTourRequestsPage() {
                 onClick={handleResetFilters}
                 className="adm-btn-clear"
               >
-                Clear Filters
+                Xoá bộ lọc
               </button>
               <button
                 type="submit"
                 className="adm-btn-apply"
               >
-                Apply Filters
+                Áp dụng
               </button>
             </div>
           </div>
@@ -337,18 +337,18 @@ export default function AdminTourRequestsPage() {
         {loading && data.length === 0 ? (
           <div className="p-16 flex flex-col items-center justify-center bg-white" style={{ minHeight: '300px' }}>
             <RefreshCw className="animate-spin text-emerald-sage mb-3" size={32} />
-            <p className="text-slate-500 text-sm">Retrieving tour requests...</p>
+            <p className="text-slate-500 text-sm">Đang tải danh sách yêu cầu tham quan...</p>
           </div>
         ) : error ? (
           <div className="p-10 flex flex-col items-center justify-center text-center bg-white" style={{ minHeight: '300px' }}>
             <AlertCircle className="text-red-500 mb-3" size={36} />
-            <p className="text-slate-800 font-bold mb-1">An error occurred</p>
+            <p className="text-slate-800 font-bold mb-1">Đã xảy ra lỗi</p>
             <p className="text-slate-500 text-sm max-w-md">{error}</p>
             <button
               onClick={fetchTours}
               className="mt-4 px-5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm rounded-xl font-semibold transition-all"
             >
-              Try Again
+              Thử lại
             </button>
           </div>
         ) : data.length === 0 ? (
@@ -356,9 +356,9 @@ export default function AdminTourRequestsPage() {
             <div className="bg-slate-50 p-4 rounded-full text-slate-400 mb-3" style={{ width: 'fit-content' }}>
               <Calendar size={30} />
             </div>
-            <p className="text-slate-700 font-bold mb-1">No Tour Requests Found</p>
+            <p className="text-slate-700 font-bold mb-1">Không tìm thấy yêu cầu tham quan</p>
             <p className="text-slate-400 text-xs max-w-sm">
-              We couldn't find any tour requests matching your search or filters.
+              Không có yêu cầu tham quan nào khớp với từ khoá hoặc bộ lọc của bạn.
             </p>
           </div>
         ) : (
@@ -366,14 +366,14 @@ export default function AdminTourRequestsPage() {
             <table className="adm-table">
               <thead>
                 <tr>
-                  <th>Request ID</th>
-                  <th>Primary Contact</th>
-                  <th>Family Account Profile</th>
-                  <th>Preferred Schedule</th>
-                  <th style={{ textAlign: 'center' }}>Visitors</th>
-                  <th>Submitted Date</th>
-                  <th style={{ textAlign: 'center' }}>Status</th>
-                  <th style={{ textAlign: 'center' }}>Actions</th>
+                  <th>Mã yêu cầu</th>
+                  <th>Người liên hệ</th>
+                  <th>Tài khoản gia đình</th>
+                  <th>Lịch mong muốn</th>
+                  <th style={{ textAlign: 'center' }}>Số khách</th>
+                  <th>Ngày gửi</th>
+                  <th style={{ textAlign: 'center' }}>Trạng thái</th>
+                  <th style={{ textAlign: 'center' }}>Thao tác</th>
                 </tr>
               </thead>
               <tbody>
@@ -389,7 +389,7 @@ export default function AdminTourRequestsPage() {
                     <td>
                       <div className="cell-resident-name">{row.contactName || 'N/A'}</div>
                       <div className="cell-resident-meta">
-                        {row.contactPhone || 'No Phone'}
+                        {row.contactPhone || 'Không có SĐT'}
                       </div>
                     </td>
                     <td>
@@ -407,17 +407,17 @@ export default function AdminTourRequestsPage() {
                     </td>
                     <td style={{ fontWeight: '500', color: '#475569' }}>
                       <div style={{ fontSize: '13px', color: '#1e293b' }}>
-                        {formatEnglishDate(row.preferredDate)}
+                        {formatViDate(row.preferredDate)}
                       </div>
                       <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
-                        Slot: {row.status === 'confirmed' ? (row.confirmedTimeSlot || row.preferredTimeSlot) : row.preferredTimeSlot}
+                        Khung giờ: {row.status === 'confirmed' ? (row.confirmedTimeSlot || row.preferredTimeSlot) : row.preferredTimeSlot}
                       </div>
                     </td>
                     <td style={{ textAlign: 'center', fontWeight: '600', color: '#475569' }}>
                       {row.numberOfVisitors || 1}
                     </td>
                     <td className="cell-date">
-                      {formatEnglishDate(row.createdAt)}
+                      {formatViDate(row.createdAt)}
                     </td>
                     <td style={{ textAlign: 'center' }}>
                       <span className={`status-badge-custom-adm ${getStatusBadgeClass(row.status)}`}>
@@ -428,7 +428,7 @@ export default function AdminTourRequestsPage() {
                       <button
                         onClick={() => handleOpenDetails(row._id)}
                         className="adm-btn-action"
-                        title="View details"
+                        title="Xem chi tiết"
                       >
                         <Eye size={14} />
                       </button>
@@ -444,9 +444,9 @@ export default function AdminTourRequestsPage() {
         {total > 0 && (
           <div className="adm-pagination-footer">
             <div className="pagination-info">
-              Showing <span>{(page - 1) * limit + 1}</span> to{' '}
-              <span>{Math.min(page * limit, total)}</span> of{' '}
-              <span>{total}</span> tour bookings
+              Hiển thị <span>{(page - 1) * limit + 1}</span> đến{' '}
+              <span>{Math.min(page * limit, total)}</span> trong{' '}
+              <span>{total}</span> yêu cầu tham quan
             </div>
 
             <div className="pagination-controls">
@@ -459,7 +459,7 @@ export default function AdminTourRequestsPage() {
               </button>
 
               <div className="page-indicator">
-                Page {page} / {totalPages}
+                Trang {page} / {totalPages}
               </div>
 
               <button

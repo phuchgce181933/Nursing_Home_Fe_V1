@@ -21,9 +21,9 @@ import LockoutScreen from '../../components/family/SubmitAdmission/LockoutScreen
 
 /* ─── constants ─────────────────────────────── */
 const STEPS = [
-  { id: 1, label: 'Personal Info', Icon: User },
-  { id: 2, label: 'Health Profile',   Icon: Stethoscope },
-  { id: 3, label: 'Admission Request', Icon: ClipboardCheck },
+  { id: 1, label: 'Thông tin cá nhân', Icon: User },
+  { id: 2, label: 'Hồ sơ sức khỏe',   Icon: Stethoscope },
+  { id: 3, label: 'Yêu cầu nhập viện', Icon: ClipboardCheck },
 ];
 
 /* ─── main page ─────────────────────────────── */
@@ -90,105 +90,105 @@ export default function SubmitAdmissionPage() {
       // Step 1
       case 'fullName':
         if (!val) {
-          return 'Full Name is required';
+          return 'Họ và tên là bắt buộc';
         }
         if (val.length < 2 || val.length > 50) {
-          return 'Full Name must be between 2 and 50 characters';
+          return 'Họ và tên phải từ 2 đến 50 ký tự';
         }
         if (!/^[a-zA-ZÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚĂĐĨŨƠàáâãèéêìíòóôõùúăđĩũơƯĂÂÊÔƠƯưăâêôơưẠ-ỹ\s]+$/.test(val)) {
-          return 'Full Name must contain only letters and spaces';
+          return 'Họ và tên chỉ được chứa chữ cái và dấu cách';
         }
         return null;
 
       case 'dob':
         if (!val) {
-          return 'Date of Birth is required';
+          return 'Ngày sinh là bắt buộc';
         }
         const dobDate = new Date(val);
         if (isNaN(dobDate.getTime())) {
-          return 'Invalid Date of Birth';
+          return 'Ngày sinh không hợp lệ';
         }
         if (dobDate >= new Date()) {
-          return 'Date of Birth must be in the past';
+          return 'Ngày sinh phải là ngày trong quá khứ';
         }
         return null;
 
       case 'gender':
         if (!val) {
-          return 'Gender is required';
+          return 'Giới tính là bắt buộc';
         }
         return null;
 
       case 'idNumber':
         if (!val) {
-          return 'ID Number is required';
+          return 'Số CMND/hộ chiếu là bắt buộc';
         }
         const isCccd = /^\d{12}$/.test(val);
         const isPassport = /^[A-Z0-9]{8,12}$/i.test(val);
         if (!isCccd && !isPassport) {
-          return 'Invalid identification number. Must be a 12-digit Citizen ID or an 8-12 character Passport.';
+          return 'Số định danh không hợp lệ. Phải là CCCD 12 chữ số hoặc hộ chiếu 8-12 ký tự.';
         }
         return null;
 
       case 'address':
         if (!val) {
-          return 'Current Address is required';
+          return 'Địa chỉ hiện tại là bắt buộc';
         }
         if (val.length < 5 || val.length > 150) {
-          return 'Address must be between 5 and 150 characters';
+          return 'Địa chỉ phải từ 5 đến 150 ký tự';
         }
         return null;
 
       case 'relationship':
         if (!val) {
-          return 'Relationship is required';
+          return 'Quan hệ với người được chăm sóc là bắt buộc';
         }
         return null;
 
       // Step 2
       case 'healthCondition':
         if (!val) {
-          return 'Initial Health Condition is required';
+          return 'Tóm tắt tình trạng sức khỏe là bắt buộc';
         }
         if (val.length < 10 || val.length > 500) {
-          return 'Health condition summary must be between 10 and 500 characters';
+          return 'Tóm tắt sức khỏe phải từ 10 đến 500 ký tự';
         }
         return null;
 
       // Step 3
       case 'preferredDate':
         if (!val) {
-          return 'Preferred Date is required';
+          return 'Ngày mong muốn nhập viện là bắt buộc';
         }
         const prefDate = new Date(val);
         if (isNaN(prefDate.getTime())) {
-          return 'Invalid Date';
+          return 'Ngày không hợp lệ';
         }
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         if (prefDate < today) {
-          return 'Preferred Date must be today or in the future';
+          return 'Ngày mong muốn phải là hôm nay hoặc trong tương lai';
         }
         return null;
 
       case 'contactPhone':
         if (!val) {
-          return 'Contact Phone is required';
+          return 'Số điện thoại liên hệ là bắt buộc';
         }
         if (!/^(0|\+84)(3|5|7|8|9)\d{8}$/.test(val)) {
-          return 'Invalid contact phone number. Must be a valid 10-digit number starting with 03, 05, 07, 08, or 09.';
+          return 'Số điện thoại không hợp lệ. Phải là số 10 chữ số bắt đầu bằng 03, 05, 07, 08 hoặc 09.';
         }
         return null;
 
       case 'admissionReason':
         if (!val) {
-          return 'Reason for Admission is required';
+          return 'Lý do nhập viện là bắt buộc';
         }
         return null;
 
       case 'additionalNotes':
         if (val && val.length > 500) {
-          return 'Additional Notes must not exceed 500 characters';
+          return 'Ghi chú bổ sung không được vượt quá 500 ký tự';
         }
         return null;
 
@@ -336,7 +336,7 @@ export default function SubmitAdmissionPage() {
       const msg =
         err?.response?.data?.message ||
         err?.message ||
-        'An error occurred. Please try again.';
+        'Đã xảy ra lỗi. Vui lòng thử lại.';
 
       // Nếu là lỗi trùng đơn từ API (409 Conflict hoặc thông báo trùng khớp)
       if (err?.response?.status === 409 || msg.toLowerCase().includes('already have a pending') || msg.toLowerCase().includes('trùng')) {
@@ -389,9 +389,9 @@ export default function SubmitAdmissionPage() {
     <form className="sap-page" onSubmit={handleSubmit} noValidate>
       {/* ── page header ── */}
       <div className="sap-page__header">
-        <h1 className="sap-page__title">Submit Admission Request</h1>
+        <h1 className="sap-page__title">Gửi yêu cầu nhập viện</h1>
         <p className="sap-page__subtitle">
-          Please complete the steps below so we can best support your relative.
+          Vui lòng hoàn thành các bước bên dưới để chúng tôi hỗ trợ người thân của bạn tốt nhất.
         </p>
       </div>
 
@@ -448,12 +448,12 @@ export default function SubmitAdmissionPage() {
             disabled={submitting}
           >
             <ChevronLeft size={16} />
-            Back
+            Quay lại
           </button>
 
           {step < STEPS.length ? (
             <button type="button" className="sap-btn sap-btn--primary" onClick={handleNext}>
-              Continue
+              Tiếp theo
               <ChevronRight size={16} />
             </button>
           ) : (
@@ -465,12 +465,12 @@ export default function SubmitAdmissionPage() {
               {submitting ? (
                 <>
                   <Loader2 size={16} className="sap-spinner" />
-                  Submitting...
+                  Đang gửi...
                 </>
               ) : (
                 <>
                   <Send size={16} />
-                  Submit Admission Request
+                  Gửi yêu cầu nhập viện
                 </>
               )}
             </button>
@@ -485,9 +485,9 @@ export default function SubmitAdmissionPage() {
             <Phone size={20} />
           </div>
           <div>
-            <h4 className="sap-help-card__title">Need Assistance?</h4>
+            <h4 className="sap-help-card__title">Cần hỗ trợ?</h4>
             <p className="sap-help-card__desc">
-              Call <strong>1900 1234</strong> for 24/7 direct guidance on admission procedures.
+              Gọi <strong>1900 1234</strong> để được tư vấn 24/7 về thủ tục nhập viện.
             </p>
           </div>
         </div>
@@ -496,9 +496,9 @@ export default function SubmitAdmissionPage() {
             <ClipboardCheck size={20} />
           </div>
           <div>
-            <h4 className="sap-help-card__title">Required Documents</h4>
+            <h4 className="sap-help-card__title">Giấy tờ cần chuẩn bị</h4>
             <p className="sap-help-card__desc">
-              Please prepare the resident's original Citizen ID and historical medical summaries.
+              Vui lòng chuẩn bị CCCD gốc của cư dân và hồ sơ y tế lịch sử.
             </p>
           </div>
         </div>

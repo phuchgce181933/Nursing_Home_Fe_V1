@@ -10,12 +10,12 @@ import {
   Eye,
 } from 'lucide-react';
 
-const formatEnglishDate = (dateStr) => {
+const formatViDate = (dateStr) => {
   if (!dateStr) return '';
   try {
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return dateStr;
-    return d.toLocaleDateString('en-US', {
+    return d.toLocaleDateString('vi-VN', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
@@ -28,19 +28,19 @@ const formatEnglishDate = (dateStr) => {
 const getStatusLabel = (status) => {
   switch (status) {
     case 'new_request':
-      return 'Pending';
+      return 'Yêu cầu mới';
     case 'consulting':
-      return 'Consulting';
+      return 'Đang tư vấn';
     case 'assessing':
-      return 'Assessing';
+      return 'Đang đánh giá';
     case 'contracting':
-      return 'Contracting';
+      return 'Ký hợp đồng';
     case 'checked_in':
-      return 'Completed';
+      return 'Đã nhận vào ở';
     case 'cancelled':
-      return 'Cancelled';
+      return 'Đã huỷ';
     default:
-      return status || 'Pending';
+      return status || 'Yêu cầu mới';
   }
 };
 
@@ -57,18 +57,18 @@ export default function LockoutScreen({
     <div className="sap-lockout">
       {/* breadcrumbs */}
       <div className="sap-lockout__breadcrumbs">
-        <span>Family Portal</span>
+        <span>Cổng gia đình</span>
         <ChevronRight size={12} />
-        <span>Admission Requests</span>
+        <span>Yêu cầu nhập viện</span>
         <ChevronRight size={12} />
-        <span className="sap-lockout__breadcrumbs-active">New Request</span>
+        <span className="sap-lockout__breadcrumbs-active">Yêu cầu mới</span>
       </div>
 
       {/* page header */}
       <div className="sap-lockout__header">
-        <h1 className="sap-page__title">New Admission Request</h1>
+        <h1 className="sap-page__title">Yêu cầu nhập viện mới</h1>
         <p className="sap-page__subtitle">
-          Initiate the transition process for your loved one with our specialist care team.
+          Bắt đầu quy trình chuyển người thân của bạn với đội ngũ chăm sóc chuyên nghiệp của chúng tôi.
         </p>
       </div>
 
@@ -78,9 +78,9 @@ export default function LockoutScreen({
           <AlertTriangle size={24} />
         </div>
         <div className="sap-lockout__banner-content">
-          <h3 className="sap-lockout__banner-title">Duplicate Request Detected</h3>
+          <h3 className="sap-lockout__banner-title">Phát hiện yêu cầu trùng lặp</h3>
           <p className="sap-lockout__banner-text">
-            You already have a pending admission request for this person. Our team is currently reviewing the existing application submitted on <strong>{formatEnglishDate(activeRequest?.createdAt || new Date())}</strong>. To avoid confusion, further requests for this individual are restricted.
+            Bạn đã có một yêu cầu nhập viện đang chờ xử lý cho người này. Đội ngũ của chúng tôi đang xem xét đơn được gửi vào ngày <strong>{formatViDate(activeRequest?.createdAt || new Date())}</strong>. Để tránh nhầm lẫn, không thể gửi thêm yêu cầu cho người này.
           </p>
         </div>
         <div className="sap-lockout__banner-actions">
@@ -91,138 +91,138 @@ export default function LockoutScreen({
               document.getElementById('recent-requests-section')?.scrollIntoView({ behavior: 'smooth' });
             }}
           >
-            View Pending Request
+            Xem yêu cầu đang chờ
             <ChevronRight size={16} />
           </button>
-              <button
-                type="button"
-                className="sap-lockout__banner-btn sap-lockout__banner-btn--edit"
-                onClick={() => {
-                  setDuplicateDetected(false);
-                  setStep(1);
-                  // Xóa trường định danh để phá vỡ điều kiện trùng lặp, mở lại biểu mẫu nhập liệu
-                  setFormData((prev) => ({
-                    ...prev,
-                    idNumber: '',
-                  }));
-                  setErrors((prev) => ({
-                    ...prev,
-                    idNumber: null,
-                  }));
-                }}
-              >
-                Go Back and Edit
-                <ChevronRight size={16} />
-              </button>
-            </div>
+          <button
+            type="button"
+            className="sap-lockout__banner-btn sap-lockout__banner-btn--edit"
+            onClick={() => {
+              setDuplicateDetected(false);
+              setStep(1);
+              // Xóa trường định danh để phá vỡ điều kiện trùng lặp, mở lại biểu mẫu nhập liệu
+              setFormData((prev) => ({
+                ...prev,
+                idNumber: '',
+              }));
+              setErrors((prev) => ({
+                ...prev,
+                idNumber: null,
+              }));
+            }}
+          >
+            Quay lại và chỉnh sửa
+            <ChevronRight size={16} />
+          </button>
+        </div>
+      </div>
+
+      {/* locked stepper cards */}
+      <div className="sap-lockout__cards-grid">
+        <div className="sap-lockout__card sap-lockout__card--complete">
+          <div className="sap-lockout__card-header">
+            <span className="sap-lockout__card-step">BƯỚC 01</span>
+            <User size={18} className="sap-lockout__card-icon" />
           </div>
-    
-          {/* locked stepper cards */}
-          <div className="sap-lockout__cards-grid">
-            <div className="sap-lockout__card sap-lockout__card--complete">
-              <div className="sap-lockout__card-header">
-                <span className="sap-lockout__card-step">STEP 01</span>
-                <User size={18} className="sap-lockout__card-icon" />
-              </div>
-              <h4 className="sap-lockout__card-title">Applicant Information</h4>
-              <p className="sap-lockout__card-desc">
-                Verify the details of the future resident including medical history and preferences.
-              </p>
-              <div className="sap-lockout__card-badge is-complete">
-                <Check size={14} />
-                Complete
-              </div>
-            </div>
-    
-            <div className="sap-lockout__card sap-lockout__card--pending">
-              <div className="sap-lockout__card-header">
-                <span className="sap-lockout__card-step">STEP 02</span>
-                <ClipboardCheck size={18} className="sap-lockout__card-icon" />
-              </div>
-              <h4 className="sap-lockout__card-title">Required Documents</h4>
-              <p className="sap-lockout__card-desc">
-                Upload ID, proof of residence, and recent medical evaluation forms.
-              </p>
-              <div className="sap-lockout__card-badge is-pending">
-                <Clock size={14} />
-                Pending Review
-              </div>
-            </div>
-    
-            <div className="sap-lockout__card sap-lockout__card--locked">
-              <div className="sap-lockout__card-header">
-                <span className="sap-lockout__card-step">STEP 03</span>
-                <Lock size={18} className="sap-lockout__card-icon" />
-              </div>
-              <h4 className="sap-lockout__card-title">Submission Locked</h4>
-              <p className="sap-lockout__card-desc">
-                Cannot start a new request while another is active.
-              </p>
-              <div className="sap-lockout__card-badge is-locked">
-                <Lock size={12} />
-                Submission Locked
-              </div>
-            </div>
+          <h4 className="sap-lockout__card-title">Thông tin người đăng ký</h4>
+          <p className="sap-lockout__card-desc">
+            Xác nhận thông tin của cư dân tương lai bao gồm lịch sử y tế và mong muốn chăm sóc.
+          </p>
+          <div className="sap-lockout__card-badge is-complete">
+            <Check size={14} />
+            Hoàn thành
           </div>
-    
-          {/* recent requests table */}
-          <div id="recent-requests-section" className="sap-lockout__table-section">
-            <div className="sap-lockout__table-header">
-              <h2 className="sap-lockout__table-title">Recent Requests</h2>
-              <button
-                type="button"
-                className="sap-lockout__table-link"
-                onClick={() => navigate('/family/admission-requests')}
-              >
-                View all history
-                <Share2 size={12} style={{ marginLeft: 4 }} />
-              </button>
-            </div>
-    
-            <div className="sap-lockout__table-wrap">
-              <table className="sap-lockout__table">
-                <thead>
-                  <tr>
-                    <th>APPLICANT NAME</th>
-                    <th>SUBMITTED ON</th>
-                    <th>STATUS</th>
-                    <th>REFERENCE ID</th>
-                    <th>ACTION</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {admissions.map((adm) => (
-                    <tr key={adm._id || adm.id}>
-                      <td style={{ fontWeight: 600, color: '#1A365D' }}>
-                        {adm.applicant?.fullName || 'N/A'}
-                      </td>
-                      <td>
-                        {formatEnglishDate(adm.createdAt)}
-                      </td>
-                      <td>
-                        <span className={`sap-status-badge sap-status-badge--${adm.status}`}>
-                          {getStatusLabel(adm.status)}
-                        </span>
-                      </td>
-                      <td style={{ fontFamily: 'monospace', fontSize: '12px', color: '#64748b' }}>
-                        {adm.requestCode || `#ANH-${(adm._id || adm.id || '').substring(0, 4).toUpperCase()}`}
-                      </td>
-                      <td>
-                        <button
-                          type="button"
-                          className="sap-lockout__table-view-btn"
-                          onClick={() => navigate(`/family/admission-requests`)}
-                          title="View Details"
-                        >
-                          <Eye size={16} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+        </div>
+
+        <div className="sap-lockout__card sap-lockout__card--pending">
+          <div className="sap-lockout__card-header">
+            <span className="sap-lockout__card-step">BƯỚC 02</span>
+            <ClipboardCheck size={18} className="sap-lockout__card-icon" />
+          </div>
+          <h4 className="sap-lockout__card-title">Giấy tờ cần thiết</h4>
+          <p className="sap-lockout__card-desc">
+            Tải lên CMND, giấy tờ cư trú và các biểu mẫu đánh giá y tế gần nhất.
+          </p>
+          <div className="sap-lockout__card-badge is-pending">
+            <Clock size={14} />
+            Chờ xét duyệt
+          </div>
+        </div>
+
+        <div className="sap-lockout__card sap-lockout__card--locked">
+          <div className="sap-lockout__card-header">
+            <span className="sap-lockout__card-step">BƯỚC 03</span>
+            <Lock size={18} className="sap-lockout__card-icon" />
+          </div>
+          <h4 className="sap-lockout__card-title">Gửi yêu cầu bị khóa</h4>
+          <p className="sap-lockout__card-desc">
+            Không thể tạo yêu cầu mới khi đang có yêu cầu đang xử lý.
+          </p>
+          <div className="sap-lockout__card-badge is-locked">
+            <Lock size={12} />
+            Đã bị khóa
+          </div>
+        </div>
+      </div>
+
+      {/* recent requests table */}
+      <div id="recent-requests-section" className="sap-lockout__table-section">
+        <div className="sap-lockout__table-header">
+          <h2 className="sap-lockout__table-title">Yêu cầu gần đây</h2>
+          <button
+            type="button"
+            className="sap-lockout__table-link"
+            onClick={() => navigate('/family/admission-requests')}
+          >
+            Xem toàn bộ lịch sử
+            <Share2 size={12} style={{ marginLeft: 4 }} />
+          </button>
+        </div>
+
+        <div className="sap-lockout__table-wrap">
+          <table className="sap-lockout__table">
+            <thead>
+              <tr>
+                <th>TÊN NGƯỜI ĐĂNG KÝ</th>
+                <th>NGÀY GỬI</th>
+                <th>TRẠNG THÁI</th>
+                <th>MÃ THAM CHIẾU</th>
+                <th>THAO TÁC</th>
+              </tr>
+            </thead>
+            <tbody>
+              {admissions.map((adm) => (
+                <tr key={adm._id || adm.id}>
+                  <td style={{ fontWeight: 600, color: '#1A365D' }}>
+                    {adm.applicant?.fullName || 'N/A'}
+                  </td>
+                  <td>
+                    {formatViDate(adm.createdAt)}
+                  </td>
+                  <td>
+                    <span className={`sap-status-badge sap-status-badge--${adm.status}`}>
+                      {getStatusLabel(adm.status)}
+                    </span>
+                  </td>
+                  <td style={{ fontFamily: 'monospace', fontSize: '12px', color: '#64748b' }}>
+                    {adm.requestCode || `#ANH-${(adm._id || adm.id || '').substring(0, 4).toUpperCase()}`}
+                  </td>
+                  <td>
+                    <button
+                      type="button"
+                      className="sap-lockout__table-view-btn"
+                      onClick={() => navigate(`/family/admission-requests`)}
+                      title="Xem chi tiết"
+                    >
+                      <Eye size={16} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
               {admissions.length === 0 && (
                 <tr>
                   <td colSpan={5} className="text-center text-slate-400 py-8">
-                    No recent requests found.
+                    Không có yêu cầu nào gần đây.
                   </td>
                 </tr>
               )}
