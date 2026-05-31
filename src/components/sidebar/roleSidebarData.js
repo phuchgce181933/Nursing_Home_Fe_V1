@@ -36,6 +36,11 @@ export const roleSidebarData = {
       path: '/doctor/appointments',
     },
     {
+      title: 'Theo dõi Sức khỏe',
+      icon: HeartPulse,
+      path: '/doctor/health-monitoring',
+    },
+    {
       title: 'Bệnh nhân',
       icon: Users,
       path: '/doctor/patients',
@@ -76,6 +81,7 @@ export const roleSidebarData = {
     { title: 'sidebar.nurseDashboard', icon: LayoutDashboard, path: '/nurse/dashboard' },
     { title: 'sidebar.myProfile', icon: UserCircle, path: '/nurse/profile' },
     { title: 'sidebar.careNotes', icon: Activity, path: '/nurse/care-notes' },
+    { title: 'Theo dõi Sức khỏe', icon: HeartPulse, path: '/nurse/health-monitoring' },
     { title: 'sidebar.medication', icon: Pill, path: '/nurse/medications' },
     { title: 'sidebar.admissionRequests', icon: ClipboardList, path: '/nurse/admission-requests' },
     { title: 'sidebar.servicePackages', icon: HeartPulse, path: '/nurse/service-packages' },

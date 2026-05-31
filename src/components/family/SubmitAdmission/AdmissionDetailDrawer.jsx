@@ -690,12 +690,12 @@ export default function AdmissionDetailDrawer({
   const isApprovable =
     isAdminRole &&
     admission &&
-    ['new_request', 'consulting', 'assessing'].includes(admission.status);
+    ['new_request', 'consulting'].includes(admission.status);
 
   const isRejectable =
     isAdminRole &&
     admission &&
-    ['new_request', 'consulting', 'assessing'].includes(admission.status);
+    ['new_request', 'consulting'].includes(admission.status);
 
   // Dynamic timeline builder
   const getTimelineSteps = () => {

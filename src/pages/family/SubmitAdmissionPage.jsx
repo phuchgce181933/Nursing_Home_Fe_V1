@@ -442,6 +442,7 @@ export default function SubmitAdmissionPage() {
         {/* ── footer buttons ── */}
         <div className="sap-footer">
           <button
+            key="btn-back"
             type="button"
             className="sap-btn sap-btn--outline"
             onClick={handlePrev}
@@ -452,12 +453,13 @@ export default function SubmitAdmissionPage() {
           </button>
 
           {step < STEPS.length ? (
-            <button type="button" className="sap-btn sap-btn--primary" onClick={handleNext}>
+            <button key="btn-next" type="button" className="sap-btn sap-btn--primary" onClick={handleNext}>
               Continue
               <ChevronRight size={16} />
             </button>
           ) : (
             <button
+              key="btn-submit"
               type="submit"
               className="sap-btn sap-btn--primary sap-btn--submit"
               disabled={submitting}

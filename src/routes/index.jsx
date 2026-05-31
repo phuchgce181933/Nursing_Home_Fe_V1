@@ -55,6 +55,7 @@ import AdmissionRequestsHistoryPage from '../pages/family/AdmissionRequestsHisto
 import SubmitFacilityTourPage from '../pages/family/SubmitFacilityTourPage';
 import FacilityTourHistoryPage from '../pages/family/FacilityTourHistoryPage';
 import IncidentManagementPage from '../pages/IncidentManagementPage';
+import HealthMonitoringPage from '../pages/shared/HealthMonitoringPage';
 import ProtectedRoute from '../components/ProtectedRoute';
 
 function AppRoutes() {
@@ -148,6 +149,7 @@ function AppRoutes() {
         <Route path="service-packages" element={<ServicePackagesPage />} />
         <Route path="appointments" element={<CareAppointmentsPage />} />
         <Route path="patients" element={<PlaceholderPage title="Danh sách bệnh nhân" />} />
+        <Route path="health-monitoring" element={<HealthMonitoringPage />} />
         <Route path="medications" element={<DoctorMedicationPage />} />
         <Route path="leave" element={<LeaveRequestPage />} />
         <Route path="messages" element={<PlaceholderPage title="Tin nhắn" />} />
@@ -168,6 +170,7 @@ function AppRoutes() {
         <Route path="admission-requests" element={<AdminAdmissionRequestsPage />} />
         <Route path="service-packages" element={<ServicePackagesPage />} />
         <Route path="care-notes" element={<PlaceholderPage title="Ghi chú chăm sóc" />} />
+        <Route path="health-monitoring" element={<HealthMonitoringPage />} />
         <Route path="medications" element={<MedicationPage />} />
         <Route path="leave" element={<LeaveRequestPage />} />
         <Route path="medications" element={<PharmacyPage />} />
