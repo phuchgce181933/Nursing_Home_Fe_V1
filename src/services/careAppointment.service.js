@@ -45,6 +45,13 @@ const getMyAppointments = async (params = {}) => {
   return response.data;
 };
 
+const getAvailableStaff = async (start, end, appointmentId = '') => {
+  const response = await axiosClient.get('/care-appointments/available-staff', {
+    params: { start, end, appointmentId },
+  });
+  return response.data;
+};
+
 export default {
   listAppointments,
   getAppointment,
@@ -55,4 +62,5 @@ export default {
   assignNurse,
   updateStatus,
   getMyAppointments,
+  getAvailableStaff,
 };

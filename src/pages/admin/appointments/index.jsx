@@ -109,6 +109,9 @@ export default function CareAppointmentsPage() {
   // Master data for modals
   const [doctorsList, setDoctorsList] = useState([]);
   const [nursesList, setNursesList] = useState([]);
+  const [availableDoctors, setAvailableDoctors] = useState([]);
+  const [availableNurses, setAvailableNurses] = useState([]);
+  const [loadingAvailableStaff, setLoadingAvailableStaff] = useState(false);
   const [residentsList, setResidentsList] = useState([]);
   const [loadingMaster, setLoadingMaster] = useState(false);
 
@@ -233,12 +236,31 @@ export default function CareAppointmentsPage() {
   };
 
   // Open assign staff modal
-  const handleOpenAssign = (appt) => {
+  const handleOpenAssign = async (appt) => {
     setSelectedAppt(appt);
     setSelectedDocId(appt.doctorStaffId?._id || appt.doctorStaffId || '');
     setSelectedNurId(appt.nurseStaffId?._id || appt.nurseStaffId || '');
     setAssignmentError(null);
+    setAvailableDoctors([]);
+    setAvailableNurses([]);
     setShowAssignModal(true);
+
+    try {
+      setLoadingAvailableStaff(true);
+      const res = await careAppointmentService.getAvailableStaff(
+        appt.scheduledStartAt,
+        appt.scheduledEndAt,
+        appt._id
+      );
+      setAvailableDoctors(res.doctors || []);
+      setAvailableNurses(res.nurses || []);
+    } catch (err) {
+      console.error('Failed to load available staff for slot:', err);
+      const errMsg = err.response?.data?.message || 'Không thể tải danh sách bác sĩ/y tá trực ca tại khung giờ này.';
+      setAssignmentError(errMsg);
+    } finally {
+      setLoadingAvailableStaff(false);
+    }
   };
 
   // Handle Save Staff assignment (Doctor & Nurse)
@@ -686,13 +708,25 @@ export default function CareAppointmentsPage() {
                   className="cap-filter-select"
                   value={selectedDocId}
                   onChange={(e) => setSelectedDocId(e.target.value)}
+                  disabled={loadingAvailableStaff}
                 >
-                  <option value="">-- Chưa chỉ định Bác sĩ --</option>
-                  {doctorsList.map((doc) => (
-                    <option key={doc._id} value={doc._id}>
-                      {doc.fullName} ({doc.specialty || 'Đa khoa'})
-                    </option>
-                  ))}
+                  {loadingAvailableStaff ? (
+                    <option value="">Đang tải danh sách Bác sĩ trực ca...</option>
+                  ) : (
+                    <>
+                      <option value="">-- Chưa chỉ định Bác sĩ --</option>
+                      {availableDoctors.map((doc) => (
+                        <option key={doc._id} value={doc._id}>
+                          {doc.fullName} ({doc.specialty || 'Đa khoa'})
+                        </option>
+                      ))}
+                      {selectedAppt.doctorStaffId && !availableDoctors.some(d => d._id === (selectedAppt.doctorStaffId._id || selectedAppt.doctorStaffId)) && (
+                        <option key={selectedAppt.doctorStaffId._id || selectedAppt.doctorStaffId} value={selectedAppt.doctorStaffId._id || selectedAppt.doctorStaffId}>
+                          {selectedAppt.doctorStaffId.fullName || 'Bác sĩ hiện tại'} (Không trong ca trực)
+                        </option>
+                      )}
+                    </>
+                  )}
                 </select>
               </div>
 
@@ -702,13 +736,25 @@ export default function CareAppointmentsPage() {
                   className="cap-filter-select"
                   value={selectedNurId}
                   onChange={(e) => setSelectedNurId(e.target.value)}
+                  disabled={loadingAvailableStaff}
                 >
-                  <option value="">-- Chưa chỉ định Y tá --</option>
-                  {nursesList.map((nur) => (
-                    <option key={nur._id} value={nur._id}>
-                      {nur.fullName}
-                    </option>
-                  ))}
+                  {loadingAvailableStaff ? (
+                    <option value="">Đang tải danh sách Y tá trực ca...</option>
+                  ) : (
+                    <>
+                      <option value="">-- Chưa chỉ định Y tá --</option>
+                      {availableNurses.map((nur) => (
+                        <option key={nur._id} value={nur._id}>
+                          {nur.fullName}
+                        </option>
+                      ))}
+                      {selectedAppt.nurseStaffId && !availableNurses.some(n => n._id === (selectedAppt.nurseStaffId._id || selectedAppt.nurseStaffId)) && (
+                        <option key={selectedAppt.nurseStaffId._id || selectedAppt.nurseStaffId} value={selectedAppt.nurseStaffId._id || selectedAppt.nurseStaffId}>
+                          {selectedAppt.nurseStaffId.fullName || 'Y tá hiện tại'} (Không trong ca trực)
+                        </option>
+                      )}
+                    </>
+                  )}
                 </select>
               </div>
 
