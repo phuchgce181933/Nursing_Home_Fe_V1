@@ -277,7 +277,13 @@ export default function SubmitAdmissionPage() {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
+
+    if (step < STEPS.length) {
+      handleNext();
+      return;
+    }
+
     setSubmitError(null);
 
     let firstErrorStep = null;
