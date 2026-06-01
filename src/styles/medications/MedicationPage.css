@@ -609,3 +609,258 @@
   font-weight: 700;
   color: #0f172a;
 }
+
+
+/* ── Extra badge states (BE uppercase statuses) ── */
+.med-badge--late_taken { background: #fef9c3; color: #854d0e; }
+.med-badge--skipped    { background: #e2e8f0; color: #475569; }
+.med-badge--cancelled  { background: #fee2e2; color: #991b1b; }
+
+/* ── Extra stat cards ── */
+.med-stat-card--pending  { border-left-color: #f59e0b; }
+.med-stat-card--missed   { border-left-color: #ef4444; }
+
+/* ── XL modal ── */
+.med-modal--xl { max-width: 980px; }
+
+/* ── Prescription item row (multi-drug form) ── */
+.med-item-row {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  background: #f8fafc;
+}
+.med-item-row__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.med-item-row__label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1e40af;
+}
+
+/* ── Danger action button ── */
+.med-action-btn--danger { background: #fee2e2; color: #991b1b; }
+.med-action-btn--danger:hover { background: #fecaca; }
+
+/* ── Form hint text ── */
+.med-form-hint {
+  display: block;
+  font-size: 11px;
+  color: #64748b;
+  margin-top: 3px;
+}
+
+/* ══════════════════════════════════════
+   Health Warning Panel (prescription form)
+   ══════════════════════════════════════ */
+.med-health-panel {
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  margin: 14px 0;
+  overflow: hidden;
+}
+
+.med-health-panel--loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.med-health-panel__spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid #cbd5e1;
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: med-spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes med-spin { to { transform: rotate(360deg); } }
+
+.med-health-panel--empty {
+  padding: 10px 14px;
+  font-size: 13px;
+  color: #16a34a;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  margin: 14px 0;
+}
+
+.med-health-panel__title {
+  padding: 8px 14px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #64748b;
+  background: #f1f5f9;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+/* ── Each health section ── */
+.med-health-section {
+  padding: 12px 14px;
+  border-bottom: 1px solid #e2e8f0;
+}
+.med-health-section:last-child { border-bottom: none; }
+
+.med-health-section__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.med-health-section__icon { font-size: 15px; flex-shrink: 0; }
+
+.med-health-section__label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.med-health-section__note {
+  margin: 8px 0 0;
+  font-size: 12px;
+  font-style: italic;
+  line-height: 1.5;
+  color: #92400e;
+}
+
+.med-health-section__text {
+  margin: 0;
+  font-size: 13px;
+  color: #334155;
+  line-height: 1.5;
+}
+
+/* Section colour variants */
+.med-health-section--danger  { background: #fff1f2; }
+.med-health-section--warning { background: #fffbeb; }
+.med-health-section--info    { background: #eff6ff; }
+.med-health-section--neutral { background: #f8fafc; }
+
+.med-health-section--danger  .med-health-section__label { color: #be123c; }
+.med-health-section--warning .med-health-section__label { color: #b45309; }
+.med-health-section--info    .med-health-section__label { color: #1d4ed8; }
+.med-health-section--neutral .med-health-section__label { color: #475569; }
+
+/* ── Tag chips ── */
+.med-health-section__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.med-health-tag {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.med-health-tag--danger  { background: #fecdd3; color: #9f1239; }
+.med-health-tag--warning { background: #fde68a; color: #78350f; }
+.med-health-tag--info    { background: #bfdbfe; color: #1e40af; }
+.med-health-tag--neutral { background: #e2e8f0; color: #475569; }
+
+/* ══════════════════════════════════════
+   Medication Autocomplete Dropdown
+   ══════════════════════════════════════ */
+.med-autocomplete {
+  position: relative;
+}
+
+.med-autocomplete__wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.med-autocomplete__wrap .med-form-input {
+  width: 100%;
+  padding-right: 28px; /* space for spinner */
+}
+
+.med-autocomplete__spin {
+  position: absolute;
+  right: 10px;
+  width: 13px;
+  height: 13px;
+  border: 2px solid #cbd5e1;
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: med-spin 0.65s linear infinite;
+  pointer-events: none;
+  flex-shrink: 0;
+}
+
+.med-autocomplete__list {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
+  right: 0;
+  z-index: 999;
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.med-autocomplete__item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.med-autocomplete__item:hover {
+  background: #eff6ff;
+}
+
+.med-autocomplete__name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.med-autocomplete__meta {
+  font-size: 11px;
+  color: #64748b;
+}
+
+/* Unit-route mismatch warning */
+.med-unit-route-warn {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin: 2px 0 10px;
+  padding: 8px 12px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 6px;
+  font-size: 12.5px;
+  color: #9a3412;
+  line-height: 1.5;
+}
