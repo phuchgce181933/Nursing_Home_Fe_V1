@@ -51,6 +51,11 @@ export const roleSidebarData = {
       path: '/doctor/medications',
     },
     {
+      title: 'Ghi chú chăm sóc',
+      icon: Activity,
+      path: '/doctor/care-notes',
+    },
+    {
       title: 'Yêu cầu Nhập viện',
       icon: ClipboardList,
       path: '/doctor/admission-requests',

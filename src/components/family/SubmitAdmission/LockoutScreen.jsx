@@ -10,12 +10,12 @@ import {
   Eye,
 } from 'lucide-react';
 
-const formatEnglishDate = (dateStr) => {
+const formatViDate = (dateStr) => {
   if (!dateStr) return '';
   try {
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return dateStr;
-    return d.toLocaleDateString('en-US', {
+    return d.toLocaleDateString('vi-VN', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
@@ -28,19 +28,19 @@ const formatEnglishDate = (dateStr) => {
 const getStatusLabel = (status) => {
   switch (status) {
     case 'new_request':
-      return 'Pending';
+      return 'Yêu cầu mới';
     case 'consulting':
-      return 'Consulting';
+      return 'Đang tư vấn';
     case 'assessing':
-      return 'Assessing';
+      return 'Đang đánh giá';
     case 'contracting':
-      return 'Contracting';
+      return 'Ký hợp đồng';
     case 'checked_in':
-      return 'Completed';
+      return 'Đã nhận vào ở';
     case 'cancelled':
-      return 'Cancelled';
+      return 'Đã huỷ';
     default:
-      return status || 'Pending';
+      return status || 'Yêu cầu mới';
   }
 };
 

@@ -56,6 +56,7 @@ import SubmitFacilityTourPage from '../pages/family/SubmitFacilityTourPage';
 import FacilityTourHistoryPage from '../pages/family/FacilityTourHistoryPage';
 import IncidentManagementPage from '../pages/IncidentManagementPage';
 import HealthMonitoringPage from '../pages/shared/HealthMonitoringPage';
+import CareNotesPage from '../pages/shared/CareNotesPage';
 import ProtectedRoute from '../components/ProtectedRoute';
 
 function AppRoutes() {
@@ -151,6 +152,7 @@ function AppRoutes() {
         <Route path="patients" element={<PlaceholderPage title="Danh sách bệnh nhân" />} />
         <Route path="health-monitoring" element={<HealthMonitoringPage />} />
         <Route path="medications" element={<DoctorMedicationPage />} />
+        <Route path="care-notes" element={<CareNotesPage />} />
         <Route path="leave" element={<LeaveRequestPage />} />
         <Route path="messages" element={<PlaceholderPage title="Tin nhắn" />} />
         <Route path="incidents" element={<IncidentManagementPage />} />
@@ -169,8 +171,8 @@ function AppRoutes() {
         <Route path="profile" element={<ProfilePage />} />
         <Route path="admission-requests" element={<AdminAdmissionRequestsPage />} />
         <Route path="service-packages" element={<ServicePackagesPage />} />
-        <Route path="care-notes" element={<PlaceholderPage title="Ghi chú chăm sóc" />} />
         <Route path="health-monitoring" element={<HealthMonitoringPage />} />
+        <Route path="care-notes" element={<CareNotesPage />} />
         <Route path="medications" element={<MedicationPage />} />
         <Route path="leave" element={<LeaveRequestPage />} />
         <Route path="medications" element={<PharmacyPage />} />

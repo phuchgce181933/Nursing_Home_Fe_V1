@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import facilityTourService from '../../../services/facilityTour.service';
 
-const formatEnglishDate = (dateStr) => {
+const formatViDate = (dateStr) => {
   if (!dateStr) return 'N/A';
   try {
     const d = new Date(dateStr);
@@ -96,16 +96,15 @@ export default function FacilityTourDetailDrawer({ isOpen, onClose, tour, onCanc
       setCancelReason('');
       onClose();
     } catch (err) {
-      const msg = err?.response?.data?.message || err?.message || 'Failed to cancel the tour request.';
+      const msg = err?.response?.data?.message || err?.message || 'Không thể huỷ yêu cầu tham quan.';
       setCancelError(msg);
     } finally {
       setCancelling(false);
     }
   };
 
-  // Timeline node definitions
   const isCancelled = tour.status === 'cancelled';
-  
+
   const steps = [
     {
       key: 'submitted',
@@ -217,7 +216,7 @@ export default function FacilityTourDetailDrawer({ isOpen, onClose, tour, onCanc
                   <div className="ftd-schedule-item__content">
                     <span className="ftd-schedule-item__label">Ngày</span>
                     <span className="ftd-schedule-item__value">
-                      {formatEnglishDate(tour.preferredDate)}
+                      {formatViDate(tour.preferredDate)}
                     </span>
                   </div>
                 </div>

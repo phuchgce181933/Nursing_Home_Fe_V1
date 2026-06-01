@@ -20,7 +20,7 @@ import admissionService from '../../../services/admission.service';
 import servicePackageService from '../../../services/servicePackage.service';
 import facilityService from '../../../services/facility.service';
 
-const formatEnglishDate = (dateStr) => {
+const formatViDate = (dateStr) => {
   if (!dateStr) return 'N/A';
   try {
     const d = new Date(dateStr);
@@ -161,7 +161,6 @@ export default function AdmissionDetailDrawer({
   const [cancellationReason, setCancellationReason] = useState('');
   const [cancelling, setCancelling] = useState(false);
 
-  // Admin approval state
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [packages, setPackages] = useState([]);
   const [loadingPackages, setLoadingPackages] = useState(false);
@@ -170,36 +169,29 @@ export default function AdmissionDetailDrawer({
   const [approving, setApproving] = useState(false);
   const [isOpenPackageDropdown, setIsOpenPackageDropdown] = useState(false);
 
-  // Admin rejection state
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
   const [rejecting, setRejecting] = useState(false);
 
-  // Modal error state for displaying beautiful error banner instead of browser alert popup
   const [modalError, setModalError] = useState(null);
 
-  // New Workflow Action States
-  // 1. Assign Consultant
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [staffMembers, setStaffMembers] = useState([]);
   const [loadingStaff, setLoadingStaff] = useState(false);
   const [selectedStaffId, setSelectedStaffId] = useState('');
   const [assigning, setAssigning] = useState(false);
 
-  // 2. Pre-admission Consultation
   const [showConsultationModal, setShowConsultationModal] = useState(false);
   const [consultationNotes, setConsultationNotes] = useState('');
   const [consultationGenNotes, setConsultationGenNotes] = useState('');
   const [recordingConsultation, setRecordingConsultation] = useState(false);
 
-  // 3. Initial Assessment Scheduling
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [scheduleDate, setScheduleDate] = useState('');
   const [initialAssessmentNotes, setInitialAssessmentNotes] = useState('');
   const [scheduleGenNotes, setScheduleGenNotes] = useState('');
   const [scheduling, setScheduling] = useState(false);
 
-  // 4. Evaluate Admission Eligibility
   const [showEligibilityModal, setShowEligibilityModal] = useState(false);
   const [eligibilityStatus, setEligibilityStatus] = useState('eligible');
   const [assessmentResult, setAssessmentResult] = useState('');
@@ -207,12 +199,10 @@ export default function AdmissionDetailDrawer({
   const [eligibilityGenNotes, setEligibilityGenNotes] = useState('');
   const [evaluating, setEvaluating] = useState(false);
 
-  // 5. Assign Service Package
   const [showAssignPackageModal, setShowAssignPackageModal] = useState(false);
   const [selectedPackageId, setSelectedPackageId] = useState('');
   const [assigningPackage, setAssigningPackage] = useState(false);
 
-  // 6. Create Admission Contract
   const [showContractModal, setShowContractModal] = useState(false);
   const [contractNum, setContractNum] = useState('');
   const [contractStart, setContractStart] = useState('');
@@ -221,7 +211,6 @@ export default function AdmissionDetailDrawer({
   const [contractGenNotes, setContractGenNotes] = useState('');
   const [creatingContract, setCreatingContract] = useState(false);
 
-  // 7. Check-in Resident
   const [showCheckInModal, setShowCheckInModal] = useState(false);
   const [assignedBedHex, setAssignedBedHex] = useState('');
   const [assignedRoomHex, setAssignedRoomHex] = useState('');
@@ -259,7 +248,6 @@ export default function AdmissionDetailDrawer({
     showCheckInModal
   ]);
 
-  // Load details whenever admissionId changes or role changes
   useEffect(() => {
     if (!isOpen || !admissionId) return;
 
@@ -267,14 +255,13 @@ export default function AdmissionDetailDrawer({
       try {
         setLoading(true);
         setError(null);
-        // Cả admin, manager, doctor, nurse đều dùng chung route admin để đọc chi tiết nhờ BE đã mở quyền đọc
         const res = (isAdmin || isDoctorOrNurseRole || isAdminRole)
           ? await admissionService.adminGetAdmissionDetail(admissionId)
           : await admissionService.getAdmissionDetail(admissionId);
         setAdmission(res?.admission || null);
       } catch (err) {
         console.error('Failed to load admission details:', err);
-        setError('Failed to connect to server. Please try again later.');
+        setError('Không thể kết nối máy chủ. Vui lòng thử lại sau.');
       } finally {
         setLoading(false);
       }
@@ -283,7 +270,6 @@ export default function AdmissionDetailDrawer({
     fetchDetail();
   }, [isOpen, admissionId, isAdmin, isDoctorOrNurseRole, isAdminRole]);
 
-  // Load packages when approve modal or assign package modal opens
   useEffect(() => {
     if (showApproveModal || showAssignPackageModal) {
       const fetchPackages = async () => {
@@ -301,7 +287,6 @@ export default function AdmissionDetailDrawer({
     }
   }, [showApproveModal, showAssignPackageModal]);
 
-  // Load staff members when assign consultant modal opens
   useEffect(() => {
     if (showAssignModal) {
       const fetchStaff = async () => {
@@ -432,21 +417,20 @@ export default function AdmissionDetailDrawer({
     try {
       setCancelling(true);
       await admissionService.cancelAdmissionRequest(admissionId, {
-        cancellationReason: cancellationReason.trim() || 'Cancelled at family request',
+        cancellationReason: cancellationReason.trim() || 'Huỷ theo yêu cầu của gia đình',
       });
       setShowCancelModal(false);
       setCancellationReason('');
       if (onCancelSuccess) {
         onCancelSuccess();
       }
-      // Reload details
       const res = (isAdmin || isDoctorOrNurseRole || isAdminRole)
         ? await admissionService.adminGetAdmissionDetail(admissionId)
         : await admissionService.getAdmissionDetail(admissionId);
       setAdmission(res?.admission || null);
     } catch (err) {
       console.error('Failed to cancel admission request:', err);
-      setModalError(err.response?.data?.message || 'An error occurred while cancelling the request. Please try again.');
+      setModalError(err.response?.data?.message || 'Đã xảy ra lỗi khi huỷ yêu cầu. Vui lòng thử lại.');
     } finally {
       setCancelling(false);
     }
@@ -465,12 +449,11 @@ export default function AdmissionDetailDrawer({
       if (onCancelSuccess) {
         onCancelSuccess();
       }
-      // Reload details
       const res = await admissionService.adminGetAdmissionDetail(admissionId);
       setAdmission(res?.admission || null);
     } catch (err) {
       console.error('Failed to approve request:', err);
-      setModalError(err.response?.data?.message || 'An error occurred while approving the request.');
+      setModalError(err.response?.data?.message || 'Đã xảy ra lỗi khi duyệt yêu cầu.');
     } finally {
       setApproving(false);
     }
@@ -488,18 +471,16 @@ export default function AdmissionDetailDrawer({
       if (onCancelSuccess) {
         onCancelSuccess();
       }
-      // Reload details
       const res = await admissionService.adminGetAdmissionDetail(admissionId);
       setAdmission(res?.admission || null);
     } catch (err) {
       console.error('Failed to reject request:', err);
-      setModalError(err.response?.data?.message || 'An error occurred while rejecting the request.');
+      setModalError(err.response?.data?.message || 'Đã xảy ra lỗi khi từ chối yêu cầu.');
     } finally {
       setRejecting(false);
     }
   };
 
-  // Workflow Handlers
   const handleAssignConsultant = async (e) => {
     if (e) e.preventDefault();
     if (!admissionId || !selectedStaffId) return;
@@ -514,7 +495,7 @@ export default function AdmissionDetailDrawer({
       setAdmission(res?.admission || null);
     } catch (err) {
       console.error('Failed to assign consultant:', err);
-      setModalError(err.response?.data?.message || 'An error occurred while assigning the consultant.');
+      setModalError(err.response?.data?.message || 'Đã xảy ra lỗi khi phân công tư vấn viên.');
     } finally {
       setAssigning(false);
     }
@@ -538,7 +519,7 @@ export default function AdmissionDetailDrawer({
       setAdmission(res?.admission || null);
     } catch (err) {
       console.error('Failed to record consultation:', err);
-      setModalError(err.response?.data?.message || 'An error occurred while recording the consultation.');
+      setModalError(err.response?.data?.message || 'Đã xảy ra lỗi khi ghi nhận tư vấn.');
     } finally {
       setRecordingConsultation(false);
     }
@@ -552,7 +533,6 @@ export default function AdmissionDetailDrawer({
       setScheduling(true);
       let selectedDate = new Date(scheduleDate);
       const now = new Date();
-      // If the selected date is in the past or less than 5 minutes in the future relative to the client clock
       if (selectedDate.getTime() - now.getTime() < 5 * 60 * 1000) {
         selectedDate = new Date(now.getTime() + 10 * 60 * 1000);
       }
@@ -571,7 +551,7 @@ export default function AdmissionDetailDrawer({
       setAdmission(res?.admission || null);
     } catch (err) {
       console.error('Failed to schedule assessment:', err);
-      setModalError(err.response?.data?.message || 'An error occurred while scheduling the assessment.');
+      setModalError(err.response?.data?.message || 'Đã xảy ra lỗi khi lên lịch đánh giá.');
     } finally {
       setScheduling(false);
     }
@@ -598,7 +578,7 @@ export default function AdmissionDetailDrawer({
       setAdmission(res?.admission || null);
     } catch (err) {
       console.error('Failed to evaluate eligibility:', err);
-      setModalError(err.response?.data?.message || 'An error occurred while evaluating eligibility.');
+      setModalError(err.response?.data?.message || 'Đã xảy ra lỗi khi đánh giá điều kiện nhập viện.');
     } finally {
       setEvaluating(false);
     }
@@ -618,7 +598,7 @@ export default function AdmissionDetailDrawer({
       setAdmission(res?.admission || null);
     } catch (err) {
       console.error('Failed to assign package:', err);
-      setModalError(err.response?.data?.message || 'An error occurred while assigning the service package.');
+      setModalError(err.response?.data?.message || 'Đã xảy ra lỗi khi gán gói dịch vụ.');
     } finally {
       setAssigningPackage(false);
     }
@@ -648,7 +628,7 @@ export default function AdmissionDetailDrawer({
       setAdmission(res?.admission || null);
     } catch (err) {
       console.error('Failed to create contract:', err);
-      setModalError(err.response?.data?.message || 'An error occurred while creating the contract.');
+      setModalError(err.response?.data?.message || 'Đã xảy ra lỗi khi tạo hợp đồng.');
     } finally {
       setCreatingContract(false);
     }
@@ -674,7 +654,7 @@ export default function AdmissionDetailDrawer({
       setAdmission(res?.admission || null);
     } catch (err) {
       console.error('Failed to check-in resident:', err);
-      setModalError(err.response?.data?.message || 'An error occurred during resident check-in.');
+      setModalError(err.response?.data?.message || 'Đã xảy ra lỗi khi nhận cư dân vào ở.');
     } finally {
       setCheckingIn(false);
     }
@@ -703,7 +683,6 @@ export default function AdmissionDetailDrawer({
     ['new_request', 'consulting'].includes(admission.status) &&
     !admission.approvedAt;
 
-  // Dynamic timeline builder
   const getTimelineSteps = () => {
     if (!admission) return [];
 
@@ -723,7 +702,7 @@ export default function AdmissionDetailDrawer({
           ? 'Đã hoàn thành'
           : 'Đang chờ',
         date: admission.consultedAt
-          ? `${formatEnglishDate(admission.consultedAt)}`
+          ? `${formatViDate(admission.consultedAt)}`
           : admission.consultationScheduledAt
             ? `Lịch hẹn: ${formatEnglishDate(admission.consultationScheduledAt)}`
             : '',
@@ -845,7 +824,6 @@ export default function AdmissionDetailDrawer({
                   <Clock size={16} /> TIẾN TRÌNH XỬ LÝ
                 </h5>
                 <div className="arh-timeline">
-                  {/* Timeline connecting line */}
                   <div className="arh-timeline__line" />
 
                   {admission.status === 'cancelled' && (
@@ -867,13 +845,11 @@ export default function AdmissionDetailDrawer({
 
                     return (
                       <div key={step.key} className={`arh-timeline__step ${isDone ? 'is-done' : isActive ? 'is-active' : ''}`}>
-                        {/* Bullet symbol */}
                         <div className="arh-timeline__dot flex items-center justify-center">
                           {isDone && <Check size={8} className="text-white" />}
                           {isActive && getStepIcon(step.key)}
                         </div>
 
-                        {/* Title and stats */}
                         <div>
                           <p className="arh-timeline__title">
                             {step.title}
@@ -905,7 +881,7 @@ export default function AdmissionDetailDrawer({
                 </h5>
                 <div className="arh-detail-card__profile" style={{ background: 'rgba(239, 244, 255, 0.4)', border: '1px solid rgba(27, 54, 93, 0.05)', padding: '14px', borderRadius: '12px' }}>
                   <img
-                    alt="Requester photo"
+                    alt="Ảnh người yêu cầu"
                     className="arh-detail-card__avatar"
                     src="https://lh3.googleusercontent.com/aida-public/AB6AXuCJXACrUfkBY9FzZgqaYWlbX2_62AvB8l3uq1FtPvHQLPXjrGi_pCx100ZMjqgFsjpLnyALy7cQ5HakNfzB6W_5g45qDwYQEw1vHmVH5smWEcdKtoEiRARx_wst369IQZWNEsbxfaQiR7N8bZ8CdZpY4zVsLhpqnZGHYN0qm0QbBarwa-WWJ7keBArDnMmO3hrwY_wqVVkmiqKVtfEhifVie9Jn2HWA4tbPhuGX_x4lUz6m_HgraTM9IbraKGLNxKx4xcqhALN9SqZE"
                   />
@@ -1017,7 +993,7 @@ export default function AdmissionDetailDrawer({
                     </div>
                     <div>
                       <p className="font-bold text-slate-800 text-[13.5px]">
-                        {formatDayOfWeek(scheduledDate)}, {formatEnglishDate(scheduledDate)}
+                        {formatDayOfWeek(scheduledDate)}, {formatViDate(scheduledDate)}
                       </p>
                       <p className="text-slate-500 text-[12.5px] mt-1 font-medium flex items-center gap-1">
                         <Clock size={12} className="text-slate-400" />
@@ -1123,7 +1099,7 @@ export default function AdmissionDetailDrawer({
                   <div className="arh-detail-item">
                     <p className="arh-detail-item__label">Ngày mong muốn nhập viện</p>
                     <p className="arh-detail-item__value" style={{ color: '#1B365D', fontWeight: 'bold' }}>
-                      {formatEnglishDate(admission.preferredAdmissionDate)}
+                      {formatViDate(admission.preferredAdmissionDate)}
                     </p>
                   </div>
                   <div className="arh-detail-item">
@@ -1184,7 +1160,6 @@ export default function AdmissionDetailDrawer({
                       </button>
                     )}
 
-                    {/* 4. Evaluate Admission Eligibility (Doctor role only) */}
                     {isDoctorRole && ['consulting', 'assessing'].includes(admission.status) && (
                       <button
                         type="button"
@@ -1375,7 +1350,6 @@ export default function AdmissionDetailDrawer({
             className="arh-modal"
             onClick={(e) => {
               e.stopPropagation();
-              // Đóng dropdown khi click vùng trống khác trong modal
               if (isOpenPackageDropdown) setIsOpenPackageDropdown(false);
             }}
           >
@@ -1910,7 +1884,7 @@ export default function AdmissionDetailDrawer({
                   type="text"
                   className="adm-filter-input"
                   style={{ paddingLeft: '14px' }}
-                  placeholder="e.g. HĐ-2026-0001"
+                  placeholder="vd: HĐ-2026-0001"
                   value={contractNum}
                   onChange={(e) => setContractNum(e.target.value)}
                   required

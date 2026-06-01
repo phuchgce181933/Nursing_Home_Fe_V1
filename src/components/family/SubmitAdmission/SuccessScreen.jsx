@@ -9,7 +9,7 @@ import {
   Share2,
 } from 'lucide-react';
 
-const formatEnglishDate = (dateStr) => {
+const formatViDate = (dateStr) => {
   if (!dateStr) return '';
   try {
     const d = new Date(dateStr);
@@ -108,7 +108,7 @@ export default function SuccessScreen({ submittedData = {}, formData = {}, navig
           <div className="sap-success__hotline-left">
             <img
               src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=120&h=120"
-              alt="Support Staff Avatar"
+              alt="Ảnh nhân viên hỗ trợ"
               className="sap-success__hotline-avatar"
             />
             <div className="sap-success__hotline-text">

@@ -15,7 +15,7 @@ import {
 import facilityTourService from '../../services/facilityTour.service';
 import FacilityTourDetailDrawer from '../../components/family/FacilityTour/FacilityTourDetailDrawer';
 
-const formatEnglishDate = (dateStr) => {
+const formatViDate = (dateStr) => {
   if (!dateStr) return 'N/A';
   try {
     const d = new Date(dateStr);
@@ -308,7 +308,7 @@ export default function FacilityTourHistoryPage() {
                           <strong className="text-slate-800">{t.contactName}</strong>
                         </td>
                         <td>{t.contactPhone}</td>
-                        <td>{formatEnglishDate(t.preferredDate)}</td>
+                        <td>{formatViDate(t.preferredDate)}</td>
                         <td>{t.preferredTimeSlot || 'N/A'}</td>
                         <td>{t.numberOfVisitors}</td>
                         <td>

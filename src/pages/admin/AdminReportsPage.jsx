@@ -244,11 +244,11 @@ export default function AdminReportsPage() {
             <>
               <div className="adm-filter-group">
                 <label>Trạng thái</label>
-                <input value={status} onChange={(e) => setStatus(e.target.value)} placeholder="open, resolved..." />
+                <input value={status} onChange={(e) => setStatus(e.target.value)} placeholder="open, investigating, resolved... (để trống = tất cả)" />
               </div>
               <div className="adm-filter-group">
                 <label>Độ nghiêm trọng</label>
-                <input value={severity} onChange={(e) => setSeverity(e.target.value)} placeholder="low, medium, high" />
+                <input value={severity} onChange={(e) => setSeverity(e.target.value)} placeholder="low, medium, high, critical (để trống = tất cả)" />
               </div>
             </>
           )}

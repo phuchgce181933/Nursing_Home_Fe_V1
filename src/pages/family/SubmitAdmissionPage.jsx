@@ -336,7 +336,7 @@ export default function SubmitAdmissionPage() {
       const msg =
         err?.response?.data?.message ||
         err?.message ||
-        'An error occurred. Please try again.';
+        'Đã xảy ra lỗi. Vui lòng thử lại.';
 
       // Nếu là lỗi trùng đơn từ API (409 Conflict hoặc thông báo trùng khớp)
       if (err?.response?.status === 409 || msg.toLowerCase().includes('already have a pending') || msg.toLowerCase().includes('trùng')) {

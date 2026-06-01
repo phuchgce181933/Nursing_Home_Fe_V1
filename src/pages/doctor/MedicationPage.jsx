@@ -5,8 +5,8 @@ import '../../styles/medications/MedicationPage.css';
 /* ── constants ── */
 const ROUTES_LIST = ['Oral', 'IM Injection', 'IV Injection', 'Subcutaneous', 'Sublingual', 'Topical', 'Eye drop', 'Ear drop', 'Inhalation'];
 
-const RX_STATUS_LABELS = { active: 'Active', paused: 'Paused', stopped: 'Stopped', completed: 'Completed' };
-const ADMIN_STATUS_LABELS = { pending: 'Pending', taken: 'Taken', missed: 'Missed', overdue: 'Overdue' };
+const RX_STATUS_LABELS = { active: 'Đang dùng', paused: 'Tạm dừng', stopped: 'Đã dừng', completed: 'Hoàn thành' };
+const ADMIN_STATUS_LABELS = { pending: 'Chờ dùng', taken: 'Đã dùng', missed: 'Bỏ lỡ', overdue: 'Quá hạn' };
 
 const toDateInput = (d) => d ? new Date(d).toISOString().slice(0, 10) : '';
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-GB') : '—';
@@ -25,13 +25,13 @@ function ResidentWarning({ resident }) {
       {hasAllergies && (
         <div className="med-warning-banner__row">
           <span className="med-warning-banner__icon"></span>
-          <span><strong>Allergies:</strong> {resident.allergies.join(', ')}</span>
+          <span><strong>Dị ứng:</strong> {resident.allergies.join(', ')}</span>
         </div>
       )}
       {hasConditions && (
         <div className="med-warning-banner__row">
           <span className="med-warning-banner__icon"></span>
-          <span><strong>Chronic conditions:</strong> {resident.chronicConditions.join(', ')}</span>
+          <span><strong>Bệnh mãn tính:</strong> {resident.chronicConditions.join(', ')}</span>
         </div>
       )}
     </div>
@@ -104,27 +104,27 @@ function PrescriptionModal({ mode, prescription, residents, onSave, onClose }) {
 
   return (
     <Modal
-      title={isEdit ? 'Edit Prescription' : 'Create Prescription'}
+      title={isEdit ? 'Chỉnh sửa đơn thuốc' : 'Tạo đơn thuốc'}
       onClose={onClose}
       footer={
         <>
-          <button className="med-btn med-btn--secondary" onClick={onClose}>Cancel</button>
+          <button className="med-btn med-btn--secondary" onClick={onClose}>Hủy</button>
           <button className="med-btn med-btn--primary" onClick={handleSubmit}>
-            {isEdit ? 'Save Changes' : 'Create'}
+            {isEdit ? 'Lưu thay đổi' : 'Tạo mới'}
           </button>
         </>
       }
     >
       {/* Resident selector — read-only when editing */}
       <div className="med-form-group">
-        <label className="med-form-label">Resident <span style={{ color: '#ef4444' }}>*</span></label>
+        <label className="med-form-label">Cư dân <span style={{ color: '#ef4444' }}>*</span></label>
         {isEdit ? (
           <div className="med-form-input" style={{ background: '#f8fafc', color: '#64748b' }}>
             {prescription.residentId?.fullName} ({prescription.residentId?.residentCode})
           </div>
         ) : (
           <select className={`med-form-select${errors.residentId ? ' med-form-select--err' : ''}`} value={form.residentId} onChange={set('residentId')}>
-            <option value="">-- Select resident --</option>
+            <option value="">-- Chọn cư dân --</option>
             {residents.map((r) => (
               <option key={r._id} value={r._id}>{r.fullName} ({r.residentCode})</option>
             ))}
@@ -137,57 +137,57 @@ function PrescriptionModal({ mode, prescription, residents, onSave, onClose }) {
 
       <div className="med-form-row">
         <div className="med-form-group">
-          <label className="med-form-label">Medication name <span style={{ color: '#ef4444' }}>*</span></label>
-          <input className={`med-form-input${errors.medicationName ? ' med-form-input--err' : ''}`} value={form.medicationName} onChange={set('medicationName')} placeholder="e.g. Metformin" />
+          <label className="med-form-label">Tên thuốc <span style={{ color: '#ef4444' }}>*</span></label>
+          <input className={`med-form-input${errors.medicationName ? ' med-form-input--err' : ''}`} value={form.medicationName} onChange={set('medicationName')} placeholder="VD: Metformin" />
           {errors.medicationName && <span className="med-form-error">{errors.medicationName}</span>}
         </div>
         <div className="med-form-group">
-          <label className="med-form-label">Dosage <span style={{ color: '#ef4444' }}>*</span></label>
-          <input className={`med-form-input${errors.dosage ? ' med-form-input--err' : ''}`} value={form.dosage} onChange={set('dosage')} placeholder="e.g. 500mg" />
+          <label className="med-form-label">Liều lượng <span style={{ color: '#ef4444' }}>*</span></label>
+          <input className={`med-form-input${errors.dosage ? ' med-form-input--err' : ''}`} value={form.dosage} onChange={set('dosage')} placeholder="VD: 500mg" />
           {errors.dosage && <span className="med-form-error">{errors.dosage}</span>}
         </div>
       </div>
 
       <div className="med-form-row">
         <div className="med-form-group">
-          <label className="med-form-label">Route</label>
+          <label className="med-form-label">Đường dùng</label>
           <select className="med-form-select" value={form.route} onChange={set('route')}>
             {ROUTES_LIST.map((r) => <option key={r} value={r}>{r}</option>)}
           </select>
         </div>
         <div className="med-form-group">
-          <label className="med-form-label">Frequency</label>
-          <input className="med-form-input" value={form.frequency} onChange={set('frequency')} placeholder="e.g. Twice daily" />
+          <label className="med-form-label">Tần suất</label>
+          <input className="med-form-input" value={form.frequency} onChange={set('frequency')} placeholder="VD: Hai lần mỗi ngày" />
         </div>
       </div>
 
       <div className="med-form-row">
         <div className="med-form-group">
-          <label className="med-form-label">Start date <span style={{ color: '#ef4444' }}>*</span></label>
+          <label className="med-form-label">Ngày bắt đầu <span style={{ color: '#ef4444' }}>*</span></label>
           <input type="date" className={`med-form-input${errors.startDate ? ' med-form-input--err' : ''}`} value={form.startDate} onChange={set('startDate')} />
           {errors.startDate && <span className="med-form-error">{errors.startDate}</span>}
         </div>
         <div className="med-form-group">
-          <label className="med-form-label">End date</label>
+          <label className="med-form-label">Ngày kết thúc</label>
           <input type="date" className="med-form-input" value={form.endDate} onChange={set('endDate')} />
         </div>
       </div>
 
       {isEdit && (
         <div className="med-form-group">
-          <label className="med-form-label">Status</label>
+          <label className="med-form-label">Trạng thái</label>
           <select className="med-form-select" value={form.status} onChange={set('status')}>
-            <option value="active">Active</option>
-            <option value="paused">Paused</option>
-            <option value="stopped">Stopped</option>
-            <option value="completed">Completed</option>
+            <option value="active">Đang dùng</option>
+            <option value="paused">Tạm dừng</option>
+            <option value="stopped">Đã dừng</option>
+            <option value="completed">Hoàn thành</option>
           </select>
         </div>
       )}
 
       <div className="med-form-group">
-        <label className="med-form-label">Notes</label>
-        <textarea className="med-form-textarea" rows={3} value={form.notes} onChange={set('notes')} placeholder="Additional notes..." />
+        <label className="med-form-label">Ghi chú</label>
+        <textarea className="med-form-textarea" rows={3} value={form.notes} onChange={set('notes')} placeholder="Ghi chú bổ sung..." />
       </div>
     </Modal>
   );
@@ -208,38 +208,38 @@ function ScheduleModal({ prescription, onSave, onClose }) {
 
   return (
     <Modal
-      title={`Medication Schedule — ${prescription.medicationName}`}
+      title={`Lịch dùng thuốc — ${prescription.medicationName}`}
       onClose={onClose}
       footer={
         <>
-          <button className="med-btn med-btn--secondary" onClick={onClose}>Cancel</button>
-          <button className="med-btn med-btn--primary" onClick={() => onSave(prescription._id, times)}>Save Schedule</button>
+          <button className="med-btn med-btn--secondary" onClick={onClose}>Hủy</button>
+          <button className="med-btn med-btn--primary" onClick={() => onSave(prescription._id, times)}>Lưu lịch</button>
         </>
       }
     >
       <div className="med-info-card" style={{ marginBottom: 16 }}>
         <div className="med-info-card__grid">
           <div className="med-info-card__item">
-            <span className="med-info-card__label">Resident</span>
+            <span className="med-info-card__label">Cư dân</span>
             <span className="med-info-card__value">{prescription.residentId?.fullName}</span>
           </div>
           <div className="med-info-card__item">
-            <span className="med-info-card__label">Dosage</span>
+            <span className="med-info-card__label">Liều lượng</span>
             <span className="med-info-card__value">{prescription.dosage} — {prescription.route}</span>
           </div>
           <div className="med-info-card__item">
-            <span className="med-info-card__label">Frequency</span>
+            <span className="med-info-card__label">Tần suất</span>
             <span className="med-info-card__value">{prescription.frequency || '—'}</span>
           </div>
         </div>
       </div>
 
       <div className="med-section-head">
-        <h3>Scheduled times</h3>
+        <h3>Giờ dùng thuốc</h3>
       </div>
 
       <div className="med-times-list">
-        {times.length === 0 && <span style={{ color: '#94a3b8', fontSize: 14 }}>No times set yet.</span>}
+        {times.length === 0 && <span style={{ color: '#94a3b8', fontSize: 14 }}>Chưa có giờ nào được đặt.</span>}
         {times.map((t) => (
           <span key={t} className="med-time-chip">
             {t}
@@ -255,7 +255,7 @@ function ScheduleModal({ prescription, onSave, onClose }) {
           value={newTime}
           onChange={(e) => setNewTime(e.target.value)}
         />
-        <button className="med-time-add__btn" onClick={addTime}>+ Add time</button>
+        <button className="med-time-add__btn" onClick={addTime}>+ Thêm giờ</button>
       </div>
     </Modal>
   );
@@ -274,34 +274,34 @@ function HistoryModal({ prescription, onClose }) {
   }, [prescription._id]);
 
   return (
-    <Modal title={`Administration History — ${prescription.medicationName}`} onClose={onClose} size="lg">
+    <Modal title={`Lịch sử dùng thuốc — ${prescription.medicationName}`} onClose={onClose} size="lg">
       <div className="med-info-card" style={{ marginBottom: 16 }}>
         <div className="med-info-card__grid">
           <div className="med-info-card__item">
-            <span className="med-info-card__label">Resident</span>
+            <span className="med-info-card__label">Cư dân</span>
             <span className="med-info-card__value">{prescription.residentId?.fullName} ({prescription.residentId?.residentCode})</span>
           </div>
           <div className="med-info-card__item">
-            <span className="med-info-card__label">Dosage</span>
+            <span className="med-info-card__label">Liều lượng</span>
             <span className="med-info-card__value">{prescription.dosage} — {prescription.route}</span>
           </div>
         </div>
       </div>
 
       {loading ? (
-        <p className="med-empty">Loading history...</p>
+        <p className="med-empty">Đang tải lịch sử...</p>
       ) : history.length === 0 ? (
-        <p className="med-empty">No administration history yet.</p>
+        <p className="med-empty">Chưa có lịch sử dùng thuốc.</p>
       ) : (
         <div className="med-table-wrap">
           <table className="med-table">
             <thead>
               <tr>
-                <th>Scheduled</th>
-                <th>Taken at</th>
-                <th>Status</th>
-                <th>Administered by</th>
-                <th>Notes</th>
+                <th>Giờ dự kiến</th>
+                <th>Đã dùng lúc</th>
+                <th>Trạng thái</th>
+                <th>Người thực hiện</th>
+                <th>Ghi chú</th>
               </tr>
             </thead>
             <tbody>
@@ -343,39 +343,39 @@ function PrescriptionsTab({ prescriptions, residents, loading, onOpenCreate, onO
   return (
     <div className="med-tab-content">
       <div className="med-filter">
-        <input className="med-filter__search" type="text" placeholder="Search by resident name or medication..." value={search} onChange={(e) => setSearch(e.target.value)} />
+        <input className="med-filter__search" type="text" placeholder="Tìm theo tên cư dân hoặc thuốc..." value={search} onChange={(e) => setSearch(e.target.value)} />
         <select className="med-filter__select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-          <option value="">All statuses</option>
-          <option value="active">Active</option>
-          <option value="paused">Paused</option>
-          <option value="stopped">Stopped</option>
-          <option value="completed">Completed</option>
+          <option value="">Tất cả trạng thái</option>
+          <option value="active">Đang dùng</option>
+          <option value="paused">Tạm dừng</option>
+          <option value="stopped">Đã dừng</option>
+          <option value="completed">Hoàn thành</option>
         </select>
       </div>
 
       {loading ? (
-        <p className="med-empty">Loading prescriptions...</p>
+        <p className="med-empty">Đang tải đơn thuốc...</p>
       ) : (
         <div className="med-table-wrap">
           <table className="med-table">
             <thead>
               <tr>
-                <th>Resident</th>
-                <th>Medication</th>
-                <th>Dosage</th>
-                <th>Frequency</th>
-                <th>Schedule</th>
-                <th>Route</th>
-                <th>Start date</th>
-                <th>End date</th>
-                <th>Prescribed by</th>
-                <th>Status</th>
-                <th>Actions</th>
+                <th>Cư dân</th>
+                <th>Thuốc</th>
+                <th>Liều lượng</th>
+                <th>Tần suất</th>
+                <th>Lịch dùng</th>
+                <th>Đường dùng</th>
+                <th>Ngày bắt đầu</th>
+                <th>Ngày kết thúc</th>
+                <th>Bác sĩ kê đơn</th>
+                <th>Trạng thái</th>
+                <th>Thao tác</th>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
-                <tr><td colSpan={11} className="med-empty">No prescriptions found</td></tr>
+                <tr><td colSpan={11} className="med-empty">Không tìm thấy đơn thuốc</td></tr>
               ) : (
                 filtered.map((p) => (
                   <tr key={p._id}>
@@ -392,7 +392,7 @@ function PrescriptionsTab({ prescriptions, residents, loading, onOpenCreate, onO
                     <td>
                       {p.scheduleTimes?.length > 0
                         ? p.scheduleTimes.map((t) => <span key={t} className="med-time-chip" style={{ marginRight: 4 }}>{t}</span>)
-                        : <span style={{ color: '#94a3b8' }}>Not set</span>}
+                        : <span style={{ color: '#94a3b8' }}>Chưa đặt</span>}
                     </td>
                     <td>{p.route}</td>
                     <td>{fmtDate(p.startDate)}</td>
@@ -401,9 +401,9 @@ function PrescriptionsTab({ prescriptions, residents, loading, onOpenCreate, onO
                     <td><StatusBadge status={p.status} type="rx" /></td>
                     <td>
                       <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                        <button className="med-action-btn med-action-btn--edit" onClick={() => onOpenEdit(p)}> Edit</button>
-                        <button className="med-action-btn med-action-btn--schedule" onClick={() => onOpenSchedule(p)}> Schedule</button>
-                        <button className="med-action-btn med-action-btn--history" onClick={() => onOpenHistory(p)}> History</button>
+                        <button className="med-action-btn med-action-btn--edit" onClick={() => onOpenEdit(p)}> Sửa</button>
+                        <button className="med-action-btn med-action-btn--schedule" onClick={() => onOpenSchedule(p)}> Lịch</button>
+                        <button className="med-action-btn med-action-btn--history" onClick={() => onOpenHistory(p)}> Lịch sử</button>
                       </div>
                     </td>
                   </tr>
@@ -472,7 +472,7 @@ function DailyTab() {
       </div>
 
       <div className="med-stats">
-        {[['pending', 'Pending'], ['taken', 'Taken'], ['missed', 'Missed'], ['overdue', 'Overdue']].map(([k, label]) => (
+        {[['pending', 'Chờ dùng'], ['taken', 'Đã dùng'], ['missed', 'Bỏ lỡ'], ['overdue', 'Quá hạn']].map(([k, label]) => (
           <div key={k} className={`med-stat-card med-stat-card--${k}`}>
             <div className="med-stat-card__label">{label}</div>
             <div className="med-stat-card__value">{counts[k]}</div>
@@ -481,35 +481,35 @@ function DailyTab() {
       </div>
 
       <div className="med-filter">
-        <input className="med-filter__search" type="text" placeholder="Search by resident name or medication..." value={search} onChange={(e) => setSearch(e.target.value)} />
+        <input className="med-filter__search" type="text" placeholder="Tìm theo tên cư dân hoặc thuốc..." value={search} onChange={(e) => setSearch(e.target.value)} />
         <select className="med-filter__select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-          <option value="">All statuses</option>
-          <option value="pending">Pending</option>
-          <option value="taken">Taken</option>
-          <option value="missed">Missed</option>
-          <option value="overdue">Overdue</option>
+          <option value="">Tất cả trạng thái</option>
+          <option value="pending">Chờ dùng</option>
+          <option value="taken">Đã dùng</option>
+          <option value="missed">Bỏ lỡ</option>
+          <option value="overdue">Quá hạn</option>
         </select>
       </div>
 
       {loading ? (
-        <p className="med-empty">Loading schedule...</p>
+        <p className="med-empty">Đang tải lịch dùng thuốc...</p>
       ) : (
         <div className="med-table-wrap">
           <table className="med-table">
             <thead>
               <tr>
-                <th>Time</th>
-                <th>Resident</th>
-                <th>Medication</th>
-                <th>Dosage</th>
-                <th>Route</th>
-                <th>Status</th>
-                <th>Administered by</th>
+                <th>Giờ</th>
+                <th>Cư dân</th>
+                <th>Thuốc</th>
+                <th>Liều lượng</th>
+                <th>Đường dùng</th>
+                <th>Trạng thái</th>
+                <th>Người thực hiện</th>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
-                <tr><td colSpan={7} className="med-empty">No records for this date</td></tr>
+                <tr><td colSpan={7} className="med-empty">Không có dữ liệu cho ngày này</td></tr>
               ) : (
                 filtered.map((a) => (
                   <tr key={a._id}>
@@ -527,7 +527,7 @@ function DailyTab() {
                     <td>
                       <StatusBadge status={a.status} type="admin" />
                       {a.status === 'taken' && a.takenAt && (
-                        <div className="med-taken-time">at {fmtTime(a.takenAt)}</div>
+                        <div className="med-taken-time">lúc {fmtTime(a.takenAt)}</div>
                       )}
                     </td>
                     <td>{a.administeredByStaffId?.userId?.fullName || '—'}</td>
@@ -576,7 +576,7 @@ function DoctorMedicationPage() {
       closeModal();
       loadPrescriptions();
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to create prescription');
+      alert(err.response?.data?.message || 'Không thể tạo đơn thuốc');
     }
   };
 
@@ -586,7 +586,7 @@ function DoctorMedicationPage() {
       closeModal();
       loadPrescriptions();
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to update prescription');
+      alert(err.response?.data?.message || 'Không thể cập nhật đơn thuốc');
     }
   };
 
@@ -596,27 +596,27 @@ function DoctorMedicationPage() {
       closeModal();
       loadPrescriptions();
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to save schedule');
+      alert(err.response?.data?.message || 'Không thể lưu lịch dùng thuốc');
     }
   };
 
   return (
     <div className="med-page">
       <div className="med-page__header">
-        <h1 className="med-page__title">Medication Management</h1>
+        <h1 className="med-page__title">Quản lý thuốc</h1>
         {activeTab === 'prescriptions' && (
           <button className="med-btn med-btn--primary" onClick={() => setModal({ type: 'create', prescription: null })}>
-            + Create Prescription
+            + Tạo đơn thuốc
           </button>
         )}
       </div>
 
       <div className="med-tabs">
         <button className={`med-tab ${activeTab === 'prescriptions' ? 'med-tab--active' : ''}`} onClick={() => setActiveTab('prescriptions')}>
-          Prescriptions
+          Đơn thuốc
         </button>
         <button className={`med-tab ${activeTab === 'daily' ? 'med-tab--active' : ''}`} onClick={() => setActiveTab('daily')}>
-          Daily Schedule
+          Lịch dùng thuốc hàng ngày
         </button>
       </div>
 
