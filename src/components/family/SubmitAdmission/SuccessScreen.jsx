@@ -24,6 +24,21 @@ const formatViDate = (dateStr) => {
   }
 };
 
+const formatEnglishDate = (dateStr) => {
+  if (!dateStr) return 'N/A';
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString('vi-VN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+  } catch (e) {
+    return dateStr;
+  }
+};
+
 export default function SuccessScreen({ submittedData = {}, formData = {}, navigate }) {
   const patientName = submittedData?.applicant?.fullName || formData.fullName || 'N/A';
   const rawPrefDate = submittedData?.preferredAdmissionDate || formData.preferredDate;
