@@ -2,11 +2,14 @@
   --pharmacy-ink: #0f172a;
   --pharmacy-muted: #5b6b82;
   --pharmacy-line: rgba(15, 23, 42, 0.12);
+  --pharmacy-line-strong: rgba(15, 23, 42, 0.2);
   --pharmacy-surface: #ffffff;
   --pharmacy-surface-soft: #f4f7fb;
+  --pharmacy-surface-muted: #f8fafc;
   --pharmacy-accent: #0f766e;
   --pharmacy-accent-strong: #115e59;
   --pharmacy-highlight: #f97316;
+  --pharmacy-focus: rgba(15, 118, 110, 0.22);
   position: relative;
   padding: 32px;
   font-family: 'Archivo', 'Helvetica Neue', Arial, sans-serif;
@@ -144,6 +147,10 @@
   box-shadow: 0 16px 32px rgba(15, 23, 42, 0.08);
 }
 
+.pharmacy-card__body p {
+  margin: 0 0 10px;
+}
+
 .pharmacy-card__header {
   display: flex;
   justify-content: space-between;
@@ -191,6 +198,9 @@
   text-align: left;
 }
 
+.pharmacy-table tbody tr:hover {
+  background: rgba(15, 118, 110, 0.06);
+
 .pharmacy-table thead {
   background: #f1f5f9;
   text-transform: uppercase;
@@ -228,6 +238,11 @@
   outline: none;
   background: transparent;
   font-size: 14px;
+}
+
+.pharmacy-search:focus-within {
+  border-color: var(--pharmacy-accent);
+  box-shadow: 0 0 0 3px var(--pharmacy-focus);
 }
 
 .pharmacy-primary {
@@ -302,11 +317,33 @@
 .pharmacy-form-grid input,
 .pharmacy-form-grid select,
 .pharmacy-form-grid textarea {
-  border: 1px solid rgba(15, 23, 42, 0.16);
+  border: 1px solid var(--pharmacy-line-strong);
   border-radius: 12px;
   padding: 10px 12px;
-  background: #fff;
+  background: var(--pharmacy-surface-muted);
   font-family: inherit;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.pharmacy-form input:focus,
+.pharmacy-form textarea:focus,
+.pharmacy-form select:focus,
+.pharmacy-toolbar input:focus,
+.pharmacy-toolbar select:focus,
+.pharmacy-form-grid input:focus,
+.pharmacy-form-grid select:focus,
+.pharmacy-form-grid textarea:focus {
+  outline: none;
+  border-color: var(--pharmacy-accent);
+  box-shadow: 0 0 0 3px var(--pharmacy-focus);
+  background: #fff;
+}
+
+.pharmacy-form textarea,
+.pharmacy-form-grid textarea {
+  min-height: 110px;
+  resize: vertical;
+  line-height: 1.5;
 }
 
 .pharmacy-modal {
@@ -328,6 +365,10 @@
   overflow: auto;
   padding: 22px;
   box-shadow: 0 30px 60px rgba(15, 23, 42, 0.35);
+}
+
+.pharmacy-modal__body .pharmacy-form textarea {
+  background: #fff;
 }
 
 .pharmacy-modal__header {
@@ -384,6 +425,12 @@
 .pharmacy-message {
   color: var(--pharmacy-highlight);
   font-weight: 600;
+  padding: 6px 10px;
+  background: rgba(249, 115, 22, 0.12);
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .pharmacy-empty,
@@ -393,6 +440,12 @@
 
 .pharmacy-error {
   color: #b91c1c;
+  background: rgba(185, 28, 28, 0.08);
+  border-radius: 10px;
+  padding: 6px 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 @keyframes rise {
