@@ -1,56 +1,58 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Check } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../hooks/useAuth';
 import { getAuthToken } from '../utils/auth';
 import servicePackageService from '../services/servicePackage.service';
-import '../styles/shared/HomePage.css'; // Uses same premium shared homepage styling
+import '../styles/shared/HomePage.css';
 
 const DEFAULT_PACKAGES = [
   {
     _id: 'default-basic',
-    name: 'Basic Care Package',
+    name: 'Gói Chăm Sóc Cơ Bản',
     tier: 'basic',
     monthlyPrice: 12000000,
-    description: 'Daily living assistance, standard health monitoring, and professional nutrition guidelines.',
+    description: 'Hỗ trợ sinh hoạt hàng ngày, theo dõi sức khỏe tiêu chuẩn và hướng dẫn dinh dưỡng chuyên nghiệp.',
     services: [
-      'Daily assistance with dining, bathing, and laundry',
-      'Vital signs check (blood pressure, heart rate) twice daily',
-      'Regular check-ups by family doctor once every two weeks',
-      'Basic daily recreational activities and community events'
-    ]
+      'Hỗ trợ ăn uống, tắm rửa và giặt ủi hàng ngày',
+      'Kiểm tra dấu hiệu sinh tồn (huyết áp, nhịp tim) hai lần mỗi ngày',
+      'Kiểm tra sức khỏe định kỳ bởi bác sĩ gia đình mỗi hai tuần',
+      'Hoạt động giải trí và gắn kết cộng đồng hàng ngày',
+    ],
   },
   {
     _id: 'default-standard',
-    name: 'Standard Care Package',
+    name: 'Gói Chăm Sóc Tiêu Chuẩn',
     tier: 'standard',
     monthlyPrice: 18000000,
-    description: 'Comprehensive clinical support combined with active rehabilitation and continuous health telemetry.',
+    description: 'Hỗ trợ lâm sàng toàn diện kết hợp với vật lý trị liệu chủ động và theo dõi sức khỏe liên tục.',
     services: [
-      'All features included in the Basic Care package',
-      'Personalized physiotherapy and rehab 3 times a week',
-      'Weekly clinical check-ups by specialist doctors',
-      '24/7 continuous health tracking via smart medical devices',
-      'Specialized dietary plans customized by clinical nutritionists'
-    ]
+      'Bao gồm tất cả tính năng của gói Cơ bản',
+      'Vật lý trị liệu và phục hồi chức năng cá nhân hóa 3 lần/tuần',
+      'Kiểm tra lâm sàng hàng tuần bởi bác sĩ chuyên khoa',
+      'Theo dõi sức khỏe 24/7 qua thiết bị y tế thông minh',
+      'Thực đơn dinh dưỡng được thiết kế bởi chuyên gia lâm sàng',
+    ],
   },
   {
     _id: 'default-premium',
-    name: 'Premium Care Package',
+    name: 'Gói Chăm Sóc Cao Cấp',
     tier: 'premium',
     monthlyPrice: 28000000,
-    description: 'Specialized therapies for residents recovering from stroke, injuries, or living with cognitive decline.',
+    description: 'Trị liệu chuyên sâu cho người cao tuổi phục hồi sau đột quỵ, chấn thương hoặc suy giảm nhận thức.',
     services: [
-      'All features included in the Standard Care package',
-      'Daily 1-on-1 intensive physical therapy and cognitive training',
-      'Doctor check-ups every two days and 24/7 on-duty nurses',
-      'Tailored cognitive support plans for dementia and Alzheimer care',
-      'Exclusive access to creative hobby clubs and wellness activities'
-    ]
-  }
+      'Bao gồm tất cả tính năng của gói Tiêu chuẩn',
+      'Vật lý trị liệu 1 kèm 1 hàng ngày và tập luyện nhận thức chuyên sâu',
+      'Bác sĩ thăm khám 2 ngày/lần và điều dưỡng trực 24/7',
+      'Kế hoạch hỗ trợ nhận thức cho chứng sa sút trí tuệ và Alzheimer',
+      'Tham gia các CLB sáng tạo và hoạt động wellness độc quyền',
+    ],
+  },
 ];
 
 export default function ServicesPage() {
+  const { t } = useTranslation();
   const { token, user } = useAuth();
   const [packages, setPackages] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -86,35 +88,42 @@ export default function ServicesPage() {
 
   return (
     <div className="home-page">
-      {/* Header */}
+      {/* Header — dùng chung với HomePage */}
       <header className="home-header">
         <div className="home-header__brand">
-          <Link to="/" className="home-logo" style={{ textDecoration: 'none' }}>An Nhiên Care Home</Link>
+          <img
+            src="https://res.cloudinary.com/dhcrddnss/image/upload/v1780035528/Logo_vi%E1%BB%87n_d%C6%B0%E1%BB%A1ng_l%C3%A3o_An_Nhi%C3%AAn_lrmocn.png"
+            alt={t('home.logoAlt')}
+            className="home-logo__img"
+          />
+          <span className="home-logo">{t('home.brand')}</span>
         </div>
 
         <nav className="home-nav">
-          <Link to="/">Home</Link>
-          <Link to="/services" className="text-blue-600 font-bold">Services</Link>
-          <Link to="/#tech">Tech</Link>
-          <Link to="/#living">Living Space</Link>
-          <Link to="/#pricing">Pricing</Link>
-          <Link to="/#contact">Contact</Link>
+          <Link to="/#home">{t('home.home')}</Link>
+          <Link to="/#intro">{t('home.intro')}</Link>
+          <Link to="/services" className="text-blue-600 font-bold">{t('home.services')}</Link>
+          <Link to="/#tech">{t('home.tech')}</Link>
+          <Link to="/#living">{t('home.living')}</Link>
+          <Link to="/#pricing">{t('home.pricing')}</Link>
+          <Link to="/#news">{t('home.news')}</Link>
+          <Link to="/#contact">{t('home.contact')}</Link>
         </nav>
 
         <Link to={bookPath} className="home-header__button">
-          Book a Visit
+          {t('home.registerAdmission')}
         </Link>
       </header>
 
       <main>
-        {/* Services Hero */}
+        {/* Hero section */}
         <section className="home-pricing" style={{ background: 'linear-gradient(180deg, #f8fafc 0%, #ffffff 100%)', paddingBottom: '40px' }}>
           <div className="section-head" style={{ marginBottom: '20px' }}>
             <h1 style={{ fontSize: 'clamp(2.2rem, 3.5vw, 3.2rem)', fontWeight: '800', color: '#0f172a', marginBottom: '16px' }}>
-              Our Care Service Packages
+              Các Gói Dịch Vụ Chăm Sóc
             </h1>
             <p style={{ color: '#64748b', fontSize: '1.05rem', maxWidth: '800px', margin: '0 auto' }}>
-              Explore our complete portfolio of advanced residential medical care, physical rehabilitation, and professional nursing services tailored for seniors.
+              Khám phá toàn bộ danh mục dịch vụ chăm sóc y tế nội trú cao cấp, phục hồi chức năng và điều dưỡng chuyên nghiệp dành cho người cao tuổi.
             </p>
           </div>
         </section>
@@ -123,25 +132,28 @@ export default function ServicesPage() {
         <section className="home-pricing" style={{ paddingTop: '0px', backgroundColor: '#ffffff' }}>
           {loading ? (
             <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-              <div className="animate-spin text-blue-600 font-bold text-lg mb-2">Loading...</div>
-              <p>Loading care service packages...</p>
+              <div className="animate-spin text-blue-600 font-bold text-lg mb-2">Đang tải...</div>
+              <p>Đang tải danh sách gói dịch vụ chăm sóc...</p>
             </div>
           ) : (
             <div className="pricing-grid">
               {packages.map((pkg) => {
                 const isStandard = pkg.tier === 'standard';
-                const badgeClass = `pricing-card__badge ${pkg.tier}`;
                 return (
                   <div key={pkg._id} className={`pricing-card ${isStandard ? 'featured' : ''}`}>
-                    <span className={badgeClass}>{pkg.tier}</span>
+                    <span className={`pricing-card__badge ${pkg.tier}`}>
+                      {t(`home.packageTier.${pkg.tier}`, pkg.tier?.toUpperCase())}
+                    </span>
                     <h3 className="pricing-card__title">{pkg.name}</h3>
                     <div className="pricing-card__price-box">
                       <span className="pricing-card__price">{pkg.monthlyPrice?.toLocaleString() || 0}</span>
-                      <span className="pricing-card__period">VND / month</span>
+                      <span className="pricing-card__period">{t('home.pricePerMonth', 'VNĐ / tháng')}</span>
                     </div>
-                    <p className="pricing-card__description">{pkg.description || 'Comprehensive clinical care, health monitoring, and daily residential support.'}</p>
+                    <p className="pricing-card__description">
+                      {pkg.description || t('home.packageFallbackDescription', 'Chăm sóc lâm sàng toàn diện, giám sát sức khỏe và hỗ trợ sinh hoạt hàng ngày.')}
+                    </p>
                     <div className="pricing-card__divider" />
-                    <span className="pricing-card__list-title">Services Included:</span>
+                    <span className="pricing-card__list-title">{t('home.servicesIncluded', 'Dịch vụ bao gồm:')}</span>
                     <div className="pricing-card__list">
                       {pkg.services && pkg.services.map((srv, idx) => (
                         <div key={idx} className="pricing-card__item">
@@ -154,7 +166,7 @@ export default function ServicesPage() {
                       to={bookPath}
                       className={`pricing-card__button ${isStandard ? 'pricing-card__button--primary' : 'pricing-card__button--secondary'}`}
                     >
-                      Register for Admission
+                      {t('home.registerAdmission', 'Đăng ký nhập viện')}
                     </Link>
                   </div>
                 );
@@ -166,17 +178,17 @@ export default function ServicesPage() {
         {/* Footer */}
         <footer className="home-footer">
           <div>
-            <p className="footer-brand">An Nhiên Care Home</p>
-            <p>Providing professional, dedicated senior care services in accordance with international standards.</p>
+            <p className="footer-brand">{t('home.brand')}</p>
+            <p>{t('home.footerDescription')}</p>
           </div>
           <div className="footer-links">
-            <Link to="/">Home</Link>
-            <Link to="/services">Services</Link>
-            <a href="/#contact">Privacy Policy</a>
-            <a href="/#contact">Terms of Service</a>
+            <a href="/#home">{t('home.footerHome')}</a>
+            <Link to="/services">{t('home.services')}</Link>
+            <a href="/#contact">{t('home.footerPrivacy')}</a>
+            <a href="/#contact">{t('home.footerTerms')}</a>
           </div>
           <div>
-            <p className="footer-caption">© 2026 An Nhiên Care Home. All rights reserved.</p>
+            <p className="footer-caption">{t('home.footerCopyright')}</p>
           </div>
         </footer>
       </main>

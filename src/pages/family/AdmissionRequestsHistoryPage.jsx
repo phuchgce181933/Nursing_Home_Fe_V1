@@ -4,7 +4,7 @@ import { Search, Plus, Eye, Inbox, Loader2, Calendar, ChevronLeft, ChevronRight,
 import admissionService from '../../services/admission.service';
 import AdmissionDetailDrawer from '../../components/family/SubmitAdmission/AdmissionDetailDrawer';
 
-const formatViDate = (dateStr) => {
+const formatEnglishDate = (dateStr) => {
   if (!dateStr) return 'N/A';
   try {
     const d = new Date(dateStr);
@@ -41,17 +41,17 @@ const getStatusBadgeClass = (status) => {
 const getStatusLabel = (status) => {
   switch (status) {
     case 'new_request':
-      return 'Yêu cầu mới';
+      return 'Chờ duyệt';
     case 'consulting':
       return 'Đang tư vấn';
     case 'assessing':
       return 'Đang đánh giá';
     case 'contracting':
-      return 'Ký hợp đồng';
+      return 'Đang làm hợp đồng';
     case 'checked_in':
-      return 'Đã nhận vào ở';
+      return 'Đã tiếp nhận';
     case 'cancelled':
-      return 'Đã huỷ';
+      return 'Đã hủy';
     default:
       return status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Mới';
   }
@@ -190,9 +190,9 @@ export default function AdmissionRequestsHistoryPage() {
         {/* Header Section */}
         <div className="arh-header">
           <div className="arh-header__title-group">
-            <h1 className="arh-header__title">Lịch sử yêu cầu nhập viện</h1>
+            <h1 className="arh-header__title">Lịch sử yêu cầu tiếp nhận</h1>
             <p className="arh-header__subtitle">
-              Quản lý và theo dõi các yêu cầu nhập viện cho người thân của bạn.
+              Quản lý và theo dõi các yêu cầu tiếp nhận và chăm sóc cho người thân của bạn.
             </p>
           </div>
           <button
@@ -200,7 +200,7 @@ export default function AdmissionRequestsHistoryPage() {
             onClick={() => navigate('/family/admission-requests/new')}
           >
             <Plus size={16} />
-            Gửi yêu cầu mới
+            Đăng ký tiếp nhận mới
           </button>
         </div>
 
@@ -225,7 +225,7 @@ export default function AdmissionRequestsHistoryPage() {
               <div className="arh-stat-card__icon-box arh-stat-card__icon-box--completed">
                 <CheckCircle size={20} />
               </div>
-              <span className="arh-stat-card__label">Đã nhận vào ở</span>
+              <span className="arh-stat-card__label">Tiếp nhận hoàn tất</span>
             </div>
             <div className="arh-stat-card__value">
               {String(stats.completed).padStart(2, '0')}
@@ -253,7 +253,7 @@ export default function AdmissionRequestsHistoryPage() {
             <input
               type="text"
               className="arh-filters__input"
-              placeholder="Tìm mã yêu cầu, tên người thân hoặc CMND..."
+              placeholder="Tìm kiếm theo mã yêu cầu, tên người thân hoặc CCCD..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -269,12 +269,12 @@ export default function AdmissionRequestsHistoryPage() {
               }}
             >
               <option value="">Tất cả trạng thái</option>
-              <option value="new_request">Yêu cầu mới</option>
+              <option value="new_request">Chờ duyệt</option>
               <option value="consulting">Đang tư vấn</option>
               <option value="assessing">Đang đánh giá</option>
-              <option value="contracting">Ký hợp đồng</option>
-              <option value="checked_in">Đã nhận vào ở</option>
-              <option value="cancelled">Đã huỷ</option>
+              <option value="contracting">Đang làm hợp đồng</option>
+              <option value="checked_in">Đã tiếp nhận</option>
+              <option value="cancelled">Đã hủy</option>
             </select>
           </div>
 
@@ -302,9 +302,9 @@ export default function AdmissionRequestsHistoryPage() {
           ) : admissions.length === 0 ? (
             <div className="arh-empty-box">
               <Inbox size={48} className="arh-empty-icon" />
-              <p className="arh-empty-text">Không tìm thấy yêu cầu nhập viện.</p>
+              <p className="arh-empty-text">Không tìm thấy yêu cầu tiếp nhận nào.</p>
               <p className="text-xs max-w-sm text-slate-400 mt-1">
-                Thử thay đổi từ khoá tìm kiếm hoặc lọc theo trạng thái khác.
+                Hãy thử thay đổi từ khóa tìm kiếm hoặc lọc theo trạng thái khác.
               </p>
             </div>
           ) : (
@@ -319,7 +319,7 @@ export default function AdmissionRequestsHistoryPage() {
                       <th>Ngày mong muốn</th>
                       <th>Trạng thái</th>
                       <th>Đánh giá y tế</th>
-                      <th className="text-center">Thao tác</th>
+                      <th className="text-center">Hành động</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -340,12 +340,12 @@ export default function AdmissionRequestsHistoryPage() {
                           </div>
                         </td>
                         <td>
-                          {formatViDate(adm.createdAt)}
+                          {formatEnglishDate(adm.createdAt)}
                         </td>
                         <td className="font-medium">
                           <div className="flex items-center gap-1.5">
                             <Calendar size={13} className="text-slate-400" />
-                            {formatViDate(adm.preferredAdmissionDate)}
+                            {formatEnglishDate(adm.preferredAdmissionDate)}
                           </div>
                         </td>
                         <td>
@@ -376,7 +376,7 @@ export default function AdmissionRequestsHistoryPage() {
               {/* Pagination block */}
               <div className="arh-pagination">
                 <span className="arh-pagination__info">
-                  Hiển thị {Math.min((page - 1) * limit + 1, total)} - {Math.min(page * limit, total)} trong {total} yêu cầu
+                  Hiển thị {Math.min((page - 1) * limit + 1, total)} - {Math.min(page * limit, total)} trên {total} yêu cầu
                 </span>
                 <div className="arh-pagination__controls">
                   <button
