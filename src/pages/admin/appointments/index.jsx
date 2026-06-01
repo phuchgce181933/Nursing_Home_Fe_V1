@@ -401,7 +401,7 @@ export default function CareAppointmentsPage() {
         const residentIdParam = typeof residentIdStr === 'object' ? String(residentIdStr) : residentIdStr;
         const res = await admissionService.adminGetAdmissionList({
           residentId: residentIdParam,
-          status: 'assessing,contracting,checked_in,cancelled',
+          status: 'consulting,assessing,contracting,checked_in,cancelled',
           limit: 1,
         });
 
@@ -432,7 +432,7 @@ export default function CareAppointmentsPage() {
             summary: vitals?.summary || adm.applicant?.initialHealthCondition || '',
             consultationNotes: adm.consultationNotes || '',
             assessmentResult: adm.assessmentResult || '',
-            eligibilityStatus: adm.eligibilityStatus || 'eligible',
+            eligibilityStatus: ['eligible', 'not_eligible'].includes(adm.eligibilityStatus) ? adm.eligibilityStatus : 'eligible',
             rejectionReason: adm.rejectionReason || '',
           });
         } else {

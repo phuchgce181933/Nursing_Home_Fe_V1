@@ -681,21 +681,27 @@ export default function AdmissionDetailDrawer({
   };
 
   // Determine if request is cancellable (family mode)
+  // Block cancellation once the intake clinical appointment has been completed by the doctor
+  const intakeApptCompleted = admission?.assignedCareAppointment?.status === 'completed';
   const isCancellable =
     !isAdmin &&
     admission &&
-    ['new_request', 'consulting', 'assessing', 'contracting'].includes(admission.status);
+    ['new_request', 'consulting', 'assessing', 'contracting'].includes(admission.status) &&
+    !intakeApptCompleted;
 
   // Determine if request is approvable/rejectable (admin mode)
+  // Only approvable if: admin role, status is new_request or consulting, AND not yet approved before
   const isApprovable =
     isAdminRole &&
     admission &&
-    ['new_request', 'consulting'].includes(admission.status);
+    ['new_request', 'consulting'].includes(admission.status) &&
+    !admission.approvedAt;
 
   const isRejectable =
     isAdminRole &&
     admission &&
-    ['new_request', 'consulting'].includes(admission.status);
+    ['new_request', 'consulting'].includes(admission.status) &&
+    !admission.approvedAt;
 
   // Dynamic timeline builder
   const getTimelineSteps = () => {
@@ -800,7 +806,7 @@ export default function AdmissionDetailDrawer({
         {/* Header Block */}
         <div className="arh-drawer__header">
           <div>
-            <h2 className="arh-drawer__title">Request Details</h2>
+            <h2 className="arh-drawer__title">Chi tiết yêu cầu</h2>
             {admission && (
               <p className="arh-detail-card__code">
                 #{admission.requestCode || `ANH-${admission._id.substring(0, 4).toUpperCase()}`}
@@ -820,7 +826,7 @@ export default function AdmissionDetailDrawer({
           {loading && (
             <div className="arh-loading-box">
               <Loader2 className="arh-loading-spinner" size={32} />
-              <p className="arh-loading-text">Loading admission details...</p>
+              <p className="arh-loading-text">Đang tải thông tin hồ sơ tiếp nhận...</p>
             </div>
           )}
 
@@ -836,7 +842,7 @@ export default function AdmissionDetailDrawer({
               {/* Timeline Progress */}
               <div className="arh-detail-card">
                 <h5 className="arh-drawer__section-title">
-                  <Clock size={16} /> PROCESSING TIMELINE
+                  <Clock size={16} /> TIẾN TRÌNH XỬ LÝ
                 </h5>
                 <div className="arh-timeline">
                   {/* Timeline connecting line */}
@@ -845,12 +851,12 @@ export default function AdmissionDetailDrawer({
                   {admission.status === 'cancelled' && (
                     <div className="arh-timeline__step is-cancelled">
                       <div className="arh-timeline__dot animate-pulse" />
-                      <p className="arh-timeline__title">Request Cancelled</p>
+                      <p className="arh-timeline__title">Yêu cầu đã bị hủy</p>
                       <p className="arh-timeline__date">
-                        Cancelled date: {formatEnglishDate(admission.cancelledAt || admission.updatedAt)}
+                        Ngày hủy: {formatEnglishDate(admission.cancelledAt || admission.updatedAt)}
                       </p>
                       <p className="arh-timeline__desc">
-                        "Reason: {admission.cancellationReason || admission.rejectionReason || 'Cancelled by user'}"
+                        "Lý do: {admission.cancellationReason || admission.rejectionReason || 'Hủy theo yêu cầu'}"
                       </p>
                     </div>
                   )}
@@ -895,7 +901,7 @@ export default function AdmissionDetailDrawer({
               {/* Requester Contact card */}
               <div className="arh-detail-card">
                 <h5 className="arh-drawer__section-title">
-                  <User size={16} /> PRIMARY CONTACT
+                  <User size={16} /> NGƯỜI LIÊN HỆ CHÍNH
                 </h5>
                 <div className="arh-detail-card__profile" style={{ background: 'rgba(239, 244, 255, 0.4)', border: '1px solid rgba(27, 54, 93, 0.05)', padding: '14px', borderRadius: '12px' }}>
                   <img
@@ -905,15 +911,15 @@ export default function AdmissionDetailDrawer({
                   />
                   <div className="arh-detail-card__info">
                     <h4 className="arh-detail-card__name">
-                      {admission.familyAccount?.fullName || admission.requestedByName || 'Relative'}
+                      {admission.familyAccount?.fullName || admission.requestedByName || 'Người thân'}
                     </h4>
                     <p className="arh-detail-item__value" style={{ marginTop: '4px', fontSize: '12.5px', color: '#475569', fontWeight: '500' }}>
                       {formatRelationship(admission.applicant?.relationshipToRequester)} • {admission.requestedByPhone || admission.familyAccount?.phone || 'N/A'}
                     </p>
                     {isAdmin && admission.familyAccount && (
                       <div className="text-[11.5px] text-slate-500 mt-2 font-medium bg-white/70 p-2 rounded border border-slate-100 flex flex-col gap-0.5">
-                        <div><strong>Username:</strong> {admission.familyAccount.username || 'N/A'}</div>
-                        <div><strong>Family Email:</strong> {admission.familyAccount.email || 'N/A'}</div>
+                        <div><strong>Tên đăng nhập:</strong> {admission.familyAccount.username || 'N/A'}</div>
+                        <div><strong>Email gia đình:</strong> {admission.familyAccount.email || 'N/A'}</div>
                       </div>
                     )}
                   </div>
@@ -923,29 +929,29 @@ export default function AdmissionDetailDrawer({
               {/* Elderly Resident profile card */}
               <div className="arh-detail-card">
                 <h5 className="arh-drawer__section-title">
-                  <Heart size={16} /> ELDERLY RESIDENT DETAILS
+                  <Heart size={16} /> THÔNG TIN NGƯỜI CAO TUỔI
                 </h5>
                 <div className="arh-detail-grid">
                   <div className="arh-detail-item">
-                    <p className="arh-detail-item__label">Full Name</p>
+                    <p className="arh-detail-item__label">Họ và tên</p>
                     <p className="arh-detail-item__value" style={{ fontWeight: 'bold' }}>{admission.applicant?.fullName || 'N/A'}</p>
                   </div>
                   <div className="arh-detail-item">
-                    <p className="arh-detail-item__label">Date of Birth</p>
+                    <p className="arh-detail-item__label">Ngày sinh</p>
                     <p className="arh-detail-item__value">{formatEnglishDate(admission.applicant?.dateOfBirth)}</p>
                   </div>
                   <div className="arh-detail-item">
-                    <p className="arh-detail-item__label">Blood Type</p>
+                    <p className="arh-detail-item__label">Nhóm máu</p>
                     <p className="arh-detail-item__value" style={{ fontWeight: 'bold' }}>{formatBloodType(admission.applicant?.bloodType)}</p>
                   </div>
                   <div className="arh-detail-item">
-                    <p className="arh-detail-item__label">Gender</p>
+                    <p className="arh-detail-item__label">Giới tính</p>
                     <p className="arh-detail-item__value">
                       {formatGender(admission.applicant?.gender)}
                     </p>
                   </div>
                   <div className="arh-detail-item" style={{ gridColumn: 'span 2' }}>
-                    <p className="arh-detail-item__label">Current Address</p>
+                    <p className="arh-detail-item__label">Địa chỉ hiện tại</p>
                     <p className="arh-detail-item__value" style={{ fontSize: '12.5px', lineHeight: '1.4' }}>
                       {admission.applicant?.personalAddress || 'N/A'}
                     </p>
@@ -956,11 +962,11 @@ export default function AdmissionDetailDrawer({
               {/* Health Profile Card */}
               <div className="arh-detail-card arh-detail-card--health-alert">
                 <h5 className="arh-drawer__section-title">
-                  <AlertCircle size={16} /> HEALTH INFORMATION
+                  <AlertCircle size={16} /> THÔNG TIN SỨC KHỎE
                 </h5>
                 <div className="arh-detail-grid" style={{ gridTemplateColumns: '1fr' }}>
                   <div className="arh-detail-item">
-                    <p className="arh-detail-item__label" style={{ color: '#ba1a1a' }}>Allergies</p>
+                    <p className="arh-detail-item__label" style={{ color: '#ba1a1a' }}>Dị ứng</p>
                     <div className="arh-tags" style={{ marginTop: '4px' }}>
                       {admission.applicant?.allergies && admission.applicant.allergies.length > 0 ? (
                         admission.applicant.allergies.map((alg, i) => (
@@ -969,13 +975,13 @@ export default function AdmissionDetailDrawer({
                           </span>
                         ))
                       ) : (
-                        <span className="text-xs text-slate-400 italic">No documented allergies</span>
+                        <span className="text-xs text-slate-400 italic">Không có dị ứng được ghi nhận</span>
                       )}
                     </div>
                   </div>
 
                   <div className="arh-detail-item" style={{ marginTop: '8px' }}>
-                    <p className="arh-detail-item__label" style={{ color: '#ba1a1a' }}>Chronic Conditions</p>
+                    <p className="arh-detail-item__label" style={{ color: '#ba1a1a' }}>Bệnh mãn tính</p>
                     <div className="arh-tags" style={{ marginTop: '4px' }}>
                       {admission.applicant?.chronicConditions && admission.applicant.chronicConditions.length > 0 ? (
                         admission.applicant.chronicConditions.map((cond, i) => (
@@ -984,15 +990,15 @@ export default function AdmissionDetailDrawer({
                           </span>
                         ))
                       ) : (
-                        <span className="text-xs text-slate-400 italic">No documented chronic conditions</span>
+                        <span className="text-xs text-slate-400 italic">Không có bệnh mãn tính được ghi nhận</span>
                       )}
                     </div>
                   </div>
 
                   <div className="arh-detail-item" style={{ marginTop: '12px', borderTop: '1px solid rgba(186, 26, 26, 0.15)', paddingTop: '8px' }}>
-                    <p className="arh-detail-item__label" style={{ color: '#ba1a1a' }}>Detailed Health Summary</p>
+                    <p className="arh-detail-item__label" style={{ color: '#ba1a1a' }}>Tóm tắt tình trạng sức khỏe</p>
                     <p className="arh-detail-item__value" style={{ fontStyle: 'italic', background: 'rgba(255, 255, 255, 0.6)', padding: '8px 12px', borderRadius: '8px', marginTop: '4px', border: '1px dashed rgba(186, 26, 26, 0.15)', color: '#334155' }}>
-                      "{admission.applicant?.initialHealthCondition || 'No detailed health summary provided'}"
+                      "{admission.applicant?.initialHealthCondition || 'Chưa có tóm tắt sức khỏe chi tiết'}"
                     </p>
                   </div>
                 </div>
@@ -1026,19 +1032,19 @@ export default function AdmissionDetailDrawer({
               {appt && (doctor || nurse) && (
                 <div className="arh-detail-card" style={{ borderLeft: '4px solid #1B365D', background: 'rgba(27, 54, 93, 0.03)' }}>
                   <h5 className="arh-drawer__section-title" style={{ color: '#1B365D' }}>
-                    <UserCheck size={16} /> ASSIGNED MEDICAL STAFF
+                    <UserCheck size={16} /> NHÂN VIÊN Y TẾ PHỤ TRÁCH
                   </h5>
                   <div className="arh-detail-grid mt-3">
                     {doctor && (
                       <div className="arh-detail-item">
-                        <p className="arh-detail-item__label" style={{ color: '#1B365D' }}>Assigned Doctor</p>
+                        <p className="arh-detail-item__label" style={{ color: '#1B365D' }}>Bác sĩ phụ trách</p>
                         <p className="arh-detail-item__value" style={{ fontWeight: 'bold' }}>{doctor.fullName}</p>
                         {doctor.email && <p className="text-[11px] text-slate-400 font-normal">{doctor.email}</p>}
                       </div>
                     )}
                     {nurse && (
                       <div className="arh-detail-item">
-                        <p className="arh-detail-item__label" style={{ color: '#1B365D' }}>Assigned Nurse</p>
+                        <p className="arh-detail-item__label" style={{ color: '#1B365D' }}>Điều dưỡng phụ trách</p>
                         <p className="arh-detail-item__value" style={{ fontWeight: 'bold' }}>{nurse.fullName}</p>
                         {nurse.email && <p className="text-[11px] text-slate-400 font-normal">{nurse.email}</p>}
                       </div>
@@ -1051,7 +1057,7 @@ export default function AdmissionDetailDrawer({
               {(admission.servicePackageId || admission.assignedServicePackage) && (
                 <div className="arh-detail-card" style={{ borderLeft: '4px solid #2D6A4F', background: 'rgba(45, 106, 79, 0.03)' }}>
                   <h5 className="arh-drawer__section-title" style={{ color: '#2D6A4F' }}>
-                    <CheckCircle size={16} /> ASSIGNED SERVICE PACKAGE
+                    <CheckCircle size={16} /> GÓI DỊCH VỤ ĐƯỢC CHỈ ĐỊNH
                   </h5>
                   <div className="mt-2 text-[13.5px] font-bold text-[#1B365D]">
                     {admission.servicePackageId?.name || admission.assignedServicePackage}
@@ -1111,22 +1117,22 @@ export default function AdmissionDetailDrawer({
               {/* Extra Admission details */}
               <div className="arh-detail-card">
                 <h5 className="arh-drawer__section-title">
-                  <Calendar size={16} /> ADMISSION DETAILS
+                  <Calendar size={16} /> CHI TIẾT YÊU CẦU TIẾP NHẬN
                 </h5>
                 <div className="arh-detail-grid">
                   <div className="arh-detail-item">
-                    <p className="arh-detail-item__label">Preferred Admission Date</p>
+                    <p className="arh-detail-item__label">Ngày mong muốn nhập viện</p>
                     <p className="arh-detail-item__value" style={{ color: '#1B365D', fontWeight: 'bold' }}>
                       {formatEnglishDate(admission.preferredAdmissionDate)}
                     </p>
                   </div>
                   <div className="arh-detail-item">
-                    <p className="arh-detail-item__label">Relationship</p>
+                    <p className="arh-detail-item__label">Mối quan hệ</p>
                     <p className="arh-detail-item__value">{formatRelationship(admission.applicant?.relationshipToRequester)}</p>
                   </div>
                   {admission.consultantId && (
                     <div className="arh-detail-item" style={{ gridColumn: 'span 2', marginTop: '6px', borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
-                      <p className="arh-detail-item__label" style={{ color: '#1B365D' }}>Assigned Consultant</p>
+                      <p className="arh-detail-item__label" style={{ color: '#1B365D' }}>Nhân viên tư vấn</p>
                       <p className="arh-detail-item__value" style={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <span className="text-[#1B365D] bg-slate-100 px-2 py-0.5 rounded text-[12px] font-semibold border border-slate-200">
                           {admission.consultantId.fullName} ({admission.consultantId.role?.toUpperCase()})
@@ -1140,7 +1146,7 @@ export default function AdmissionDetailDrawer({
                     </div>
                   )}
                   <div className="arh-detail-item" style={{ gridColumn: 'span 2' }}>
-                    <p className="arh-detail-item__label">Reason for Admission</p>
+                    <p className="arh-detail-item__label">Lý do tiếp nhận</p>
                     <p className="arh-detail-item__value" style={{ fontSize: '12.5px' }}>
                       {formatAdmissionReason(admission.reasonForAdmission)}
                     </p>
@@ -1318,7 +1324,7 @@ export default function AdmissionDetailDrawer({
             <h4 className="arh-modal__title">Xác nhận hủy yêu cầu tiếp nhận</h4>
             <p className="arh-modal__text">
               Bạn có chắc chắn muốn hủy yêu cầu tiếp nhận cho{' '}
-              <strong className="text-slate-800">{admission?.applicant?.fullName}</strong>? This action will immediately terminate the entire consultation process and cannot be undone.
+              <strong className="text-slate-800">{admission?.applicant?.fullName}</strong>? Hành động này sẽ chấm dứt toàn bộ quy trình tư vấn và không thể hoàn tác.
             </p>
             {modalError && (
               <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-lg text-xs mb-4">
@@ -1327,7 +1333,7 @@ export default function AdmissionDetailDrawer({
             )}
             <textarea
               className="arh-modal__textarea"
-              placeholder="Please share your reason for cancellation (e.g., Change of family plans, found alternative solution...)"
+              placeholder="Vui lòng cho biết lý do hủy (ví dụ: Thay đổi kế hoạch gia đình, đã tìm được giải pháp khác...)"
               value={cancellationReason}
               onChange={(e) => setCancellationReason(e.target.value)}
             />
@@ -1341,7 +1347,7 @@ export default function AdmissionDetailDrawer({
                 }}
                 disabled={cancelling}
               >
-                Go Back
+                Quay lại
               </button>
               <button
                 className="arh-drawer__btn arh-drawer__btn--cancel"
@@ -1349,7 +1355,7 @@ export default function AdmissionDetailDrawer({
                 disabled={cancelling}
               >
                 {cancelling && <Loader2 className="animate-spin mr-1" size={13} />}
-                Confirm Cancellation
+                Xác nhận hủy
               </button>
             </div>
           </div>
@@ -1373,9 +1379,9 @@ export default function AdmissionDetailDrawer({
               if (isOpenPackageDropdown) setIsOpenPackageDropdown(false);
             }}
           >
-            <h4 className="arh-modal__title">Approve Admission Request</h4>
+            <h4 className="arh-modal__title">Duyệt yêu cầu tiếp nhận</h4>
             <p className="arh-modal__text">
-              You are approving the admission request for <strong className="text-slate-800">{admission?.applicant?.fullName}</strong>. This transitions the request to <span className="font-bold text-emerald-600">Contracting</span> and verifies health eligibility.
+              Bạn đang duyệt yêu cầu tiếp nhận cho <strong className="text-slate-800">{admission?.applicant?.fullName}</strong>. Yêu cầu sẽ chuyển sang giai đoạn <span className="font-bold text-emerald-600">Ký hợp đồng</span> và xác nhận điều kiện sức khỏe.
             </p>
             {modalError && (
               <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-lg text-xs mb-4 font-sans">
@@ -1387,11 +1393,11 @@ export default function AdmissionDetailDrawer({
 
             <div className="mb-4">
               <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
-                Administrative Notes
+                Ghi chú quản trị
               </label>
               <textarea
                 className="arh-modal__textarea"
-                placeholder="Add special instructions, comments, or follow-up tasks..."
+                placeholder="Thêm ghi chú, hướng dẫn đặc biệt hoặc các công việc cần theo dõi..."
                 value={adminNotes}
                 onChange={(e) => setAdminNotes(e.target.value)}
               />
@@ -1409,7 +1415,7 @@ export default function AdmissionDetailDrawer({
                 }}
                 disabled={approving}
               >
-                Cancel
+                Hủy bỏ
               </button>
               <button
                 className="adm-btn-apply flex-1 justify-center"
@@ -1418,7 +1424,7 @@ export default function AdmissionDetailDrawer({
                 disabled={approving}
               >
                 {approving && <Loader2 className="animate-spin mr-1" size={13} />}
-                Confirm Approval
+                Xác nhận duyệt
               </button>
             </div>
           </div>
@@ -1435,9 +1441,9 @@ export default function AdmissionDetailDrawer({
             className="arh-modal"
             onClick={(e) => e.stopPropagation()}
           >
-            <h4 className="arh-modal__title" style={{ color: '#ba1a1a' }}>Reject Admission Request</h4>
+            <h4 className="arh-modal__title" style={{ color: '#ba1a1a' }}>Từ chối yêu cầu tiếp nhận</h4>
             <p className="arh-modal__text">
-              You are rejecting the admission request for <strong className="text-slate-800">{admission?.applicant?.fullName}</strong>. This transitions the request to <span className="font-bold text-red-600">Cancelled</span> and marks them as ineligible.
+              Bạn đang từ chối yêu cầu tiếp nhận của <strong className="text-slate-800">{admission?.applicant?.fullName}</strong>. Yêu cầu sẽ chuyển sang trạng thái <span className="font-bold text-red-600">Đã hủy</span> và được đánh dấu là không đủ điều kiện.
             </p>
             {modalError && (
               <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-lg text-xs mb-4 font-sans">
@@ -1447,12 +1453,12 @@ export default function AdmissionDetailDrawer({
 
             <div className="mb-4">
               <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
-                Rejection Reason (Mandatory)
+                Lý do từ chối (Bắt buộc)
               </label>
               <textarea
                 className="arh-modal__textarea"
                 style={{ border: '1px solid rgba(186, 26, 26, 0.25)' }}
-                placeholder="Enter details on why this application is rejected..."
+                placeholder="Nhập chi tiết lý do từ chối đơn tiếp nhận này..."
                 value={rejectionReason}
                 onChange={(e) => setRejectionReason(e.target.value)}
                 required
@@ -1469,7 +1475,7 @@ export default function AdmissionDetailDrawer({
                 }}
                 disabled={rejecting}
               >
-                Cancel
+                Hủy bỏ
               </button>
               <button
                 className="arh-drawer__btn arh-drawer__btn--cancel"
@@ -1477,7 +1483,7 @@ export default function AdmissionDetailDrawer({
                 disabled={rejecting || !rejectionReason.trim()}
               >
                 {rejecting && <Loader2 className="animate-spin mr-1" size={13} />}
-                Confirm Rejection
+                Xác nhận từ chối
               </button>
             </div>
           </div>
@@ -1488,9 +1494,9 @@ export default function AdmissionDetailDrawer({
       {showAssignModal && (
         <div className="arh-modal-backdrop" onClick={() => setShowAssignModal(false)}>
           <div className="arh-modal" onClick={(e) => e.stopPropagation()}>
-            <h4 className="arh-modal__title">Assign Consultant</h4>
+            <h4 className="arh-modal__title">Chỉ định nhân viên tư vấn</h4>
             <p className="arh-modal__text">
-              Select a medical staff member (Doctor or Nurse) to be in charge of consultation and initial assessment for <strong className="text-slate-800">{admission?.applicant?.fullName}</strong>.
+              Chọn nhân viên y tế (Bác sĩ hoặc Điều dưỡng) phụ trách tư vấn và đánh giá ban đầu cho <strong className="text-slate-800">{admission?.applicant?.fullName}</strong>.
             </p>
             {modalError && (
               <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-lg text-xs mb-4 font-sans">
@@ -1501,12 +1507,12 @@ export default function AdmissionDetailDrawer({
             <form onSubmit={handleAssignConsultant}>
               <div className="mb-4">
                 <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
-                  Select Consultant *
+                  Chọn nhân viên tư vấn *
                 </label>
                 {loadingStaff ? (
                   <div className="flex items-center gap-2 py-2 text-xs text-slate-400">
                     <Loader2 size={14} className="animate-spin" />
-                    <span>Loading available staff...</span>
+                    <span>Đang tải danh sách nhân viên...</span>
                   </div>
                 ) : (
                   <select
@@ -1515,7 +1521,7 @@ export default function AdmissionDetailDrawer({
                     onChange={(e) => setSelectedStaffId(e.target.value)}
                     required
                   >
-                    <option value="">-- Pick Doctor or Nurse --</option>
+                    <option value="">-- Chọn bác sĩ hoặc điều dưỡng --</option>
                     {staffMembers.map((st) => (
                       <option key={st._id} value={st._id}>
                         {st.fullName} ({st.role.toUpperCase()})
@@ -1536,7 +1542,7 @@ export default function AdmissionDetailDrawer({
                   }}
                   disabled={assigning}
                 >
-                  Cancel
+                  Hủy bỏ
                 </button>
                 <button
                   type="submit"
@@ -1545,7 +1551,7 @@ export default function AdmissionDetailDrawer({
                   disabled={assigning || !selectedStaffId}
                 >
                   {assigning && <Loader2 className="animate-spin mr-1" size={13} />}
-                  Assign Consultant
+                  Xác nhận chỉ định
                 </button>
               </div>
             </form>
@@ -1557,9 +1563,9 @@ export default function AdmissionDetailDrawer({
       {showConsultationModal && (
         <div className="arh-modal-backdrop" onClick={() => setShowConsultationModal(false)}>
           <div className="arh-modal" onClick={(e) => e.stopPropagation()}>
-            <h4 className="arh-modal__title">Record Pre-admission Consultation</h4>
+            <h4 className="arh-modal__title">Ghi nhận tư vấn tiền nhập viện</h4>
             <p className="arh-modal__text">
-              Log consultation and support notes for <strong className="text-slate-800">{admission?.applicant?.fullName}</strong> to evaluate care requirements.
+              Ghi lại nội dung tư vấn và hỗ trợ cho <strong className="text-slate-800">{admission?.applicant?.fullName}</strong> để đánh giá nhu cầu chăm sóc.
             </p>
             {modalError && (
               <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-lg text-xs mb-4 font-sans">
@@ -1570,12 +1576,12 @@ export default function AdmissionDetailDrawer({
             <form onSubmit={handleRecordConsultation}>
               <div className="mb-3">
                 <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
-                  Consultation Notes *
+                  Nội dung tư vấn *
                 </label>
                 <textarea
                   className="arh-modal__textarea"
                   style={{ minHeight: '120px' }}
-                  placeholder="Record summary of notes, family requests, care expectations, etc..."
+                  placeholder="Ghi tóm tắt nội dung tư vấn, yêu cầu của gia đình, mong đợi về chăm sóc..."
                   value={consultationNotes}
                   onChange={(e) => setConsultationNotes(e.target.value)}
                   required
@@ -1584,12 +1590,12 @@ export default function AdmissionDetailDrawer({
 
               <div className="mb-4">
                 <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
-                  Additional Notes
+                  Ghi chú bổ sung
                 </label>
                 <textarea
                   className="arh-modal__textarea"
                   style={{ minHeight: '60px' }}
-                  placeholder="Optional general notes..."
+                  placeholder="Ghi chú thêm (không bắt buộc)..."
                   value={consultationGenNotes}
                   onChange={(e) => setConsultationGenNotes(e.target.value)}
                 />
@@ -1607,7 +1613,7 @@ export default function AdmissionDetailDrawer({
                   }}
                   disabled={recordingConsultation}
                 >
-                  Cancel
+                  Hủy bỏ
                 </button>
                 <button
                   type="submit"
@@ -1616,7 +1622,7 @@ export default function AdmissionDetailDrawer({
                   disabled={recordingConsultation || !consultationNotes.trim()}
                 >
                   {recordingConsultation && <Loader2 className="animate-spin mr-1" size={13} />}
-                  Record Consultation
+                  Lưu tư vấn
                 </button>
               </div>
             </form>
@@ -1628,9 +1634,9 @@ export default function AdmissionDetailDrawer({
       {showScheduleModal && (
         <div className="arh-modal-backdrop" onClick={() => setShowScheduleModal(false)}>
           <div className="arh-modal" onClick={(e) => e.stopPropagation()}>
-            <h4 className="arh-modal__title">Schedule Initial Health Assessment</h4>
+            <h4 className="arh-modal__title">Lên lịch đánh giá sức khỏe ban đầu</h4>
             <p className="arh-modal__text">
-              Set a date and time for the physical health and cognitive assessment of <strong className="text-slate-800">{admission?.applicant?.fullName}</strong>.
+              Đặt ngày giờ đánh giá sức khỏe thể chất và nhận thức cho <strong className="text-slate-800">{admission?.applicant?.fullName}</strong>.
             </p>
             {modalError && (
               <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-lg text-xs mb-4 font-sans">
@@ -1641,7 +1647,7 @@ export default function AdmissionDetailDrawer({
             <form onSubmit={handleScheduleAssessment}>
               <div className="mb-3">
                 <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
-                  Assessment Date & Time * (Must be in the future)
+                  Ngày & Giờ đánh giá * (Phải là thời điểm trong tương lai)
                 </label>
                 <input
                   type="datetime-local"
@@ -1655,12 +1661,12 @@ export default function AdmissionDetailDrawer({
 
               <div className="mb-3">
                 <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
-                  Initial Assessment Notes
+                  Ghi chú đánh giá ban đầu
                 </label>
                 <textarea
                   className="arh-modal__textarea"
                   style={{ minHeight: '60px' }}
-                  placeholder="Special instructions for patient preparation, location (e.g. Room B102)..."
+                  placeholder="Hướng dẫn đặc biệt cho bệnh nhân, địa điểm (vd: Phòng B102)..."
                   value={initialAssessmentNotes}
                   onChange={(e) => setInitialAssessmentNotes(e.target.value)}
                 />
@@ -1668,12 +1674,12 @@ export default function AdmissionDetailDrawer({
 
               <div className="mb-4">
                 <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
-                  General Notes
+                  Ghi chú chung
                 </label>
                 <textarea
                   className="arh-modal__textarea"
                   style={{ minHeight: '50px' }}
-                  placeholder="Optional general notes..."
+                  placeholder="Ghi chú thêm (không bắt buộc)..."
                   value={scheduleGenNotes}
                   onChange={(e) => setScheduleGenNotes(e.target.value)}
                 />
@@ -1692,7 +1698,7 @@ export default function AdmissionDetailDrawer({
                   }}
                   disabled={scheduling}
                 >
-                  Cancel
+                  Hủy bỏ
                 </button>
                 <button
                   type="submit"
@@ -1701,7 +1707,7 @@ export default function AdmissionDetailDrawer({
                   disabled={scheduling || !scheduleDate}
                 >
                   {scheduling && <Loader2 className="animate-spin mr-1" size={13} />}
-                  Schedule Assessment
+                  Xác nhận lịch hẹn
                 </button>
               </div>
             </form>
@@ -1713,9 +1719,9 @@ export default function AdmissionDetailDrawer({
       {showEligibilityModal && (
         <div className="arh-modal-backdrop" onClick={() => setShowEligibilityModal(false)}>
           <div className="arh-modal" onClick={(e) => e.stopPropagation()}>
-            <h4 className="arh-modal__title">Evaluate Admission Eligibility</h4>
+            <h4 className="arh-modal__title">Đánh giá điều kiện nhập viện</h4>
             <p className="arh-modal__text">
-              As a Doctor, evaluate the physical/medical eligibility of <strong className="text-slate-800">{admission?.applicant?.fullName}</strong> for staying at the care home.
+              Với tư cách bác sĩ, hãy đánh giá điều kiện thể chất/y tế của <strong className="text-slate-800">{admission?.applicant?.fullName}</strong> để xét duyệt nhập viện dưỡng lão.
             </p>
             {modalError && (
               <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-lg text-xs mb-4 font-sans">
@@ -1726,7 +1732,7 @@ export default function AdmissionDetailDrawer({
             <form onSubmit={handleEvaluateEligibility}>
               <div className="mb-3">
                 <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
-                  Eligibility Status *
+                  Kết quả đánh giá *
                 </label>
                 <select
                   className="adm-filter-select"
@@ -1734,19 +1740,19 @@ export default function AdmissionDetailDrawer({
                   onChange={(e) => setEligibilityStatus(e.target.value)}
                   required
                 >
-                  <option value="eligible">Eligible (Đủ điều kiện nhập viện)</option>
-                  <option value="not_eligible">Ineligible (Không đủ điều kiện - Từ chối)</option>
+                  <option value="eligible">Đủ điều kiện nhập viện</option>
+                  <option value="not_eligible">Không đủ điều kiện – Từ chối</option>
                 </select>
               </div>
 
               <div className="mb-3">
                 <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
-                  Medical Assessment Result Summary *
+                  Tóm tắt kết quả khám lâm sàng *
                 </label>
                 <textarea
                   className="arh-modal__textarea"
                   style={{ minHeight: '80px' }}
-                  placeholder="Provide detailed clinical assessment result and reasoning..."
+                  placeholder="Mô tả chi tiết kết quả và nhận định lâm sàng..."
                   value={assessmentResult}
                   onChange={(e) => setAssessmentResult(e.target.value)}
                   required
@@ -1756,12 +1762,12 @@ export default function AdmissionDetailDrawer({
               {eligibilityStatus === 'not_eligible' && (
                 <div className="mb-3">
                   <label className="block text-xs font-bold text-red-600 mb-1.5 uppercase tracking-wider">
-                    Rejection Reason *
+                    Lý do từ chối *
                   </label>
                   <textarea
                     className="arh-modal__textarea"
                     style={{ minHeight: '60px', border: '1.5px solid #fed7d7' }}
-                    placeholder="Provide mandatory reason why resident is ineligible (e.g. Requires ICU care, contagious disease)..."
+                    placeholder="Nêu rõ lý do cư dân không đủ điều kiện (vd: Cần chăm sóc ICU, bệnh truyền nhiễm)..."
                     value={rejReason}
                     onChange={(e) => setRejReason(e.target.value)}
                     required
@@ -1771,12 +1777,12 @@ export default function AdmissionDetailDrawer({
 
               <div className="mb-4">
                 <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
-                  General Notes
+                  Ghi chú chung
                 </label>
                 <textarea
                   className="arh-modal__textarea"
                   style={{ minHeight: '50px' }}
-                  placeholder="Optional general notes..."
+                  placeholder="Ghi chú thêm (không bắt buộc)..."
                   value={eligibilityGenNotes}
                   onChange={(e) => setEligibilityGenNotes(e.target.value)}
                 />
@@ -1795,7 +1801,7 @@ export default function AdmissionDetailDrawer({
                   }}
                   disabled={evaluating}
                 >
-                  Cancel
+                  Hủy bỏ
                 </button>
                 <button
                   type="submit"
@@ -1804,7 +1810,7 @@ export default function AdmissionDetailDrawer({
                   disabled={evaluating || !assessmentResult.trim() || (eligibilityStatus === 'not_eligible' && !rejReason.trim())}
                 >
                   {evaluating && <Loader2 className="animate-spin mr-1" size={13} />}
-                  Submit Evaluation
+                  Gửi đánh giá
                 </button>
               </div>
             </form>
@@ -1816,9 +1822,9 @@ export default function AdmissionDetailDrawer({
       {showAssignPackageModal && (
         <div className="arh-modal-backdrop" onClick={() => setShowAssignPackageModal(false)}>
           <div className="arh-modal" onClick={(e) => e.stopPropagation()}>
-            <h4 className="arh-modal__title">Assign Care Service Package</h4>
+            <h4 className="arh-modal__title">Giao gói dịch vụ chăm sóc</h4>
             <p className="arh-modal__text">
-              Assign or update the Care Service Package for <strong className="text-slate-800">{admission?.applicant?.fullName}</strong>.
+              Giao hoặc cập nhật gói dịch vụ chăm sóc cho <strong className="text-slate-800">{admission?.applicant?.fullName}</strong>.
             </p>
             {modalError && (
               <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-lg text-xs mb-4 font-sans">
@@ -1829,12 +1835,12 @@ export default function AdmissionDetailDrawer({
             <form onSubmit={handleAssignPackage}>
               <div className="mb-4 relative">
                 <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
-                  Active Care Package *
+                  Gói dịch vụ đang hoạt động *
                 </label>
                 {loadingPackages ? (
                   <div className="flex items-center gap-2 py-2 text-xs text-slate-400">
                     <Loader2 size={14} className="animate-spin" />
-                    <span>Loading active packages...</span>
+                    <span>Đang tải danh sách gói dịch vụ...</span>
                   </div>
                 ) : (
                   <select
@@ -1843,10 +1849,10 @@ export default function AdmissionDetailDrawer({
                     onChange={(e) => setSelectedPackageId(e.target.value)}
                     required
                   >
-                    <option value="">-- Pick active package --</option>
+                    <option value="">-- Chọn gói dịch vụ --</option>
                     {packages.map((pkg) => (
                       <option key={pkg._id} value={pkg._id}>
-                        {pkg.name} ({pkg.tier.toUpperCase()} - {pkg.monthlyPrice?.toLocaleString()} VND/mo)
+                        {pkg.name} ({pkg.tier.toUpperCase()} - {pkg.monthlyPrice?.toLocaleString()} VND/tháng)
                       </option>
                     ))}
                   </select>
@@ -1864,7 +1870,7 @@ export default function AdmissionDetailDrawer({
                   }}
                   disabled={assigningPackage}
                 >
-                  Cancel
+                  Hủy bỏ
                 </button>
                 <button
                   type="submit"
@@ -1873,7 +1879,7 @@ export default function AdmissionDetailDrawer({
                   disabled={assigningPackage || !selectedPackageId}
                 >
                   {assigningPackage && <Loader2 className="animate-spin mr-1" size={13} />}
-                  Assign Package
+                  Xác nhận giao gói
                 </button>
               </div>
             </form>
@@ -1885,9 +1891,9 @@ export default function AdmissionDetailDrawer({
       {showContractModal && (
         <div className="arh-modal-backdrop" onClick={() => setShowContractModal(false)}>
           <div className="arh-modal" onClick={(e) => e.stopPropagation()}>
-            <h4 className="arh-modal__title">Create/Edit Admission Contract</h4>
+            <h4 className="arh-modal__title">Tạo / Chỉnh sửa hợp đồng nhập viện</h4>
             <p className="arh-modal__text">
-              Generate admission service terms and sign the care contract for <strong className="text-slate-800">{admission?.applicant?.fullName}</strong>.
+              Lập điều khoản dịch vụ và ký kết hợp đồng chăm sóc cho <strong className="text-slate-800">{admission?.applicant?.fullName}</strong>.
             </p>
             {modalError && (
               <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-lg text-xs mb-4 font-sans">
@@ -1898,7 +1904,7 @@ export default function AdmissionDetailDrawer({
             <form onSubmit={handleCreateContract}>
               <div className="mb-3">
                 <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
-                  Contract Number *
+                  Số hợp đồng *
                 </label>
                 <input
                   type="text"
@@ -1914,7 +1920,7 @@ export default function AdmissionDetailDrawer({
               <div className="grid grid-cols-2 gap-3 mb-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
-                    Contract Start Date
+                    Ngày bắt đầu hợp đồng
                   </label>
                   <input
                     type="date"
@@ -1926,7 +1932,7 @@ export default function AdmissionDetailDrawer({
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
-                    Contract End Date
+                    Ngày kết thúc hợp đồng
                   </label>
                   <input
                     type="date"
@@ -1940,12 +1946,12 @@ export default function AdmissionDetailDrawer({
 
               <div className="mb-3">
                 <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
-                  Contract Terms & Conditions
+                  Điều khoản hợp đồng
                 </label>
                 <textarea
                   className="arh-modal__textarea"
                   style={{ minHeight: '80px' }}
-                  placeholder="Enter details about billing cycles, responsibility clauses, emergency contacts..."
+                  placeholder="Nhập chi tiết chu kỳ thanh toán, điều khoản trách nhiệm, liên hệ khẩn cấp..."
                   value={contractTerms}
                   onChange={(e) => setContractTerms(e.target.value)}
                 />
@@ -1953,12 +1959,12 @@ export default function AdmissionDetailDrawer({
 
               <div className="mb-4">
                 <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
-                  General Notes
+                  Ghi chú chung
                 </label>
                 <textarea
                   className="arh-modal__textarea"
                   style={{ minHeight: '50px' }}
-                  placeholder="Optional general notes..."
+                  placeholder="Ghi chú thêm (không bắt buộc)..."
                   value={contractGenNotes}
                   onChange={(e) => setContractGenNotes(e.target.value)}
                 />
@@ -1979,7 +1985,7 @@ export default function AdmissionDetailDrawer({
                   }}
                   disabled={creatingContract}
                 >
-                  Cancel
+                  Hủy bỏ
                 </button>
                 <button
                   type="submit"
@@ -1988,7 +1994,7 @@ export default function AdmissionDetailDrawer({
                   disabled={creatingContract || !contractNum.trim()}
                 >
                   {creatingContract && <Loader2 className="animate-spin mr-1" size={13} />}
-                  Sign Contract
+                  Ký kết hợp đồng
                 </button>
               </div>
             </form>
@@ -2000,9 +2006,9 @@ export default function AdmissionDetailDrawer({
       {showCheckInModal && (
         <div className="arh-modal-backdrop" onClick={() => setShowCheckInModal(false)}>
           <div className="arh-modal" onClick={(e) => e.stopPropagation()}>
-            <h4 className="arh-modal__title">Confirm Resident Check-in</h4>
+            <h4 className="arh-modal__title">Xác nhận nhận phòng cư dân</h4>
             <p className="arh-modal__text">
-              Finalize room and bed assignment for <strong className="text-slate-800">{admission?.applicant?.fullName}</strong>. This registers them as an active resident.
+              Hoàn tất phân bổ phòng và giường cho <strong className="text-slate-800">{admission?.applicant?.fullName}</strong>. Cư dân sẽ được đăng ký là cư dân đang hoạt động.
             </p>
             {modalError && (
               <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-lg text-xs mb-4 font-sans">
@@ -2014,11 +2020,11 @@ export default function AdmissionDetailDrawer({
               <div className="grid grid-cols-2 gap-3 mb-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
-                    Select Building (Tòa nhà)
+                    Chọn tòa nhà
                   </label>
                   {loadingBuildings ? (
                     <div className="flex items-center gap-1.5 text-xs text-slate-400 py-2 font-medium">
-                      <Loader2 size={12} className="animate-spin" /> Loading buildings...
+                      <Loader2 size={12} className="animate-spin" /> Đang tải tòa nhà...
                     </div>
                   ) : (
                     <select
@@ -2038,11 +2044,11 @@ export default function AdmissionDetailDrawer({
 
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
-                    Select Floor (Tầng)
+                    Chọn tầng
                   </label>
                   {loadingFloors ? (
                     <div className="flex items-center gap-1.5 text-xs text-slate-400 py-2 font-medium">
-                      <Loader2 size={12} className="animate-spin" /> Loading floors...
+                      <Loader2 size={12} className="animate-spin" /> Đang tải danh sách tầng...
                     </div>
                   ) : (
                     <select
@@ -2063,11 +2069,11 @@ export default function AdmissionDetailDrawer({
 
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
-                    Select Room (Phòng ở)
+                    Chọn phòng
                   </label>
                   {loadingRooms ? (
                     <div className="flex items-center gap-1.5 text-xs text-slate-400 py-2 font-medium">
-                      <Loader2 size={12} className="animate-spin" /> Loading rooms...
+                      <Loader2 size={12} className="animate-spin" /> Đang tải danh sách phòng...
                     </div>
                   ) : (
                     <select
@@ -2088,11 +2094,11 @@ export default function AdmissionDetailDrawer({
 
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
-                    Select Bed (Giường số)
+                    Chọn giường
                   </label>
                   {loadingBeds ? (
                     <div className="flex items-center gap-1.5 text-xs text-slate-400 py-2 font-medium">
-                      <Loader2 size={12} className="animate-spin" /> Loading beds...
+                      <Loader2 size={12} className="animate-spin" /> Đang tải danh sách giường...
                     </div>
                   ) : (
                     <select
@@ -2137,7 +2143,7 @@ export default function AdmissionDetailDrawer({
                   }}
                   disabled={checkingIn}
                 >
-                  Cancel
+                  Hủy bỏ
                 </button>
                 <button
                   type="submit"
@@ -2146,7 +2152,7 @@ export default function AdmissionDetailDrawer({
                   disabled={checkingIn}
                 >
                   {checkingIn && <Loader2 className="animate-spin mr-1" size={13} />}
-                  Confirm Check-in
+                  Xác nhận nhận phòng
                 </button>
               </div>
             </form>
