@@ -24,6 +24,21 @@ const formatViDate = (dateStr) => {
   }
 };
 
+const formatEnglishDate = (dateStr) => {
+  if (!dateStr) return 'N/A';
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString('vi-VN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+  } catch (e) {
+    return dateStr;
+  }
+};
+
 export default function SuccessScreen({ submittedData = {}, formData = {}, navigate }) {
   const patientName = submittedData?.applicant?.fullName || formData.fullName || 'N/A';
   const rawPrefDate = submittedData?.preferredAdmissionDate || formData.preferredDate;
@@ -37,9 +52,9 @@ export default function SuccessScreen({ submittedData = {}, formData = {}, navig
         </div>
 
         {/* success message */}
-        <h2 className="sap-success__title">Yêu cầu đã được gửi thành công!</h2>
+        <h2 className="sap-success__title">Gửi yêu cầu tiếp nhận thành công!</h2>
         <p className="sap-success__desc">
-          Cảm ơn bạn đã chọn <strong>An Nhiên Care Home</strong>. Đội ngũ tư vấn của chúng tôi sẽ xem xét đơn và liên hệ với bạn trong vòng <strong>24 giờ</strong> tới.
+          Cảm ơn bạn đã lựa chọn <strong>An Nhiên Care Home</strong>. Đội ngũ tư vấn của chúng tôi sẽ xem xét hồ sơ của bạn và liên hệ trong vòng <strong>24 giờ</strong> tới.
         </p>
 
         {/* detail cards row */}
@@ -61,7 +76,7 @@ export default function SuccessScreen({ submittedData = {}, formData = {}, navig
             <div className="sap-success__summary-card-info">
               <span className="sap-success__summary-card-label">NGÀY MONG MUỐN</span>
               <span className="sap-success__summary-card-value">
-                {rawPrefDate ? formatViDate(rawPrefDate) : 'Chưa xác định'}
+                {rawPrefDate ? formatEnglishDate(rawPrefDate) : 'Chưa xác định'}
               </span>
             </div>
           </div>
@@ -75,7 +90,7 @@ export default function SuccessScreen({ submittedData = {}, formData = {}, navig
           <div className="sap-success__advice-content">
             <h4 className="sap-success__advice-title">Các bước tiếp theo</h4>
             <p className="sap-success__advice-text">
-              Vui lòng chuẩn bị giấy tờ tùy thân và hồ sơ y tế gần nhất của cư dân để hỗ trợ buổi tư vấn sắp tới.
+              Vui lòng chuẩn bị các giấy tờ tùy thân của cư dân và hồ sơ y tế gần đây nhất để thuận tiện cho buổi tư vấn y tế sắp tới của chúng tôi.
             </p>
           </div>
         </div>
@@ -96,7 +111,7 @@ export default function SuccessScreen({ submittedData = {}, formData = {}, navig
             onClick={() => navigate('/family/dashboard')}
           >
             <Home size={16} />
-            Về trang tổng quan
+            Quay lại trang chủ
           </button>
         </div>
 
@@ -117,7 +132,7 @@ export default function SuccessScreen({ submittedData = {}, formData = {}, navig
             </div>
           </div>
           <div className="sap-success__hotline-actions">
-            <button type="button" className="sap-success__hotline-icon-btn" aria-label="Gửi tin nhắn hỗ trợ">
+            <button type="button" className="sap-success__hotline-icon-btn" aria-label="Gửi tin nhắn">
               <MessageSquare size={18} />
             </button>
             <button type="button" className="sap-success__hotline-icon-btn" aria-label="Chia sẻ thông tin">

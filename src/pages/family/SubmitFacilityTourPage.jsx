@@ -48,12 +48,12 @@ export default function SubmitFacilityTourPage() {
 
     switch (name) {
       case 'contactName':
-        if (!val) return 'Họ tên người liên hệ là bắt buộc';
-        if (val.length < 2 || val.length > 50) return 'Họ tên phải từ 2 đến 50 ký tự';
+        if (!val) return 'Tên liên hệ là bắt buộc';
+        if (val.length < 2 || val.length > 50) return 'Tên phải từ 2 đến 50 ký tự';
         return null;
 
       case 'contactPhone':
-        if (!val) return 'Số điện thoại liên hệ là bắt buộc';
+        if (!val) return 'Số điện thoại là bắt buộc';
         if (!/^[0-9+\s-]{8,15}$/.test(val)) return 'Định dạng số điện thoại không hợp lệ';
         return null;
 
@@ -66,13 +66,13 @@ export default function SubmitFacilityTourPage() {
         const dateObj = new Date(val);
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        if (dateObj < today) return 'Ngày mong muốn phải là ngày trong tương lai';
+        if (dateObj < today) return 'Ngày mong muốn phải là hôm nay hoặc trong tương lai';
         return null;
 
       case 'numberOfVisitors':
         const visitors = parseInt(value, 10);
         if (isNaN(visitors) || visitors < 1 || visitors > 20) {
-          return 'Số người tham quan phải từ 1 đến 20';
+          return 'Số lượng người tham quan phải từ 1 đến 20';
         }
         return null;
 
@@ -137,7 +137,7 @@ export default function SubmitFacilityTourPage() {
       setSubmittedData(res?.tour || payload);
       setSubmitted(true);
     } catch (err) {
-      const msg = err?.response?.data?.message || err?.message || 'Đã xảy ra lỗi. Vui lòng thử lại.';
+      const msg = err?.response?.data?.message || err?.message || 'Có lỗi xảy ra. Vui lòng thử lại.';
       setSubmitError(msg);
     } finally {
       setSubmitting(false);
@@ -151,15 +151,15 @@ export default function SubmitFacilityTourPage() {
           <div className="sftp-success__icon-box">
             <CheckCircle size={48} className="sftp-success__icon" />
           </div>
-          <h2 className="sftp-success__title">Đã đặt lịch tham quan thành công</h2>
+          <h2 className="sftp-success__title">Đăng ký tham quan thành công</h2>
           <p className="sftp-success__desc">
-            Yêu cầu tham quan của bạn đã được gửi đến ban quản lý.
-            Chúng tôi sẽ liên hệ sớm để xác nhận lịch hẹn.
+            Yêu cầu tham quan cơ sở của bạn đã được gửi thành công đến ban quản lý.
+            Chúng tôi sẽ sớm liên hệ với bạn để xác nhận lịch hẹn chính thức.
           </p>
 
           <div className="sftp-success__details">
             <div className="sftp-success__detail-row">
-              <span className="sftp-success__detail-label">Tên người liên hệ:</span>
+              <span className="sftp-success__detail-label">Tên liên hệ:</span>
               <strong className="sftp-success__detail-value">{submittedData?.contactName}</strong>
             </div>
             <div className="sftp-success__detail-row">
@@ -171,7 +171,7 @@ export default function SubmitFacilityTourPage() {
                       month: 'long',
                       day: 'numeric',
                     })
-                  : 'N/A'}
+                  : 'Chưa xác định'}
               </strong>
             </div>
             {submittedData?.preferredTimeSlot && (
@@ -181,7 +181,7 @@ export default function SubmitFacilityTourPage() {
               </div>
             )}
             <div className="sftp-success__detail-row">
-              <span className="sftp-success__detail-label">Số người tham quan:</span>
+              <span className="sftp-success__detail-label">Số người:</span>
               <strong className="sftp-success__detail-value">{submittedData?.numberOfVisitors}</strong>
             </div>
           </div>
@@ -197,7 +197,7 @@ export default function SubmitFacilityTourPage() {
               onClick={() => navigate('/')}
               className="sftp-btn sftp-btn--outline"
             >
-              Về trang chủ
+              Quay lại trang chủ
             </button>
           </div>
         </div>
@@ -209,9 +209,9 @@ export default function SubmitFacilityTourPage() {
     <form className="sftp-page" onSubmit={handleSubmit} noValidate>
       {/* ── Header ── */}
       <div className="sftp-header">
-        <h1 className="sftp-header__title">Đặt lịch tham quan cơ sở</h1>
+        <h1 className="sftp-header__title">Đăng ký tham quan cơ sở</h1>
         <p className="sftp-header__subtitle">
-          Tham quan cơ sở chăm sóc hiện đại, trải nghiệm tiêu chuẩn Nhật Bản và tư vấn trực tiếp với đội ngũ y tế của chúng tôi.
+          Ghé thăm viện dưỡng lão hiện đại của chúng tôi, trải nghiệm các tiêu chuẩn Nhật Bản và nhận tư vấn trực tiếp từ các chuyên gia y tế.
         </p>
       </div>
 
@@ -220,13 +220,13 @@ export default function SubmitFacilityTourPage() {
         <div className="sftp-grid">
           {/* Contact Name */}
           <div className={`sftp-group ${errors.contactName && touched.contactName ? 'has-error' : ''}`}>
-            <label className="sftp-label">Họ tên người liên hệ <span className="sftp-required">*</span></label>
+            <label className="sftp-label">Tên liên hệ <span className="sftp-required">*</span></label>
             <div className="sftp-input-wrap">
               <User size={16} className="sftp-input-icon" />
               <input
                 type="text"
                 className="sftp-input"
-                placeholder="Nhập họ tên đầy đủ"
+                placeholder="Nhập họ và tên"
                 value={formData.contactName}
                 onChange={(e) => setField('contactName', e.target.value)}
                 onBlur={() => handleBlur('contactName')}
@@ -280,7 +280,7 @@ export default function SubmitFacilityTourPage() {
 
           {/* Preferred Date */}
           <div className={`sftp-group ${errors.preferredDate && touched.preferredDate ? 'has-error' : ''}`}>
-            <label className="sftp-label">Ngày mong muốn <span className="sftp-required">*</span></label>
+            <label className="sftp-label">Ngày mong muốn *</label>
             <div className="sftp-input-wrap">
               <Calendar size={16} className="sftp-input-icon" />
               <input
@@ -319,7 +319,7 @@ export default function SubmitFacilityTourPage() {
 
           {/* Number of Visitors */}
           <div className={`sftp-group ${errors.numberOfVisitors && touched.numberOfVisitors ? 'has-error' : ''}`}>
-            <label className="sftp-label">Số người tham quan <span className="sftp-required">*</span></label>
+            <label className="sftp-label">Số lượng người tham quan <span className="sftp-required">*</span></label>
             <div className="sftp-input-wrap">
               <Users size={16} className="sftp-input-icon" />
               <input
@@ -341,12 +341,12 @@ export default function SubmitFacilityTourPage() {
 
         {/* Additional Notes */}
         <div className="sftp-group sftp-group--full">
-          <label className="sftp-label">Ghi chú bổ sung</label>
+          <label className="sftp-label">Ghi chú thêm</label>
           <div className="sftp-input-wrap sftp-textarea-wrap">
             <MessageSquare size={16} className="sftp-input-icon sftp-textarea-icon" />
             <textarea
               className="sftp-input sftp-textarea"
-              placeholder="Cho chúng tôi biết nếu bạn có yêu cầu đặc biệt nào..."
+              placeholder="Cho chúng tôi biết nếu bạn có bất kỳ yêu cầu đặc biệt nào..."
               rows={4}
               value={formData.notes}
               onChange={(e) => setField('notes', e.target.value)}
@@ -388,7 +388,7 @@ export default function SubmitFacilityTourPage() {
             ) : (
               <>
                 <Send size={16} />
-                Đặt lịch tham quan
+                Đăng ký tham quan
               </>
             )}
           </button>

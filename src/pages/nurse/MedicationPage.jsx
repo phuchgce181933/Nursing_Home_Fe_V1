@@ -1,47 +1,34 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import medicationService from '../../services/medication.service';
 import '../../styles/medications/MedicationPage.css';
 
-/* ── constants ── */
-const ROUTES_LIST = ['Oral', 'IM Injection', 'IV Injection', 'Subcutaneous', 'Sublingual', 'Topical', 'Eye drop', 'Ear drop', 'Inhalation'];
-const RX_STATUS_LABELS = { active: 'Đang dùng', paused: 'Tạm dừng', stopped: 'Đã dừng', completed: 'Hoàn thành' };
-const ADMIN_STATUS_LABELS = { pending: 'Chờ dùng', taken: 'Đã dùng', missed: 'Bỏ lỡ', overdue: 'Quá hạn' };
-
-const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-GB') : '—';
-const fmtTime = (d) => new Date(d).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-const fmtDatetime = (d) => d ? `${fmtDate(d)} ${fmtTime(d)}` : '—';
+/* ── helpers ── */
+const fmtDate = (d) => (d ? new Date(d).toLocaleDateString('en-GB') : '—');
+const fmtTime = (d) =>
+  new Date(d).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+const fmtDatetime = (d) => (d ? `${fmtDate(d)} ${fmtTime(d)}` : '—');
 const fmtDayLabel = (d) =>
-  new Date(d).toLocaleDateString('en-GB', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' });
-const toDateInput = (d) => d ? new Date(d).toISOString().slice(0, 10) : '';
+  new Date(d).toLocaleDateString('en-GB', {
+    weekday: 'long', day: '2-digit', month: 'short', year: 'numeric',
+  });
 
-/* ── Allergy / condition warning banner ── */
-function ResidentWarning({ resident }) {
-  if (!resident) return null;
-  const hasAllergies = resident.allergies?.length > 0;
-  const hasConditions = resident.chronicConditions?.length > 0;
-  if (!hasAllergies && !hasConditions) return null;
-  return (
-    <div className="med-warning-banner">
-      {hasAllergies && (
-        <div className="med-warning-banner__row">
-          <span className="med-warning-banner__icon">⚠️</span>
-          <span><strong>Dị ứng:</strong> {resident.allergies.join(', ')}</span>
-        </div>
-      )}
-      {hasConditions && (
-        <div className="med-warning-banner__row">
-          <span className="med-warning-banner__icon">🩺</span>
-          <span><strong>Bệnh mãn tính:</strong> {resident.chronicConditions.join(', ')}</span>
-        </div>
-      )}
-    </div>
-  );
-}
+const MISSED_REASONS = ['refused', 'asleep', 'vomiting', 'hospitalized', 'other'];
+
+const RX_STATUS_KEYS = { ACTIVE: 'statusActive', COMPLETED: 'statusCompleted', CANCELLED: 'statusCancelled' };
+const SCHED_STATUS_KEYS = {
+  PENDING: 'schedPending', TAKEN: 'schedTaken', LATE_TAKEN: 'schedLateTaken',
+  MISSED: 'schedMissed', SKIPPED: 'schedSkipped', OVERDUE: 'schedOverdue',
+};
 
 /* ── StatusBadge ── */
 function StatusBadge({ status, type }) {
-  const labels = type === 'admin' ? ADMIN_STATUS_LABELS : RX_STATUS_LABELS;
-  return <span className={`med-badge med-badge--${status}`}>{labels[status] || status}</span>;
+  const { t } = useTranslation();
+  const keyMap = type === 'sched' ? SCHED_STATUS_KEYS : RX_STATUS_KEYS;
+  const label = keyMap[status] ? t(`medication.${keyMap[status]}`) : status;
+  return (
+    <span className={`med-badge med-badge--${status.toLowerCase()}`}>{label}</span>
+  );
 }
 
 /* ── Modal wrapper ── */
@@ -60,207 +47,81 @@ function Modal({ title, onClose, children, footer, size }) {
   );
 }
 
-/* ── Edit Prescription Modal (Nurse) ── */
-function EditPrescriptionModal({ prescription, onSave, onClose }) {
-  const [form, setForm] = useState({
-    medicationName: prescription.medicationName || '',
-    dosage: prescription.dosage || '',
-    route: prescription.route || 'Oral',
-    frequency: prescription.frequency || '',
-    startDate: toDateInput(prescription.startDate),
-    endDate: toDateInput(prescription.endDate),
-    status: prescription.status || 'active',
-    notes: prescription.notes || '',
-  });
+/* ── Mark Modal (taken or missed) ── */
+function MarkModal({ schedule, action, onConfirm, onClose, saving }) {
+  const { t } = useTranslation();
+  const isMissed = action === 'missed';
+  const [reason, setReason] = useState('');
+  const [notes, setNotes] = useState('');
 
-  const set = (f) => (e) => setForm((p) => ({ ...p, [f]: e.target.value }));
-
-  const handleSubmit = () => {
-    if (!form.medicationName.trim() || !form.dosage.trim()) return;
-    onSave(prescription._id, { ...form, endDate: form.endDate || null });
+  const handleConfirm = () => {
+    if (isMissed && !reason) return;
+    onConfirm(schedule._id, action, reason, notes);
   };
 
-  const resident = prescription.residentId;
+  const resident = schedule._resident || {};
 
   return (
     <Modal
-      title="Chỉnh sửa đơn thuốc"
+      title={isMissed ? t('medication.confirmMissed') : t('medication.confirmTaken')}
       onClose={onClose}
       footer={
         <>
-          <button className="med-btn med-btn--secondary" onClick={onClose}>Hủy</button>
-          <button className="med-btn med-btn--primary" onClick={handleSubmit}>Lưu thay đổi</button>
-        </>
-      }
-    >
-      <div className="med-info-card" style={{ marginBottom: 12 }}>
-        <div className="med-info-card__row">
-          <span className="med-info-card__label">Cư dân</span>
-          <span className="med-info-card__value">{resident?.fullName} ({resident?.residentCode})</span>
-        </div>
-        <div className="med-info-card__row">
-          <span className="med-info-card__label">Bác sĩ kê đơn</span>
-          <span className="med-info-card__value">{prescription.prescribedByStaffId?.userId?.fullName || '—'}</span>
-        </div>
-      </div>
-
-      <ResidentWarning resident={resident} />
-
-      <div className="med-form-row">
-        <div className="med-form-group">
-          <label className="med-form-label">Tên thuốc <span style={{ color: '#ef4444' }}>*</span></label>
-          <input className="med-form-input" value={form.medicationName} onChange={set('medicationName')} />
-        </div>
-        <div className="med-form-group">
-          <label className="med-form-label">Liều lượng <span style={{ color: '#ef4444' }}>*</span></label>
-          <input className="med-form-input" value={form.dosage} onChange={set('dosage')} />
-        </div>
-      </div>
-
-      <div className="med-form-row">
-        <div className="med-form-group">
-          <label className="med-form-label">Đường dùng</label>
-          <select className="med-form-select" value={form.route} onChange={set('route')}>
-            {ROUTES_LIST.map((r) => <option key={r} value={r}>{r}</option>)}
-          </select>
-        </div>
-        <div className="med-form-group">
-          <label className="med-form-label">Tần suất</label>
-          <input className="med-form-input" value={form.frequency} onChange={set('frequency')} />
-        </div>
-      </div>
-
-      <div className="med-form-row">
-        <div className="med-form-group">
-          <label className="med-form-label">Ngày bắt đầu</label>
-          <input type="date" className="med-form-input" value={form.startDate} onChange={set('startDate')} />
-        </div>
-        <div className="med-form-group">
-          <label className="med-form-label">Ngày kết thúc</label>
-          <input type="date" className="med-form-input" value={form.endDate} onChange={set('endDate')} />
-        </div>
-      </div>
-
-      <div className="med-form-group">
-        <label className="med-form-label">Trạng thái</label>
-        <select className="med-form-select" value={form.status} onChange={set('status')}>
-          <option value="active">Đang dùng</option>
-          <option value="paused">Tạm dừng</option>
-          <option value="stopped">Đã dừng</option>
-          <option value="completed">Hoàn thành</option>
-        </select>
-      </div>
-
-      <div className="med-form-group">
-        <label className="med-form-label">Ghi chú</label>
-        <textarea className="med-form-textarea" rows={3} value={form.notes} onChange={set('notes')} placeholder="Ghi chú bổ sung..." />
-      </div>
-    </Modal>
-  );
-}
-
-/* ── History Modal ── */
-function HistoryModal({ prescription, onClose }) {
-  const [history, setHistory] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    medicationService.getAdministrationHistory(prescription._id)
-      .then(setHistory)
-      .catch(() => setHistory([]))
-      .finally(() => setLoading(false));
-  }, [prescription._id]);
-
-  return (
-    <Modal title={`Lịch sử dùng thuốc — ${prescription.medicationName}`} onClose={onClose} size="lg">
-      <div className="med-info-card" style={{ marginBottom: 16 }}>
-        <div className="med-info-card__row">
-          <span className="med-info-card__label">Cư dân</span>
-          <span className="med-info-card__value">{prescription.residentId?.fullName} ({prescription.residentId?.residentCode})</span>
-        </div>
-        <div className="med-info-card__row">
-          <span className="med-info-card__label">Liều lượng</span>
-          <span className="med-info-card__value">{prescription.dosage} — {prescription.route}</span>
-        </div>
-      </div>
-
-      {loading ? (
-        <p className="med-empty">Đang tải lịch sử...</p>
-      ) : history.length === 0 ? (
-        <p className="med-empty">Chưa có lịch sử dùng thuốc.</p>
-      ) : (
-        <div className="med-table-wrap">
-          <table className="med-table">
-            <thead>
-              <tr>
-                <th>Giờ dự kiến</th>
-                <th>Đã dùng lúc</th>
-                <th>Trạng thái</th>
-                <th>Người thực hiện</th>
-                <th>Ghi chú</th>
-              </tr>
-            </thead>
-            <tbody>
-              {history.map((h) => (
-                <tr key={h._id}>
-                  <td>{fmtDatetime(h.scheduledAt)}</td>
-                  <td>{h.takenAt ? fmtDatetime(h.takenAt) : '—'}</td>
-                  <td><StatusBadge status={h.status} type="admin" /></td>
-                  <td>{h.administeredByStaffId?.userId?.fullName || '—'}</td>
-                  <td>{h.notes || '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </Modal>
-  );
-}
-
-/* ── Confirm Mark Modal ── */
-function ConfirmMarkModal({ admin, newStatus, onConfirm, onClose, saving }) {
-  const [notes, setNotes] = useState('');
-  const isMissed = newStatus === 'missed';
-  return (
-    <Modal
-      title={isMissed ? 'Xác nhận bỏ lỡ liều thuốc' : 'Xác nhận đã dùng thuốc'}
-      onClose={onClose}
-      footer={
-        <>
-          <button className="med-btn med-btn--secondary" onClick={onClose} disabled={saving}>Hủy</button>
+          <button className="med-btn med-btn--secondary" onClick={onClose} disabled={saving}>
+            {t('medication.cancelBtn')}
+          </button>
           <button
             className={`med-btn ${isMissed ? 'med-btn--danger' : 'med-btn--primary'}`}
-            onClick={() => onConfirm(admin._id, newStatus, notes)}
-            disabled={saving}
+            onClick={handleConfirm}
+            disabled={saving || (isMissed && !reason)}
           >
-            {saving ? 'Đang lưu...' : isMissed ? 'Xác nhận bỏ lỡ' : 'Xác nhận đã dùng'}
+            {saving ? t('medication.loading') : t('medication.confirmBtn')}
           </button>
         </>
       }
     >
       <div className="med-info-card" style={{ marginBottom: 16 }}>
         <div className="med-info-card__row">
-          <span className="med-info-card__label">Cư dân</span>
-          <span className="med-info-card__value">{admin.residentId?.fullName} ({admin.residentId?.residentCode})</span>
+          <span className="med-info-card__label">{t('medication.colResident')}</span>
+          <span className="med-info-card__value">{resident.fullName} ({resident.residentCode})</span>
         </div>
         <div className="med-info-card__row">
-          <span className="med-info-card__label">Thuốc</span>
-          <span className="med-info-card__value">{admin.prescriptionId?.medicationName} {admin.prescriptionId?.dosage}</span>
+          <span className="med-info-card__label">{t('medication.colMedication')}</span>
+          <span className="med-info-card__value">{schedule.medicationName} — {schedule.dosage}</span>
         </div>
         <div className="med-info-card__row">
-          <span className="med-info-card__label">Giờ dự kiến</span>
-          <span className="med-info-card__value">{fmtTime(admin.scheduledAt)}</span>
+          <span className="med-info-card__label">{t('medication.colTime')}</span>
+          <span className="med-info-card__value">{fmtTime(schedule.scheduledTime)}</span>
         </div>
       </div>
+
+      {isMissed && (
+        <div className="med-form-group">
+          <label className="med-form-label">
+            {t('medication.missedReasonLabel')} <span style={{ color: '#ef4444' }}>*</span>
+          </label>
+          <select
+            className="med-form-select"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+          >
+            <option value="">—</option>
+            {MISSED_REASONS.map((r) => (
+              <option key={r} value={r}>
+                {t(`medication.reason${r.charAt(0).toUpperCase() + r.slice(1)}`)}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       <div className="med-form-group">
-        <label className="med-form-label">{isMissed ? 'Lý do bỏ lỡ liều thuốc' : 'Ghi chú (tùy chọn)'}</label>
+        <label className="med-form-label">{t('medication.optionalNotes')}</label>
         <textarea
           className="med-form-textarea"
-          rows={3}
+          rows={2}
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          placeholder={isMissed ? 'Nhập lý do...' : 'Nhập ghi chú nếu có...'}
         />
       </div>
     </Modal>
@@ -271,21 +132,26 @@ function ConfirmMarkModal({ admin, newStatus, onConfirm, onClose, saving }) {
    Tab 1 — Today's Schedule
    ════════════════════════════════════════ */
 function ScheduleTab() {
+  const { t } = useTranslation();
   const [date, setDate] = useState(new Date());
-  const [admins, setAdmins] = useState([]);
+  const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  const [confirmModal, setConfirmModal] = useState(null);
+  const [markModal, setMarkModal] = useState(null); // { schedule, action }
   const [saving, setSaving] = useState(false);
 
   const dateStr = date.toISOString().slice(0, 10);
 
   const load = useCallback(() => {
     setLoading(true);
-    medicationService.listAdministrations({ date: dateStr, limit: 200 })
-      .then((res) => setAdmins(res.data || []))
-      .catch(() => setAdmins([]))
+    medicationService
+      .getDailySchedule({ date: dateStr })
+      .then((res) => {
+        const arr = Array.isArray(res) ? res : (res?.data || res?.groups || []);
+        setGroups(arr);
+      })
+      .catch(() => setGroups([]))
       .finally(() => setLoading(false));
   }, [dateStr]);
 
@@ -297,41 +163,55 @@ function ScheduleTab() {
     setDate(d);
   };
 
-  const openConfirm = (admin, newStatus) => setConfirmModal({ admin, newStatus });
-  const closeConfirm = () => setConfirmModal(null);
+  // Flatten groups → rows
+  const allRows = useMemo(() => {
+    const flat = [];
+    groups.forEach((group) => {
+      const resident = group.residentId || group.resident || {};
+      (group.schedules || []).forEach((s) => {
+        flat.push({ ...s, _resident: resident });
+      });
+    });
+    return flat.sort((a, b) => new Date(a.scheduledTime) - new Date(b.scheduledTime));
+  }, [groups]);
 
-  const handleConfirm = async (id, newStatus, notes) => {
+  const counts = useMemo(() => ({
+    PENDING: allRows.filter((s) => s.status === 'PENDING').length,
+    TAKEN: allRows.filter((s) => s.status === 'TAKEN' || s.status === 'LATE_TAKEN').length,
+    MISSED: allRows.filter((s) => s.status === 'MISSED').length,
+    OVERDUE: allRows.filter((s) => s.status === 'OVERDUE').length,
+  }), [allRows]);
+
+  const overdueRows = useMemo(() => allRows.filter((s) => s.status === 'OVERDUE'), [allRows]);
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase();
+    return allRows.filter((s) => {
+      const matchSearch =
+        !q ||
+        (s._resident?.fullName || '').toLowerCase().includes(q) ||
+        (s.medicationName || '').toLowerCase().includes(q);
+      const matchStatus = !statusFilter || s.status === statusFilter;
+      return matchSearch && matchStatus;
+    });
+  }, [allRows, search, statusFilter]);
+
+  const handleConfirm = async (id, action, reason, notes) => {
     setSaving(true);
     try {
-      await medicationService.markAdministration(id, { status: newStatus, notes });
-      closeConfirm();
+      if (action === 'taken') {
+        await medicationService.markTaken(id, notes ? { notes } : {});
+      } else {
+        await medicationService.markMissed(id, { reason, notes: notes || undefined });
+      }
+      setMarkModal(null);
       load();
     } catch (err) {
-      alert(err.response?.data?.message || 'Không thể cập nhật trạng thái');
+      alert(err.response?.data?.message || t('medication.markError'));
     } finally {
       setSaving(false);
     }
   };
-
-  const counts = useMemo(() => ({
-    pending: admins.filter((a) => a.status === 'pending').length,
-    taken: admins.filter((a) => a.status === 'taken').length,
-    missed: admins.filter((a) => a.status === 'missed').length,
-    overdue: admins.filter((a) => a.status === 'overdue').length,
-  }), [admins]);
-
-  const overdueItems = useMemo(() => admins.filter((a) => a.status === 'overdue'), [admins]);
-
-  const filtered = useMemo(() => {
-    const q = search.toLowerCase();
-    return admins.filter((a) => {
-      const match = !q
-        || (a.residentId?.fullName || '').toLowerCase().includes(q)
-        || (a.prescriptionId?.medicationName || '').toLowerCase().includes(q);
-      const st = !statusFilter || a.status === statusFilter;
-      return match && st;
-    });
-  }, [admins, search, statusFilter]);
 
   return (
     <div className="med-tab-content">
@@ -342,82 +222,108 @@ function ScheduleTab() {
       </div>
 
       <div className="med-stats">
-        {[['pending', 'Chờ dùng'], ['taken', 'Đã dùng'], ['missed', 'Bỏ lỡ'], ['overdue', 'Quá hạn']].map(([k, label]) => (
-          <div key={k} className={`med-stat-card med-stat-card--${k}`}>
-            <div className="med-stat-card__label">{label}</div>
+        {[
+          ['PENDING', 'schedPending'],
+          ['TAKEN', 'schedTaken'],
+          ['MISSED', 'schedMissed'],
+          ['OVERDUE', 'schedOverdue'],
+        ].map(([k, labelKey]) => (
+          <div key={k} className={`med-stat-card med-stat-card--${k.toLowerCase()}`}>
+            <div className="med-stat-card__label">{t(`medication.${labelKey}`)}</div>
             <div className="med-stat-card__value">{counts[k]}</div>
           </div>
         ))}
       </div>
 
-      {overdueItems.length > 0 && (
+      {overdueRows.length > 0 && (
         <div className="med-reminder">
           <span className="med-reminder__icon">🔔</span>
           <span className="med-reminder__text">
-            <strong>{overdueItems.length} liều quá hạn</strong> cần chú ý:{' '}
-            {overdueItems.map((a) => `${a.residentId?.fullName} — ${a.prescriptionId?.medicationName} (${fmtTime(a.scheduledAt)})`).join(' · ')}
+            <strong>{t('medication.overdueAlert_other', { count: overdueRows.length })}</strong>
+            {': '}
+            {overdueRows
+              .map((s) => `${s._resident?.fullName} — ${s.medicationName} (${fmtTime(s.scheduledTime)})`)
+              .join(' · ')}
           </span>
         </div>
       )}
 
       <div className="med-filter">
-        <input className="med-filter__search" type="text" placeholder="Tìm theo tên cư dân hoặc thuốc..." value={search} onChange={(e) => setSearch(e.target.value)} />
-        <select className="med-filter__select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-          <option value="">Tất cả trạng thái</option>
-          <option value="pending">Chờ dùng</option>
-          <option value="taken">Đã dùng</option>
-          <option value="missed">Bỏ lỡ</option>
-          <option value="overdue">Quá hạn</option>
+        <input
+          className="med-filter__search"
+          type="text"
+          placeholder={t('medication.searchPlaceholder')}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        <select
+          className="med-filter__select"
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+        >
+          <option value="">{t('medication.allStatuses')}</option>
+          {Object.keys(SCHED_STATUS_KEYS).map((k) => (
+            <option key={k} value={k}>{t(`medication.${SCHED_STATUS_KEYS[k]}`)}</option>
+          ))}
         </select>
       </div>
 
       {loading ? (
-        <p className="med-empty">Đang tải lịch dùng thuốc...</p>
+        <p className="med-empty">{t('medication.loading')}</p>
       ) : (
         <div className="med-table-wrap">
           <table className="med-table">
             <thead>
               <tr>
-                <th>Giờ</th>
-                <th>Cư dân</th>
-                <th>Thuốc</th>
-                <th>Liều lượng</th>
-                <th>Đường dùng</th>
-                <th>Trạng thái</th>
-                <th>Thao tác</th>
+                <th>{t('medication.colTime')}</th>
+                <th>{t('medication.colResident')}</th>
+                <th>{t('medication.colMedication')}</th>
+                <th>{t('medication.colDosage')}</th>
+                <th>{t('medication.colStatus')}</th>
+                <th>{t('medication.colActualTime')}</th>
+                <th>{t('medication.colActions')}</th>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
-                <tr><td colSpan={7} className="med-empty">Không có dữ liệu cho ngày này</td></tr>
+                <tr><td colSpan={7} className="med-empty">{t('medication.noDataForDate')}</td></tr>
               ) : (
-                filtered.map((a) => (
-                  <tr key={a._id}>
-                    <td><span className="med-time">{fmtTime(a.scheduledAt)}</span></td>
+                filtered.map((s) => (
+                  <tr key={s._id}>
+                    <td><span className="med-time">{fmtTime(s.scheduledTime)}</span></td>
                     <td>
-                      <div className="med-resident__name">{a.residentId?.fullName}</div>
-                      <div className="med-resident__code">{a.residentId?.residentCode}</div>
+                      <div className="med-resident__name">{s._resident?.fullName}</div>
+                      <div className="med-resident__code">{s._resident?.residentCode}</div>
                     </td>
+                    <td className="med-drug__name">{s.medicationName}</td>
+                    <td>{s.dosage}</td>
                     <td>
-                      <div className="med-drug__name">{a.prescriptionId?.medicationName}</div>
-                      <div className="med-drug__sub">{a.prescriptionId?.frequency}</div>
-                    </td>
-                    <td>{a.prescriptionId?.dosage}</td>
-                    <td>{a.prescriptionId?.route}</td>
-                    <td>
-                      <StatusBadge status={a.status} type="admin" />
-                      {a.status === 'taken' && a.takenAt && (
-                        <div className="med-taken-time">lúc {fmtTime(a.takenAt)}</div>
+                      <StatusBadge status={s.status} type="sched" />
+                      {s.status === 'MISSED' && s.reason && (
+                        <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+                          ({t(`medication.reason${s.reason.charAt(0).toUpperCase() + s.reason.slice(1)}`)})
+                        </div>
                       )}
                     </td>
                     <td>
-                      {(a.status === 'pending' || a.status === 'overdue') && (
+                      {s.actualTimeTaken
+                        ? `${t('medication.atTime')} ${fmtTime(s.actualTimeTaken)}`
+                        : '—'}
+                    </td>
+                    <td>
+                      {(s.status === 'PENDING' || s.status === 'OVERDUE') && (
                         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                          <button className="med-action-btn med-action-btn--taken" onClick={() => openConfirm(a, 'taken')}>
-                            ✓ Đã dùng
+                          <button
+                            className="med-action-btn med-action-btn--taken"
+                            onClick={() => setMarkModal({ schedule: s, action: 'taken' })}
+                          >
+                            ✓ {t('medication.schedTaken')}
                           </button>
-                          <button className="med-action-btn med-action-btn--missed" onClick={() => openConfirm(a, 'missed')}>
-                            ✕ Bỏ lỡ
+                          <button
+                            className="med-action-btn med-action-btn--missed"
+                            onClick={() => setMarkModal({ schedule: s, action: 'missed' })}
+                          >
+                            ✕ {t('medication.schedMissed')}
                           </button>
                         </div>
                       )}
@@ -430,12 +336,12 @@ function ScheduleTab() {
         </div>
       )}
 
-      {confirmModal && (
-        <ConfirmMarkModal
-          admin={confirmModal.admin}
-          newStatus={confirmModal.newStatus}
+      {markModal && (
+        <MarkModal
+          schedule={markModal.schedule}
+          action={markModal.action}
           onConfirm={handleConfirm}
-          onClose={closeConfirm}
+          onClose={() => setMarkModal(null)}
           saving={saving}
         />
       )}
@@ -444,131 +350,151 @@ function ScheduleTab() {
 }
 
 /* ════════════════════════════════════════
-   Tab 2 — Prescriptions
+   Tab 2 — Prescriptions (read-only reference)
    ════════════════════════════════════════ */
 function PrescriptionsTab() {
+  const { t } = useTranslation();
   const [prescriptions, setPrescriptions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('active');
-  const [modal, setModal] = useState({ type: null, prescription: null });
-  // type: null | 'edit' | 'history'
+  const [statusFilter, setStatusFilter] = useState('ACTIVE');
+  const [expanded, setExpanded] = useState(new Set());
 
   const load = useCallback(() => {
     setLoading(true);
-    medicationService.listPrescriptions({ limit: 100 })
-      .then((res) => setPrescriptions(res.data || []))
+    medicationService
+      .listPrescriptions({ limit: 100 })
+      .then((res) => {
+        const arr = Array.isArray(res) ? res : (res?.data || []);
+        setPrescriptions(arr);
+      })
       .catch(() => setPrescriptions([]))
       .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => { load(); }, [load]);
 
-  const closeModal = () => setModal({ type: null, prescription: null });
-
-  const handleSaveEdit = async (id, form) => {
-    try {
-      await medicationService.updatePrescription(id, form);
-      closeModal();
-      load();
-    } catch (err) {
-      alert(err.response?.data?.message || 'Không thể cập nhật đơn thuốc');
-    }
-  };
-
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
     return prescriptions.filter((p) => {
-      const match = !q
-        || (p.residentId?.fullName || '').toLowerCase().includes(q)
-        || (p.medicationName || '').toLowerCase().includes(q);
-      const st = !statusFilter || p.status === statusFilter;
-      return match && st;
+      const matchSearch =
+        !q ||
+        (p.residentId?.fullName || '').toLowerCase().includes(q) ||
+        (p.diagnosisNote || '').toLowerCase().includes(q) ||
+        (p.items || []).some((it) => (it.medicationName || '').toLowerCase().includes(q));
+      const matchStatus = !statusFilter || p.status === statusFilter;
+      return matchSearch && matchStatus;
     });
   }, [prescriptions, search, statusFilter]);
+
+  const toggleExpand = (id) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
 
   return (
     <div className="med-tab-content">
       <div className="med-filter">
-        <input className="med-filter__search" type="text" placeholder="Tìm theo tên cư dân hoặc thuốc..." value={search} onChange={(e) => setSearch(e.target.value)} />
-        <select className="med-filter__select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-          <option value="">Tất cả trạng thái</option>
-          <option value="active">Đang dùng</option>
-          <option value="paused">Tạm dừng</option>
-          <option value="stopped">Đã dừng</option>
-          <option value="completed">Hoàn thành</option>
+        <input
+          className="med-filter__search"
+          type="text"
+          placeholder={t('medication.searchPlaceholder')}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        <select
+          className="med-filter__select"
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+        >
+          <option value="">{t('medication.allStatuses')}</option>
+          {Object.keys(RX_STATUS_KEYS).map((k) => (
+            <option key={k} value={k}>{t(`medication.${RX_STATUS_KEYS[k]}`)}</option>
+          ))}
         </select>
       </div>
 
       {loading ? (
-        <p className="med-empty">Đang tải đơn thuốc...</p>
+        <p className="med-empty">{t('medication.loading')}</p>
       ) : (
         <div className="med-table-wrap">
           <table className="med-table">
             <thead>
               <tr>
-                <th>Cư dân</th>
-                <th>Thuốc</th>
-                <th>Liều lượng</th>
-                <th>Tần suất</th>
-                <th>Lịch dùng</th>
-                <th>Đường dùng</th>
-                <th>Ngày bắt đầu</th>
-                <th>Ngày kết thúc</th>
-                <th>Bác sĩ kê đơn</th>
-                <th>Trạng thái</th>
-                <th>Thao tác</th>
+                <th>{t('medication.colResident')}</th>
+                <th>{t('medication.colDiagnosis')}</th>
+                <th>{t('medication.colValidUntil')}</th>
+                <th>{t('medication.colMedications')}</th>
+                <th>{t('medication.colPrescribedBy')}</th>
+                <th>{t('medication.colStatus')}</th>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
-                <tr><td colSpan={11} className="med-empty">Không tìm thấy đơn thuốc</td></tr>
+                <tr><td colSpan={6} className="med-empty">{t('medication.noData')}</td></tr>
               ) : (
-                filtered.map((p) => (
-                  <tr key={p._id}>
-                    <td>
-                      <div className="med-resident__name">{p.residentId?.fullName}</div>
-                      <div className="med-resident__code">{p.residentId?.residentCode}</div>
-                    </td>
-                    <td>
-                      <div className="med-drug__name">{p.medicationName}</div>
-                      {p.notes && <div className="med-drug__sub">{p.notes}</div>}
-                    </td>
-                    <td>{p.dosage}</td>
-                    <td>{p.frequency || '—'}</td>
-                    <td>
-                      {p.scheduleTimes?.length > 0
-                        ? p.scheduleTimes.map((t) => <span key={t} className="med-time-chip" style={{ marginRight: 4 }}>{t}</span>)
-                        : <span style={{ color: '#94a3b8' }}>Chưa đặt</span>}
-                    </td>
-                    <td>{p.route}</td>
-                    <td>{fmtDate(p.startDate)}</td>
-                    <td>{fmtDate(p.endDate)}</td>
-                    <td>{p.prescribedByStaffId?.userId?.fullName || '—'}</td>
-                    <td><StatusBadge status={p.status} type="rx" /></td>
-                    <td>
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                        <button className="med-action-btn med-action-btn--edit" onClick={() => setModal({ type: 'edit', prescription: p })}>
-                          ✎ Sửa
-                        </button>
-                        <button className="med-action-btn med-action-btn--history" onClick={() => setModal({ type: 'history', prescription: p })}>
-                          ⏱ Lịch sử
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                filtered.map((p) => {
+                  const isOpen = expanded.has(p._id);
+                  return (
+                    <>
+                      <tr key={p._id} style={{ cursor: 'pointer' }} onClick={() => toggleExpand(p._id)}>
+                        <td>
+                          <div className="med-resident__name">{p.residentId?.fullName}</div>
+                          <div className="med-resident__code">{p.residentId?.residentCode}</div>
+                        </td>
+                        <td style={{ maxWidth: 200, fontSize: 13 }}>{p.diagnosisNote}</td>
+                        <td>{fmtDate(p.validUntil)}</td>
+                        <td>
+                          {(p.items || []).length} {t('medication.items')} {isOpen ? '▲' : '▼'}
+                        </td>
+                        <td>{p.prescribedByStaffId?.userId?.fullName || '—'}</td>
+                        <td><StatusBadge status={p.status} type="rx" /></td>
+                      </tr>
+                      {isOpen && (p.items || []).length > 0 && (
+                        <tr key={`${p._id}-items`}>
+                          <td colSpan={6} style={{ padding: 0, background: '#f8fafc' }}>
+                            <div style={{ padding: '8px 16px' }}>
+                              <table className="med-table" style={{ margin: 0 }}>
+                                <thead>
+                                  <tr>
+                                    <th>{t('medication.medicationName')}</th>
+                                    <th>{t('medication.dosage')}</th>
+                                    <th>{t('medication.unit')}</th>
+                                    <th>{t('medication.frequencyLabel')}</th>
+                                    <th>{t('medication.times')}</th>
+                                    <th>{t('medication.startDate')}</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {p.items.map((it) => (
+                                    <tr key={it._id}>
+                                      <td className="med-drug__name">{it.medicationName}</td>
+                                      <td>{it.dosage}</td>
+                                      <td>{it.unit || '—'}</td>
+                                      <td>{it.frequency}</td>
+                                      <td>
+                                        {(it.times || []).map((tm) => (
+                                          <span key={tm} className="med-time-chip" style={{ marginRight: 4 }}>{tm}</span>
+                                        ))}
+                                      </td>
+                                      <td>{it.startDate ? fmtDate(it.startDate) : '—'}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
-      )}
-
-      {modal.type === 'edit' && (
-        <EditPrescriptionModal prescription={modal.prescription} onSave={handleSaveEdit} onClose={closeModal} />
-      )}
-      {modal.type === 'history' && (
-        <HistoryModal prescription={modal.prescription} onClose={closeModal} />
       )}
     </div>
   );
@@ -578,20 +504,27 @@ function PrescriptionsTab() {
    Root — NurseMedicationPage
    ════════════════════════════════════════ */
 function NurseMedicationPage() {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState('schedule');
 
   return (
     <div className="med-page">
       <div className="med-page__header">
-        <h1 className="med-page__title">Quản lý thuốc</h1>
+        <h1 className="med-page__title">{t('medication.pageTitle')}</h1>
       </div>
 
       <div className="med-tabs">
-        <button className={`med-tab ${activeTab === 'schedule' ? 'med-tab--active' : ''}`} onClick={() => setActiveTab('schedule')}>
-          Lịch hôm nay
+        <button
+          className={`med-tab ${activeTab === 'schedule' ? 'med-tab--active' : ''}`}
+          onClick={() => setActiveTab('schedule')}
+        >
+          {t('medication.tabDailySchedule')}
         </button>
-        <button className={`med-tab ${activeTab === 'prescriptions' ? 'med-tab--active' : ''}`} onClick={() => setActiveTab('prescriptions')}>
-          Đơn thuốc
+        <button
+          className={`med-tab ${activeTab === 'prescriptions' ? 'med-tab--active' : ''}`}
+          onClick={() => setActiveTab('prescriptions')}
+        >
+          {t('medication.tabPrescriptions')}
         </button>
       </div>
 

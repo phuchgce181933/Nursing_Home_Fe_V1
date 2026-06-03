@@ -42,7 +42,7 @@ export default function Step2({ data = {}, onChange, errors = {}, touched = {}, 
             tags={data.allergies ?? []}
             onAdd={(v) => onChange('allergies', [...(data.allergies ?? []), v])}
             onRemove={(v) => onChange('allergies', (data.allergies ?? []).filter((x) => x !== v))}
-            placeholder="Nhập dị ứng và nhấn Enter (vd: Penicillin)..."
+            placeholder="Nhập tác nhân dị ứng rồi bấm Enter (ví dụ: Penicillin)..."
           />
         </div>
 
@@ -55,10 +55,10 @@ export default function Step2({ data = {}, onChange, errors = {}, touched = {}, 
         </div>
 
         <div className="sap-field sap-field--full">
-          <label className="sap-label">Tóm tắt tình trạng sức khỏe</label>
+          <label className="sap-label">Tóm tắt sức khỏe hiện tại</label>
           <textarea
             rows={4}
-            placeholder="Mô tả tình trạng sức khỏe tổng quát, khả năng di chuyển, hỗ trợ ăn uống, v.v..."
+            placeholder="Mô tả trạng thái sức khỏe cơ bản, khả năng vận động, hỗ trợ ăn uống, v.v..."
             {...textareaField('healthCondition')}
           />
           {touched.healthCondition && errors.healthCondition && (

@@ -25,7 +25,7 @@ export default function Step1({ data = {}, onChange, errors = {}, touched = {}, 
       <div className="sap-grid-2">
         <div className="sap-field">
           <label className="sap-label">Họ và tên</label>
-          <input placeholder="Nhập họ tên người được chăm sóc" {...field('fullName')} />
+          <input placeholder="Nhập họ tên cư dân" {...field('fullName')} />
           {touched.fullName && errors.fullName && (
             <div className="sap-field__error-message">
               <AlertCircle size={12} />
@@ -59,8 +59,8 @@ export default function Step1({ data = {}, onChange, errors = {}, touched = {}, 
           )}
         </div>
         <div className="sap-field">
-          <label className="sap-label">CMND / Hộ chiếu / Số định danh</label>
-          <input placeholder="Nhập số CMND/hộ chiếu" {...field('idNumber')} />
+          <label className="sap-label">Số CCCD / Hộ chiếu</label>
+          <input placeholder="Nhập số định danh" {...field('idNumber')} />
           {touched.idNumber && errors.idNumber && (
             <div className="sap-field__error-message">
               <AlertCircle size={12} />
@@ -70,7 +70,7 @@ export default function Step1({ data = {}, onChange, errors = {}, touched = {}, 
         </div>
         <div className="sap-field sap-field--full">
           <label className="sap-label">Địa chỉ hiện tại</label>
-          <input placeholder="Số nhà, phường/xã, quận/huyện, tỉnh/thành phố..." {...field('address')} />
+          <input placeholder="Số nhà, tên đường, phường/xã, quận/huyện, tỉnh/thành phố..." {...field('address')} />
           {touched.address && errors.address && (
             <div className="sap-field__error-message">
               <AlertCircle size={12} />
@@ -79,13 +79,13 @@ export default function Step1({ data = {}, onChange, errors = {}, touched = {}, 
           )}
         </div>
         <div className="sap-field">
-          <label className="sap-label">Quan hệ với người được chăm sóc</label>
+          <label className="sap-label">Quan hệ với cư dân</label>
           <select {...selectField('relationship')}>
             <option value="">Chọn quan hệ</option>
-            <option value="child">Con</option>
+            <option value="child">Con cái</option>
             <option value="spouse">Vợ/Chồng</option>
             <option value="sibling">Anh/Chị/Em</option>
-            <option value="legal_guardian">Người giám hộ</option>
+            <option value="legal_guardian">Người giám hộ hợp pháp</option>
           </select>
           {touched.relationship && errors.relationship && (
             <div className="sap-field__error-message">

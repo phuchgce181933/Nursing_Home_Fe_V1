@@ -1,27 +1,29 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Search, Loader2, Grid, List, Activity, Check, CheckCircle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../hooks/useAuth';
 import servicePackageService from '../../services/servicePackage.service';
 import '../../styles/admin/ServicePackagesPage.css'; // Premium care plans styling sheet
 
-const TIER_OPTIONS = [
-  { value: '', label: 'Tất cả cấp độ' },
-  { value: 'basic', label: 'Cơ bản' },
-  { value: 'standard', label: 'Tiêu chuẩn' },
-  { value: 'premium', label: 'Cao cấp' },
-  { value: 'vip', label: 'VIP' },
-];
-
-const ACTIVE_OPTIONS = [
-  { value: '', label: 'Tất cả trạng thái' },
-  { value: 'true', label: 'Gói đang hoạt động' },
-  { value: 'false', label: 'Gói không hoạt động' },
-];
-
 export default function ServicePackagesPage() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const isAdmin = ['admin', 'manager'].includes(user?.role);
   const rolePrefix = isAdmin ? 'admin' : 'medical';
+
+  const TIER_OPTIONS = [
+    { value: '', label: t('admin.servicePackages.allTiers', 'All Tiers') },
+    { value: 'basic', label: t('admin.servicePackages.tierBasic', 'Basic Level') },
+    { value: 'standard', label: t('admin.servicePackages.tierStandard', 'Standard Level') },
+    { value: 'premium', label: t('admin.servicePackages.tierPremium', 'Premium Level') },
+    { value: 'vip', label: t('admin.servicePackages.tierVip', 'VIP Level') },
+  ];
+
+  const ACTIVE_OPTIONS = [
+    { value: '', label: t('admin.servicePackages.colStatus', 'All Statuses') },
+    { value: 'true', label: t('admin.servicePackages.activePackages', 'Active Packages') },
+    { value: 'false', label: t('admin.servicePackages.inactivePackages', 'Inactive Packages') },
+  ];
 
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -101,7 +103,7 @@ export default function ServicePackagesPage() {
       }
     } catch (err) {
       console.error('Failed to fetch service packages:', err);
-      setError('Không thể tải danh sách gói dịch vụ. Vui lòng kiểm tra quyền truy cập hoặc kết nối mạng.');
+      setError('Could not retrieve service packages. Please check your privileges or network connection.');
     } finally {
       setLoading(false);
     }
@@ -136,7 +138,7 @@ export default function ServicePackagesPage() {
       setShowDetailModal(true);
     } catch (err) {
       console.error('Failed to load details:', err);
-      alert('Không thể tải thông tin gói dịch vụ. Vui lòng thử lại.');
+      alert('Could not retrieve package details. Please try again.');
     }
   };
 
@@ -167,7 +169,7 @@ export default function ServicePackagesPage() {
   const handleCreatePackage = async (e) => {
     if (e) e.preventDefault();
     if (!formName.trim()) {
-      setFormError('Tên gói dịch vụ là bắt buộc');
+      setFormError('Package Name is required');
       return;
     }
 
@@ -193,7 +195,7 @@ export default function ServicePackagesPage() {
       fetchPackages();
     } catch (err) {
       console.error('Failed to create package:', err);
-      setFormError(err.response?.data?.message || 'Có lỗi xảy ra khi tạo gói dịch vụ.');
+      setFormError(err.response?.data?.message || 'An error occurred while creating the package.');
     } finally {
       setSubmitting(false);
     }
@@ -204,7 +206,7 @@ export default function ServicePackagesPage() {
     if (e) e.preventDefault();
     if (!selectedPackage?._id) return;
     if (!formName.trim()) {
-      setFormError('Tên gói dịch vụ là bắt buộc');
+      setFormError('Package Name is required');
       return;
     }
 
@@ -230,7 +232,7 @@ export default function ServicePackagesPage() {
       fetchPackages();
     } catch (err) {
       console.error('Failed to update package:', err);
-      setFormError(err.response?.data?.message || 'Có lỗi xảy ra khi cập nhật gói dịch vụ.');
+      setFormError(err.response?.data?.message || 'An error occurred while updating the package.');
     } finally {
       setSubmitting(false);
     }
@@ -252,7 +254,7 @@ export default function ServicePackagesPage() {
       fetchPackages();
     } catch (err) {
       console.error('Failed to delete package:', err);
-      alert(err.response?.data?.message || 'Không thể vô hiệu hóa gói dịch vụ. Vui lòng thử lại.');
+      alert(err.response?.data?.message || 'Could not deactivate package. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -308,11 +310,11 @@ export default function ServicePackagesPage() {
       {/* Top Banner Header */}
       <div className="sp-header">
         <div>
-          <h1>Gói dịch vụ chăm sóc</h1>
+          <h1>{t('admin.servicePackages.title', 'Care Service Packages')}</h1>
           <p>
             {isAdmin
-              ? 'Cấu hình, quản lý và theo dõi các gói chăm sóc cho cư dân cao tuổi.'
-              : 'Xem các gói dịch vụ y tế và chăm sóc tiêu chuẩn.'}
+              ? t('admin.servicePackages.subtitleAdmin', 'Configure, manage, and monitor residential care packages for elderly residents.')
+              : t('admin.servicePackages.subtitleMedical', 'Review standard medical and care service packages.')}
           </p>
         </div>
         {isAdmin && (
@@ -324,7 +326,7 @@ export default function ServicePackagesPage() {
             className="sp-btn-edit"
             style={{ borderRadius: '12px', padding: '12px 24px' }}
           >
-            Tạo gói mới
+            {t('admin.servicePackages.createNew', 'Create New Package')}
           </button>
         )}
       </div>
@@ -336,7 +338,7 @@ export default function ServicePackagesPage() {
             <Activity size={20} />
           </div>
           <div className="sp-stat-info">
-            <span className="sp-stat-label">Tổng gói chăm sóc</span>
+            <span className="sp-stat-label">{t('admin.servicePackages.totalPlans', 'Total Care Plans')}</span>
             <span className="sp-stat-value">{stats.totalPlans}</span>
           </div>
         </div>
@@ -346,7 +348,7 @@ export default function ServicePackagesPage() {
             <CheckCircle size={20} />
           </div>
           <div className="sp-stat-info">
-            <span className="sp-stat-label">Gói đang hoạt động</span>
+            <span className="sp-stat-label">{t('admin.servicePackages.activePlans', 'Active Plans')}</span>
             <span className="sp-stat-value">{stats.activePlans}</span>
           </div>
         </div>
@@ -356,7 +358,7 @@ export default function ServicePackagesPage() {
             <span className="font-bold text-xs">VIP</span>
           </div>
           <div className="sp-stat-info">
-            <span className="sp-stat-label">VIP & Cao cấp</span>
+            <span className="sp-stat-label">{t('admin.servicePackages.vipPremium', 'VIP & Premium')}</span>
             <span className="sp-stat-value">{stats.vipPremiumPlans}</span>
           </div>
         </div>
@@ -371,7 +373,7 @@ export default function ServicePackagesPage() {
                 <Search className="adm-filter-input-icon" size={16} />
                 <input
                   type="text"
-                  placeholder="Tìm theo tên hoặc mã gói..."
+                  placeholder={t('admin.servicePackages.searchPlaceholder', 'Search name or package code...')}
                   className="adm-filter-input"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
@@ -414,14 +416,14 @@ export default function ServicePackagesPage() {
                 className="adm-btn-clear"
                 style={{ padding: '10px 18px' }}
               >
-                Đặt lại
+                {t('admin.servicePackages.reset', 'Reset')}
               </button>
               <button
                 type="submit"
                 className="adm-btn-apply"
                 style={{ padding: '10px 20px', background: '#1B365D' }}
               >
-                Áp dụng bộ lọc
+                {t('admin.servicePackages.applyFilters', 'Apply Filters')}
               </button>
             </div>
           </form>
@@ -432,18 +434,18 @@ export default function ServicePackagesPage() {
           <button
             onClick={() => setViewType('grid')}
             className={`sp-toggle-btn ${viewType === 'grid' ? 'is-active' : ''}`}
-            title="Dạng lưới"
+            title={t('admin.servicePackages.gridCard', 'Grid Card')}
           >
             <Grid size={15} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'text-bottom' }} />
-            Dạng lưới
+            {t('admin.servicePackages.gridCard', 'Grid Card')}
           </button>
           <button
             onClick={() => setViewType('table')}
             className={`sp-toggle-btn ${viewType === 'table' ? 'is-active' : ''}`}
-            title="Dạng bảng"
+            title={t('admin.servicePackages.tableRows', 'Table Rows')}
           >
             <List size={15} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'text-bottom' }} />
-            Dạng bảng
+            {t('admin.servicePackages.tableRows', 'Table Rows')}
           </button>
         </div>
       </div>
@@ -458,11 +460,11 @@ export default function ServicePackagesPage() {
       {loading && data.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-slate-400">
           <Loader2 className="animate-spin text-indigo-600 mb-3" size={32} />
-          <p>Đang tải gói dịch vụ chăm sóc...</p>
+          <p>{t('admin.servicePackages.loading', 'Loading care service packages...')}</p>
         </div>
       ) : data.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-slate-400 bg-white border border-slate-100 rounded-2xl">
-          <p className="font-medium">Không tìm thấy gói dịch vụ nào phù hợp với bộ lọc.</p>
+          <p className="font-medium">{t('admin.servicePackages.noPackages', 'No service packages found matching filters.')}</p>
         </div>
       ) : viewType === 'grid' ? (
         /* GORGEOUS PREMIUM CARE PLANS GRID VIEW */
@@ -474,25 +476,25 @@ export default function ServicePackagesPage() {
                 <div className="sp-card__title-row">
                   <span className="sp-card__title">{pkg.name}</span>
                   <span className={`sp-tier-tag ${getTierTagClass(pkg.tier)}`}>
-                    {pkg.tier}
+                    {t(`admin.servicePackages.tier${pkg.tier.charAt(0).toUpperCase() + pkg.tier.slice(1)}`, pkg.tier)}
                   </span>
                 </div>
               </div>
 
               <div className="sp-card__body">
-                <span className="sp-card__price-label">Mức giá</span>
+                <span className="sp-card__price-label">{t('admin.servicePackages.pricingRate', 'Pricing Rate')}</span>
                 <p className="sp-card__price">
                   {pkg.monthlyPrice?.toLocaleString() || 0}
-                  <span>VND / tháng</span>
+                  <span>{t('admin.servicePackages.vndMonth', 'VND / month')}</span>
                 </p>
 
                 <p className="sp-card__desc">
-                  {pkg.description || 'Chăm sóc lâm sàng toàn diện và hỗ trợ sinh hoạt hàng ngày cho cư dân.'}
+                  {pkg.description || 'Comprehensive clinical care and daily living assistance for residents.'}
                 </p>
 
                 <div className="sp-card__divider" />
 
-                <span className="sp-card__services-title">Dịch vụ bao gồm</span>
+                <span className="sp-card__services-title">{t('admin.servicePackages.servicesIncluded', 'Services Included')}</span>
                 <div className="sp-card__services-list">
                   {pkg.services && pkg.services.slice(0, 4).map((s, idx) => (
                     <div key={idx} className="sp-card__service-item">
@@ -502,7 +504,7 @@ export default function ServicePackagesPage() {
                   ))}
                   {pkg.services && pkg.services.length > 4 && (
                     <span className="text-[11.5px] text-[#2D6A4F] font-bold italic mt-1 pl-5">
-                      +{pkg.services.length - 4} tính năng khác
+                      +{pkg.services.length - 4} {t('admin.servicePackages.otherClinical', 'other clinical features')}
                     </span>
                   )}
                 </div>
@@ -513,7 +515,7 @@ export default function ServicePackagesPage() {
                   onClick={() => handleOpenDetail(pkg._id)}
                   className="sp-btn-view"
                 >
-                  Xem chi tiết
+                  {t('admin.servicePackages.viewDetails', 'View Details')}
                 </button>
                 {isAdmin && pkg.isActive && (
                   <>
@@ -521,13 +523,13 @@ export default function ServicePackagesPage() {
                       onClick={() => handleOpenEdit(pkg)}
                       className="sp-btn-edit"
                     >
-                      Sửa
+                      {t('admin.servicePackages.edit', 'Edit')}
                     </button>
                     <button
                       onClick={() => handleDeletePackage(pkg._id, pkg.name)}
                       className="sp-btn-deactivate"
                     >
-                      Vô hiệu hóa
+                      {t('admin.servicePackages.deactivate', 'Deactivate')}
                     </button>
                   </>
                 )}
@@ -542,12 +544,12 @@ export default function ServicePackagesPage() {
             <table className="adm-table">
               <thead>
                 <tr>
-                  <th>Mã</th>
-                  <th>Tên & Cấp độ</th>
-                  <th>Giá / Tháng</th>
-                  <th>Dịch vụ bao gồm</th>
-                  <th>Trạng thái</th>
-                  <th>Hành động</th>
+                  <th>{t('admin.servicePackages.colCode', 'Code')}</th>
+                  <th>{t('admin.servicePackages.colName', 'Name & Tier')}</th>
+                  <th>{t('admin.servicePackages.colPrice', 'Price / Month')}</th>
+                  <th>{t('admin.servicePackages.colServices', 'Services Included')}</th>
+                  <th>{t('admin.servicePackages.colStatus', 'Status')}</th>
+                  <th>{t('admin.servicePackages.colActions', 'Actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -566,7 +568,7 @@ export default function ServicePackagesPage() {
                       <div className="flex items-center gap-2">
                         <span>{pkg.name}</span>
                         <span className={`sp-tier-tag ${getTierTagClass(pkg.tier)}`}>
-                          {pkg.tier}
+                          {t(`admin.servicePackages.tier${pkg.tier.charAt(0).toUpperCase() + pkg.tier.slice(1)}`, pkg.tier)}
                         </span>
                       </div>
                     </td>
@@ -579,15 +581,15 @@ export default function ServicePackagesPage() {
                       <div className="flex flex-wrap gap-1">
                         {pkg.services && pkg.services.slice(0, 3).map((s, idx) => (
                           <span
-                            key={idx}
-                            className="bg-slate-100 text-slate-600 text-[10px] px-1.5 py-0.5 rounded font-medium"
+                              key={idx}
+                              className="bg-slate-100 text-slate-600 text-[10px] px-1.5 py-0.5 rounded font-medium"
                           >
                             {s}
                           </span>
                         ))}
                         {pkg.services && pkg.services.length > 3 && (
                           <span className="text-[10px] text-slate-400 font-bold italic ml-1">
-                            +{pkg.services.length - 3} dịch vụ khác
+                            +{pkg.services.length - 3} {t('admin.servicePackages.otherClinical', 'more')}
                           </span>
                         )}
                       </div>
@@ -600,7 +602,7 @@ export default function ServicePackagesPage() {
                             : 'status-badge-custom-adm--cancelled'
                         }`}
                       >
-                        {pkg.isActive ? 'Đang hoạt động' : 'Không hoạt động'}
+                        {pkg.isActive ? t('admin.servicePackages.active', 'Active') : t('admin.servicePackages.inactive', 'Inactive')}
                       </span>
                     </td>
                     <td>
@@ -610,7 +612,7 @@ export default function ServicePackagesPage() {
                           className="sp-btn-view"
                           style={{ padding: '6px 12px', fontSize: '12px', borderRadius: '8px' }}
                         >
-                          Xem
+                          {t('admin.servicePackages.viewDetails', 'View')}
                         </button>
                         {isAdmin && pkg.isActive && (
                           <>
@@ -619,14 +621,14 @@ export default function ServicePackagesPage() {
                               className="sp-btn-edit"
                               style={{ padding: '6px 12px', fontSize: '12px', borderRadius: '8px' }}
                             >
-                              Sửa
+                              {t('admin.servicePackages.edit', 'Edit')}
                             </button>
                             <button
                               onClick={() => handleDeletePackage(pkg._id, pkg.name)}
                               className="sp-btn-deactivate"
                               style={{ padding: '6px 12px', fontSize: '12px', borderRadius: '8px' }}
                             >
-                              Vô hiệu hóa
+                              Deactivate
                             </button>
                           </>
                         )}
@@ -644,7 +646,7 @@ export default function ServicePackagesPage() {
       {totalPages > 1 && (
         <div className="adm-pagination-footer" style={{ borderRadius: '16px', background: '#ffffff', border: '1px solid #e2e8f0' }}>
           <div className="pagination-info">
-            Trang <span>{page}</span> / <span>{totalPages}</span> ({total} gói dịch vụ)
+            Showing page <span>{page}</span> of <span>{totalPages}</span> ({total} total packages)
           </div>
           <div className="pagination-controls">
             <button
@@ -652,7 +654,7 @@ export default function ServicePackagesPage() {
               onClick={() => setPage(page - 1)}
               className="btn-page"
             >
-              Trước
+              Prev
             </button>
             <span className="page-indicator">{page}</span>
             <button
@@ -660,7 +662,7 @@ export default function ServicePackagesPage() {
               onClick={() => setPage(page + 1)}
               className="btn-page"
             >
-              Tiếp
+              Next
             </button>
           </div>
         </div>
@@ -683,20 +685,20 @@ export default function ServicePackagesPage() {
             <div className="dossier-body">
               {/* Premium Pricing Highlight Panel */}
               <div className="dossier-price-panel">
-                <span className="dossier-price-label">Giá mỗi tháng</span>
+                <span className="dossier-price-label">Price per Month</span>
                 <span className="dossier-price-value">
-                  {selectedPackage.monthlyPrice?.toLocaleString()} <span>VND/tháng</span>
+                  {selectedPackage.monthlyPrice?.toLocaleString()} <span>VND</span>
                 </span>
               </div>
 
               {/* Italic plan description dossier block */}
-              <span className="dossier-section-title">Mô tả dịch vụ chăm sóc</span>
+              <span className="dossier-section-title">Care Description</span>
               <div className="dossier-desc">
-                "{selectedPackage.description || 'Các dịch vụ lâm sàng chuyên biệt tiêu chuẩn, theo dõi sức khỏe và hỗ trợ nhận thức dành cho chăm sóc người cao tuổi.'}"
+                "{selectedPackage.description || 'Standard specialized clinical services, health monitoring, and cognitive assistance designated for elderly care.'}"
               </div>
 
               {/* Included services with checkmark bullets */}
-              <span className="dossier-section-title">Dịch vụ y tế bao gồm</span>
+              <span className="dossier-section-title">Included Medical Services</span>
               <div className="dossier-services-box">
                 {selectedPackage.services && selectedPackage.services.length > 0 ? (
                   selectedPackage.services.map((srv, i) => (
@@ -708,7 +710,7 @@ export default function ServicePackagesPage() {
                     </div>
                   ))
                 ) : (
-                  <p className="text-xs text-slate-400 italic py-3 text-center">Chưa có dịch vụ nào được chỉ định cho cấp độ này.</p>
+                  <p className="text-xs text-slate-400 italic py-3 text-center">No services specified for this care tier.</p>
                 )}
               </div>
 
@@ -719,7 +721,7 @@ export default function ServicePackagesPage() {
                   className="sp-btn-close-dossier"
                   onClick={() => setShowDetailModal(false)}
                 >
-                  Đóng hồ sơ
+                  Close Dossier
                 </button>
               </div>
             </div>
@@ -731,9 +733,9 @@ export default function ServicePackagesPage() {
       {showCreateModal && (
         <div className="arh-modal-backdrop" onClick={() => setShowCreateModal(false)}>
           <div className="arh-modal" style={{ maxWidth: '600px' }} onClick={(e) => e.stopPropagation()}>
-            <h4 className="arh-modal__title">Tạo gói dịch vụ chăm sóc</h4>
+            <h4 className="arh-modal__title">Create Care Plan Package</h4>
             <p className="arh-modal__text">
-              Tạo gói dịch vụ chăm sóc sức khỏe chuyên biệt mới cho các trường hợp nhận vào.
+              Create a new specialized healthcare service package for active admissions.
             </p>
 
             <form onSubmit={handleCreatePackage}>
@@ -745,13 +747,13 @@ export default function ServicePackagesPage() {
 
               <div className="mb-3">
                 <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
-                  Tên gói dịch vụ *
+                  Package Name *
                 </label>
                 <input
                   type="text"
                   className="adm-filter-input"
                   style={{ paddingLeft: '14px' }}
-                  placeholder="VD: Gói chăm sóc lâm sàng tiêu chuẩn"
+                  placeholder="e.g. Standard Clinical Care Plan"
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
                   required
@@ -761,22 +763,22 @@ export default function ServicePackagesPage() {
               <div className="grid grid-cols-2 gap-3 mb-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
-                    Cấp độ
+                    Tier Level
                   </label>
                   <select
                     className="adm-filter-select"
                     value={formTier}
                     onChange={(e) => setFormTier(e.target.value)}
                   >
-                    <option value="basic">Cơ bản</option>
-                    <option value="standard">Tiêu chuẩn</option>
-                    <option value="premium">Cao cấp</option>
-                    <option value="vip">VIP</option>
+                    <option value="basic">Basic Level</option>
+                    <option value="standard">Standard Level</option>
+                    <option value="premium">Premium Level</option>
+                    <option value="vip">VIP Level</option>
                   </select>
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
-                    Giá / Tháng (VND)
+                    Price / Month (VND)
                   </label>
                   <input
                     type="number"
@@ -790,12 +792,12 @@ export default function ServicePackagesPage() {
 
               <div className="mb-3">
                 <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
-                  Mô tả
+                  Description
                 </label>
                 <textarea
                   className="arh-modal__textarea"
                   style={{ minHeight: '60px' }}
-                  placeholder="Tóm tắt các tính năng chăm sóc, yêu cầu sức khỏe phù hợp..."
+                  placeholder="Summarize care features, target health requirements..."
                   value={formDescription}
                   onChange={(e) => setFormDescription(e.target.value)}
                 />
@@ -803,12 +805,12 @@ export default function ServicePackagesPage() {
 
               <div className="mb-5">
                 <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
-                  Dịch vụ bao gồm (mỗi dòng một dịch vụ)
+                  Included Services (One per line)
                 </label>
                 <textarea
                   className="arh-modal__textarea"
                   style={{ minHeight: '120px', fontFamily: 'monospace' }}
-                  placeholder="VD:&#10;Đánh giá lão khoa chuyên biệt&#10;Hỗ trợ y tá lão khoa 24/7&#10;Quản lý thuốc lâm sàng"
+                  placeholder="e.g.&#10;Specialized Geriatric Assessment&#10;Geriatric Nurse Support 24/7&#10;Clinical Medication Administration"
                   value={formServices}
                   onChange={(e) => setFormServices(e.target.value)}
                 />
@@ -825,7 +827,7 @@ export default function ServicePackagesPage() {
                   }}
                   disabled={submitting}
                 >
-                  Huỷ
+                  Cancel
                 </button>
                 <button
                   type="submit"
@@ -834,7 +836,7 @@ export default function ServicePackagesPage() {
                   disabled={submitting}
                 >
                   {submitting && <Loader2 className="animate-spin mr-1" size={13} />}
-                  Tạo gói
+                  Create Plan
                 </button>
               </div>
             </form>
@@ -846,9 +848,9 @@ export default function ServicePackagesPage() {
       {showEditModal && selectedPackage && (
         <div className="arh-modal-backdrop" onClick={() => setShowEditModal(false)}>
           <div className="arh-modal" style={{ maxWidth: '600px' }} onClick={(e) => e.stopPropagation()}>
-            <h4 className="arh-modal__title">Chỉnh sửa gói dịch vụ chăm sóc</h4>
+            <h4 className="arh-modal__title">Modify Care Plan Package</h4>
             <p className="arh-modal__text">
-              Chỉnh sửa thông tin giá và tính năng cho <strong className="text-slate-800">{selectedPackage.name}</strong>.
+              Edit pricing details and features for <strong className="text-slate-800">{selectedPackage.name}</strong>.
             </p>
 
             <form onSubmit={handleUpdatePackage}>
@@ -860,7 +862,7 @@ export default function ServicePackagesPage() {
 
               <div className="mb-3">
                 <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
-                  Tên gói dịch vụ *
+                  Package Name *
                 </label>
                 <input
                   type="text"
@@ -875,22 +877,22 @@ export default function ServicePackagesPage() {
               <div className="grid grid-cols-2 gap-3 mb-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
-                    Cấp độ
+                    Tier Level
                   </label>
                   <select
                     className="adm-filter-select"
                     value={formTier}
                     onChange={(e) => setFormTier(e.target.value)}
                   >
-                    <option value="basic">Cơ bản</option>
-                    <option value="standard">Tiêu chuẩn</option>
-                    <option value="premium">Cao cấp</option>
-                    <option value="vip">VIP</option>
+                    <option value="basic">Basic Level</option>
+                    <option value="standard">Standard Level</option>
+                    <option value="premium">Premium Level</option>
+                    <option value="vip">VIP Level</option>
                   </select>
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
-                    Giá / Tháng (VND)
+                    Price / Month (VND)
                   </label>
                   <input
                     type="number"
@@ -904,7 +906,7 @@ export default function ServicePackagesPage() {
 
               <div className="mb-3">
                 <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
-                  Mô tả
+                  Description
                 </label>
                 <textarea
                   className="arh-modal__textarea"
@@ -916,7 +918,7 @@ export default function ServicePackagesPage() {
 
               <div className="mb-5">
                 <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
-                  Dịch vụ bao gồm (mỗi dòng một dịch vụ)
+                  Included Services (One per line)
                 </label>
                 <textarea
                   className="arh-modal__textarea"
@@ -937,7 +939,7 @@ export default function ServicePackagesPage() {
                   }}
                   disabled={submitting}
                 >
-                  Huỷ
+                  Cancel
                 </button>
                 <button
                   type="submit"
@@ -946,7 +948,7 @@ export default function ServicePackagesPage() {
                   disabled={submitting}
                 >
                   {submitting && <Loader2 className="animate-spin mr-1" size={13} />}
-                  Cập nhật gói
+                  Update Plan
                 </button>
               </div>
             </form>
@@ -963,11 +965,11 @@ export default function ServicePackagesPage() {
           }
         }}>
           <div className="arh-modal" style={{ maxWidth: '480px' }} onClick={(e) => e.stopPropagation()}>
-            <h4 className="arh-modal__title" style={{ color: '#ef4444' }}>Vô hiệu hóa gói dịch vụ</h4>
+            <h4 className="arh-modal__title" style={{ color: '#ef4444' }}>Deactivate Care Package</h4>
             <p className="arh-modal__text" style={{ marginBottom: '24px', fontSize: '14.5px', color: '#475569' }}>
-              Bạn có chắc muốn vô hiệu hóa <strong>"{packageToDeactivate.name}"</strong>?
+              Are you sure you want to deactivate/soft-delete <strong>"{packageToDeactivate.name}"</strong>?
               <span className="block mt-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                Gói đã vô hiệu hóa sẽ không thể được gán cho cư dân mới nhập viện.
+                Deactivated packages cannot be assigned to new admissions.
               </span>
             </p>
 
@@ -982,7 +984,7 @@ export default function ServicePackagesPage() {
                 }}
                 disabled={loading}
               >
-                Huỷ
+                Cancel
               </button>
               <button
                 type="button"
@@ -1007,7 +1009,7 @@ export default function ServicePackagesPage() {
                 disabled={loading}
               >
                 {loading && <Loader2 className="animate-spin mr-2" size={14} />}
-                Xác nhận vô hiệu hóa
+                Confirm Deactivation
               </button>
             </div>
           </div>

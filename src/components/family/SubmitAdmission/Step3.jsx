@@ -2,9 +2,9 @@ import { ClipboardCheck, Phone, AlertCircle, Info } from 'lucide-react';
 
 const ADMISSION_REASONS = [
   { value: 'long_term_care', label: 'Chăm sóc dài hạn' },
-  { value: 'rehabilitation', label: 'Phục hồi chức năng & Vật lý trị liệu' },
-  { value: 'post_surgery',   label: 'Hồi phục sau phẫu thuật' },
-  { value: 'hospice',        label: 'Chăm sóc giảm nhẹ & Cuối đời' },
+  { value: 'rehabilitation', label: 'Phục hồi chức năng & Trị liệu' },
+  { value: 'post_surgery',   label: 'Phục hồi sau phẫu thuật' },
+  { value: 'hospice',        label: 'Chăm sóc giảm nhẹ cuối đời' },
   { value: 'other',          label: 'Lý do khác' },
 ];
 
@@ -34,7 +34,7 @@ export default function Step3({ data = {}, onChange, errors = {}, touched = {}, 
     <div className="sap-section">
       <div className="sap-section__heading">
         <ClipboardCheck size={16} />
-        Thông tin nhập viện
+        Chi tiết tiếp nhận
       </div>
 
       <div className="sap-grid-2">
@@ -79,10 +79,10 @@ export default function Step3({ data = {}, onChange, errors = {}, touched = {}, 
           )}
         </div>
         <div className="sap-field sap-field--full">
-          <label className="sap-label">Ghi chú bổ sung</label>
+          <label className="sap-label">Ghi chú thêm</label>
           <textarea
             rows={4}
-            placeholder="Yêu cầu đặc biệt về phòng, chế độ ăn, hỗ trợ, v.v..."
+            placeholder="Yêu cầu đặc biệt về phòng, chế độ ăn uống, hỗ trợ sinh hoạt, v.v..."
             {...textareaField('additionalNotes')}
           />
           {touched.additionalNotes && errors.additionalNotes && (
@@ -97,7 +97,7 @@ export default function Step3({ data = {}, onChange, errors = {}, touched = {}, 
           <div className="sap-info-alert">
             <Info size={18} className="sap-info-alert__icon" />
             <p>
-              Sau khi gửi, đội ngũ chuyên viên của <strong>An Nhiên Care Home</strong> sẽ liên hệ với bạn trong vòng <strong>24 giờ</strong> để xác nhận thông tin và hướng dẫn các bước tiếp theo.
+              Sau khi gửi, đội ngũ tư vấn chuyên gia của <strong>An Nhiên Care Home</strong> sẽ liên hệ với bạn trong vòng <strong>24 giờ</strong> để xác nhận thông tin và hướng dẫn các bước tiếp theo.
             </p>
           </div>
         </div>

@@ -57,18 +57,18 @@ export default function LockoutScreen({
     <div className="sap-lockout">
       {/* breadcrumbs */}
       <div className="sap-lockout__breadcrumbs">
-        <span>Cổng gia đình</span>
+        <span>Trang Gia đình</span>
         <ChevronRight size={12} />
-        <span>Yêu cầu nhập viện</span>
+        <span>Yêu cầu tiếp nhận</span>
         <ChevronRight size={12} />
         <span className="sap-lockout__breadcrumbs-active">Yêu cầu mới</span>
       </div>
 
       {/* page header */}
       <div className="sap-lockout__header">
-        <h1 className="sap-page__title">Yêu cầu nhập viện mới</h1>
+        <h1 className="sap-page__title">Yêu cầu tiếp nhận mới</h1>
         <p className="sap-page__subtitle">
-          Bắt đầu quy trình chuyển người thân của bạn với đội ngũ chăm sóc chuyên nghiệp của chúng tôi.
+          Bắt đầu quá trình tiếp nhận chăm sóc cho người thân yêu của bạn với đội ngũ chuyên gia của chúng tôi.
         </p>
       </div>
 
@@ -78,9 +78,9 @@ export default function LockoutScreen({
           <AlertTriangle size={24} />
         </div>
         <div className="sap-lockout__banner-content">
-          <h3 className="sap-lockout__banner-title">Phát hiện yêu cầu trùng lặp</h3>
+          <h3 className="sap-lockout__banner-title">Phát hiện yêu cầu bị trùng lặp</h3>
           <p className="sap-lockout__banner-text">
-            Bạn đã có một yêu cầu nhập viện đang chờ xử lý cho người này. Đội ngũ của chúng tôi đang xem xét đơn được gửi vào ngày <strong>{formatViDate(activeRequest?.createdAt || new Date())}</strong>. Để tránh nhầm lẫn, không thể gửi thêm yêu cầu cho người này.
+            Bạn đã có một yêu cầu tiếp nhận đang chờ xử lý cho cư dân này. Đội ngũ của chúng tôi hiện đang xem xét hồ sơ hiện có được gửi vào ngày <strong>{formatEnglishDate(activeRequest?.createdAt || new Date())}</strong>. Để tránh nhầm lẫn, các yêu cầu tiếp theo cho cá nhân này tạm thời bị hạn chế.
           </p>
         </div>
         <div className="sap-lockout__banner-actions">
@@ -111,7 +111,7 @@ export default function LockoutScreen({
               }));
             }}
           >
-            Quay lại và chỉnh sửa
+            Quay lại chỉnh sửa
             <ChevronRight size={16} />
           </button>
         </div>
@@ -124,13 +124,13 @@ export default function LockoutScreen({
             <span className="sap-lockout__card-step">BƯỚC 01</span>
             <User size={18} className="sap-lockout__card-icon" />
           </div>
-          <h4 className="sap-lockout__card-title">Thông tin người đăng ký</h4>
+          <h4 className="sap-lockout__card-title">Thông tin cư dân</h4>
           <p className="sap-lockout__card-desc">
-            Xác nhận thông tin của cư dân tương lai bao gồm lịch sử y tế và mong muốn chăm sóc.
+            Xác minh thông tin chi tiết của cư dân tương lai bao gồm lịch sử y tế và sở thích.
           </p>
           <div className="sap-lockout__card-badge is-complete">
             <Check size={14} />
-            Hoàn thành
+            Đã hoàn thành
           </div>
         </div>
 
@@ -139,13 +139,13 @@ export default function LockoutScreen({
             <span className="sap-lockout__card-step">BƯỚC 02</span>
             <ClipboardCheck size={18} className="sap-lockout__card-icon" />
           </div>
-          <h4 className="sap-lockout__card-title">Giấy tờ cần thiết</h4>
+          <h4 className="sap-lockout__card-title">Hồ sơ chuẩn bị</h4>
           <p className="sap-lockout__card-desc">
-            Tải lên CMND, giấy tờ cư trú và các biểu mẫu đánh giá y tế gần nhất.
+            Tải lên CCCD, giấy tờ cư trú và các biểu mẫu đánh giá y tế gần đây.
           </p>
           <div className="sap-lockout__card-badge is-pending">
             <Clock size={14} />
-            Chờ xét duyệt
+            Chờ duyệt
           </div>
         </div>
 
@@ -154,13 +154,13 @@ export default function LockoutScreen({
             <span className="sap-lockout__card-step">BƯỚC 03</span>
             <Lock size={18} className="sap-lockout__card-icon" />
           </div>
-          <h4 className="sap-lockout__card-title">Gửi yêu cầu bị khóa</h4>
+          <h4 className="sap-lockout__card-title">Khóa gửi hồ sơ</h4>
           <p className="sap-lockout__card-desc">
-            Không thể tạo yêu cầu mới khi đang có yêu cầu đang xử lý.
+            Không thể tạo yêu cầu mới khi yêu cầu khác đang hoạt động.
           </p>
           <div className="sap-lockout__card-badge is-locked">
             <Lock size={12} />
-            Đã bị khóa
+            Khóa gửi hồ sơ
           </div>
         </div>
       </div>
@@ -183,11 +183,11 @@ export default function LockoutScreen({
           <table className="sap-lockout__table">
             <thead>
               <tr>
-                <th>TÊN NGƯỜI ĐĂNG KÝ</th>
+                <th>HỌ TÊN CƯ DÂN</th>
                 <th>NGÀY GỬI</th>
                 <th>TRẠNG THÁI</th>
-                <th>MÃ THAM CHIẾU</th>
-                <th>THAO TÁC</th>
+                <th>MÃ ĐƠN</th>
+                <th>HÀNH ĐỘNG</th>
               </tr>
             </thead>
             <tbody>
@@ -197,7 +197,7 @@ export default function LockoutScreen({
                     {adm.applicant?.fullName || 'N/A'}
                   </td>
                   <td>
-                    {formatViDate(adm.createdAt)}
+                    {formatEnglishDate(adm.createdAt)}
                   </td>
                   <td>
                     <span className={`sap-status-badge sap-status-badge--${adm.status}`}>
@@ -222,7 +222,7 @@ export default function LockoutScreen({
               {admissions.length === 0 && (
                 <tr>
                   <td colSpan={5} className="text-center text-slate-400 py-8">
-                    Không có yêu cầu nào gần đây.
+                    Không tìm thấy yêu cầu nào gần đây.
                   </td>
                 </tr>
               )}

@@ -114,7 +114,7 @@ function HomePage() {
         </nav>
 
         <Link to={bookPath} className="home-header__button">
-          {t('home.bookVisit')}
+          {t('home.registerAdmission')}
         </Link>
       </header>
 

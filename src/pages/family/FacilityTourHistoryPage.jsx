@@ -48,13 +48,13 @@ const getStatusBadgeClass = (status) => {
 const getStatusLabel = (status) => {
   switch (status) {
     case 'pending':
-      return 'Chờ xét duyệt';
+      return 'Chờ duyệt';
     case 'confirmed':
       return 'Đã xác nhận';
     case 'completed':
-      return 'Đã hoàn thành';
+      return 'Đã hoàn tất';
     case 'cancelled':
-      return 'Đã huỷ';
+      return 'Đã hủy';
     default:
       return status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Chờ duyệt';
   }
@@ -164,9 +164,9 @@ export default function FacilityTourHistoryPage() {
         {/* Header Section */}
         <div className="arh-header">
           <div className="arh-header__title-group">
-            <h1 className="arh-header__title">Lịch sử tour tham quan</h1>
+            <h1 className="arh-header__title">Lịch sử Đăng ký Tham quan</h1>
             <p className="arh-header__subtitle">
-              Quản lý và theo dõi các lịch tham quan An Nhiên Care Home của bạn.
+              Quản lý và theo dõi các lịch hẹn tham quan của bạn tại Viện dưỡng lão An Nhiên.
             </p>
           </div>
           <button
@@ -186,7 +186,7 @@ export default function FacilityTourHistoryPage() {
               <div className="arh-stat-card__icon-box arh-stat-card__icon-box--pending">
                 <Clock size={20} />
               </div>
-              <span className="arh-stat-card__label">Đang hoạt động</span>
+              <span className="arh-stat-card__label">Lịch hẹn hoạt động</span>
             </div>
             <div className="arh-stat-card__value">
               {String(stats.active).padStart(2, '0')}
@@ -199,7 +199,7 @@ export default function FacilityTourHistoryPage() {
               <div className="arh-stat-card__icon-box arh-stat-card__icon-box--completed">
                 <CheckCircle size={20} />
               </div>
-              <span className="arh-stat-card__label">Đã hoàn thành</span>
+              <span className="arh-stat-card__label">Lịch hẹn đã hoàn tất</span>
             </div>
             <div className="arh-stat-card__value">
               {String(stats.completed).padStart(2, '0')}
@@ -212,7 +212,7 @@ export default function FacilityTourHistoryPage() {
               <div className="arh-stat-card__icon-box arh-stat-card__icon-box--appointment">
                 <Calendar size={20} />
               </div>
-              <span className="arh-stat-card__label">Tổng lịch đã đặt</span>
+              <span className="arh-stat-card__label">Tổng lượt đặt lịch</span>
             </div>
             <div className="arh-stat-card__value">
               {String(stats.total).padStart(2, '0')}
@@ -227,7 +227,7 @@ export default function FacilityTourHistoryPage() {
             <Search className="arh-filters__icon" size={16} />
             <input
               type="text"
-              placeholder="Tìm theo tên người liên hệ..."
+              placeholder="Tìm kiếm theo tên liên hệ..."
               className="arh-filters__input"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -245,10 +245,10 @@ export default function FacilityTourHistoryPage() {
               }}
             >
               <option value="">Tất cả trạng thái</option>
-              <option value="pending">Chờ xét duyệt</option>
-              <option value="confirmed">Đã duyệt & Xác nhận</option>
-              <option value="completed">Đã hoàn thành</option>
-              <option value="cancelled">Đã huỷ</option>
+              <option value="pending">Chờ duyệt</option>
+              <option value="confirmed">Đã xác nhận</option>
+              <option value="completed">Đã hoàn tất</option>
+              <option value="cancelled">Đã hủy</option>
             </select>
           </div>
 
@@ -271,13 +271,13 @@ export default function FacilityTourHistoryPage() {
           {loading ? (
             <div className="arh-loading">
               <Loader2 size={32} className="arh-spinner" />
-              <span>Đang tải lịch sử tour tham quan...</span>
+              <span>Đang tải lịch sử đăng ký tham quan...</span>
             </div>
           ) : tours.length === 0 ? (
             <div className="arh-empty">
               <Inbox size={48} className="arh-empty__icon" />
-              <h4>Không tìm thấy yêu cầu tham quan</h4>
-              <p>Bạn chưa đặt lịch tham quan hoặc không có yêu cầu nào khớp bộ lọc hiện tại.</p>
+              <h4>Không tìm thấy yêu cầu tham quan nào</h4>
+              <p>Bạn chưa đăng ký lịch hẹn tham quan nào hoặc không có yêu cầu nào khớp với bộ lọc hiện tại.</p>
               <button
                 className="arh-btn arh-btn--primary mt-4"
                 onClick={() => navigate('/family/facility-tours/new')}
@@ -296,9 +296,9 @@ export default function FacilityTourHistoryPage() {
                       <th>Số điện thoại</th>
                       <th>Ngày mong muốn</th>
                       <th>Khung giờ</th>
-                      <th>Số khách</th>
+                      <th>Khách</th>
                       <th>Trạng thái</th>
-                      <th className="text-right">Thao tác</th>
+                      <th className="text-right">Hành động</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -345,14 +345,14 @@ export default function FacilityTourHistoryPage() {
                     <div className="arh-mobile-card__body">
                       <div className="arh-mobile-card__row">
                         <span>Ngày:</span>
-                        <strong>{formatViDate(t.preferredDate)}</strong>
+                        <strong>{formatEnglishDate(t.preferredDate)}</strong>
                       </div>
                       <div className="arh-mobile-card__row">
                         <span>Khung giờ:</span>
                         <strong>{t.preferredTimeSlot || 'N/A'}</strong>
                       </div>
                       <div className="arh-mobile-card__row">
-                        <span>Số khách:</span>
+                        <span>Khách:</span>
                         <strong>{t.numberOfVisitors}</strong>
                       </div>
                     </div>
@@ -363,7 +363,7 @@ export default function FacilityTourHistoryPage() {
                         onClick={() => handleOpenDetail(t)}
                       >
                         <Eye size={16} />
-                        Xem chi tiết
+                        Xem chi tiết lịch hẹn
                       </button>
                     </div>
                   </div>
@@ -374,7 +374,7 @@ export default function FacilityTourHistoryPage() {
               {totalPages > 1 && (
                 <div className="arh-pagination">
                   <span className="arh-pagination__total">
-                    Hiển thị <strong>{tours.length}</strong> trong <strong>{total}</strong> yêu cầu
+                    Hiển thị <strong>{tours.length}</strong> trên <strong>{total}</strong> yêu cầu
                   </span>
 
                   <div className="arh-pagination__controls">
