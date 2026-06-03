@@ -15,35 +15,13 @@ import {
   Activity,
   Users,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import facilityTourService from '../../services/facilityTour.service';
 import AdminTourDetailDrawer from '../../components/family/FacilityTour/AdminTourDetailDrawer';
 
 // CSS Imports to align designs perfectly
 import '../../styles/admin/AdminAdmissionRequestsPage.css';
 import '../../styles/family/FacilityTourHistoryPage.css';
-
-const STATUS_OPTIONS = [
-  { value: '', label: 'All Statuses' },
-  { value: 'pending', label: 'Pending Review' },
-  { value: 'confirmed', label: 'Approved & Confirmed' },
-  { value: 'completed', label: 'Completed' },
-  { value: 'cancelled', label: 'Cancelled / Rejected' },
-];
-
-const formatEnglishDate = (dateStr) => {
-  if (!dateStr) return 'N/A';
-  try {
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return dateStr;
-    return d.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    });
-  } catch (e) {
-    return dateStr;
-  }
-};
 
 const getStatusBadgeClass = (status) => {
   switch (status) {
@@ -60,22 +38,47 @@ const getStatusBadgeClass = (status) => {
   }
 };
 
-const getStatusLabel = (status) => {
-  switch (status) {
-    case 'pending':
-      return 'Pending Review';
-    case 'confirmed':
-      return 'Confirmed';
-    case 'completed':
-      return 'Completed';
-    case 'cancelled':
-      return 'Cancelled';
-    default:
-      return status || 'Unknown';
-  }
-};
-
 export default function AdminTourRequestsPage() {
+  const { t, i18n } = useTranslation();
+
+  const STATUS_OPTIONS = [
+    { value: '', label: t('admin.tourRequests.allStatuses', 'All Statuses') },
+    { value: 'pending', label: t('admin.tourRequests.statusPending', 'Pending Review') },
+    { value: 'confirmed', label: t('admin.tourRequests.statusConfirmed', 'Approved & Confirmed') },
+    { value: 'completed', label: t('admin.tourRequests.statusCompleted', 'Completed') },
+    { value: 'cancelled', label: t('admin.tourRequests.statusCancelled', 'Cancelled / Rejected') },
+  ];
+
+  const formatEnglishDate = (dateStr) => {
+    if (!dateStr) return 'N/A';
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return dateStr;
+      return d.toLocaleDateString(i18n.language === 'vi' ? 'vi-VN' : 'en-US', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      });
+    } catch (e) {
+      return dateStr;
+    }
+  };
+
+  const getStatusLabel = (status) => {
+    switch (status) {
+      case 'pending':
+        return t('admin.tourRequests.statusPending', 'Pending Review');
+      case 'confirmed':
+        return t('admin.tourRequests.statusConfirmed', 'Confirmed');
+      case 'completed':
+        return t('admin.tourRequests.statusCompleted', 'Completed');
+      case 'cancelled':
+        return t('admin.tourRequests.statusCancelled', 'Cancelled');
+      default:
+        return status || 'Unknown';
+    }
+  };
+
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -194,10 +197,10 @@ export default function AdminTourRequestsPage() {
         <div>
           <h1>
             <Calendar className="text-emerald-sage" size={26} />
-            Tour Booking Requests
+            {t('admin.tourRequests.title', 'Tour Booking Requests')}
           </h1>
           <p>
-            Manage facility visitations, approve time slots, and consult with family member accounts.
+            {t('admin.tourRequests.subtitle', 'Manage facility visitations, approve time slots, and consult with family member accounts.')}
           </p>
         </div>
         <button
@@ -206,7 +209,7 @@ export default function AdminTourRequestsPage() {
           className="adm-btn-refresh"
         >
           <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          Reload Data
+          {t('admin.admissionRequests.reloadData', 'Reload Data')}
         </button>
       </div>
 
@@ -218,7 +221,7 @@ export default function AdminTourRequestsPage() {
             <ClipboardList size={22} />
           </div>
           <div>
-            <span className="adm-stat-label">Total Requests</span>
+            <span className="adm-stat-label">{t('admin.admissionRequests.totalRequests', 'Total Requests')}</span>
             <span className="adm-stat-value">{total}</span>
           </div>
         </div>
@@ -229,7 +232,7 @@ export default function AdminTourRequestsPage() {
             <Clock size={22} />
           </div>
           <div>
-            <span className="adm-stat-label">Pending Review</span>
+            <span className="adm-stat-label">{t('admin.tourRequests.statusPending', 'Pending Review')}</span>
             <span className="adm-stat-value">{data.filter(x => x.status === 'pending').length}</span>
           </div>
         </div>
@@ -240,7 +243,7 @@ export default function AdminTourRequestsPage() {
             <CheckCircle size={22} />
           </div>
           <div>
-            <span className="adm-stat-label">Confirmed Tours</span>
+            <span className="adm-stat-label">{t('admin.tourRequests.confirmedTours', 'Confirmed Tours')}</span>
             <span className="adm-stat-value">{data.filter(x => x.status === 'confirmed').length}</span>
           </div>
         </div>
@@ -251,7 +254,7 @@ export default function AdminTourRequestsPage() {
             <Users size={22} />
           </div>
           <div>
-            <span className="adm-stat-label">Completed Tours</span>
+            <span className="adm-stat-label">{t('admin.tourRequests.completedTours', 'Completed Tours')}</span>
             <span className="adm-stat-value">{data.filter(x => x.status === 'completed').length}</span>
           </div>
         </div>
@@ -268,7 +271,7 @@ export default function AdminTourRequestsPage() {
                 <input
                   type="text"
                   className="adm-filter-input"
-                  placeholder="Search contact name, phone, or email..."
+                  placeholder={t('admin.tourRequests.searchPlaceholder', 'Search contact name, phone, or email...')}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
@@ -295,7 +298,7 @@ export default function AdminTourRequestsPage() {
           <div className="adm-filter-row-secondary">
             <div className="adm-filter-date-group">
               <span className="adm-date-title">
-                <Calendar size={13} className="text-slate-400" /> Preferred Date Range:
+                <Calendar size={13} className="text-slate-400" /> {t('admin.tourRequests.preferredDateRange', 'Preferred Date Range:')}
               </span>
 
               <input
@@ -304,7 +307,7 @@ export default function AdminTourRequestsPage() {
                 value={from}
                 onChange={(e) => setFrom(e.target.value)}
               />
-              <span className="text-slate-400 text-xs font-semibold">to</span>
+              <span className="text-slate-400 text-xs font-semibold">{t('admin.admissionRequests.to', 'to')}</span>
               <input
                 type="date"
                 className="adm-date-input"
@@ -319,13 +322,13 @@ export default function AdminTourRequestsPage() {
                 onClick={handleResetFilters}
                 className="adm-btn-clear"
               >
-                Clear Filters
+                {t('admin.admissionRequests.clearFilters', 'Clear Filters')}
               </button>
               <button
                 type="submit"
                 className="adm-btn-apply"
               >
-                Apply Filters
+                {t('admin.admissionRequests.applyFilters', 'Apply Filters')}
               </button>
             </div>
           </div>
@@ -337,18 +340,18 @@ export default function AdminTourRequestsPage() {
         {loading && data.length === 0 ? (
           <div className="p-16 flex flex-col items-center justify-center bg-white" style={{ minHeight: '300px' }}>
             <RefreshCw className="animate-spin text-emerald-sage mb-3" size={32} />
-            <p className="text-slate-500 text-sm">Retrieving tour requests...</p>
+            <p className="text-slate-500 text-sm">{t('admin.tourRequests.retrieving', 'Retrieving tour requests...')}</p>
           </div>
         ) : error ? (
           <div className="p-10 flex flex-col items-center justify-center text-center bg-white" style={{ minHeight: '300px' }}>
             <AlertCircle className="text-red-500 mb-3" size={36} />
-            <p className="text-slate-800 font-bold mb-1">An error occurred</p>
+            <p className="text-slate-800 font-bold mb-1">{t('admin.admissionRequests.errorOccurred', 'An error occurred')}</p>
             <p className="text-slate-500 text-sm max-w-md">{error}</p>
             <button
               onClick={fetchTours}
               className="mt-4 px-5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm rounded-xl font-semibold transition-all"
             >
-              Try Again
+              {t('admin.admissionRequests.tryAgain', 'Try Again')}
             </button>
           </div>
         ) : data.length === 0 ? (
@@ -356,9 +359,9 @@ export default function AdminTourRequestsPage() {
             <div className="bg-slate-50 p-4 rounded-full text-slate-400 mb-3" style={{ width: 'fit-content' }}>
               <Calendar size={30} />
             </div>
-            <p className="text-slate-700 font-bold mb-1">No Tour Requests Found</p>
+            <p className="text-slate-700 font-bold mb-1">{t('admin.tourRequests.noRequestsFound', 'No Tour Requests Found')}</p>
             <p className="text-slate-400 text-xs max-w-sm">
-              We couldn't find any tour requests matching your search or filters.
+              {t('admin.tourRequests.noRequestsDesc', "We couldn't find any tour requests matching your search or filters.")}
             </p>
           </div>
         ) : (
@@ -366,14 +369,14 @@ export default function AdminTourRequestsPage() {
             <table className="adm-table">
               <thead>
                 <tr>
-                  <th>Request ID</th>
-                  <th>Primary Contact</th>
-                  <th>Family Account Profile</th>
-                  <th>Preferred Schedule</th>
-                  <th style={{ textAlign: 'center' }}>Visitors</th>
-                  <th>Submitted Date</th>
-                  <th style={{ textAlign: 'center' }}>Status</th>
-                  <th style={{ textAlign: 'center' }}>Actions</th>
+                  <th>{t('admin.tourRequests.colRequestId', 'Request ID')}</th>
+                  <th>{t('admin.admissionRequests.colPrimaryContact', 'Primary Contact')}</th>
+                  <th>{t('admin.tourRequests.colFamilyProfile', 'Family Account Profile')}</th>
+                  <th>{t('admin.tourRequests.colPreferredSchedule', 'Preferred Schedule')}</th>
+                  <th style={{ textAlign: 'center' }}>{t('admin.tourRequests.colVisitors', 'Visitors')}</th>
+                  <th>{t('admin.admissionRequests.colSubmittedDate', 'Submitted Date')}</th>
+                  <th style={{ textAlign: 'center' }}>{t('admin.admissionRequests.colStatus', 'Status')}</th>
+                  <th style={{ textAlign: 'center' }}>{t('admin.admissionRequests.colActions', 'Actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -428,7 +431,7 @@ export default function AdminTourRequestsPage() {
                       <button
                         onClick={() => handleOpenDetails(row._id)}
                         className="adm-btn-action"
-                        title="View details"
+                        title={t('admin.admissionRequests.colActions', 'Actions')}
                       >
                         <Eye size={14} />
                       </button>
@@ -444,9 +447,9 @@ export default function AdminTourRequestsPage() {
         {total > 0 && (
           <div className="adm-pagination-footer">
             <div className="pagination-info">
-              Showing <span>{(page - 1) * limit + 1}</span> to{' '}
-              <span>{Math.min(page * limit, total)}</span> of{' '}
-              <span>{total}</span> tour bookings
+              {t('admin.admissionRequests.showing', 'Showing')} <span>{(page - 1) * limit + 1}</span> {t('admin.admissionRequests.showingTo', 'to')}{' '}
+              <span>{Math.min(page * limit, total)}</span> {t('admin.admissionRequests.showingOf', 'of')}{' '}
+              <span>{total}</span> {t('admin.tourRequests.showingTours', 'tour bookings')}
             </div>
 
             <div className="pagination-controls">
@@ -459,7 +462,7 @@ export default function AdminTourRequestsPage() {
               </button>
 
               <div className="page-indicator">
-                Page {page} / {totalPages}
+                {t('admin.admissionRequests.page', 'Page')} {page} / {totalPages}
               </div>
 
               <button

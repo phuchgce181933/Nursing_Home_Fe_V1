@@ -135,12 +135,22 @@ export const roleSidebarData = {
       path: '/nurse/profile',
     },
     {
+      title: 'Lịch hoạt động',
+      icon: Calendar,
+      path: '/nurse/activity-schedule',
+    },
+    {
       title: 'Ghi chú chăm sóc',
       icon: Activity,
       path: '/nurse/care-notes',
     },
     {
-      title: 'Meal Plans',
+      title: 'Theo dõi Sức khỏe',
+      icon: HeartPulse,
+      path: '/nurse/health-monitoring',
+    },
+    {
+      title: 'Kế hoạch bữa ăn',
       icon: Soup,
       path: '/nurse/meal-plans',
     },
@@ -154,10 +164,26 @@ export const roleSidebarData = {
       icon: Pill,
       path: '/nurse/medications',
     },
-    { title: 'Yêu cầu Nhập viện', icon: ClipboardList, path: '/nurse/admission-requests' },
-    { title: 'Gói Dịch vụ', icon: HeartPulse, path: '/nurse/service-packages' },
-    { title: 'Sự cố', icon: FileText, path: '/nurse/incidents' },
-    { title: 'Nghỉ phép', icon: CalendarOff, path: '/nurse/leave' },
+    {
+      title: 'Yêu cầu Nhập viện',
+      icon: ClipboardList,
+      path: '/nurse/admission-requests',
+    },
+    {
+      title: 'Gói Dịch vụ',
+      icon: HeartPulse,
+      path: '/nurse/service-packages',
+    },
+    {
+      title: 'Sự cố',
+      icon: FileText,
+      path: '/nurse/incidents',
+    },
+    {
+      title: 'Nghỉ phép',
+      icon: CalendarOff,
+      path: '/nurse/leave',
+    },
     {
       title: 'Tin nhắn',
       icon: MessageSquare,

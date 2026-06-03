@@ -19,13 +19,13 @@ export default function Step1({ data = {}, onChange, errors = {}, touched = {}, 
     <div className="sap-section">
       <div className="sap-section__heading">
         <User size={16} />
-        Basic Information
+        Thông tin cơ bản
       </div>
 
       <div className="sap-grid-2">
         <div className="sap-field">
-          <label className="sap-label">Full Name</label>
-          <input placeholder="Enter resident's full name" {...field('fullName')} />
+          <label className="sap-label">Họ và tên</label>
+          <input placeholder="Nhập họ tên cư dân" {...field('fullName')} />
           {touched.fullName && errors.fullName && (
             <div className="sap-field__error-message">
               <AlertCircle size={12} />
@@ -34,7 +34,7 @@ export default function Step1({ data = {}, onChange, errors = {}, touched = {}, 
           )}
         </div>
         <div className="sap-field">
-          <label className="sap-label">Date of Birth</label>
+          <label className="sap-label">Ngày sinh</label>
           <input type="date" {...field('dob')} />
           {touched.dob && errors.dob && (
             <div className="sap-field__error-message">
@@ -44,12 +44,12 @@ export default function Step1({ data = {}, onChange, errors = {}, touched = {}, 
           )}
         </div>
         <div className="sap-field">
-          <label className="sap-label">Gender</label>
+          <label className="sap-label">Giới tính</label>
           <select {...selectField('gender')}>
-            <option value="">Select Gender</option>
-            <option value="male">Male</option>
-            <option value="female">Female</option>
-            <option value="other">Other</option>
+            <option value="">Chọn giới tính</option>
+            <option value="male">Nam</option>
+            <option value="female">Nữ</option>
+            <option value="other">Khác</option>
           </select>
           {touched.gender && errors.gender && (
             <div className="sap-field__error-message">
@@ -59,8 +59,8 @@ export default function Step1({ data = {}, onChange, errors = {}, touched = {}, 
           )}
         </div>
         <div className="sap-field">
-          <label className="sap-label">Citizen ID / Passport / ID Number</label>
-          <input placeholder="Enter ID number" {...field('idNumber')} />
+          <label className="sap-label">Số CCCD / Hộ chiếu</label>
+          <input placeholder="Nhập số định danh" {...field('idNumber')} />
           {touched.idNumber && errors.idNumber && (
             <div className="sap-field__error-message">
               <AlertCircle size={12} />
@@ -69,8 +69,8 @@ export default function Step1({ data = {}, onChange, errors = {}, touched = {}, 
           )}
         </div>
         <div className="sap-field sap-field--full">
-          <label className="sap-label">Current Address</label>
-          <input placeholder="Street address, ward, district, city..." {...field('address')} />
+          <label className="sap-label">Địa chỉ hiện tại</label>
+          <input placeholder="Số nhà, tên đường, phường/xã, quận/huyện, tỉnh/thành phố..." {...field('address')} />
           {touched.address && errors.address && (
             <div className="sap-field__error-message">
               <AlertCircle size={12} />
@@ -79,13 +79,13 @@ export default function Step1({ data = {}, onChange, errors = {}, touched = {}, 
           )}
         </div>
         <div className="sap-field">
-          <label className="sap-label">Relationship to Resident</label>
+          <label className="sap-label">Quan hệ với cư dân</label>
           <select {...selectField('relationship')}>
-            <option value="">Select Relationship</option>
-            <option value="child">Child</option>
-            <option value="spouse">Spouse</option>
-            <option value="sibling">Sibling</option>
-            <option value="legal_guardian">Guardian</option>
+            <option value="">Chọn quan hệ</option>
+            <option value="child">Con cái</option>
+            <option value="spouse">Vợ/Chồng</option>
+            <option value="sibling">Anh/Chị/Em</option>
+            <option value="legal_guardian">Người giám hộ hợp pháp</option>
           </select>
           {touched.relationship && errors.relationship && (
             <div className="sap-field__error-message">

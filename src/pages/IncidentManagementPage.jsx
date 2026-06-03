@@ -18,6 +18,20 @@ const initialForm = {
 
 const statusOptions = ['open', 'investigating', 'resolved', 'closed'];
 
+const STATUS_LABELS = {
+  open: 'Mở',
+  investigating: 'Đang điều tra',
+  resolved: 'Đã giải quyết',
+  closed: 'Đã đóng',
+};
+
+const SEVERITY_LABELS = {
+  low: 'Thấp',
+  medium: 'Trung bình',
+  high: 'Cao',
+  critical: 'Nghiêm trọng',
+};
+
 function formatDate(value) {
   if (!value) return '—';
   return new Date(value).toLocaleString('vi-VN');
@@ -47,13 +61,13 @@ function IncidentManagementPage() {
   const isAdmin = user?.role === 'admin';
 
   const formatResidentLabel = (resident) => {
-    const baseName = resident?.fullName || 'Unnamed resident';
+    const baseName = resident?.fullName || 'Cư dân không tên';
     const code = resident?.residentCode ? ` (${resident.residentCode})` : '';
     return `${baseName}${code}`;
   };
 
   const formatStaffLabel = (staff) => {
-    const name = staff?.fullName || staff?.email || 'Unnamed staff';
+    const name = staff?.fullName || staff?.email || 'Nhân viên không tên';
     const role = staff?.role ? ` — ${staff.role.toUpperCase()}` : '';
     const email = staff?.email ? ` • ${staff.email}` : '';
     return `${name}${role}${email}`;
@@ -76,7 +90,7 @@ function IncidentManagementPage() {
       setMessage('');
     } catch (error) {
       setMessageType('error');
-      setMessage(error?.response?.data?.message || 'Unable to load incidents.');
+      setMessage(error?.response?.data?.message || 'Không thể tải danh sách sự cố.');
     } finally {
       setLoading(false);
     }
@@ -118,7 +132,7 @@ function IncidentManagementPage() {
         }
 
         setMessageType('error');
-        setMessage(error?.response?.data?.message || 'Unable to load resident and staff options.');
+        setMessage(error?.response?.data?.message || 'Không thể tải tùy chọn cư dân và nhân viên.');
       } finally {
         if (active) {
           setOptionsLoading(false);
@@ -148,12 +162,12 @@ function IncidentManagementPage() {
 
       await incidentService.createIncident(payload);
       setMessageType('success');
-      setMessage('Incident created successfully.');
+      setMessage('Tạo sự cố thành công.');
       setForm(initialForm);
       await loadIncidents();
     } catch (error) {
       setMessageType('error');
-      setMessage(error?.response?.data?.message || 'Unable to create incident.');
+      setMessage(error?.response?.data?.message || 'Không thể tạo sự cố.');
     } finally {
       setIsSaving(false);
     }
@@ -166,11 +180,11 @@ function IncidentManagementPage() {
     try {
       await incidentService.updateIncidentStatus(incidentId, { status });
       setMessageType('success');
-      setMessage('Incident status updated.');
+      setMessage('Cập nhật trạng thái sự cố thành công.');
       await loadIncidents();
     } catch (error) {
       setMessageType('error');
-      setMessage(error?.response?.data?.message || 'Unable to update incident status.');
+      setMessage(error?.response?.data?.message || 'Không thể cập nhật trạng thái sự cố.');
     } finally {
       setIsSaving(false);
     }
@@ -192,10 +206,10 @@ function IncidentManagementPage() {
       link.click();
       URL.revokeObjectURL(url);
       setMessageType('success');
-      setMessage('Incident export started.');
+      setMessage('Bắt đầu xuất dữ liệu sự cố.');
     } catch (error) {
       setMessageType('error');
-      setMessage(error?.response?.data?.message || 'Unable to export incidents.');
+      setMessage(error?.response?.data?.message || 'Không thể xuất dữ liệu sự cố.');
     }
   };
 
@@ -207,19 +221,19 @@ function IncidentManagementPage() {
   }), [incidents]);
 
   if (!user) {
-    return <LoadingSpinner label="Loading incident page..." />;
+    return <LoadingSpinner label="Đang tải trang sự cố..." />;
   }
 
   return (
     <div className="profile-page">
       <header className="profile-page__header">
         <div>
-          <h1 className="profile-page__title">Incident Management</h1>
-          <p className="profile-page__subtitle">Manage incidents for admin, doctor, and nurse workflows.</p>
+          <h1 className="profile-page__title">Quản lý sự cố</h1>
+          <p className="profile-page__subtitle">Quản lý sự cố cho quản trị viên, bác sĩ và điều dưỡng.</p>
         </div>
         <button type="button" className="button button--primary" onClick={handleExport}>
           <Download size={16} />
-          Export CSV
+          Xuất CSV
         </button>
       </header>
 
@@ -230,14 +244,14 @@ function IncidentManagementPage() {
       )}
 
       <section className="profile-card">
-        <h2 className="profile-card__heading">Create Incident</h2>
+        <h2 className="profile-card__heading">Tạo sự cố</h2>
         <form className="profile-form" onSubmit={handleCreate}>
           <div
             className="profile-form__grid"
             style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}
           >
               <label className="profile-form__field">
-                <span className="profile-form__label">Incident Type</span>
+                <span className="profile-form__label">Loại sự cố</span>
                 <input
                   className="profile-form__input"
                   value={form.incidentType}
@@ -247,21 +261,21 @@ function IncidentManagementPage() {
               </label>
 
               <label className="profile-form__field">
-                <span className="profile-form__label">Severity</span>
+                <span className="profile-form__label">Mức độ nghiêm trọng</span>
                 <select
                   className="profile-form__input"
                   value={form.severity}
                   onChange={(event) => setForm((current) => ({ ...current, severity: event.target.value }))}
                 >
-                  <option value="low">Low</option>
-                  <option value="medium">Medium</option>
-                  <option value="high">High</option>
-                  <option value="critical">Critical</option>
+                  <option value="low">Thấp</option>
+                  <option value="medium">Trung bình</option>
+                  <option value="high">Cao</option>
+                  <option value="critical">Nghiêm trọng</option>
                 </select>
               </label>
 
               <label className="profile-form__field">
-                <span className="profile-form__label">Incident Time</span>
+                <span className="profile-form__label">Thời gian xảy ra</span>
                 <input
                   className="profile-form__input"
                   type="datetime-local"
@@ -272,7 +286,7 @@ function IncidentManagementPage() {
               </label>
 
               <label className="profile-form__field">
-                <span className="profile-form__label">Location</span>
+                <span className="profile-form__label">Địa điểm</span>
                 <input
                   className="profile-form__input"
                   value={form.location}
@@ -281,14 +295,14 @@ function IncidentManagementPage() {
               </label>
 
               <label className="profile-form__field">
-                <span className="profile-form__label">Resident</span>
+                <span className="profile-form__label">Cư dân</span>
                 <select
                   className="profile-form__input"
                   value={form.residentId}
                   onChange={(event) => setForm((current) => ({ ...current, residentId: event.target.value }))}
                   disabled={optionsLoading}
                 >
-                  <option value="">No resident selected</option>
+                  <option value="">Không chọn cư dân</option>
                   {residents.map((resident) => (
                     <option key={resident._id} value={resident._id}>
                       {formatResidentLabel(resident)}
@@ -298,7 +312,7 @@ function IncidentManagementPage() {
               </label>
 
               <label className="profile-form__field">
-                <span className="profile-form__label">Assigned Staff</span>
+                <span className="profile-form__label">Nhân viên phụ trách</span>
                 <select
                   className="profile-form__input"
                   multiple
@@ -312,7 +326,7 @@ function IncidentManagementPage() {
                   }
                   disabled={optionsLoading}
                 >
-                  <option value="">No staff selected</option>
+                  <option value="">Không chọn nhân viên</option>
                   {staffAccounts.map((staff) => (
                     <option key={staff._id} value={staff._id}>
                       {formatStaffLabel(staff)}
@@ -322,7 +336,7 @@ function IncidentManagementPage() {
               </label>
 
               <label className="profile-form__field" style={{ gridColumn: '1 / -1' }}>
-                <span className="profile-form__label">Description</span>
+                <span className="profile-form__label">Mô tả</span>
                 <textarea
                   className="profile-form__input"
                   rows={4}
@@ -336,29 +350,29 @@ function IncidentManagementPage() {
           <div className="profile-page__actions">
             <button type="submit" className="button button--primary" disabled={isSaving}>
               <PlusCircle size={16} />
-              {isSaving ? 'Saving...' : 'Create Incident'}
+              {isSaving ? 'Đang lưu...' : 'Tạo sự cố'}
             </button>
           </div>
         </form>
       </section>
       
       <section className="profile-card profile-card--accent" style={{ marginTop: '1.5rem' }}>
-        <h2 className="profile-card__heading">Overview</h2>
+        <h2 className="profile-card__heading">Tổng quan</h2>
         <div className="profile-form__grid">
           <div>
-            <p className="profile-card__empty">Total incidents</p>
+            <p className="profile-card__empty">Tổng sự cố</p>
             <strong>{stats.total}</strong>
           </div>
           <div>
-            <p className="profile-card__empty">Open</p>
+            <p className="profile-card__empty">Đang mở</p>
             <strong>{stats.open}</strong>
           </div>
           <div>
-            <p className="profile-card__empty">Investigating</p>
+            <p className="profile-card__empty">Đang điều tra</p>
             <strong>{stats.investigating}</strong>
           </div>
           <div>
-            <p className="profile-card__empty">Resolved</p>
+            <p className="profile-card__empty">Đã giải quyết</p>
             <strong>{stats.resolved}</strong>
           </div>
         </div>
@@ -367,29 +381,29 @@ function IncidentManagementPage() {
       <section className="profile-card" style={{ marginTop: '1.5rem' }}>
         <div className="profile-page__header">
           <div>
-            <h2 className="profile-card__heading">Incident List</h2>
-            <p className="profile-card__empty">Filter and review current incidents.</p>
+            <h2 className="profile-card__heading">Danh sách sự cố</h2>
+            <p className="profile-card__empty">Lọc và xem xét các sự cố hiện tại.</p>
           </div>
           <div className="profile-form__grid" style={{ width: '100%', maxWidth: 720 }}>
             <label className="profile-form__field">
-              <span className="profile-form__label">Search</span>
+              <span className="profile-form__label">Tìm kiếm</span>
               <input
                 className="profile-form__input"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search incident, location, reporter"
+                placeholder="Tìm sự cố, địa điểm, người báo cáo"
               />
             </label>
             <label className="profile-form__field">
-              <span className="profile-form__label">Status</span>
+              <span className="profile-form__label">Trạng thái</span>
               <select
                 className="profile-form__input"
                 value={statusFilter}
                 onChange={(event) => setStatusFilter(event.target.value)}
               >
-                <option value="">All</option>
+                <option value="">Tất cả</option>
                 {statusOptions.map((option) => (
-                  <option key={option} value={option}>{option}</option>
+                  <option key={option} value={option}>{STATUS_LABELS[option] || option}</option>
                 ))}
               </select>
             </label>
@@ -397,9 +411,9 @@ function IncidentManagementPage() {
         </div>
 
         {loading ? (
-          <LoadingSpinner label="Loading incidents..." />
+          <LoadingSpinner label="Đang tải sự cố..." />
         ) : incidents.length === 0 ? (
-          <p className="profile-card__empty">No incidents found.</p>
+          <p className="profile-card__empty">Không tìm thấy sự cố nào.</p>
         ) : (
           <div className="profile-form__grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))' }}>
             {incidents.map((incident) => (
@@ -407,16 +421,16 @@ function IncidentManagementPage() {
                 <div className="profile-page__header" style={{ alignItems: 'flex-start' }}>
                   <div>
                     <p className="profile-card__role">{incident.incidentType}</p>
-                    <h3>{incident.residentId?.fullName || incident.residentId || 'Resident not specified'}</h3>
+                    <h3>{incident.residentId?.fullName || incident.residentId || 'Chưa xác định cư dân'}</h3>
                   </div>
-                  <span className="profile-card__role">{incident.status}</span>
+                  <span className="profile-card__role">{STATUS_LABELS[incident.status] || incident.status}</span>
                 </div>
 
                 <p className="profile-card__empty">{incident.description}</p>
-                <p className="profile-card__empty">Location: {incident.location || '—'}</p>
-                <p className="profile-card__empty">Severity: {incident.severity}</p>
-                <p className="profile-card__empty">Reported by: {incident.reporterName || incident.reporterEmail || 'Unknown'}</p>
-                <p className="profile-card__empty">Time: {formatDate(incident.incidentAt)}</p>
+                <p className="profile-card__empty">Địa điểm: {incident.location || '—'}</p>
+                <p className="profile-card__empty">Mức độ: {SEVERITY_LABELS[incident.severity] || incident.severity}</p>
+                <p className="profile-card__empty">Báo cáo bởi: {incident.reporterName || incident.reporterEmail || 'Không xác định'}</p>
+                <p className="profile-card__empty">Thời gian: {formatDate(incident.incidentAt)}</p>
 
                 <div className="profile-page__actions">
                   {statusOptions.map((status) => (
@@ -427,7 +441,7 @@ function IncidentManagementPage() {
                       onClick={() => handleStatusUpdate(incident._id, status)}
                       disabled={isSaving || status === incident.status}
                     >
-                      {status}
+                      {STATUS_LABELS[status] || status}
                     </button>
                   ))}
                 </div>

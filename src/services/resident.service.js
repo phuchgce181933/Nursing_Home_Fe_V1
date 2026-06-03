@@ -11,6 +11,11 @@ const getResidentList = async (params = {}) => {
   return response.data;
 };
 
+const getFamilyResidentList = async () => {
+  const response = await axiosClient.get('/family/residents');
+  return response.data;
+};
+
 const updateResidentPersonalInfo = async (residentId, body) => {
   const response = await axiosClient.patch(`/admin/residents/${residentId}/personal-info`, body);
   return response.data;
@@ -934,6 +939,7 @@ const transferResidentToRoom = (residentId, body) =>
 const residentService = {
   createResident,
   getResidentList,
+  getFamilyResidentList,
   updateResidentPersonalInfo,
   updateResidentFamilyInfo,
   listForAssignment,

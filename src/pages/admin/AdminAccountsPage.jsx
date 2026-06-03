@@ -28,7 +28,7 @@ const initialEditForm = {
 
 function formatDate(value) {
   if (!value) return '—';
-  return new Date(value).toLocaleString('en-US'); // Thường dùng 'en-US' hoặc 'en-GB' cho tiếng Anh
+  return new Date(value).toLocaleString('vi-VN');
 }
 
 function AdminAccountsPage() {
@@ -64,7 +64,7 @@ function AdminAccountsPage() {
         limit: data.limit,
       });
     } catch (error) {
-      setMessage(error?.response?.data?.message || 'Failed to load accounts list.');
+      setMessage(error?.response?.data?.message || 'Không thể tải danh sách tài khoản.');
       setMessageType('error');
     } finally {
       setLoading(false);
@@ -109,12 +109,12 @@ function AdminAccountsPage() {
 
       await authService.createStaffAccount(payload);
       setMessageType('success');
-      setMessage('Staff account created successfully.');
+      setMessage('Tạo tài khoản nhân viên thành công.');
       setCreateForm(initialCreateForm);
       await loadAccounts(1);
     } catch (error) {
       setMessageType('error');
-      setMessage(error?.response?.data?.message || 'Failed to create account.');
+      setMessage(error?.response?.data?.message || 'Không thể tạo tài khoản.');
     } finally {
       setSubmitting(false);
     }
@@ -145,15 +145,15 @@ function AdminAccountsPage() {
       await authService.updateUserByAdmin(editUser._id, {
         ...editForm,
         isBanned: Boolean(editForm.isBanned),
-        banReason: editForm.isBanned ? editForm.banReason || 'Banned by Administrator' : '',
+        banReason: editForm.isBanned ? editForm.banReason || 'Bị cấm bởi quản trị viên' : '',
       });
       setMessageType('success');
-      setMessage('Account updated successfully.');
+      setMessage('Cập nhật tài khoản thành công.');
       setEditUser(null);
       await loadAccounts(pagination.page);
     } catch (error) {
       setMessageType('error');
-      setMessage(error?.response?.data?.message || 'Failed to update account.');
+      setMessage(error?.response?.data?.message || 'Không thể cập nhật tài khoản.');
     } finally {
       setSubmitting(false);
     }
@@ -166,11 +166,11 @@ function AdminAccountsPage() {
     try {
       await authService.toggleStaffActive(user._id);
       setMessageType('success');
-      setMessage('Active status updated successfully.');
+      setMessage('Cập nhật trạng thái hoạt động thành công.');
       await loadAccounts(pagination.page);
     } catch (error) {
       setMessageType('error');
-      setMessage(error?.response?.data?.message || 'Failed to change account status.');
+      setMessage(error?.response?.data?.message || 'Không thể thay đổi trạng thái tài khoản.');
     } finally {
       setSubmitting(false);
     }
@@ -183,14 +183,14 @@ function AdminAccountsPage() {
     try {
       await authService.updateUserByAdmin(user._id, {
         isBanned: !user.isBanned,
-        banReason: user.isBanned ? '' : 'Banned by Administrator',
+        banReason: user.isBanned ? '' : 'Bị cấm bởi quản trị viên',
       });
       setMessageType('success');
-      setMessage(user.isBanned ? 'Account unbanned successfully.' : 'Account banned successfully.');
+      setMessage(user.isBanned ? 'Bỏ cấm tài khoản thành công.' : 'Cấm tài khoản thành công.');
       await loadAccounts(pagination.page);
     } catch (error) {
       setMessageType('error');
-      setMessage(error?.response?.data?.message || 'Failed to perform ban/unban action.');
+      setMessage(error?.response?.data?.message || 'Không thể thực hiện thao tác cấm/bỏ cấm.');
     } finally {
       setSubmitting(false);
     }
@@ -200,9 +200,9 @@ function AdminAccountsPage() {
     <div className="profile-page">
       <div className="profile-page__container">
         <header className="profile-page__header">
-          <h1 className="profile-page__title">Account Management</h1>
+          <h1 className="profile-page__title">Quản lý tài khoản</h1>
           <p className="profile-page__subtitle">
-            Create staff accounts, monitor list, and ban/unban accounts as needed.
+            Tạo tài khoản nhân viên, theo dõi danh sách và cấm/bỏ cấm tài khoản khi cần.
           </p>
         </header>
 
@@ -213,11 +213,11 @@ function AdminAccountsPage() {
         )}
 
         <section className="profile-card">
-          <h2 className="profile-card__heading">Create New Account</h2>
+          <h2 className="profile-card__heading">Tạo tài khoản mới</h2>
           <form className="profile-form" onSubmit={handleCreateSubmit}>
             <div className="profile-form__grid">
               <label className="profile-form__field">
-                <span className="profile-form__label">Full Name</span>
+                <span className="profile-form__label">Họ và tên</span>
                 <input
                   className="profile-form__input"
                   value={createForm.fullName}
@@ -238,7 +238,7 @@ function AdminAccountsPage() {
               </label>
 
               <label className="profile-form__field">
-                <span className="profile-form__label">Password</span>
+                <span className="profile-form__label">Mật khẩu</span>
                 <input
                   className="profile-form__input"
                   type="password"
@@ -249,22 +249,22 @@ function AdminAccountsPage() {
               </label>
 
               <label className="profile-form__field">
-                <span className="profile-form__label">Role</span>
+                <span className="profile-form__label">Vai trò</span>
                 <select
                   className="profile-form__input"
                   value={createForm.role}
                   onChange={(event) => setCreateForm((current) => ({ ...current, role: event.target.value }))}
                 >
-                  <option value="doctor">Doctor</option>
-                  <option value="nurse">Nurse</option>
-                  <option value="manager">Manager</option>
-                  <option value="staff">Staff</option>
-                  <option value="pharmacist">Pharmacist</option>
+                  <option value="doctor">Bác sĩ</option>
+                  <option value="nurse">Điều dưỡng</option>
+                  <option value="manager">Quản lý</option>
+                  <option value="staff">Nhân viên</option>
+                  <option value="pharmacist">Dược sĩ</option>
                 </select>
               </label>
 
               <label className="profile-form__field">
-                <span className="profile-form__label">Phone Number</span>
+                <span className="profile-form__label">Số điện thoại</span>
                 <input
                   className="profile-form__input"
                   value={createForm.phone}
@@ -273,21 +273,21 @@ function AdminAccountsPage() {
               </label>
 
               <label className="profile-form__field">
-                <span className="profile-form__label">Gender</span>
+                <span className="profile-form__label">Giới tính</span>
                 <select
                   className="profile-form__input"
                   value={createForm.gender}
                   onChange={(event) => setCreateForm((current) => ({ ...current, gender: event.target.value }))}
                 >
-                  <option value="male">Male</option>
-                  <option value="female">Female</option>
-                  <option value="other">Other</option>
-                  <option value="unknown">Unknown</option>
+                  <option value="male">Nam</option>
+                  <option value="female">Nữ</option>
+                  <option value="other">Khác</option>
+                  <option value="unknown">Không rõ</option>
                 </select>
               </label>
 
               <label className="profile-form__field">
-                <span className="profile-form__label">Date of Birth</span>
+                <span className="profile-form__label">Ngày sinh</span>
                 <input
                   className="profile-form__input"
                   type="date"
@@ -297,17 +297,17 @@ function AdminAccountsPage() {
               </label>
 
               <label className="profile-form__field">
-                <span className="profile-form__label">Staff Code</span>
+                <span className="profile-form__label">Mã nhân viên</span>
                 <input
                   className="profile-form__input"
                   value={createForm.staffCode}
                   onChange={(event) => setCreateForm((current) => ({ ...current, staffCode: event.target.value }))}
-                  placeholder="Auto-generated if left blank"
+                  placeholder="Tự động tạo nếu để trống"
                 />
               </label>
 
               <label className="profile-form__field" style={{ gridColumn: '1 / -1' }}>
-                <span className="profile-form__label">Address</span>
+                <span className="profile-form__label">Địa chỉ</span>
                 <input
                   className="profile-form__input"
                   value={createForm.address}
@@ -316,7 +316,7 @@ function AdminAccountsPage() {
               </label>
 
               <label className="profile-form__field">
-                <span className="profile-form__label">Specialty</span>
+                <span className="profile-form__label">Chuyên môn</span>
                 <input
                   className="profile-form__input"
                   value={createForm.specialty}
@@ -325,7 +325,7 @@ function AdminAccountsPage() {
               </label>
 
               <label className="profile-form__field">
-                <span className="profile-form__label">Certifications (comma-separated)</span>
+                <span className="profile-form__label">Chứng chỉ (cách nhau bởi dấu phẩy)</span>
                 <input
                   className="profile-form__input"
                   value={createForm.certifications}
@@ -335,7 +335,7 @@ function AdminAccountsPage() {
             </div>
             <div className="profile-page__actions">
               <button type="submit" className="button button--primary" disabled={submitting}>
-                {submitting ? 'Creating...' : 'Create Account'}
+                {submitting ? 'Đang tạo...' : 'Tạo tài khoản'}
               </button>
             </div>
           </form>
@@ -344,8 +344,8 @@ function AdminAccountsPage() {
         <section className="profile-card">
           <div className="account-toolbar">
             <div>
-              <h2 className="profile-card__heading">Account List</h2>
-              <p className="profile-card__empty">Total {pagination.total} accounts.</p>
+              <h2 className="profile-card__heading">Danh sách tài khoản</h2>
+              <p className="profile-card__empty">Tổng cộng {pagination.total} tài khoản.</p>
             </div>
             <div className="account-filter-row">
               <input
@@ -353,26 +353,26 @@ function AdminAccountsPage() {
                 name="search"
                 value={filters.search}
                 onChange={handleFilterChange}
-                placeholder="Search by name or email"
+                placeholder="Tìm theo tên hoặc email"
               />
               <select className="profile-form__input" name="role" value={filters.role} onChange={handleFilterChange}>
-                <option value="">All Roles</option>
-                <option value="doctor">Doctor</option>
-                <option value="nurse">Nurse</option>
-                <option value="caregiver">Caregiver</option>
-                <option value="staff">Staff</option>
-                <option value="admin">Admin</option>
+                <option value="">Tất cả vai trò</option>
+                <option value="doctor">Bác sĩ</option>
+                <option value="nurse">Điều dưỡng</option>
+                <option value="caregiver">Người chăm sóc</option>
+                <option value="staff">Nhân viên</option>
+                <option value="admin">Quản trị</option>
               </select>
               <select className="profile-form__input" name="isActive" value={filters.isActive} onChange={handleFilterChange}>
-                <option value="">All Statuses</option>
-                <option value="true">Active</option>
-                <option value="false">Inactive</option>
+                <option value="">Tất cả trạng thái</option>
+                <option value="true">Đang hoạt động</option>
+                <option value="false">Không hoạt động</option>
               </select>
               <button type="button" className="button button--primary" onClick={handleApplyFilters}>
-                Filter
+                Lọc
               </button>
               <button type="button" className="button button--secondary" onClick={handleResetFilters}>
-                Reset Filter
+                Đặt lại
               </button>
             </div>
           </div>
@@ -380,22 +380,22 @@ function AdminAccountsPage() {
           {loading ? (
             <div className="loading-spinner" role="status" aria-live="polite">
               <span className="loading-spinner__ring" aria-hidden="true" />
-              <span className="loading-spinner__label">Loading accounts list...</span>
+              <span className="loading-spinner__label">Đang tải danh sách tài khoản...</span>
             </div>
           ) : accounts.length === 0 ? (
-            <p className="profile-card__empty">No matching accounts found.</p>
+            <p className="profile-card__empty">Không tìm thấy tài khoản phù hợp.</p>
           ) : (
             <div className="account-table-wrap">
               <table className="account-table">
                 <thead>
                   <tr>
-                    <th>Name</th>
+                    <th>Họ tên</th>
                     <th>Email</th>
-                    <th>Role</th>
-                    <th>Status</th>
-                    <th>Banned</th>
-                    <th>Created At</th>
-                    <th>Actions</th>
+                    <th>Vai trò</th>
+                    <th>Trạng thái</th>
+                    <th>Bị cấm</th>
+                    <th>Ngày tạo</th>
+                    <th>Thao tác</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -406,22 +406,22 @@ function AdminAccountsPage() {
                       <td>{user.role}</td>
                       <td>
                         <span className={`account-chip ${user.isActive ? 'account-chip--active' : 'account-chip--inactive'}`}>
-                          {user.isActive ? 'Active' : 'Inactive'}
+                          {user.isActive ? 'Hoạt động' : 'Không hoạt động'}
                         </span>
-                        {user.isBanned && <span className="account-chip account-chip--banned">Banned</span>}
+                        {user.isBanned && <span className="account-chip account-chip--banned">Bị cấm</span>}
                       </td>
-                      <td>{user.isBanned ? 'Yes' : 'No'}</td>
+                      <td>{user.isBanned ? 'Có' : 'Không'}</td>
                       <td>{formatDate(user.createdAt)}</td>
                       <td>
                         <div className="account-actions">
                           <button type="button" className="button button--secondary" onClick={() => handleEditOpen(user)}>
-                            Edit
+                            Sửa
                           </button>
                           {/* <button type="button" className="button button--primary" onClick={() => handleToggleActive(user)} disabled={submitting}>
                             {user.isActive ? 'Deactivate' : 'Activate'}
                           </button> */}
                           <button type="button" className={`button ${user.isBanned ? 'button--secondary' : 'button--danger'}`} onClick={() => handleToggleBan(user)} disabled={submitting}>
-                            {user.isBanned ? 'Unban' : 'Ban'}
+                            {user.isBanned ? 'Bỏ cấm' : 'Cấm'}
                           </button>
                         </div>
                       </td>
@@ -439,10 +439,10 @@ function AdminAccountsPage() {
               disabled={pagination.page <= 1 || loading}
               onClick={() => loadAccounts(pagination.page - 1)}
             >
-              Previous
+              Trước
             </button>
             <span>
-              Page {pagination.page} / {pagination.totalPages}
+              Trang {pagination.page} / {pagination.totalPages}
             </span>
             <button
               type="button"
@@ -450,18 +450,18 @@ function AdminAccountsPage() {
               disabled={pagination.page >= pagination.totalPages || loading}
               onClick={() => loadAccounts(pagination.page + 1)}
             >
-              Next
+              Tiếp theo
             </button>
           </div>
         </section>
 
         {editUser && (
           <section className="profile-card">
-            <h2 className="profile-card__heading">Update Account: {editUser.fullName}</h2>
+            <h2 className="profile-card__heading">Cập nhật tài khoản: {editUser.fullName}</h2>
             <form className="profile-form" onSubmit={handleEditSubmit}>
               <div className="profile-form__grid">
                 <label className="profile-form__field">
-                  <span className="profile-form__label">Full Name</span>
+                  <span className="profile-form__label">Họ và tên</span>
                   <input
                     className="profile-form__input"
                     value={editForm.fullName}
@@ -470,7 +470,7 @@ function AdminAccountsPage() {
                 </label>
 
                 <label className="profile-form__field">
-                  <span className="profile-form__label">Phone Number</span>
+                  <span className="profile-form__label">Số điện thoại</span>
                   <input
                     className="profile-form__input"
                     value={editForm.phone}
@@ -479,36 +479,36 @@ function AdminAccountsPage() {
                 </label>
 
                 <label className="profile-form__field">
-                  <span className="profile-form__label">Gender</span>
+                  <span className="profile-form__label">Giới tính</span>
                   <select
                     className="profile-form__input"
                     value={editForm.gender}
                     onChange={(event) => setEditForm((current) => ({ ...current, gender: event.target.value }))}
                   >
-                    <option value="male">Male</option>
-                    <option value="female">Female</option>
-                    <option value="other">Other</option>
-                    <option value="unknown">Unknown</option>
+                    <option value="male">Nam</option>
+                    <option value="female">Nữ</option>
+                    <option value="other">Khác</option>
+                    <option value="unknown">Không rõ</option>
                   </select>
                 </label>
 
                 <label className="profile-form__field">
-                  <span className="profile-form__label">Role</span>
+                  <span className="profile-form__label">Vai trò</span>
                   <select
                     className="profile-form__input"
                     value={editForm.role}
                     onChange={(event) => setEditForm((current) => ({ ...current, role: event.target.value }))}
                   >
-                    <option value="doctor">Doctor</option>
-                    <option value="nurse">Nurse</option>
-                    <option value="manager">Manager</option>
-                    <option value="staff">Staff</option>
-                    <option value="admin">Admin</option>
+                    <option value="doctor">Bác sĩ</option>
+                    <option value="nurse">Điều dưỡng</option>
+                    <option value="manager">Quản lý</option>
+                    <option value="staff">Nhân viên</option>
+                    <option value="admin">Quản trị</option>
                   </select>
                 </label>
 
                 <label className="profile-form__field">
-                  <span className="profile-form__label">Address</span>
+                  <span className="profile-form__label">Địa chỉ</span>
                   <input
                     className="profile-form__input"
                     value={editForm.address}
@@ -517,45 +517,45 @@ function AdminAccountsPage() {
                 </label>
 
                 <label className="profile-form__field">
-                  <span className="profile-form__label">Active Status</span>
+                  <span className="profile-form__label">Trạng thái hoạt động</span>
                   <select
                     className="profile-form__input"
                     value={editForm.isActive ? 'true' : 'false'}
                     onChange={(event) => setEditForm((current) => ({ ...current, isActive: event.target.value === 'true' }))}
                   >
-                    <option value="true">Active</option>
-                    <option value="false">Inactive</option>
+                    <option value="true">Đang hoạt động</option>
+                    <option value="false">Không hoạt động</option>
                   </select>
                 </label>
 
                 <label className="profile-form__field">
-                  <span className="profile-form__label">Ban Status</span>
+                  <span className="profile-form__label">Trạng thái cấm</span>
                   <select
                     className="profile-form__input"
                     value={editForm.isBanned ? 'true' : 'false'}
                     onChange={(event) => setEditForm((current) => ({ ...current, isBanned: event.target.value === 'true' }))}
                   >
-                    <option value="false">Not Banned</option>
-                    <option value="true">Banned</option>
+                    <option value="false">Không bị cấm</option>
+                    <option value="true">Bị cấm</option>
                   </select>
                 </label>
 
                 <label className="profile-form__field" style={{ gridColumn: '1 / -1' }}>
-                  <span className="profile-form__label">Ban Reason</span>
+                  <span className="profile-form__label">Lý do cấm</span>
                   <input
                     className="profile-form__input"
                     value={editForm.banReason}
                     onChange={(event) => setEditForm((current) => ({ ...current, banReason: event.target.value }))}
-                    placeholder="Enter reason if banning this account"
+                    placeholder="Nhập lý do nếu cấm tài khoản này"
                   />
                 </label>
               </div>
               <div className="profile-page__actions">
                 <button type="submit" className="button button--primary" disabled={submitting}>
-                  {submitting ? 'Saving...' : 'Save Changes'}
+                  {submitting ? 'Đang lưu...' : 'Lưu thay đổi'}
                 </button>
                 <button type="button" className="button button--secondary" onClick={() => setEditUser(null)}>
-                  Cancel
+                  Huỷ
                 </button>
               </div>
             </form>

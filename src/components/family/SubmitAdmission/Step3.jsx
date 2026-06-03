@@ -1,11 +1,11 @@
 import { ClipboardCheck, Phone, AlertCircle, Info } from 'lucide-react';
 
 const ADMISSION_REASONS = [
-  { value: 'long_term_care', label: 'Long-term Care' },
-  { value: 'rehabilitation', label: 'Rehabilitation & Therapy' },
-  { value: 'post_surgery',   label: 'Post-surgery Recovery' },
-  { value: 'hospice',        label: 'Hospice & Palliative Care' },
-  { value: 'other',          label: 'Other Reason' },
+  { value: 'long_term_care', label: 'Chăm sóc dài hạn' },
+  { value: 'rehabilitation', label: 'Phục hồi chức năng & Trị liệu' },
+  { value: 'post_surgery',   label: 'Phục hồi sau phẫu thuật' },
+  { value: 'hospice',        label: 'Chăm sóc giảm nhẹ cuối đời' },
+  { value: 'other',          label: 'Lý do khác' },
 ];
 
 export default function Step3({ data = {}, onChange, errors = {}, touched = {}, onBlur }) {
@@ -34,12 +34,12 @@ export default function Step3({ data = {}, onChange, errors = {}, touched = {}, 
     <div className="sap-section">
       <div className="sap-section__heading">
         <ClipboardCheck size={16} />
-        Admission Details
+        Chi tiết tiếp nhận
       </div>
 
       <div className="sap-grid-2">
         <div className="sap-field">
-          <label className="sap-label">Preferred Date</label>
+          <label className="sap-label">Ngày mong muốn nhập viện</label>
           <input type="date" {...field('preferredDate')} />
           {touched.preferredDate && errors.preferredDate && (
             <div className="sap-field__error-message">
@@ -51,9 +51,9 @@ export default function Step3({ data = {}, onChange, errors = {}, touched = {}, 
         <div className="sap-field">
           <label className="sap-label">
             <Phone size={13} style={{ display: 'inline', marginRight: 4 }} />
-            Contact Phone
+            Số điện thoại liên hệ
           </label>
-          <input type="tel" placeholder="Enter contact phone number" {...field('contactPhone')} />
+          <input type="tel" placeholder="Nhập số điện thoại liên hệ" {...field('contactPhone')} />
           {touched.contactPhone && errors.contactPhone && (
             <div className="sap-field__error-message">
               <AlertCircle size={12} />
@@ -62,9 +62,9 @@ export default function Step3({ data = {}, onChange, errors = {}, touched = {}, 
           )}
         </div>
         <div className="sap-field sap-field--full">
-          <label className="sap-label">Reason for Admission</label>
+          <label className="sap-label">Lý do nhập viện</label>
           <select {...selectField('admissionReason')}>
-            <option value="">Select main reason</option>
+            <option value="">Chọn lý do chính</option>
             {ADMISSION_REASONS.map(({ value, label }) => (
               <option key={value} value={value}>
                 {label}
@@ -79,10 +79,10 @@ export default function Step3({ data = {}, onChange, errors = {}, touched = {}, 
           )}
         </div>
         <div className="sap-field sap-field--full">
-          <label className="sap-label">Additional Notes</label>
+          <label className="sap-label">Ghi chú thêm</label>
           <textarea
             rows={4}
-            placeholder="Special requests regarding room, dietary requirements, assistance, etc..."
+            placeholder="Yêu cầu đặc biệt về phòng, chế độ ăn uống, hỗ trợ sinh hoạt, v.v..."
             {...textareaField('additionalNotes')}
           />
           {touched.additionalNotes && errors.additionalNotes && (
@@ -97,7 +97,7 @@ export default function Step3({ data = {}, onChange, errors = {}, touched = {}, 
           <div className="sap-info-alert">
             <Info size={18} className="sap-info-alert__icon" />
             <p>
-              Upon submission, our <strong>An Nhien Care Home</strong> specialist team will contact you within <strong>24 hours</strong> to verify the information and guide you through the next steps.
+              Sau khi gửi, đội ngũ tư vấn chuyên gia của <strong>An Nhiên Care Home</strong> sẽ liên hệ với bạn trong vòng <strong>24 giờ</strong> để xác nhận thông tin và hướng dẫn các bước tiếp theo.
             </p>
           </div>
         </div>

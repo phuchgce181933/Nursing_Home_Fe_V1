@@ -43,9 +43,14 @@ import AdminTourRequestsPage from '../pages/admin/AdminTourRequestsPage';
 import ServicePackagesPage from '../pages/admin/ServicePackagesPage';
 import PharmacyPage from '../pages/pharmacist/PharmacyPage';
 import AdminActivitiesPage from '../pages/admin/AdminActivitiesPage';
+import AdminReportsPage from '../pages/admin/AdminReportsPage';
+import ActivityStatisticsPage from '../pages/admin/ActivityStatisticsPage';
+import ActivityParticipationResultsPage from '../pages/admin/ActivityParticipationResultsPage';
+import CareAppointmentsPage from '../pages/admin/appointments';
 import DoctorDashboardPage from '../pages/doctor/DoctorDashboardPage';
 import NurseDashboardPage from '../pages/nurse/NurseDashboardPage';
 import MedicationPage from '../pages/nurse/MedicationPage';
+
 import MealPlansPage from '../pages/nurse/MealPlansPage';
 import NutritionReportsPage from '../pages/nurse/NutritionReportsPage';
 import CaregiverDashboardPage from '../pages/caregiver/CaregiverDashboardPage';
@@ -56,13 +61,20 @@ import DailyBehaviorsPage from '../pages/caregiver/daily-behaviors/DailyBehavior
 import DietPlansPage from '../pages/caregiver/diet-plans/DietPlansPage';
 import RehabilitationSchedulePage from '../pages/caregiver/rehabilitation-schedule/RehabilitationSchedulePage';
 import MealIntakeNotesPage from '../pages/caregiver/meal-intake/MealIntakeNotesPage';
+
+import ActivitySchedulePage from '../pages/nurse/ActivitySchedulePage';
+
 import DoctorMedicationPage from '../pages/doctor/MedicationPage';
 import FamilyDashboardPage from '../pages/family/FamilyDashboardPage';
 import SubmitAdmissionPage from '../pages/family/SubmitAdmissionPage';
 import AdmissionRequestsHistoryPage from '../pages/family/AdmissionRequestsHistoryPage';
 import SubmitFacilityTourPage from '../pages/family/SubmitFacilityTourPage';
 import FacilityTourHistoryPage from '../pages/family/FacilityTourHistoryPage';
+import FamilyActivityPage from '../pages/family/ActivityPage';
 import IncidentManagementPage from '../pages/IncidentManagementPage';
+import HealthMonitoringPage from '../pages/shared/HealthMonitoringPage';
+import CareNotesPage from '../pages/shared/CareNotesPage';
+import ManagerActivityDashboard from '../pages/manager/ActivityDashboard';
 import ProtectedRoute from '../components/ProtectedRoute';
 
 function AppRoutes() {
@@ -107,10 +119,14 @@ function AppRoutes() {
         <Route path="profile" element={<AdminProfile />} />
         <Route path="accounts" element={<AdminAccountsPage />} />
         <Route path="admission-requests" element={<AdminAdmissionRequestsPage />} />
+        <Route path="appointments" element={<CareAppointmentsPage />} />
         <Route path="tour-requests" element={<AdminTourRequestsPage />} />
         <Route path="service-packages" element={<ServicePackagesPage />} />
         <Route path="medications" element={<PharmacyPage />} />
         <Route path="activities" element={<AdminActivitiesPage />} />
+        <Route path="activities/statistics" element={<ActivityStatisticsPage />} />
+        <Route path="activities/participation-results" element={<ActivityParticipationResultsPage />} />
+        <Route path="reports" element={<AdminReportsPage />} />
         <Route path="incidents" element={<IncidentManagementPage />} />
         <Route path="*" element={<PlaceholderPage title="Trang quản trị" />} />
       </Route>
@@ -136,6 +152,7 @@ function AppRoutes() {
         <Route path="staff/assignments" element={<ManagerStaffAssignmentPage />} />
         <Route path="staff/emergency" element={<ManagerEmergencyAvailabilityPage />} />
         <Route path="staff/leave-requests" element={<ManagerLeaveRequestAdminPage />} />
+        <Route path="activity-dashboard" element={<ManagerActivityDashboard />} />
         <Route path="*" element={<PlaceholderPage title="Trang quản lý vận hành" />} />
       </Route>
 
@@ -152,9 +169,11 @@ function AppRoutes() {
         <Route path="profile" element={<ProfilePage />} />
         <Route path="admission-requests" element={<AdminAdmissionRequestsPage />} />
         <Route path="service-packages" element={<ServicePackagesPage />} />
-        <Route path="appointments" element={<PlaceholderPage title="Lịch khám" />} />
+        <Route path="appointments" element={<CareAppointmentsPage />} />
         <Route path="patients" element={<PlaceholderPage title="Danh sách bệnh nhân" />} />
+        <Route path="health-monitoring" element={<HealthMonitoringPage />} />
         <Route path="medications" element={<DoctorMedicationPage />} />
+        <Route path="care-notes" element={<CareNotesPage />} />
         <Route path="leave" element={<LeaveRequestPage />} />
         <Route path="messages" element={<PlaceholderPage title="Tin nhắn" />} />
         <Route path="incidents" element={<IncidentManagementPage />} />
@@ -173,10 +192,16 @@ function AppRoutes() {
         <Route path="profile" element={<ProfilePage />} />
         <Route path="admission-requests" element={<AdminAdmissionRequestsPage />} />
         <Route path="service-packages" element={<ServicePackagesPage />} />
+
         <Route path="care-notes" element={<PlaceholderPage title="Ghi chú chăm sóc" />} />
         <Route path="meal-plans" element={<MealPlansPage />} />
         <Route path="nutrition-reports" element={<NutritionReportsPage />} />
+
+        <Route path="health-monitoring" element={<HealthMonitoringPage />} />
+        <Route path="care-notes" element={<CareNotesPage />} />
+
         <Route path="medications" element={<MedicationPage />} />
+        <Route path="activity-schedule" element={<ActivitySchedulePage />} />
         <Route path="leave" element={<LeaveRequestPage />} />
         <Route path="messages" element={<PlaceholderPage title="Tin nhắn" />} />
         <Route path="incidents" element={<IncidentManagementPage />} />
@@ -251,6 +276,7 @@ function AppRoutes() {
         <Route path="dashboard" element={<FamilyDashboardPage />} />
         <Route path="admission-requests" element={<AdmissionRequestsHistoryPage />} />
         <Route path="facility-tours" element={<FacilityTourHistoryPage />} />
+        <Route path="activities" element={<FamilyActivityPage />} />
         <Route path="resident" element={<PlaceholderPage title="Hồ sơ người thân" />} />
         <Route path="notifications" element={<PlaceholderPage title="Thông báo" />} />
         <Route path="messages" element={<PlaceholderPage title="Tin nhắn" />} />
