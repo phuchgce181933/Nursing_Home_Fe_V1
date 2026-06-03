@@ -12,6 +12,9 @@ import {
   RefreshCw,
   ChevronLeft,
   ChevronRight,
+  Edit3,
+  FileText,
+  Save,
 } from 'lucide-react';
 import pharmacyService from '../../services/pharmacy.service';
 
@@ -799,7 +802,11 @@ function PharmacyPage({ defaultTab = 'overview' }) {
                   <ul className="pharmacy-list">
                     {expiryList.slice(0, 6).map((item) => (
                       <li key={item._id}>
-                        <span>{item.medicationId?.name || 'Medication'}</span>
+                        <span>
+                          {item.medicationId?.name
+                            ? `${item.medicationId.name}${item.medicationId.medicationCode ? ' (' + item.medicationId.medicationCode + ')' : ''}`
+                            : item.medicationId?.medicationCode || item.medicationId || 'Unknown medication'}
+                        </span>
                         <strong>{formatDate(item.expiryDate)}</strong>
                       </li>
                     ))}
@@ -877,9 +884,11 @@ function PharmacyPage({ defaultTab = 'overview' }) {
                       </td>
                       <td>
                         <button type="button" className="pharmacy-action" onClick={() => openMedicationModal(med)}>
+                          <Edit3 size={14} />
                           Sửa
                         </button>
                         <button type="button" className="pharmacy-action ghost" onClick={() => openNotes(med)}>
+                          <FileText size={14} />
                           Ghi chú
                         </button>
                       </td>
@@ -973,6 +982,7 @@ function PharmacyPage({ defaultTab = 'overview' }) {
                       </td>
                       <td>
                         <button type="button" className="pharmacy-action" onClick={() => openSupplierModal(supplier)}>
+                          <Edit3 size={14} />
                           Sửa
                         </button>
                         {supplier.isActive && (
@@ -1098,6 +1108,7 @@ function PharmacyPage({ defaultTab = 'overview' }) {
                       <td>{formatDate(stock.receivedDate)}</td>
                       <td>
                         <button type="button" className="pharmacy-action" onClick={() => openStockModal(stock)}>
+                          <Edit3 size={14} />
                           Sửa
                         </button>
                       </td>
@@ -1301,6 +1312,9 @@ function PharmacyPage({ defaultTab = 'overview' }) {
                       setMedicationForm((prev) => ({ ...prev, name: event.target.value }))
                     }
                   />
+                  <div className="pharmacy-field-meta">
+                    <small>Ví dụ: Paracetamol 500mg</small>
+                  </div>
                 </label>
                 <label>
                   Mã thuốc
@@ -1377,9 +1391,11 @@ function PharmacyPage({ defaultTab = 'overview' }) {
 
               <div className="pharmacy-modal__footer">
                 <button type="button" onClick={() => setShowMedicationModal(false)} className="ghost">
+                  <X size={14} />
                   Hủy
                 </button>
                 <button type="submit" className="pharmacy-primary" disabled={medicationSaving}>
+                  <Save size={14} />
                   {medicationSaving ? 'Đang lưu...' : 'Lưu'}
                 </button>
               </div>
@@ -1411,6 +1427,9 @@ function PharmacyPage({ defaultTab = 'overview' }) {
                       setSupplierForm((prev) => ({ ...prev, name: event.target.value }))
                     }
                   />
+                  <div className="pharmacy-field-meta">
+                    <small>Tên công ty hoặc cá nhân cung cấp</small>
+                  </div>
                 </label>
                 <label>
                   Người liên hệ
@@ -1510,9 +1529,11 @@ function PharmacyPage({ defaultTab = 'overview' }) {
 
               <div className="pharmacy-modal__footer">
                 <button type="button" onClick={() => setShowSupplierModal(false)} className="ghost">
+                  <X size={14} />
                   Hủy
                 </button>
                 <button type="submit" className="pharmacy-primary" disabled={supplierSaving}>
+                  <Save size={14} />
                   {supplierSaving ? 'Đang lưu...' : 'Lưu'}
                 </button>
               </div>
@@ -1569,6 +1590,9 @@ function PharmacyPage({ defaultTab = 'overview' }) {
                       setStockForm((prev) => ({ ...prev, quantity: event.target.value }))
                     }
                   />
+                  <div className="pharmacy-field-meta">
+                    <small>Nhập số lượng nguyên dương (ví dụ: 100)</small>
+                  </div>
                 </label>
                 <label>
                   Đơn vị
@@ -1669,9 +1693,11 @@ function PharmacyPage({ defaultTab = 'overview' }) {
 
               <div className="pharmacy-modal__footer">
                 <button type="button" onClick={() => setShowStockModal(false)} className="ghost">
+                  <X size={14} />
                   Hủy
                 </button>
                 <button type="submit" className="pharmacy-primary" disabled={stockSaving}>
+                  <Save size={14} />
                   {stockSaving ? 'Đang lưu...' : 'Lưu'}
                 </button>
               </div>
