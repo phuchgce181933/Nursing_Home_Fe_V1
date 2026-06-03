@@ -1,0 +1,225 @@
+.hygiene-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.hygiene-page__title {
+  margin: 0;
+  padding: 18px 22px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%);
+  color: #f8fafc;
+  font-size: 1.75rem;
+  font-weight: 700;
+  box-shadow: 0 18px 34px rgba(15, 118, 110, 0.24);
+}
+
+.hygiene-page__intro {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid #99f6e4;
+  background: #f0fdfa;
+  border-radius: 12px;
+  color: #475569;
+  line-height: 1.6;
+}
+
+.hygiene-page__panel {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.06);
+}
+
+.hygiene-page__panel-title {
+  margin: 0 0 12px;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.hygiene-page__context {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  background: #f0fdfa;
+  border: 1px solid #99f6e4;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  color: #0f766e;
+}
+
+.hygiene-page__context--warn {
+  background: #fff7ed;
+  border-color: #fed7aa;
+  color: #9a3412;
+}
+
+.hygiene-page__form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.hygiene-page__form-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+.hygiene-page__form-grid input,
+.hygiene-page__form-grid select,
+.hygiene-page__form-grid textarea {
+  padding: 8px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+}
+
+.hygiene-page__field-full {
+  grid-column: 1 / -1;
+}
+
+.hygiene-page__field-hint {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.hygiene-page__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.hygiene-page__row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.hygiene-page__status {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.hygiene-page__status--completed {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.hygiene-page__status--partial {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.hygiene-page__status--refused {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.hygiene-page__status--assisted {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.hygiene-page__readonly-meta {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  color: #475569;
+  line-height: 1.5;
+}
+
+.hygiene-page__readonly-meta p {
+  margin: 0 0 4px;
+}
+
+.hygiene-page__delete-summary {
+  margin: 8px 0 12px;
+  padding: 10px 12px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  color: #991b1b;
+  font-weight: 600;
+}
+
+.hygiene-page__modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 1100;
+}
+
+.hygiene-page__modal {
+  width: min(640px, 100%);
+  max-height: 88vh;
+  overflow: auto;
+  background: #ffffff;
+  border-radius: 20px;
+  border: 1px solid #dbe3ee;
+  box-shadow: 0 26px 52px rgba(15, 23, 42, 0.28);
+}
+
+.hygiene-page__modal--sm {
+  width: min(440px, 100%);
+}
+
+.hygiene-page__modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px;
+  background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%);
+}
+
+.hygiene-page__modal-title {
+  margin: 0;
+  font-size: 1.06rem;
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+.hygiene-page__modal-close {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.15);
+  color: #f8fafc;
+  cursor: pointer;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.hygiene-page__modal-body {
+  padding: 14px 16px 18px;
+}
+
+@media (max-width: 768px) {
+  .hygiene-page__title {
+    font-size: 1.45rem;
+    padding: 14px 16px;
+  }
+
+  .hygiene-page .data-table {
+    display: block;
+    overflow-x: auto;
+  }
+}

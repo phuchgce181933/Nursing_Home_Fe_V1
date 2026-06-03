@@ -15,6 +15,12 @@ import {
   PackageOpen,
   Truck,
   ShieldCheck,
+  Soup,
+  BarChart3,
+  Droplets,
+  Brain,
+  Apple,
+  Dumbbell,
 } from 'lucide-react';
 
 export const roleSidebarData = {
@@ -70,6 +76,53 @@ export const roleSidebarData = {
       path: '/doctor/messages',
     },
   ],
+  caregiver: [
+    {
+      title: 'Dashboard Caregiver',
+      icon: LayoutDashboard,
+      path: '/caregiver/dashboard',
+    },
+    {
+      title: 'Hồ sơ cá nhân',
+      icon: UserCircle,
+      path: '/caregiver/profile',
+    },
+    {
+      title: 'Cư dân phụ trách',
+      icon: Users,
+      path: '/caregiver/assigned-residents',
+    },
+    {
+      title: 'Lịch chăm sóc',
+      icon: ClipboardList,
+      path: '/caregiver/daily-care-schedule',
+    },
+    {
+      title: 'Ghi nhận bữa ăn',
+      icon: Soup,
+      path: '/caregiver/meal-intake-notes',
+    },
+    {
+      title: 'Chế độ ăn uống',
+      icon: Apple,
+      path: '/caregiver/diet-plans',
+    },
+    {
+      title: 'Lịch phục hồi',
+      icon: Dumbbell,
+      path: '/caregiver/rehabilitation-schedule',
+    },
+    {
+      title: 'Hoạt động vệ sinh',
+      icon: Droplets,
+      path: '/caregiver/hygiene-activities',
+    },
+    {
+      title: 'Hành vi hằng ngày',
+      icon: Brain,
+      path: '/caregiver/daily-behaviors',
+    },
+  ],
   nurse: [
     {
       title: 'Dashboard Điều dưỡng',
@@ -85,6 +138,16 @@ export const roleSidebarData = {
       title: 'Ghi chú chăm sóc',
       icon: Activity,
       path: '/nurse/care-notes',
+    },
+    {
+      title: 'Meal Plans',
+      icon: Soup,
+      path: '/nurse/meal-plans',
+    },
+    {
+      title: 'Báo cáo dinh dưỡng',
+      icon: BarChart3,
+      path: '/nurse/nutrition-reports',
     },
     {
       title: 'Thuốc',

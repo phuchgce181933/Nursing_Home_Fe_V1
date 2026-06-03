@@ -3,6 +3,7 @@ export const ROLE_HOME_PATHS = {
   manager: '/manager/dashboard',
   doctor: '/doctor/dashboard',
   nurse: '/nurse/dashboard',
+  caregiver: '/caregiver/dashboard',
   family: '/family/dashboard',
   pharmacist: '/pharmacist/overview',
 };

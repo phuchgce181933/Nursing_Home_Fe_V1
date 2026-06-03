@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import shiftService from '../../../../services/shift.service';
 import staffService from '../../../../services/staff.service';
+import residentService from '../../../../services/resident.service';
+import careScheduleService from '../../../../services/careSchedule.service';
 import {
   CONFLICT_ICON,
   CONFLICT_LABEL,
@@ -25,6 +27,19 @@ const SHIFT_TYPES = [
 ];
 
 const SHIFT_STATUS_LABELS = { draft: 'Nháp', published: 'Đã đăng', confirmed: 'Đã xác nhận', completed: 'Hoàn thành', cancelled: 'Đã hủy' };
+const CARE_TASK_TYPES = [
+  { value: 'morning_care', label: 'Chăm sóc buổi sáng' },
+  { value: 'medication', label: 'Cho thuốc' },
+  { value: 'physical_therapy', label: 'Vật lý trị liệu' },
+  { value: 'meal_assistance', label: 'Hỗ trợ bữa ăn' },
+  { value: 'evening_check', label: 'Kiểm tra buổi tối' },
+  { value: 'emergency_response', label: 'Ứng phó khẩn cấp' },
+];
+const CARE_LEVELS = [
+  { value: 'low', label: 'Thấp' },
+  { value: 'medium', label: 'Trung bình' },
+  { value: 'high', label: 'Cao' },
+];
 
 /** Backend wraps payloads as { success, data }; list endpoints nest arrays under data.data */
 const unwrapApiData = (res) => res?.data ?? res;
@@ -923,12 +938,516 @@ function ScheduleTab() {
   );
 }
 
+function CreateCareScheduleTab() {
+  const [workDate, setWorkDate] = useState(today());
+  const { staff: staffOptions } = useAssignableStaffForDate(workDate);
+  const [residents, setResidents] = useState([]);
+  const [templates, setTemplates] = useState([]);
+  const [dayShifts, setDayShifts] = useState([]);
+  const [selectedResidents, setSelectedResidents] = useState([]);
+  const [commonStaffProfileId, setCommonStaffProfileId] = useState('');
+  const [commonShiftId, setCommonShiftId] = useState('');
+  const [templateKey, setTemplateKey] = useState('');
+  const [entries, setEntries] = useState([]);
+  const [title, setTitle] = useState('');
+  const [editingScheduleId, setEditingScheduleId] = useState('');
+  const [drafts, setDrafts] = useState([]);
+  const [detailSchedule, setDetailSchedule] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const loadResidents = async () => {
+    try {
+      const res = await residentService.listForAssignment({ status: 'admitted' });
+      setResidents(Array.isArray(res?.data) ? res.data : []);
+    } catch {
+      setResidents([]);
+    }
+  };
+
+  const loadTemplates = async () => {
+    try {
+      const res = await careScheduleService.getTemplates();
+      setTemplates(Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : []);
+    } catch {
+      setTemplates([]);
+    }
+  };
+
+  const loadShiftsForDay = async () => {
+    try {
+      const res = await shiftService.getSchedule(workDate, workDate);
+      const { shifts } = parseShiftList(res);
+      setDayShifts(shifts.filter((s) => ['published', 'confirmed'].includes(s.status)));
+    } catch {
+      setDayShifts([]);
+    }
+  };
+
+  const loadDrafts = async () => {
+    setLoading(true);
+    try {
+      const res = await careScheduleService.listSchedules({ workDate, limit: 50 });
+      const rows = Array.isArray(res?.data) ? res.data : [];
+      setDrafts(rows.filter((x) => ['draft', 'published'].includes(x.status)));
+    } catch {
+      setDrafts([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadResidents();
+    loadTemplates();
+  }, []);
+
+  useEffect(() => {
+    setCommonStaffProfileId('');
+    setCommonShiftId('');
+    loadShiftsForDay();
+    loadDrafts();
+  }, [workDate]);
+
+  const shiftsBySelectedStaff = dayShifts.filter(
+    (s) => String(s.assignedStaffId?._id || s.assignedStaffId) === String(commonStaffProfileId)
+  );
+
+  const addEntriesFromTemplate = () => {
+    setError('');
+    const tpl = templates.find((t) => t.key === templateKey);
+    if (!tpl) {
+      setError('Vui lòng chọn mẫu lịch.');
+      return;
+    }
+    if (!selectedResidents.length) {
+      setError('Vui lòng chọn ít nhất 2 cư dân.');
+      return;
+    }
+    if (selectedResidents.length < 2) {
+      setError('Lịch chăm sóc theo ngày yêu cầu tối thiểu 2 cư dân.');
+      return;
+    }
+    if (!commonStaffProfileId || !commonShiftId) {
+      setError('Vui lòng chọn nhân viên và ca áp dụng.');
+      return;
+    }
+    const generated = [];
+    selectedResidents.forEach((residentId) => {
+      tpl.entries.forEach((it) => {
+        generated.push({
+          residentId,
+          staffProfileId: commonStaffProfileId,
+          shiftId: commonShiftId,
+          taskType: it.taskType,
+          careLevel: it.careLevel,
+          scheduledTime: it.scheduledTime,
+          notes: '',
+          source: 'template',
+          templateKey,
+        });
+      });
+    });
+    setEntries((prev) => [...prev, ...generated]);
+  };
+
+  const addManualRow = () => {
+    setEntries((prev) => [
+      ...prev,
+      {
+        residentId: selectedResidents[0] || '',
+        staffProfileId: commonStaffProfileId || '',
+        shiftId: commonShiftId || '',
+        taskType: 'morning_care',
+        careLevel: 'low',
+        scheduledTime: '08:00',
+        notes: '',
+        source: 'manual',
+      },
+    ]);
+  };
+
+  const patchEntry = (idx, patch) => {
+    setEntries((prev) => prev.map((row, i) => (i === idx ? { ...row, ...patch } : row)));
+  };
+
+  const removeEntry = (idx) => setEntries((prev) => prev.filter((_, i) => i !== idx));
+
+  const resetForm = () => {
+    setTitle('');
+    setSelectedResidents([]);
+    setTemplateKey('');
+    setEntries([]);
+    setEditingScheduleId('');
+    setError('');
+  };
+
+  const validateBeforeSave = () => {
+    if (workDate < today()) return 'Không thể tạo lịch cho ngày trong quá khứ.';
+    if (selectedResidents.length < 2) return 'Vui lòng chọn tối thiểu 2 cư dân.';
+    if (!entries.length) return 'Vui lòng thêm ít nhất một đầu việc.';
+    const invalid = entries.find(
+      (e) =>
+        !e.residentId ||
+        !e.staffProfileId ||
+        !e.shiftId ||
+        !e.taskType ||
+        !e.careLevel ||
+        !e.scheduledTime
+    );
+    if (invalid) return 'Mỗi đầu việc phải có cư dân, nhân viên, ca, loại việc, mức độ và giờ.';
+    return '';
+  };
+
+  const submitDraft = async () => {
+    const msg = validateBeforeSave();
+    if (msg) {
+      setError(msg);
+      return;
+    }
+    setSaving(true);
+    setError('');
+    try {
+      const payload = { workDate, title, entries };
+      if (editingScheduleId) {
+        await careScheduleService.updateDraft(editingScheduleId, payload);
+      } else {
+        await careScheduleService.createDraft(payload);
+      }
+      resetForm();
+      loadDrafts();
+    } catch (e) {
+      setError(e?.response?.data?.message || 'Lưu draft thất bại');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const openDraft = async (id) => {
+    setSaving(true);
+    setError('');
+    try {
+      const data = await careScheduleService.getSchedule(id);
+      setEditingScheduleId(data._id);
+      setTitle(data.title || '');
+      setWorkDate((data.workDate || '').slice(0, 10) || today());
+      const rows = Array.isArray(data.entries) ? data.entries : [];
+      setEntries(
+        rows.map((r) => ({
+          residentId: String(r.residentId?._id || r.residentId || ''),
+          staffProfileId: String(r.staffProfileId?._id || r.staffProfileId || ''),
+          shiftId: String(r.shiftId?._id || r.shiftId || ''),
+          taskType: r.taskType,
+          careLevel: r.careLevel,
+          scheduledTime: r.scheduledTime,
+          notes: r.notes || '',
+          source: r.source || 'manual',
+          templateKey: r.templateKey,
+        }))
+      );
+      const residentSet = [...new Set(rows.map((r) => String(r.residentId?._id || r.residentId || '')).filter(Boolean))];
+      setSelectedResidents(residentSet);
+    } catch (e) {
+      setError(e?.response?.data?.message || 'Không mở được draft');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const publishDraft = async (id) => {
+    setSaving(true);
+    setError('');
+    try {
+      await careScheduleService.publishSchedule(id);
+      if (editingScheduleId === id) resetForm();
+      loadDrafts();
+    } catch (e) {
+      setError(e?.response?.data?.message || 'Publish thất bại');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const deleteDraft = async (id) => {
+    if (!window.confirm('Bạn có chắc muốn xóa bản nháp này?')) return;
+    setSaving(true);
+    setError('');
+    try {
+      await careScheduleService.deleteDraft(id);
+      if (editingScheduleId === id) resetForm();
+      loadDrafts();
+    } catch (e) {
+      setError(e?.response?.data?.message || 'Xóa draft thất bại');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const openPublishedDetail = async (id) => {
+    setDetailLoading(true);
+    setError('');
+    try {
+      const data = await careScheduleService.getSchedule(id);
+      setDetailSchedule(data || null);
+    } catch (e) {
+      setError(e?.response?.data?.message || 'Không tải được chi tiết lịch');
+      setDetailSchedule(null);
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  return (
+    <div>
+      <p style={{ marginBottom: 12, fontSize: '0.85rem', color: '#64748b' }}>
+        Tạo lịch chăm sóc theo ngày cho nhiều cư dân, hỗ trợ mẫu + chỉnh tay. Lưu ở trạng thái nháp, sau đó Publish để sinh nhiệm vụ chăm sóc.
+      </p>
+      {error && <p className="form-error">{error}</p>}
+
+      <div className="form-grid">
+        <div className="form-group">
+          <label>Ngày chăm sóc *</label>
+          <input type="date" min={today()} value={workDate} onChange={(e) => setWorkDate(e.target.value)} />
+        </div>
+        <div className="form-group">
+          <label>Tiêu đề</label>
+          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="VD: Lịch chăm sóc khối A" />
+        </div>
+        <div className="form-group">
+          <label>Nhân viên phụ trách chung</label>
+          <select value={commonStaffProfileId} onChange={(e) => setCommonStaffProfileId(e.target.value)}>
+            <option value="">— Chọn nhân viên —</option>
+            {staffOptions.map((s) => (
+              <option key={s.staffProfile?._id || s._id} value={s.staffProfile?._id || ''}>
+                {s.fullName}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="form-group">
+          <label>Ca áp dụng chung</label>
+          <select value={commonShiftId} onChange={(e) => setCommonShiftId(e.target.value)}>
+            <option value="">— Chọn ca —</option>
+            {shiftsBySelectedStaff.map((s) => (
+              <option key={s._id} value={s._id}>
+                {s.name} ({s.startTime} - {s.endTime})
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div style={{ marginTop: 12, marginBottom: 12 }}>
+        <label style={{ display: 'block', marginBottom: 6, fontWeight: 600 }}>Cư dân áp dụng (chọn nhiều) *</label>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,minmax(0,1fr))', gap: 8, maxHeight: 160, overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: 8, padding: 8 }}>
+          {residents.map((r) => {
+            const id = String(r._id);
+            const checked = selectedResidents.includes(id);
+            return (
+              <label key={id} style={{ fontSize: '0.85rem' }}>
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={(e) =>
+                    setSelectedResidents((prev) =>
+                      e.target.checked ? [...prev, id] : prev.filter((x) => x !== id)
+                    )
+                  }
+                />{' '}
+                {r.fullName || r.residentCode}
+              </label>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="tab-toolbar">
+        <select value={templateKey} onChange={(e) => setTemplateKey(e.target.value)}>
+          <option value="">— Chọn mẫu lịch —</option>
+          {templates.map((t) => (
+            <option key={t.key} value={t.key}>{t.name}</option>
+          ))}
+        </select>
+        <button type="button" className="btn-primary" onClick={addEntriesFromTemplate}>
+          + Thêm từ mẫu
+        </button>
+        <button type="button" className="btn-secondary" onClick={addManualRow}>
+          + Thêm thủ công
+        </button>
+      </div>
+
+      <table className="data-table">
+        <thead>
+          <tr>
+            <th>Cư dân</th>
+            <th>Nhân viên</th>
+            <th>Ca</th>
+            <th>Loại việc</th>
+            <th>Mức độ</th>
+            <th>Giờ</th>
+            <th>Nguồn</th>
+            <th>Ghi chú</th>
+            <th />
+          </tr>
+        </thead>
+        <tbody>
+          {entries.length === 0 && (
+            <tr><td colSpan={9} className="empty-state">Chưa có đầu việc</td></tr>
+          )}
+          {entries.map((row, idx) => (
+            <tr key={`${idx}-${row.residentId}-${row.scheduledTime}`}>
+              <td>
+                <select value={row.residentId} onChange={(e) => patchEntry(idx, { residentId: e.target.value })}>
+                  <option value="">—</option>
+                  {residents.map((r) => <option key={r._id} value={r._id}>{r.fullName || r.residentCode}</option>)}
+                </select>
+              </td>
+              <td>
+                <select value={row.staffProfileId} onChange={(e) => patchEntry(idx, { staffProfileId: e.target.value, shiftId: '' })}>
+                  <option value="">—</option>
+                  {staffOptions.map((s) => <option key={s.staffProfile?._id || s._id} value={s.staffProfile?._id || ''}>{s.fullName}</option>)}
+                </select>
+              </td>
+              <td>
+                <select value={row.shiftId} onChange={(e) => patchEntry(idx, { shiftId: e.target.value })}>
+                  <option value="">—</option>
+                  {dayShifts
+                    .filter((s) => String(s.assignedStaffId?._id || s.assignedStaffId) === String(row.staffProfileId))
+                    .map((s) => <option key={s._id} value={s._id}>{s.name} ({s.startTime}-{s.endTime})</option>)}
+                </select>
+              </td>
+              <td>
+                <select value={row.taskType} onChange={(e) => patchEntry(idx, { taskType: e.target.value })}>
+                  {CARE_TASK_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                </select>
+              </td>
+              <td>
+                <select value={row.careLevel} onChange={(e) => patchEntry(idx, { careLevel: e.target.value })}>
+                  {CARE_LEVELS.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
+                </select>
+              </td>
+              <td><input type="time" value={row.scheduledTime} onChange={(e) => patchEntry(idx, { scheduledTime: e.target.value })} /></td>
+              <td>{row.source === 'template' ? 'Mẫu' : 'Thủ công'}</td>
+              <td><input value={row.notes || ''} onChange={(e) => patchEntry(idx, { notes: e.target.value })} /></td>
+              <td><button type="button" className="btn btn--sm btn--delete" onClick={() => removeEntry(idx)}>Xóa</button></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <div className="tab-toolbar">
+        <button type="button" className="btn-primary" disabled={saving} onClick={submitDraft}>
+          {saving ? 'Đang lưu...' : editingScheduleId ? 'Cập nhật Draft' : 'Lưu Draft'}
+        </button>
+        <button type="button" className="btn-secondary" onClick={resetForm}>Làm mới</button>
+      </div>
+
+      <h4 style={{ marginTop: 20 }}>Lịch trong ngày</h4>
+      {loading ? <p className="loading-text">Đang tải...</p> : (
+        <table className="data-table">
+          <thead>
+            <tr><th>Tiêu đề</th><th>Ngày</th><th>Trạng thái</th><th>Cập nhật</th><th>Thao tác</th></tr>
+          </thead>
+          <tbody>
+            {drafts.length === 0 && <tr><td colSpan={5} className="empty-state">Không có lịch</td></tr>}
+            {drafts.map((d) => (
+              <tr key={d._id}>
+                <td>{d.title || '—'}</td>
+                <td>{(d.workDate || '').slice(0, 10)}</td>
+                <td><StatusBadge value={d.status} map={{ draft: 'Nháp', published: 'Đã đăng' }} prefix="shift" /></td>
+                <td>{(d.updatedAt || '').replace('T', ' ').slice(0, 16)}</td>
+                <td>
+                  {d.status === 'draft' ? (
+                    <>
+                      <button type="button" className="btn btn--sm btn--edit" onClick={() => openDraft(d._id)}>Mở</button>{' '}
+                      <button type="button" className="btn btn--sm btn--primary" onClick={() => publishDraft(d._id)}>Publish</button>{' '}
+                      <button type="button" className="btn btn--sm btn--delete" onClick={() => deleteDraft(d._id)}>
+                        Xóa
+                      </button>
+                    </>
+                  ) : (
+                    <button type="button" className="btn btn--sm btn--edit" onClick={() => openPublishedDetail(d._id)}>
+                      Chi tiết
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
+      {(detailLoading || detailSchedule) && (
+        <div className="modal-overlay" onClick={!detailLoading ? () => setDetailSchedule(null) : undefined}>
+          <div className="modal modal--scroll" style={{ maxWidth: 980 }} onClick={(e) => e.stopPropagation()}>
+            <h2 className="modal__title">Chi tiết lịch đã publish</h2>
+            {detailLoading && <p className="loading-text">Đang tải chi tiết...</p>}
+            {!detailLoading && detailSchedule && (
+              <>
+                <p style={{ margin: '4px 0 12px', fontSize: '0.85rem', color: '#64748b' }}>
+                  Tiêu đề: <strong>{detailSchedule.title || '—'}</strong> · Ngày:{' '}
+                  <strong>{(detailSchedule.workDate || '').slice(0, 10)}</strong>
+                </p>
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Cư dân</th>
+                      <th>Nhân viên</th>
+                      <th>Ca</th>
+                      <th>Loại việc</th>
+                      <th>Mức độ</th>
+                      <th>Giờ</th>
+                      <th>Nguồn</th>
+                      <th>Ghi chú</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Array.isArray(detailSchedule.entries) && detailSchedule.entries.length > 0 ? (
+                      detailSchedule.entries.map((row, idx) => {
+                        const residentName = row.residentId?.fullName || row.residentId?.residentCode || '—';
+                        const staffName = row.staffProfileId?.userId?.fullName || row.staffProfileId?.staffCode || '—';
+                        const shiftName = row.shiftId?.name || '—';
+                        const taskLabel = CARE_TASK_TYPES.find((t) => t.value === row.taskType)?.label || row.taskType || '—';
+                        const levelLabel = CARE_LEVELS.find((l) => l.value === row.careLevel)?.label || row.careLevel || '—';
+                        return (
+                          <tr key={`${detailSchedule._id || 'detail'}-${idx}`}>
+                            <td>{residentName}</td>
+                            <td>{staffName}</td>
+                            <td>{shiftName}</td>
+                            <td>{taskLabel}</td>
+                            <td>{levelLabel}</td>
+                            <td>{row.scheduledTime || '—'}</td>
+                            <td>{row.source === 'template' ? 'Mẫu' : 'Thủ công'}</td>
+                            <td>{row.notes || '—'}</td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr><td colSpan={8} className="empty-state">Lịch chưa có đầu việc</td></tr>
+                    )}
+                  </tbody>
+                </table>
+                <div className="modal__actions">
+                  <button className="btn-cancel" onClick={() => setDetailSchedule(null)}>Đóng</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 const TABS = [
   { key: 'templates', label: '📋 Mẫu ca làm việc' },
   { key: 'assign',    label: '👤 Phân công ca' },
   { key: 'schedule',  label: '📅 Lịch làm việc' },
+  { key: 'care-schedule', label: '🩺 Tạo lịch chăm sóc' },
 ];
 
 export default function ShiftManagementPage() {
@@ -955,6 +1474,7 @@ export default function ShiftManagementPage() {
         {tab === 'templates' && <TemplatesTab />}
         {tab === 'assign'    && <AssignTab />}
         {tab === 'schedule'  && <ScheduleTab />}
+        {tab === 'care-schedule' && <CreateCareScheduleTab />}
       </div>
     </AdminPageShell>
   );

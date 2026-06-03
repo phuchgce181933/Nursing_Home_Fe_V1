@@ -1,0 +1,218 @@
+.diet-plans-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.diet-plans-page__title {
+  margin: 0;
+  padding: 18px 22px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #15803d 0%, #0ea5e9 100%);
+  color: #f0fdf4;
+  font-size: 1.75rem;
+  font-weight: 700;
+  box-shadow: 0 18px 34px rgba(21, 128, 61, 0.24);
+}
+
+.diet-plans-page__intro {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid #bbf7d0;
+  background: #f0fdf4;
+  border-radius: 12px;
+  color: #475569;
+  line-height: 1.6;
+}
+
+.diet-plans-page__panel {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.06);
+}
+
+.diet-plans-page__panel-title {
+  margin: 0 0 12px;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.diet-plans-page__filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+
+.diet-plans-page__filters label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+.diet-plans-page__filters input,
+.diet-plans-page__filters select {
+  padding: 8px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+}
+
+.diet-plans-page__filter-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.diet-plans-page__day-banner {
+  margin: 0;
+  padding: 10px 12px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  color: #1e40af;
+}
+
+.diet-plans-page__status-yes {
+  color: #15803d;
+  font-weight: 700;
+}
+
+.diet-plans-page__status-no {
+  color: #94a3b8;
+}
+
+.diet-plans-page__allergies {
+  margin: 4px 0 0;
+  font-size: 0.8rem;
+  color: #b45309;
+}
+
+.diet-plans-page__row-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.diet-plans-page__modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 1100;
+}
+
+.diet-plans-page__modal {
+  width: min(760px, 100%);
+  max-height: 90vh;
+  overflow: auto;
+  background: #ffffff;
+  border-radius: 20px;
+  border: 1px solid #dbe3ee;
+  box-shadow: 0 26px 52px rgba(15, 23, 42, 0.28);
+}
+
+.diet-plans-page__modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px;
+  background: linear-gradient(135deg, #15803d 0%, #0ea5e9 100%);
+}
+
+.diet-plans-page__modal-title {
+  margin: 0;
+  font-size: 1.06rem;
+  font-weight: 700;
+  color: #f0fdf4;
+}
+
+.diet-plans-page__modal-close {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.15);
+  color: #f0fdf4;
+  cursor: pointer;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.diet-plans-page__modal-body {
+  padding: 14px 16px 18px;
+}
+
+.diet-plans-page__section {
+  margin-bottom: 16px;
+}
+
+.diet-plans-page__section h4 {
+  margin: 0 0 8px;
+  font-size: 0.95rem;
+  color: #0f766e;
+}
+
+.diet-plans-page__alert {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 10px;
+  color: #9a3412;
+  font-size: 0.9rem;
+}
+
+.diet-plans-page__empty {
+  margin: 0;
+  padding: 10px;
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+.diet-plans-page__meal-card {
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.diet-plans-page__meal-card strong {
+  color: #1e293b;
+}
+
+.diet-plans-page__meal-meta {
+  margin: 4px 0 0;
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+.diet-plans-page__diet-card {
+  margin-bottom: 8px;
+  padding: 10px 12px;
+  border: 1px solid #e9d5ff;
+  border-radius: 10px;
+  background: #faf5ff;
+}
+
+@media (max-width: 768px) {
+  .diet-plans-page__title {
+    font-size: 1.45rem;
+    padding: 14px 16px;
+  }
+
+  .diet-plans-page .data-table {
+    display: block;
+    overflow-x: auto;
+  }
+}
