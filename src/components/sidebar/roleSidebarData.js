@@ -15,11 +15,16 @@ import {
   PackageOpen,
   Truck,
   ShieldCheck,
+  Soup,
+  BarChart3,
+  Droplets,
+  Brain,
+  Apple,
+  Dumbbell,
 } from 'lucide-react';
 
 export const roleSidebarData = {
   doctor: [
-
     {
       title: 'Dashboard Bác sĩ',
       icon: LayoutDashboard,
@@ -36,11 +41,6 @@ export const roleSidebarData = {
       path: '/doctor/appointments',
     },
     {
-      title: 'Theo dõi Sức khỏe',
-      icon: HeartPulse,
-      path: '/doctor/health-monitoring',
-    },
-    {
       title: 'Bệnh nhân',
       icon: Users,
       path: '/doctor/patients',
@@ -49,11 +49,6 @@ export const roleSidebarData = {
       title: 'Thuốc',
       icon: Pill,
       path: '/doctor/medications',
-    },
-    {
-      title: 'Ghi chú chăm sóc',
-      icon: Activity,
-      path: '/doctor/care-notes',
     },
     {
       title: 'Yêu cầu Nhập viện',
@@ -80,37 +75,188 @@ export const roleSidebarData = {
       icon: MessageSquare,
       path: '/doctor/messages',
     },
-
+  ],
+  caregiver: [
+    {
+      title: 'Dashboard Caregiver',
+      icon: LayoutDashboard,
+      path: '/caregiver/dashboard',
+    },
+    {
+      title: 'Hồ sơ cá nhân',
+      icon: UserCircle,
+      path: '/caregiver/profile',
+    },
+    {
+      title: 'Cư dân phụ trách',
+      icon: Users,
+      path: '/caregiver/assigned-residents',
+    },
+    {
+      title: 'Lịch chăm sóc',
+      icon: ClipboardList,
+      path: '/caregiver/daily-care-schedule',
+    },
+    {
+      title: 'Ghi nhận bữa ăn',
+      icon: Soup,
+      path: '/caregiver/meal-intake-notes',
+    },
+    {
+      title: 'Chế độ ăn uống',
+      icon: Apple,
+      path: '/caregiver/diet-plans',
+    },
+    {
+      title: 'Lịch phục hồi',
+      icon: Dumbbell,
+      path: '/caregiver/rehabilitation-schedule',
+    },
+    {
+      title: 'Hoạt động vệ sinh',
+      icon: Droplets,
+      path: '/caregiver/hygiene-activities',
+    },
+    {
+      title: 'Hành vi hằng ngày',
+      icon: Brain,
+      path: '/caregiver/daily-behaviors',
+    },
   ],
   nurse: [
-    { title: 'sidebar.nurseDashboard', icon: LayoutDashboard, path: '/nurse/dashboard' },
-    { title: 'sidebar.myProfile', icon: UserCircle, path: '/nurse/profile' },
-    { title: 'Lịch hoạt động', icon: Calendar, path: '/nurse/activity-schedule' },
-    { title: 'sidebar.careNotes', icon: Activity, path: '/nurse/care-notes' },
-    { title: 'Theo dõi Sức khỏe', icon: HeartPulse, path: '/nurse/health-monitoring' },
-    { title: 'sidebar.medication', icon: Pill, path: '/nurse/medications' },
-    { title: 'sidebar.admissionRequests', icon: ClipboardList, path: '/nurse/admission-requests' },
-    { title: 'sidebar.servicePackages', icon: HeartPulse, path: '/nurse/service-packages' },
-    { title: 'sidebar.incidents', icon: FileText, path: '/nurse/incidents' },
-    { title: 'sidebar.leaveRequests', icon: CalendarOff, path: '/nurse/leave' },
-    { title: 'sidebar.messages', icon: MessageSquare, path: '/nurse/messages' },
+    {
+      title: 'Dashboard Điều dưỡng',
+      icon: LayoutDashboard,
+      path: '/nurse/dashboard',
+    },
+    {
+      title: 'Hồ sơ cá nhân',
+      icon: UserCircle,
+      path: '/nurse/profile',
+    },
+    {
+      title: 'Lịch hoạt động',
+      icon: Calendar,
+      path: '/nurse/activity-schedule',
+    },
+    {
+      title: 'Ghi chú chăm sóc',
+      icon: Activity,
+      path: '/nurse/care-notes',
+    },
+    {
+      title: 'Theo dõi Sức khỏe',
+      icon: HeartPulse,
+      path: '/nurse/health-monitoring',
+    },
+    {
+      title: 'Kế hoạch bữa ăn',
+      icon: Soup,
+      path: '/nurse/meal-plans',
+    },
+    {
+      title: 'Báo cáo dinh dưỡng',
+      icon: BarChart3,
+      path: '/nurse/nutrition-reports',
+    },
+    {
+      title: 'Thuốc',
+      icon: Pill,
+      path: '/nurse/medications',
+    },
+    {
+      title: 'Yêu cầu Nhập viện',
+      icon: ClipboardList,
+      path: '/nurse/admission-requests',
+    },
+    {
+      title: 'Gói Dịch vụ',
+      icon: HeartPulse,
+      path: '/nurse/service-packages',
+    },
+    {
+      title: 'Sự cố',
+      icon: FileText,
+      path: '/nurse/incidents',
+    },
+    {
+      title: 'Nghỉ phép',
+      icon: CalendarOff,
+      path: '/nurse/leave',
+    },
+    {
+      title: 'Tin nhắn',
+      icon: MessageSquare,
+      path: '/nurse/messages',
+    },
   ],
   family: [
-    { title: 'sidebar.familyDashboard', icon: LayoutDashboard, path: '/family/dashboard' },
-    { title: 'sidebar.admissionRequests', icon: History, path: '/family/admission-requests' },
-    { title: 'sidebar.facilityTourHistory', icon: Calendar, path: '/family/facility-tours' },
-    { title: 'Hoạt động', icon: Activity, path: '/family/activities' },
-    { title: 'sidebar.residentInfo', icon: Users, path: '/family/resident' },
-    { title: 'sidebar.notifications', icon: Bell, path: '/family/notifications' },
-    { title: 'sidebar.messages', icon: MessageSquare, path: '/family/messages' },
+    {
+      title: 'Trang Gia đình',
+      icon: LayoutDashboard,
+      path: '/family/dashboard',
+    },
+    {
+      title: 'Lịch sử yêu cầu',
+      icon: History,
+      path: '/family/admission-requests',
+    },
+    {
+      title: 'Facility Tour History',
+      icon: Calendar,
+      path: '/family/facility-tours',
+    },
+    {
+      title: 'Người thân',
+      icon: Users,
+      path: '/family/resident',
+    },
+    {
+      title: 'Thông báo',
+      icon: Bell,
+      path: '/family/notifications',
+    },
+    {
+      title: 'Tin nhắn',
+      icon: MessageSquare,
+      path: '/family/messages',
+    },
   ],
   pharmacist: [
-    { title: 'sidebar.pharmacyOverview', icon: LayoutDashboard, path: '/pharmacist/overview' },
-    { title: 'sidebar.myProfile', icon: UserCircle, path: '/pharmacist/profile' },
-    { title: 'sidebar.medication', icon: Pill, path: '/pharmacist/medications' },
-    { title: 'sidebar.pharmacySuppliers', icon: Truck, path: '/pharmacist/suppliers' },
-    { title: 'sidebar.pharmacyStocks', icon: PackageOpen, path: '/pharmacist/stocks' },
-    { title: 'sidebar.pharmacyDispense', icon: ShieldCheck, path: '/pharmacist/dispense' },
-    { title: 'sidebar.pharmacyReports', icon: FileText, path: '/pharmacist/reports' },
+    {
+      title: 'Tổng quan nhà thuốc',
+      icon: LayoutDashboard,
+      path: '/pharmacist/overview',
+    },
+    {
+      title: 'Hồ sơ cá nhân',
+      icon: UserCircle,
+      path: '/pharmacist/profile',
+    },
+    {
+      title: 'Quản lý thuốc',
+      icon: Pill,
+      path: '/pharmacist/medications',
+    },
+    {
+      title: 'Nhà cung cấp',
+      icon: Truck,
+      path: '/pharmacist/suppliers',
+    },
+    {
+      title: 'Tồn kho',
+      icon: PackageOpen,
+      path: '/pharmacist/stocks',
+    },
+    {
+      title: 'Cấp phát thuốc',
+      icon: ShieldCheck,
+      path: '/pharmacist/dispense',
+    },
+    {
+      title: 'Báo cáo',
+      icon: FileText,
+      path: '/pharmacist/reports',
+    },
   ],
 };

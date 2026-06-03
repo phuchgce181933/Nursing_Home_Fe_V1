@@ -50,7 +50,20 @@ import CareAppointmentsPage from '../pages/admin/appointments';
 import DoctorDashboardPage from '../pages/doctor/DoctorDashboardPage';
 import NurseDashboardPage from '../pages/nurse/NurseDashboardPage';
 import MedicationPage from '../pages/nurse/MedicationPage';
+
+import MealPlansPage from '../pages/nurse/MealPlansPage';
+import NutritionReportsPage from '../pages/nurse/NutritionReportsPage';
+import CaregiverDashboardPage from '../pages/caregiver/CaregiverDashboardPage';
+import AssignedResidentsPage from '../pages/caregiver/AssignedResidentsPage';
+import DailyCareSchedulePage from '../pages/caregiver/daily-care-schedule/DailyCareSchedulePage';
+import HygieneActivitiesPage from '../pages/caregiver/hygiene-activities/HygieneActivitiesPage';
+import DailyBehaviorsPage from '../pages/caregiver/daily-behaviors/DailyBehaviorsPage';
+import DietPlansPage from '../pages/caregiver/diet-plans/DietPlansPage';
+import RehabilitationSchedulePage from '../pages/caregiver/rehabilitation-schedule/RehabilitationSchedulePage';
+import MealIntakeNotesPage from '../pages/caregiver/meal-intake/MealIntakeNotesPage';
+
 import ActivitySchedulePage from '../pages/nurse/ActivitySchedulePage';
+
 import DoctorMedicationPage from '../pages/doctor/MedicationPage';
 import FamilyDashboardPage from '../pages/family/FamilyDashboardPage';
 import SubmitAdmissionPage from '../pages/family/SubmitAdmissionPage';
@@ -179,13 +192,39 @@ function AppRoutes() {
         <Route path="profile" element={<ProfilePage />} />
         <Route path="admission-requests" element={<AdminAdmissionRequestsPage />} />
         <Route path="service-packages" element={<ServicePackagesPage />} />
+
+        <Route path="care-notes" element={<PlaceholderPage title="Ghi chú chăm sóc" />} />
+        <Route path="meal-plans" element={<MealPlansPage />} />
+        <Route path="nutrition-reports" element={<NutritionReportsPage />} />
+
         <Route path="health-monitoring" element={<HealthMonitoringPage />} />
         <Route path="care-notes" element={<CareNotesPage />} />
+
         <Route path="medications" element={<MedicationPage />} />
         <Route path="activity-schedule" element={<ActivitySchedulePage />} />
         <Route path="leave" element={<LeaveRequestPage />} />
         <Route path="messages" element={<PlaceholderPage title="Tin nhắn" />} />
         <Route path="incidents" element={<IncidentManagementPage />} />
+      </Route>
+
+      <Route
+        path="/caregiver/*"
+        element={
+          <ProtectedRoute requiredRole="caregiver">
+            <RoleLayout />
+          </ProtectedRoute>
+        }
+      >
+        <Route index element={<Navigate to="dashboard" replace />} />
+        <Route path="dashboard" element={<CaregiverDashboardPage />} />
+        <Route path="profile" element={<ProfilePage />} />
+        <Route path="assigned-residents" element={<AssignedResidentsPage />} />
+        <Route path="daily-care-schedule" element={<DailyCareSchedulePage />} />
+        <Route path="meal-intake-notes" element={<MealIntakeNotesPage />} />
+        <Route path="hygiene-activities" element={<HygieneActivitiesPage />} />
+        <Route path="daily-behaviors" element={<DailyBehaviorsPage />} />
+        <Route path="diet-plans" element={<DietPlansPage />} />
+        <Route path="rehabilitation-schedule" element={<RehabilitationSchedulePage />} />
       </Route>
 
       <Route

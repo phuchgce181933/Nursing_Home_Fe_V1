@@ -1,0 +1,196 @@
+.rehab-schedule-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.rehab-schedule-page__title {
+  margin: 0;
+  padding: 18px 22px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #c2410c 0%, #0284c7 100%);
+  color: #fff7ed;
+  font-size: 1.75rem;
+  font-weight: 700;
+  box-shadow: 0 18px 34px rgba(194, 65, 12, 0.24);
+}
+
+.rehab-schedule-page__intro {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid #fed7aa;
+  background: #fff7ed;
+  border-radius: 12px;
+  color: #475569;
+  line-height: 1.6;
+}
+
+.rehab-schedule-page__panel {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.06);
+}
+
+.rehab-schedule-page__panel-title {
+  margin: 0 0 12px;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.rehab-schedule-page__filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+
+.rehab-schedule-page__filters label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+.rehab-schedule-page__filters input,
+.rehab-schedule-page__filters select {
+  padding: 8px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+}
+
+.rehab-schedule-page__filter-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.rehab-schedule-page__day-banner {
+  margin: 0;
+  padding: 10px 12px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  color: #1e40af;
+}
+
+.rehab-schedule-page__status-yes {
+  color: #15803d;
+  font-weight: 700;
+}
+
+.rehab-schedule-page__status-no {
+  color: #94a3b8;
+}
+
+.rehab-schedule-page__row-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.rehab-schedule-page__modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 1100;
+}
+
+.rehab-schedule-page__modal {
+  width: min(720px, 100%);
+  max-height: 90vh;
+  overflow: auto;
+  background: #ffffff;
+  border-radius: 20px;
+  border: 1px solid #dbe3ee;
+  box-shadow: 0 26px 52px rgba(15, 23, 42, 0.28);
+}
+
+.rehab-schedule-page__modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px;
+  background: linear-gradient(135deg, #c2410c 0%, #0284c7 100%);
+}
+
+.rehab-schedule-page__modal-title {
+  margin: 0;
+  font-size: 1.06rem;
+  font-weight: 700;
+  color: #fff7ed;
+}
+
+.rehab-schedule-page__modal-close {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff7ed;
+  cursor: pointer;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.rehab-schedule-page__modal-body {
+  padding: 14px 16px 18px;
+}
+
+.rehab-schedule-page__session-card {
+  margin-bottom: 10px;
+  padding: 12px 14px;
+  border: 1px solid #e2e8f0;
+  border-left: 4px solid #0284c7;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.rehab-schedule-page__session-card strong {
+  color: #1e293b;
+}
+
+.rehab-schedule-page__session-meta {
+  margin: 4px 0 0;
+  font-size: 0.85rem;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.rehab-schedule-page__assist-note {
+  margin-top: 8px;
+  padding: 8px 10px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  color: #9a3412;
+}
+
+.rehab-schedule-page__empty {
+  margin: 0;
+  padding: 10px;
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+@media (max-width: 768px) {
+  .rehab-schedule-page__title {
+    font-size: 1.45rem;
+    padding: 14px 16px;
+  }
+
+  .rehab-schedule-page .data-table {
+    display: block;
+    overflow-x: auto;
+  }
+}
