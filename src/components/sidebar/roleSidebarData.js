@@ -85,6 +85,7 @@ export const roleSidebarData = {
   nurse: [
     { title: 'sidebar.nurseDashboard', icon: LayoutDashboard, path: '/nurse/dashboard' },
     { title: 'sidebar.myProfile', icon: UserCircle, path: '/nurse/profile' },
+    { title: 'Lịch hoạt động', icon: Calendar, path: '/nurse/activity-schedule' },
     { title: 'sidebar.careNotes', icon: Activity, path: '/nurse/care-notes' },
     { title: 'Theo dõi Sức khỏe', icon: HeartPulse, path: '/nurse/health-monitoring' },
     { title: 'sidebar.medication', icon: Pill, path: '/nurse/medications' },
@@ -98,6 +99,7 @@ export const roleSidebarData = {
     { title: 'sidebar.familyDashboard', icon: LayoutDashboard, path: '/family/dashboard' },
     { title: 'sidebar.admissionRequests', icon: History, path: '/family/admission-requests' },
     { title: 'sidebar.facilityTourHistory', icon: Calendar, path: '/family/facility-tours' },
+    { title: 'Hoạt động', icon: Activity, path: '/family/activities' },
     { title: 'sidebar.residentInfo', icon: Users, path: '/family/resident' },
     { title: 'sidebar.notifications', icon: Bell, path: '/family/notifications' },
     { title: 'sidebar.messages', icon: MessageSquare, path: '/family/messages' },

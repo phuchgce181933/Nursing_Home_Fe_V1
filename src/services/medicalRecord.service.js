@@ -10,9 +10,21 @@ const getVitalsHistory = async (residentId, params = {}) => {
   return response.data;
 };
 
+const getLatestVitals = async (residentId) => {
+  try {
+    const response = await axiosClient.get(`/residents/${residentId}/medical-records`, { params: { limit: 1, page: 1 } });
+    const records = response.data?.data || [];
+    return records[0] || null;
+  } catch (err) {
+    console.error('Error fetching latest vitals:', err);
+    return null;
+  }
+};
+
 const medicalRecordService = {
   recordVitals,
   getVitalsHistory,
+  getLatestVitals,
 };
 
 export default medicalRecordService;

@@ -88,7 +88,11 @@ export const sidebarData = [
   {
     title: 'sidebar.activities',
     icon: Activity,
-    path: '/admin/activities',
+    children: [
+      { title: 'Quản lý hoạt động', path: '/admin/activities' },
+      { title: 'Thống kê hoạt động', path: '/admin/activities/statistics' },
+      { title: 'Kết quả tham gia', path: '/admin/activities/participation-results' },
+    ],
   },
   {
     title: 'sidebar.incidents',
