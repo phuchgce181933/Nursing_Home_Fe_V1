@@ -1,5 +1,9 @@
 import axiosClient from '../api/axiosClient';
 
+// Residents accessible to the current staff (assigned residents for doctor/nurse)
+const getResidents = (params = {}) =>
+  axiosClient.get('/residents', { params }).then((r) => r.data);
+
 const listNotes = (params = {}) =>
   axiosClient.get('/care-notes', { params }).then((r) => r.data);
 
@@ -22,6 +26,7 @@ const deleteNote = (id) =>
   axiosClient.delete(`/care-notes/${id}`).then((r) => r.data);
 
 export default {
+  getResidents,
   listNotes,
   getMyNotes,
   getNoteHistory,
