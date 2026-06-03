@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { PlusCircle, Search, Eye, Pencil, Trash2, History, AlertTriangle } from 'lucide-react';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import careNoteService from '../../services/careNote.service';
-import medicationService from '../../services/medication.service';
 import { useAuth } from '../../hooks/useAuth';
 import '../../styles/shared/CareNotesPage.css';
 
@@ -271,6 +270,7 @@ function NoteFormModal({ mode, note, residents, onSave, onClose }) {
     const errs = {};
     if (!form.residentId) errs.residentId = 'Vui lòng chọn cư dân';
     if (!form.content || form.content.trim().length < 5) errs.content = 'Nội dung phải ít nhất 5 ký tự';
+    if (form.noteAt && new Date(form.noteAt) > new Date()) errs.noteAt = 'Thời gian ghi nhận không được là tương lai';
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -340,10 +340,11 @@ function NoteFormModal({ mode, note, residents, onSave, onClose }) {
           <label className="cn-form-label">Thời gian ghi nhận</label>
           <input
             type="datetime-local"
-            className="cn-form-input"
+            className={`cn-form-input${errors.noteAt ? ' cn-form-input--error' : ''}`}
             value={form.noteAt}
             onChange={setF('noteAt')}
           />
+          {errors.noteAt && <span className="cn-form-error">{errors.noteAt}</span>}
         </div>
 
         {/* Content */}
@@ -590,14 +591,29 @@ function CareNotesPage() {
 
   /* filters */
   const [search, setSearch]               = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [typeFilter, setTypeFilter]       = useState('');
   const [residentFilter, setResidentFilter] = useState('');
   const [dateFrom, setDateFrom]           = useState('');
   const [dateTo, setDateTo]               = useState('');
 
+  /* debounce search input 400ms */
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 400);
+    return () => clearTimeout(t);
+  }, [search]);
+
   /* modals */
   const [modal, setModal] = useState({ type: null, data: null });
   const closeModal = () => setModal({ type: null, data: null });
+
+  /* role-based edit/delete: doctor → all; nurse → own notes only */
+  const canModify = useCallback((note) => {
+    if (!user) return false;
+    if (user.role === 'doctor') return true;
+    const noteUserId = note.authorStaffId?.userId?._id ?? note.authorStaffId?.userId;
+    return String(noteUserId) === String(user._id);
+  }, [user]);
 
   /* helpers */
   const showMsg = (text, type = 'success') => {
@@ -605,9 +621,9 @@ function CareNotesPage() {
     setTimeout(() => setMsg({ text: '', type: '' }), 4000);
   };
 
-  /* load residents once */
+  /* load residents accessible to this staff member */
   useEffect(() => {
-    medicationService.getMyResidents()
+    careNoteService.getResidents()
       .then((data) => setResidents(Array.isArray(data) ? data : (data?.data || data?.residents || [])))
       .catch(() => setResidents([]));
   }, []);
@@ -619,11 +635,11 @@ function CareNotesPage() {
       const params = {
         page,
         limit: LIMIT,
-        ...(search.trim()      ? { search: search.trim() }                     : {}),
-        ...(typeFilter         ? { noteType: typeFilter }                       : {}),
-        ...(residentFilter     ? { residentId: residentFilter }                 : {}),
-        ...(dateFrom           ? { from: new Date(dateFrom).toISOString() }     : {}),
-        ...(dateTo             ? { to: new Date(`${dateTo}T23:59:59`).toISOString() } : {}),
+        ...(debouncedSearch.trim() ? { search: debouncedSearch.trim() }                 : {}),
+        ...(typeFilter             ? { noteType: typeFilter }                            : {}),
+        ...(residentFilter         ? { residentId: residentFilter }                      : {}),
+        ...(dateFrom               ? { from: new Date(dateFrom).toISOString() }          : {}),
+        ...(dateTo                 ? { to: new Date(`${dateTo}T23:59:59`).toISOString() } : {}),
       };
       const result = tab === 'mine'
         ? await careNoteService.getMyNotes(params)
@@ -637,7 +653,7 @@ function CareNotesPage() {
     } finally {
       setLoading(false);
     }
-  }, [tab, page, search, typeFilter, residentFilter, dateFrom, dateTo]);
+  }, [tab, page, debouncedSearch, typeFilter, residentFilter, dateFrom, dateTo]);
 
   useEffect(() => { loadNotes(); }, [loadNotes]);
 
@@ -740,7 +756,7 @@ function CareNotesPage() {
           <option value="">Tất cả cư dân</option>
           {residents.map((r) => (
             <option key={r._id} value={r._id}>
-              {r.fullName}{r.residentCode ? ` (${r.residentCode})` : ''}
+              {r.fullName}{r.residentCode ? ` — ${r.residentCode}` : ''}
             </option>
           ))}
         </select>
@@ -809,7 +825,7 @@ function CareNotesPage() {
                       </span>
                     </td>
                     <td>
-                      <div className="cn-content-preview">{note.content}</div>
+                      <div className="cn-content-preview" title={note.content}>{note.content}</div>
                     </td>
                     <td>
                       <div className="cn-author-name">{authorName(note.authorStaffId)}</div>
@@ -825,20 +841,24 @@ function CareNotesPage() {
                         >
                           <Eye size={15} />
                         </button>
-                        <button
-                          className="cn-action-btn cn-action-btn--edit"
-                          title="Chỉnh sửa"
-                          onClick={() => setModal({ type: 'edit', data: note })}
-                        >
-                          <Pencil size={15} />
-                        </button>
-                        <button
-                          className="cn-action-btn cn-action-btn--delete"
-                          title="Xóa"
-                          onClick={() => setModal({ type: 'delete', data: note })}
-                        >
-                          <Trash2 size={15} />
-                        </button>
+                        {canModify(note) && (
+                          <>
+                            <button
+                              className="cn-action-btn cn-action-btn--edit"
+                              title="Chỉnh sửa"
+                              onClick={() => setModal({ type: 'edit', data: note })}
+                            >
+                              <Pencil size={15} />
+                            </button>
+                            <button
+                              className="cn-action-btn cn-action-btn--delete"
+                              title="Xóa"
+                              onClick={() => setModal({ type: 'delete', data: note })}
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </>
+                        )}
                         <button
                           className="cn-action-btn cn-action-btn--history"
                           title="Xem lịch sử cư dân"
