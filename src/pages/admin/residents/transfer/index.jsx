@@ -495,6 +495,12 @@ export default function TransferResidentPage() {
                   </div>
                 </div>
                 <form onSubmit={handleTransfer}>
+                  {(targetsData?.targets || []).length === 0 && (
+                    <p className="form-error" style={{ marginBottom: 12 }}>
+                      {targetsData?.message ||
+                        'Không có phòng/giường trống trên tầng đã chọn. Chọn tầng khác hoặc giải phóng giường trước.'}
+                    </p>
+                  )}
                   <div className="form-grid">
                     <div className="form-group">
                       <label>Phòng đích</label>
@@ -551,7 +557,7 @@ export default function TransferResidentPage() {
                     <button type="button" className="btn-cancel" onClick={() => setEditPopup(false)}>
                       Đóng
                     </button>
-                    <button type="submit" className="btn-save" disabled={saving}>
+                    <button type="submit" className="btn-save" disabled={saving || !(targetsData?.targets || []).length}>
                       {saving ? 'Đang chuyển...' : 'Xác nhận chuyển phòng'}
                     </button>
                   </div>
