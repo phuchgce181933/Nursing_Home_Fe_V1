@@ -1,0 +1,34 @@
+import axiosClient from '../api/axiosClient';
+
+const getFamilyResidents = async () => {
+  const response = await axiosClient.get('/family/residents');
+  return response.data;
+};
+
+const getResidentBillingSummary = async (residentId) => {
+  const response = await axiosClient.get(`/family/residents/${residentId}/billing-summary`);
+  return response.data;
+};
+
+const getResidentInvoices = async (residentId, params = {}) => {
+  const response = await axiosClient.get(`/family/residents/${residentId}/invoices`, { params });
+  return response.data;
+};
+
+const createInvoice = async (residentId, body) => {
+  const response = await axiosClient.post(`/residents/${residentId}/invoices`, body);
+  return response.data.data || response.data;
+};
+
+const payInvoice = async (residentId, invoiceId, body) => {
+  const response = await axiosClient.post(`/residents/${residentId}/invoices/${invoiceId}/pay`, body);
+  return response.data.data || response.data;
+};
+
+export default {
+  getFamilyResidents,
+  getResidentBillingSummary,
+  getResidentInvoices,
+  createInvoice,
+  payInvoice,
+};

@@ -48,7 +48,7 @@ export const roleSidebarData = {
      {
       title: 'Theo dõi Sức khỏe',
       icon: HeartPulse,
-      path: '/nurse/health-monitoring',
+      path: '/doctor/health-monitoring',
     },
     {
       title: 'Thuốc',
