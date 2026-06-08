@@ -70,9 +70,12 @@ function AdminProfile() {
 
     try {
       await authService.updateProfile(profileForm);
-      await refreshUser();
       setMessageType('success');
       setMessage(t('profile.updateSuccess'));
+      setTimeout(() => {
+        logout();
+        navigate('/login');
+      }, 1300);
     } catch (error) {
       setMessageType('error');
       setMessage(error?.response?.data?.message || t('profile.updateError'));
@@ -100,7 +103,10 @@ function AdminProfile() {
       });
       setMessageType('success');
       setMessage(t('profile.passwordChangeSuccess'));
-      setPasswordForm(initialPasswordForm);
+      setTimeout(() => {
+        logout();
+        navigate('/login');
+      }, 1300);
     } catch (error) {
       setMessageType('error');
       setMessage(error?.response?.data?.message || t('profile.passwordChangeError'));

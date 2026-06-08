@@ -42,13 +42,16 @@ const unban = (id) =>
  * @param {object} data - { fullName, email, password, role, phone?, gender?, specialty?, certifications?, username?, avatarFile? }
  */
 const create = (data) => {
-  const { avatarFile, certifications, ...rest } = data;
+  const { avatarFile, certifications, certificationFiles, ...rest } = data;
   const form = new FormData();
   Object.entries(rest).forEach(([k, v]) => {
     if (v !== undefined && v !== '') form.append(k, v);
   });
   if (Array.isArray(certifications)) {
     certifications.forEach((c) => form.append('certifications', c));
+  }
+  if (Array.isArray(certificationFiles)) {
+    certificationFiles.forEach((file) => form.append('certificationFiles', file));
   }
   if (avatarFile) form.append('avatar', avatarFile);
   return axiosClient.post('/auth/create-staff', form, {
