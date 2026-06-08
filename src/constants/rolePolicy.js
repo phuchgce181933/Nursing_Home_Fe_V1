@@ -2,12 +2,14 @@
 
 export const NON_ASSIGNABLE_ROLES = ['admin', 'manager'];
 
-export const OPERATIONAL_ASSIGNABLE_ROLES = ['doctor', 'nurse', 'staff'];
+export const OPERATIONAL_ASSIGNABLE_ROLES = ['doctor', 'nurse', 'caregiver', 'staff'];
 
 export const STAFF_ROLE_LABELS = {
   doctor: 'Bác sĩ',
   nurse: 'Y tá',
-  staff: 'Chăm sóc viên',
+  caregiver: 'Hộ lý',
+  pharmacist: 'Dược sĩ',
+  family: 'Gia đình',
   manager: 'Quản lý',
   admin: 'Admin',
 };
