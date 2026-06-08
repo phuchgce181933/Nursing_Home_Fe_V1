@@ -12,6 +12,7 @@ import {
   ClipboardList,
   MessageSquare,
   Settings,
+  FileCheck,
 } from 'lucide-react';
 
 export const sidebarData = [
@@ -103,6 +104,11 @@ export const sidebarData = [
     title: 'Báo cáo',
     icon: FileText,
     path: '/admin/reports',
+  },
+  {
+    title: 'sidebar.contractManagement',
+    icon: FileCheck,
+    path: '/admin/contracts',
   },
   {
     title: 'sidebar.notifications',

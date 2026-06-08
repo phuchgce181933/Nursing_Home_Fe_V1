@@ -65,6 +65,13 @@ const formatDateTime = (value) => {
   });
 };
 
+const formatCurrency = (value) => {
+  if (value == null || value === '') return 'N/A';
+  const num = Number(value);
+  if (Number.isNaN(num)) return String(value);
+  return num.toLocaleString('vi-VN', { style: 'currency', currency: 'VND' });
+};
+
 const buildOptionList = (items, key) => {
   const values = items
     .map((item) => item?.[key])
@@ -1078,6 +1085,7 @@ function PharmacyPage({ defaultTab = 'overview' }) {
               <thead>
                 <tr>
                   <th>Thuốc</th>
+                  <th>Giá mỗi đơn vị</th>
                   <th>Số lượng</th>
                   <th>Đơn vị</th>
                   <th>Số lô</th>
@@ -1101,6 +1109,7 @@ function PharmacyPage({ defaultTab = 'overview' }) {
                   stocks.map((stock) => (
                     <tr key={stock._id}>
                       <td>{stock.medicationId?.name || stock.medicationId}</td>
+                      <td>{formatCurrency(stock.costPerUnit)}</td>
                       <td>{stock.quantity}</td>
                       <td>{stock.unit || 'N/A'}</td>
                       <td>{stock.lotNumber || 'N/A'}</td>

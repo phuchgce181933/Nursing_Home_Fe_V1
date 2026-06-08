@@ -21,6 +21,9 @@ const createPrescription = (payload) =>
 const updatePrescription = (id, payload) =>
   axiosClient.put(`/prescriptions/${id}`, payload).then((r) => r.data);
 
+const estimatePrescriptionCost = (prescriptionId, residentId) =>
+  axiosClient.get(`/prescriptions/${prescriptionId}/estimate-cost`, { params: { residentId } }).then((r) => r.data);
+
 // --- Medication Schedules (MedicationSchedule model) ---
 
 // Grouped by resident — for daily view
@@ -54,6 +57,7 @@ export default {
   getPrescription,
   createPrescription,
   updatePrescription,
+  estimatePrescriptionCost,
   getDailySchedule,
   getSchedules,
   setMedicationSchedule,
