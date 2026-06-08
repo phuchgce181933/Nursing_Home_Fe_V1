@@ -15,9 +15,14 @@ const PACKAGE_PRICES = {
   'Gói VIP': 45000000,
 };
 
-const getPackagePriceLabel = (packageName) => {
-  const monthlyPrice = PACKAGE_PRICES[packageName];
-  if (!monthlyPrice) return null;
+const getPackagePrice = (resident) => {
+  if (resident?.servicePackagePrice != null) return resident.servicePackagePrice;
+  return PACKAGE_PRICES[resident?.servicePackage] || null;
+};
+
+const getPackagePriceLabel = (resident) => {
+  const monthlyPrice = getPackagePrice(resident);
+  if (monthlyPrice == null) return null;
   return `${formatMoney(monthlyPrice)} / tháng`;
 };
 
@@ -73,8 +78,11 @@ function FamilyDashboardPage() {
   };
 
   const handleCreateInvoice = async (resident) => {
-    const packagePrice = PACKAGE_PRICES[resident.servicePackage];
-    if (!packagePrice) return;
+    const packagePrice = getPackagePrice(resident);
+    if (!packagePrice) {
+      setError('Không xác định được giá gói dịch vụ. Vui lòng kiểm tra thông tin gói.');
+      return;
+    }
 
     setCreatingInvoiceFor(resident._id);
     try {
@@ -159,10 +167,10 @@ function FamilyDashboardPage() {
                   <strong>Gói dịch vụ:</strong>
                   <span>{resident.servicePackage || 'Chưa đăng ký gói dịch vụ'}</span>
                 </div>
-                {resident.servicePackage && getPackagePriceLabel(resident.servicePackage) && (
+                {resident.servicePackage && getPackagePriceLabel(resident) && (
                   <div className="info-row">
                     <strong>Giá gói dịch vụ:</strong>
-                    <span>{getPackagePriceLabel(resident.servicePackage)}</span>
+                    <span>{getPackagePriceLabel(resident)}</span>
                   </div>
                 )}
                 <div className="info-row">
