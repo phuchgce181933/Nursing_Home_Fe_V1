@@ -38,7 +38,28 @@ const getStaffAccounts = async (params = {}) => {
 };
 
 const createStaffAccount = async (payload) => {
-  const response = await axiosClient.post('/auth/create-staff', payload);
+  let data = payload;
+  const config = {};
+
+  if (payload?.avatarFile || payload?.certificationFiles?.length) {
+    const formData = new FormData();
+    Object.entries(payload).forEach(([key, value]) => {
+      if (value === undefined || value === null) return;
+      if (key === 'avatarFile') {
+        formData.append('avatar', value);
+        return;
+      }
+      if (key === 'certificationFiles') {
+        value.forEach((file) => formData.append('certificationFiles', file));
+        return;
+      }
+      formData.append(key, value);
+    });
+    data = formData;
+    config.headers = { 'Content-Type': 'multipart/form-data' };
+  }
+
+  const response = await axiosClient.post('/auth/create-staff', data, config);
   return response.data;
 };
 

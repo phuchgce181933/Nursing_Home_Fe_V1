@@ -1,6 +1,7 @@
 const ROLE_LABELS = {
   doctor: 'Bác sĩ', nurse: 'Y tá', staff: 'Chăm sóc viên',
-  manager: 'Quản lý', admin: 'Admin',
+  caregiver: 'Hộ lý', chef: 'Đầu bếp', pharmacist: 'Dược sĩ',
+  family: 'Gia đình', manager: 'Quản lý', admin: 'Admin',
 };
 
 function StatusBadge({ s }) {
@@ -72,16 +73,7 @@ export default function StaffTable({ staff, loading, onView, onEdit, onBan, canM
                 >
                   Xem
                 </button>
-                <button
-                  type="button"
-                  className="resident-page__action"
-                  onClick={() => onEdit(s)}
-                  disabled={s.isBanned || !manageable}
-                  title={!manageable ? 'Không có quyền sửa tài khoản admin/quản lý' : undefined}
-                >
-                  Sửa
-                </button>
-                <button
+                  <button
                   type="button"
                   className="resident-page__action"
                   style={s.isBanned ? undefined : { background: 'rgba(220, 38, 38, 0.12)', color: '#b91c1c' }}
