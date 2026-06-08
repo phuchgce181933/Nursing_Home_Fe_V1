@@ -1,0 +1,52 @@
+/* Page-specific — shell/table: ResidentPage.css */
+
+.resident-page .drug-allergies-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) minmax(320px, 1.1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 1024px) {
+  .resident-page .drug-allergies-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.drug-allergies-current {
+  margin-top: 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: #f8fafc;
+}
+
+.drug-allergies-current h3 {
+  margin: 0 0 8px;
+  font-size: 0.85rem;
+  color: #334155;
+  font-family: 'Space Grotesk', sans-serif;
+}
+
+.drug-allergies-current p {
+  margin: 0;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.drug-allergies-current ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.drug-allergies-current li {
+  margin-bottom: 4px;
+  color: #334155;
+  font-size: 14px;
+}
+
+.drug-allergies-panel__updated {
+  margin-top: 14px;
+  color: #94a3b8;
+  font-size: 13px;
+}

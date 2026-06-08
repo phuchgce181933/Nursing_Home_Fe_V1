@@ -1,0 +1,874 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import { Search, RefreshCw, Plus, Edit3, Trash2, Filter, CalendarDays, AlertTriangle } from 'lucide-react';
+import activityService from '../../services/activity.service';
+import authService from '../../services/auth.service';
+import residentService from '../../services/resident.service';
+import medicalRecordService from '../../services/medicalRecord.service';
+import '../../styles/admin/AdminAdmissionRequestsPage.css';
+
+const STATUS_OPTIONS = [
+  { value: '', label: 'Tất cả trạng thái' },
+  { value: 'draft', label: 'Nháp' },
+  { value: 'scheduled', label: 'Đã lên lịch' },
+  { value: 'ongoing', label: 'Đang diễn ra' },
+  { value: 'completed', label: 'Đã hoàn thành' },
+  { value: 'cancelled', label: 'Đã huỷ' },
+];
+
+const toInputDateTimeLocal = (isoString) => {
+  if (!isoString) return '';
+  const date = new Date(isoString);
+  const tzOffset = date.getTimezoneOffset();
+  const localDate = new Date(date.getTime() - tzOffset * 60000);
+  return localDate.toISOString().slice(0, 16);
+};
+
+const toIsoString = (localDateTime) => {
+  if (!localDateTime) return '';
+  return new Date(localDateTime).toISOString();
+};
+
+export default function AdminActivitiesPage() {
+  const [activities, setActivities] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [page, setPage] = useState(1);
+  const [limit] = useState(20);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+
+  const [search, setSearch] = useState('');
+  const [status, setStatus] = useState('');
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  const [appliedFilters, setAppliedFilters] = useState({ search: '', status: '', from: '', to: '' });
+
+  const [residents, setResidents] = useState([]);
+  const [staffOptions, setStaffOptions] = useState([]);
+  const [optionsLoading, setOptionsLoading] = useState(true);
+  const [participantSearch, setParticipantSearch] = useState('');
+  const [residentsAbnormalStatus, setResidentsAbnormalStatus] = useState({});
+  const [activitiesAbnormalParticipants, setActivitiesAbnormalParticipants] = useState({});
+
+  const [isCreating, setIsCreating] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [form, setForm] = useState({
+    title: '',
+    category: '',
+    description: '',
+    scheduledAt: '',
+    durationMinutes: 30,
+    location: '',
+    organizerStaffId: '',
+    participantResidentIds: [],
+    status: 'draft',
+  });
+  const [formError, setFormError] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const fetchActivities = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const params = {
+        page,
+        limit,
+        search: appliedFilters.search || undefined,
+        status: appliedFilters.status || undefined,
+        from: appliedFilters.from || undefined,
+        to: appliedFilters.to || undefined,
+      };
+      const res = await activityService.getActivityList(params);
+      setActivities(res?.data || []);
+      setTotal(res?.total || 0);
+      setTotalPages(res?.totalPages || 1);
+    } catch (err) {
+      console.error('Fetch activities failed:', err);
+      setError(err.response?.data?.message || 'Could not load activities.');
+    } finally {
+      setLoading(false);
+    }
+  }, [page, limit, appliedFilters]);
+
+  useEffect(() => {
+    fetchActivities();
+  }, [fetchActivities]);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadOptions = async () => {
+      setOptionsLoading(true);
+      try {
+        const [residentResponse, staffResponse] = await Promise.all([
+          residentService.getResidentList({ page: 1, limit: 200 }),
+          authService.getStaffAccounts({ page: 1, limit: 500 }),
+        ]);
+
+        if (!active) return;
+
+        setResidents(residentResponse?.data || []);
+        setStaffOptions(staffResponse?.data || []);
+      } catch (err) {
+        console.error('Failed to load options:', err);
+      } finally {
+        if (active) setOptionsLoading(false);
+      }
+    };
+
+    loadOptions();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // ─── Load abnormal status for all residents ───
+  useEffect(() => {
+    let active = true;
+    const loadAbnormalStatus = async () => {
+      try {
+        const statusMap = {};
+        console.log(`📋 Loading abnormal status for ${residents.length} residents...`);
+        
+        const results = await Promise.allSettled(
+          residents.map(async (resident) => {
+            try {
+              const latestRecord = await medicalRecordService.getLatestVitals(resident._id);
+              const isAbnormal = latestRecord?.abnormalFlag === true;
+              console.log(`✓ Resident ${resident.fullName} (${resident._id}): abnormal=${isAbnormal}, record=`, latestRecord);
+              return { id: resident._id, isAbnormal };
+            } catch (err) {
+              console.error(`✗ Failed to load health status for resident ${resident.fullName} (${resident._id}):`, err.message);
+              return { id: resident._id, isAbnormal: false };
+            }
+          })
+        );
+        
+        results.forEach((result) => {
+          if (result.status === 'fulfilled' && result.value) {
+            statusMap[result.value.id] = result.value.isAbnormal;
+          }
+        });
+        
+        if (active) {
+          console.log(`📊 Health status map updated:`, statusMap);
+          setResidentsAbnormalStatus(statusMap);
+        }
+      } catch (err) {
+        console.error('❌ Failed to load abnormal status:', err);
+      }
+    };
+
+    if (residents.length > 0) {
+      loadAbnormalStatus();
+    }
+
+    return () => {
+      active = false;
+    };
+  }, [residents]);
+
+  // ─── Check abnormal participants for each activity ───
+  useEffect(() => {
+    let active = true;
+    const checkActivitiesAbnormal = async () => {
+      try {
+        const abnormalMap = {};
+        console.log(`🏥 Checking abnormal status for ${activities.length} activities...`);
+        
+        for (const activity of activities) {
+          const participantIds = activity.participantResidentIds || [];
+          const abnormalCount = participantIds.filter((id) => residentsAbnormalStatus[id]).length;
+          abnormalMap[activity._id] = abnormalCount;
+          if (abnormalCount > 0) {
+            console.log(`  ⚠️ Activity "${activity.title}" has ${abnormalCount} abnormal participants`);
+          }
+        }
+        
+        if (active) {
+          setActivitiesAbnormalParticipants(abnormalMap);
+        }
+      } catch (err) {
+        console.error('❌ Failed to check activities abnormal status:', err);
+      }
+    };
+
+    if (activities.length > 0 && Object.keys(residentsAbnormalStatus).length > 0) {
+      checkActivitiesAbnormal();
+    }
+
+    return () => {
+      active = false;
+    };
+  }, [activities, residentsAbnormalStatus]);
+
+  const resetForm = () => {
+    setEditingId(null);
+    setForm({
+      title: '',
+      category: '',
+      description: '',
+      scheduledAt: '',
+      durationMinutes: 30,
+      location: '',
+      organizerStaffId: '',
+      participantResidentIds: [],
+      status: 'draft',
+    });
+    setParticipantSearch('');
+    setFormError(null);
+  };
+
+  const handleApplyFilters = (e) => {
+    if (e) e.preventDefault();
+    setPage(1);
+    setAppliedFilters({ search, status, from, to });
+  };
+
+  const toggleParticipant = (residentId) => {
+    setForm((prevForm) => {
+      const selected = Array.isArray(prevForm.participantResidentIds)
+        ? [...prevForm.participantResidentIds]
+        : [];
+      const index = selected.indexOf(residentId);
+      if (index >= 0) {
+        selected.splice(index, 1);
+      } else {
+        selected.push(residentId);
+      }
+      return { ...prevForm, participantResidentIds: selected };
+    });
+  };
+
+  const handleResetFilters = () => {
+    setSearch('');
+    setStatus('');
+    setFrom('');
+    setTo('');
+    setPage(1);
+    setAppliedFilters({ search: '', status: '', from: '', to: '' });
+  };
+
+  const handleEdit = (activity) => {
+    setEditingId(activity._id);
+    setIsCreating(true);
+    setForm({
+      title: activity.title || '',
+      category: activity.category || '',
+      description: activity.description || '',
+      scheduledAt: toInputDateTimeLocal(activity.scheduledAt),
+      durationMinutes: activity.durationMinutes || 30,
+      location: activity.location || '',
+      organizerStaffId:
+        activity.organizerStaffId?._id || activity.organizerStaffId || '',
+      participantResidentIds: Array.isArray(activity.participantResidentIds)
+        ? activity.participantResidentIds.map((id) => id.toString())
+        : [],
+      status: activity.status || 'draft',
+    });
+  };
+
+  const handleDelete = async (activityId) => {
+    if (!window.confirm('Bạn có chắc muốn xóa hoạt động này không?')) return;
+    try {
+      setLoading(true);
+      await activityService.deleteActivity(activityId);
+      fetchActivities();
+    } catch (err) {
+      console.error('Delete failed:', err);
+      alert(err.response?.data?.message || 'Không thể xóa hoạt động.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getParticipantDisplay = (activity) => {
+    const names = (activity.participantResidentIds || [])
+      .map((residentId) => {
+        const resident = residents.find((item) => item._id === residentId);
+        if (!resident) return null;
+        return resident.fullName || resident.residentCode || 'Cư dân';
+      })
+      .filter(Boolean);
+
+    if (names.length === 0) return '0 cư dân';
+    if (names.length <= 2) return names.join(', ');
+    return `${names.slice(0, 2).join(', ')} +${names.length - 2}`;
+  };
+
+  const handleStatusChange = async (activity, newStatus) => {
+    try {
+      setLoading(true);
+      await activityService.updateActivityStatus(activity._id, newStatus);
+      fetchActivities();
+    } catch (err) {
+      console.error('Status update failed:', err);
+      alert(err.response?.data?.message || 'Không thể cập nhật trạng thái.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    if (e) e.preventDefault();
+    setFormError(null);
+    if (!form.title.trim()) {
+      setFormError('Tiêu đề là bắt buộc');
+      return;
+    }
+    if (!form.scheduledAt) {
+      setFormError('Ngày/giờ lên lịch là bắt buộc');
+      return;
+    }
+
+    const payload = {
+      title: form.title.trim(),
+      category: form.category.trim() || undefined,
+      description: form.description.trim() || undefined,
+      scheduledAt: toIsoString(form.scheduledAt),
+      durationMinutes: Number(form.durationMinutes || 0),
+      location: form.location.trim() || undefined,
+      organizerStaffId: form.organizerStaffId ? form.organizerStaffId.trim() : undefined,
+      participantResidentIds: Array.isArray(form.participantResidentIds)
+        ? form.participantResidentIds.filter(Boolean)
+        : [],
+      status: form.status,
+    };
+
+    try {
+      setSubmitting(true);
+      if (editingId) {
+        await activityService.updateActivity(editingId, payload);
+      } else {
+        await activityService.createActivity(payload);
+      }
+      resetForm();
+      setIsCreating(false);
+      fetchActivities();
+    } catch (err) {
+      console.error('Submit activity failed:', err);
+      setFormError(err.response?.data?.message || 'Có lỗi khi lưu hoạt động.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="adm-container">
+      <div className="adm-header">
+        <div>
+          <h1>
+            <CalendarDays size={26} />
+            Quản lý hoạt động
+          </h1>
+          <p>Quản lý hoạt động cho cư dân: tạo, chỉnh sửa, xóa, và cập nhật trạng thái.</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            resetForm();
+            setEditingId(null);
+            setIsCreating((prev) => !prev);
+          }}
+          className="adm-btn-refresh"
+        >
+          <Plus size={16} />
+          {isCreating ? 'Đóng form' : 'Tạo hoạt động'}
+        </button>
+      </div>
+
+      <div className="adm-filter-panel">
+        <form onSubmit={handleApplyFilters} className="adm-filter-grid">
+          <div>
+            <label className="text-sm font-semibold">Tìm kiếm</label>
+            <div className="adm-filter-input-wrapper">
+              <Search className="adm-filter-input-icon" size={14} />
+              <input
+                type="text"
+                placeholder="Tìm theo tiêu đề, danh mục..."
+                className="adm-filter-input"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-sm font-semibold">Trạng thái</label>
+            <select
+              className="adm-filter-select"
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+            >
+              {STATUS_OPTIONS.map((item) => (
+                <option key={item.value} value={item.value}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="text-sm font-semibold">Từ ngày</label>
+            <input
+              type="date"
+              className="adm-filter-select"
+              value={from}
+              onChange={(e) => setFrom(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-semibold">Đến ngày</label>
+            <input
+              type="date"
+              className="adm-filter-select"
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+            />
+          </div>
+
+          <div className="flex items-end gap-3" style={{ alignSelf: 'end' }}>
+            <button type="button" className="adm-btn-refresh" onClick={handleResetFilters}>
+              <RefreshCw size={14} /> Đặt lại
+            </button>
+            <button type="submit" className="adm-btn-refresh">
+              <Filter size={14} /> Áp dụng
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {isCreating && (
+        <div className="adm-filter-panel" style={{ marginBottom: '28px' }}>
+          <h2 style={{ marginBottom: '12px', fontSize: '18px', fontWeight: 700 }}>
+            {editingId ? 'Chỉnh sửa hoạt động' : 'Tạo hoạt động'}
+          </h2>
+          <form onSubmit={handleSubmit} className="adm-filter-grid">
+            <div>
+              <label className="text-sm font-semibold">Tiêu đề</label>
+              <input
+                type="text"
+                className="adm-filter-input"
+                value={form.title}
+                onChange={(e) => setForm({ ...form, title: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-semibold">Danh mục</label>
+              <input
+                type="text"
+                className="adm-filter-input"
+                value={form.category}
+                onChange={(e) => setForm({ ...form, category: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-semibold">Lên lịch lúc</label>
+              <input
+                type="datetime-local"
+                className="adm-filter-input"
+                value={form.scheduledAt}
+                onChange={(e) => setForm({ ...form, scheduledAt: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-semibold">Thời lượng (phút)</label>
+              <input
+                type="number"
+                min="1"
+                className="adm-filter-input"
+                value={form.durationMinutes}
+                onChange={(e) => setForm({ ...form, durationMinutes: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-semibold">Địa điểm</label>
+              <input
+                type="text"
+                className="adm-filter-input"
+                value={form.location}
+                onChange={(e) => setForm({ ...form, location: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-semibold">Nhân viên tổ chức</label>
+              <select
+                className="adm-filter-select"
+                value={form.organizerStaffId}
+                onChange={(e) => setForm({ ...form, organizerStaffId: e.target.value })}
+                disabled={optionsLoading}
+              >
+                <option value="">Chọn nhân viên tổ chức</option>
+                {staffOptions.map((staff) => (
+                  <option key={staff._id} value={staff._id}>
+                    {staff.fullName || staff.email} {staff.role ? `(${staff.role})` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div style={{ gridColumn: 'span 3' }}>
+              <label className="text-sm font-semibold">Người tham gia</label>
+              <input
+                type="text"
+                className="adm-filter-input"
+                placeholder="Tìm cư dân..."
+                value={participantSearch}
+                onChange={(e) => setParticipantSearch(e.target.value)}
+                disabled={optionsLoading}
+                style={{ marginBottom: '8px' }}
+              />
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '10px' }}>
+                {residents
+                  .filter((resident) => form.participantResidentIds.includes(resident._id))
+                  .slice(0, 6)
+                  .map((resident) => {
+                    const label =
+                      (resident.fullName || 'Cư dân') +
+                      (resident.residentCode ? ' (' + resident.residentCode + ')' : '');
+                    return (
+                      <button
+                        type="button"
+                        key={resident._id}
+                        onClick={() => toggleParticipant(resident._id)}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          padding: '6px 10px',
+                          borderRadius: '999px',
+                          backgroundColor: '#e2e8f0',
+                          border: 'none',
+                          cursor: 'pointer',
+                          fontSize: '13px'
+                        }}
+                      >
+                        {label}
+                        ×
+                      </button>
+                    );
+                  })}
+                {form.participantResidentIds.length > 6 && (
+                  <span style={{ color: '#475569', fontSize: '13px', padding: '6px 10px', borderRadius: '999px', backgroundColor: '#f1f5f9' }}>
+                    {'+' + (form.participantResidentIds.length - 6) + ' khác'}
+                  </span>
+                )}
+              </div>
+              <div style={{ maxHeight: '220px', overflowY: 'auto', border: '1px solid #cbd5e1', borderRadius: '12px', padding: '8px', backgroundColor: '#ffffff' }}>
+                {!optionsLoading && residents.filter((resident) => {
+                  const searchText = participantSearch.trim().toLowerCase();
+                  return (
+                    !searchText ||
+                    resident.fullName?.toLowerCase().includes(searchText) ||
+                    resident.residentCode?.toLowerCase().includes(searchText)
+                  );
+                }).map((resident) => {
+                  const selected = form.participantResidentIds.includes(resident._id);
+                  const hasAbnormal = residentsAbnormalStatus[resident._id];
+                  return (
+                    <label
+                      key={resident._id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        padding: '8px',
+                        borderRadius: '10px',
+                        backgroundColor: selected ? (hasAbnormal ? '#fef2f2' : '#eff6ff') : 'transparent',
+                        borderLeft: hasAbnormal ? '3px solid #ef4444' : 'none',
+                        cursor: 'pointer',
+                        marginBottom: '4px'
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selected}
+                        onChange={() => toggleParticipant(resident._id)}
+                        style={{ width: '16px', height: '16px' }}
+                      />
+                      <span style={{ fontSize: '14px' }}>
+                        {resident.fullName || 'Cư dân chưa đặt tên'}{resident.residentCode ? ` (${resident.residentCode})` : ''}
+                      </span>
+                      {hasAbnormal && (
+                        <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#ef4444', fontWeight: 600 }}>
+                          <AlertTriangle size={12} />
+                          Bất thường
+                        </span>
+                      )}
+                    </label>
+                  );
+                })}
+                {!optionsLoading && residents.filter((resident) => {
+                  const searchText = participantSearch.trim().toLowerCase();
+                  return (
+                    !searchText ||
+                    resident.fullName?.toLowerCase().includes(searchText) ||
+                    resident.residentCode?.toLowerCase().includes(searchText)
+                  );
+                }).length === 0 && (
+                  <div style={{ padding: '12px', color: '#64748b' }}>Không tìm thấy cư dân phù hợp.</div>
+                )}
+                {optionsLoading && <div style={{ padding: '12px', color: '#64748b' }}>Đang tải danh sách cư dân...</div>}
+              </div>
+              {/* Health warning banner */}
+              {(() => {
+                const selectedAbnormalResidents = form.participantResidentIds
+                  .map((id) => {
+                    const resident = residents.find((r) => r._id === id);
+                    return { resident, hasAbnormal: residentsAbnormalStatus[id] };
+                  })
+                  .filter((item) => item.hasAbnormal);
+                
+                console.log(`🏥 Checking health warnings: selected=${form.participantResidentIds.length}, abnormal=${selectedAbnormalResidents.length}, statusMap=`, residentsAbnormalStatus);
+                
+                return selectedAbnormalResidents.length > 0 ? (
+                  <div
+                    style={{
+                      marginTop: '12px',
+                      padding: '12px',
+                      backgroundColor: '#fef2f2',
+                      border: '1px solid #fecaca',
+                      borderRadius: '8px',
+                      display: 'flex',
+                      gap: '10px',
+                      alignItems: 'flex-start'
+                    }}
+                  >
+                    <AlertTriangle size={20} style={{ color: '#ef4444', flexShrink: 0, marginTop: '2px' }} />
+                    <div style={{ fontSize: '13px', color: '#991b1b' }}>
+                      <strong>⚠ Cảnh báo: Cư dân có chỉ số sức khỏe bất thường</strong>
+                      <div style={{ marginTop: '6px', fontSize: '12px', opacity: 0.9 }}>
+                        {selectedAbnormalResidents.map((item) => (
+                          <div key={item.resident._id}>
+                            • {item.resident.fullName || 'Cư dân'} ({item.resident.residentCode}) - Xin hãy giám sát sau khi tham gia hoạt động
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ) : null;
+              })()}
+            </div>
+            <div>
+              <label className="text-sm font-semibold">Trạng thái</label>
+              <select
+                className="adm-filter-select"
+                value={form.status}
+                onChange={(e) => setForm({ ...form, status: e.target.value })}
+              >
+                {STATUS_OPTIONS.filter((item) => item.value).map((item) => (
+                  <option key={item.value} value={item.value}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div style={{ gridColumn: 'span 3' }}>
+              <label className="text-sm font-semibold">Mô tả</label>
+              <textarea
+                rows="3"
+                className="adm-filter-input"
+                style={{ resize: 'vertical' }}
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+              />
+            </div>
+            {formError && (
+              <div style={{ gridColumn: 'span 3', color: '#b91c1c' }}>{formError}</div>
+            )}
+            <div style={{ gridColumn: 'span 3', display: 'flex', gap: '12px' }}>
+              <button type="button" className="adm-btn-refresh" onClick={() => { resetForm(); setIsCreating(false); }}>
+                Huỷ
+              </button>
+              <button type="submit" className="adm-btn-refresh" disabled={submitting}>
+                {editingId ? 'Lưu thay đổi' : 'Tạo hoạt động'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Activities abnormal summary */}
+      {(() => {
+        const totalAbnormal = Object.values(activitiesAbnormalParticipants).reduce((sum, count) => sum + count, 0);
+        const activitiesWithAbnormal = Object.entries(activitiesAbnormalParticipants)
+          .filter(([_, count]) => count > 0)
+          .map(([activityId, count]) => {
+            const activity = activities.find((a) => a._id === activityId);
+            return { activity, count };
+          });
+        
+        return totalAbnormal > 0 ? (
+          <div
+            style={{
+              marginBottom: '18px',
+              padding: '12px 16px',
+              backgroundColor: '#fef2f2',
+              border: '1px solid #fecaca',
+              borderRadius: '8px',
+              display: 'flex',
+              gap: '12px',
+              alignItems: 'flex-start'
+            }}
+          >
+            <AlertTriangle size={20} style={{ color: '#ef4444', flexShrink: 0, marginTop: '2px' }} />
+            <div style={{ fontSize: '13px', color: '#991b1b' }}>
+              <strong>⚠ Cảnh báo: {activitiesWithAbnormal.length} hoạt động có bệnh nhân ở trạng thái bất thường</strong>
+              <div style={{ marginTop: '8px', fontSize: '12px', opacity: 0.9 }}>
+                {activitiesWithAbnormal.map(({ activity, count }) => (
+                  <div key={activity._id}>
+                    • <strong>{activity.title}</strong> - {count} bệnh nhân có chỉ số bất thường
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : null;
+      })()}
+
+      <div className="adm-table-card">
+        <div className="adm-table-responsive">
+          <table className="adm-table">
+            <thead>
+              <tr>
+                <th>Tiêu đề</th>
+                <th>Danh mục</th>
+                <th>Lên lịch lúc</th>
+                <th>Trạng thái</th>
+                <th>Người tham gia</th>
+                <th>Hành động</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan="6" style={{ textAlign: 'center', padding: '24px' }}>
+                    Đang tải hoạt động...
+                  </td>
+                </tr>
+              ) : activities.length === 0 ? (
+                <tr>
+                  <td colSpan="6" style={{ textAlign: 'center', padding: '24px' }}>
+                    Không tìm thấy hoạt động nào.
+                  </td>
+                </tr>
+              ) : (
+                activities.map((activity) => {
+                  const abnormalCount = activitiesAbnormalParticipants[activity._id] || 0;
+                  return (
+                    <tr key={activity._id} className="adm-table-row" style={abnormalCount > 0 ? { backgroundColor: '#fffbeb' } : {}}>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          {activity.title}
+                          {abnormalCount > 0 && (
+                            <span
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                fontSize: '11px',
+                                color: '#dc2626',
+                                backgroundColor: '#fee2e2',
+                                padding: '2px 6px',
+                                borderRadius: '4px',
+                                fontWeight: 600,
+                                whiteSpace: 'nowrap'
+                              }}
+                            >
+                              <AlertTriangle size={10} />
+                              {abnormalCount} bất thường
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td>{activity.category || '-'}</td>
+                      <td>{activity.scheduledAt ? new Date(activity.scheduledAt).toLocaleString() : '-'}</td>
+                      <td>
+                        <select
+                          value={activity.status}
+                          onChange={(e) => handleStatusChange(activity, e.target.value)}
+                          style={{ width: '100%', padding: '6px 10px', borderRadius: '10px', borderColor: '#cbd5e1' }}
+                        >
+                          {STATUS_OPTIONS.filter((item) => item.value).map((item) => (
+                            <option key={item.value} value={item.value}>
+                              {item.label}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          {getParticipantDisplay(activity)}
+                          {abnormalCount > 0 && (
+                            <span
+                              style={{
+                                display: 'inline-block',
+                                fontSize: '11px',
+                                color: '#dc2626',
+                                backgroundColor: '#fecaca',
+                                padding: '2px 6px',
+                                borderRadius: '4px',
+                                fontWeight: 600,
+                                whiteSpace: 'nowrap'
+                              }}
+                            >
+                              {abnormalCount} ⚠️
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          className="adm-btn-refresh"
+                          style={{ marginRight: '8px' }}
+                          onClick={() => handleEdit(activity)}
+                        >
+                          <Edit3 size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          className="adm-btn-refresh"
+                          onClick={() => handleDelete(activity._id)}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="adm-header" style={{ marginTop: '18px', justifyContent: 'space-between' }}>
+        <span>
+          Trang {page} / {totalPages} — {total} hoạt động
+        </span>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button
+            type="button"
+            className="adm-btn-refresh"
+            disabled={page <= 1}
+            onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
+          >
+            Trước
+          </button>
+          <button
+            type="button"
+            className="adm-btn-refresh"
+            disabled={page >= totalPages}
+            onClick={() => setPage((prev) => Math.min(prev + 1, totalPages))}
+          >
+            Tiếp
+          </button>
+        </div>
+      </div>
+
+      {error && <div style={{ color: '#b91c1c', marginTop: '16px' }}>{error}</div>}
+    </div>
+  );
+}

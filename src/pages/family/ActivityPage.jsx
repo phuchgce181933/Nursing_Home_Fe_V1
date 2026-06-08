@@ -1,0 +1,303 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import { Calendar, MapPin, Clock, Users, Search, RefreshCw, UserCheck } from 'lucide-react';
+import activityService from '../../services/activity.service';
+import residentService from '../../services/resident.service';
+import '../../styles/admin/AdminAdmissionRequestsPage.css';
+
+export default function FamilyActivityPage() {
+  const [activities, setActivities] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [page, setPage] = useState(1);
+  const [limit] = useState(12);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+  
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [registeredResidents, setRegisteredResidents] = useState(new Set());
+  const [familyResidents, setFamilyResidents] = useState([]);
+  const [selectedResident, setSelectedResident] = useState(null);
+  const [registering, setRegistering] = useState(false);
+
+  const fetchActivities = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const params = {
+        page,
+        limit,
+        status: statusFilter || undefined,
+        search: search || undefined,
+      };
+      
+      const res = await activityService.getActivityList(params);
+      setActivities(res?.data || []);
+      setTotal(res?.total || 0);
+      setTotalPages(res?.totalPages || 1);
+    } catch (err) {
+      console.error('Fetch activities failed:', err);
+      setError(err.response?.data?.message || 'Could not load activities.');
+    } finally {
+      setLoading(false);
+    }
+  }, [page, limit, statusFilter, search]);
+
+  useEffect(() => {
+    fetchActivities();
+  }, [fetchActivities]);
+
+  useEffect(() => {
+    const loadFamilyResidents = async () => {
+      try {
+        const res = await residentService.getFamilyResidentList();
+        const residents = Array.isArray(res) ? res : res?.data || [];
+        setFamilyResidents(residents);
+        if (residents.length > 0) {
+          setSelectedResident(residents[0]._id);
+        }
+      } catch (err) {
+        console.error('Load residents failed:', err);
+      }
+    };
+    loadFamilyResidents();
+  }, []);
+
+  const handleRegisterResident = async (activityId) => {
+    if (!selectedResident) {
+      alert('Vui lòng chọn cư dân');
+      return;
+    }
+
+    try {
+      setRegistering(true);
+      await activityService.registerResident(activityId, selectedResident);
+      
+      setRegisteredResidents(prev => {
+        const newSet = new Set(prev);
+        newSet.add(`${activityId}-${selectedResident}`);
+        return newSet;
+      });
+      
+      alert('Đã đăng ký hoạt động thành công!');
+      fetchActivities();
+    } catch (err) {
+      console.error('Register failed:', err);
+      alert(err.response?.data?.message || 'Không thể đăng ký hoạt động.');
+    } finally {
+      setRegistering(false);
+    }
+  };
+
+  const isRegistered = (activityId, residentId) => {
+    const activity = activities.find(a => a._id === activityId);
+    if (!activity) return false;
+    return activity.participantResidentIds?.includes(residentId);
+  };
+
+  return (
+    <div className="adm-container">
+      <div className="adm-header">
+        <div>
+          <h1>
+            <Calendar size={26} />
+            Hoạt động của cơ sở
+          </h1>
+          <p>Xem và đăng ký hoạt động cho cư dân gia đình.</p>
+        </div>
+      </div>
+
+      <div className="adm-filter-panel">
+        <div style={{ marginBottom: '16px' }}>
+          <label className="text-sm font-semibold">Chọn cư dân</label>
+          <select
+            className="adm-filter-select"
+            value={selectedResident}
+            onChange={(e) => setSelectedResident(e.target.value)}
+          >
+            <option value="">Chọn cư dân</option>
+            {familyResidents.map((resident) => (
+              <option key={resident._id} value={resident._id}>
+                {resident.fullName || 'Cư dân chưa đặt tên'} {resident.residentCode ? `(${resident.residentCode})` : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <form className="adm-filter-grid">
+          <div>
+            <label className="text-sm font-semibold">Tìm kiếm</label>
+            <div className="adm-filter-input-wrapper">
+              <Search className="adm-filter-input-icon" size={14} />
+              <input
+                type="text"
+                placeholder="Tìm theo tiêu đề, danh mục..."
+                className="adm-filter-input"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-sm font-semibold">Trạng thái</label>
+            <select
+              className="adm-filter-select"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
+              <option value="">Tất cả</option>
+              <option value="scheduled">Sắp diễn ra</option>
+              <option value="ongoing">Đang diễn ra</option>
+              <option value="completed">Đã hoàn thành</option>
+            </select>
+          </div>
+
+          <div style={{ alignSelf: 'flex-end' }}>
+            <button type="button" className="adm-btn-refresh" onClick={() => fetchActivities()}>
+              <RefreshCw size={14} /> Làm mới
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '40px' }}>
+          Đang tải hoạt động...
+        </div>
+      ) : error ? (
+        <div style={{ color: '#b91c1c', padding: '20px', backgroundColor: '#fee2e2', borderRadius: '8px' }}>
+          {error}
+        </div>
+      ) : activities.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
+          Không tìm thấy hoạt động nào.
+        </div>
+      ) : (
+        <>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+            gap: '16px',
+            marginBottom: '24px'
+          }}>
+            {activities.map((activity) => {
+              const isResidentRegistered = selectedResident && isRegistered(activity._id, selectedResident);
+              return (
+                <div
+                  key={activity._id}
+                  style={{
+                    backgroundColor: 'white',
+                    borderRadius: '12px',
+                    padding: '16px',
+                    border: '1px solid #e2e8f0',
+                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+                    display: 'flex',
+                    flexDirection: 'column'
+                  }}
+                >
+                  <div style={{ marginBottom: '12px' }}>
+                    <h3 style={{ marginTop: 0, marginBottom: '8px' }}>{activity.title}</h3>
+                    {activity.category && (
+                      <span style={{
+                        display: 'inline-block',
+                        padding: '4px 8px',
+                        backgroundColor: '#e0f2fe',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        color: '#0369a1',
+                        fontWeight: 500
+                      }}>
+                        {activity.category}
+                      </span>
+                    )}
+                  </div>
+
+                  <div style={{ fontSize: '14px', color: '#64748b', marginBottom: '12px' }}>
+                    {activity.description && (
+                      <p style={{ margin: '0 0 8px 0' }}>{activity.description}</p>
+                    )}
+                    
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                      <Calendar size={14} />
+                      <span>{new Date(activity.scheduledAt).toLocaleString('vi-VN')}</span>
+                    </div>
+
+                    {activity.location && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                        <MapPin size={14} />
+                        <span>{activity.location}</span>
+                      </div>
+                    )}
+
+                    {activity.durationMinutes && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                        <Clock size={14} />
+                        <span>{activity.durationMinutes} phút</span>
+                      </div>
+                    )}
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Users size={14} />
+                      <span>{activity.participantResidentIds?.length || 0} cư dân</span>
+                    </div>
+                  </div>
+
+                  <div style={{
+                    padding: '8px 12px',
+                    backgroundColor: '#f8fafc',
+                    borderRadius: '6px',
+                    marginBottom: '12px',
+                    fontSize: '12px'
+                  }}>
+                    <strong>Trạng thái:</strong> <span style={{ textTransform: 'capitalize' }}>{activity.status}</span>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="adm-btn-refresh"
+                      disabled={!selectedResident || isResidentRegistered || registering || activity.status === 'cancelled' || activity.status === 'completed'}
+                      onClick={() => handleRegisterResident(activity._id)}
+                      style={{
+                        marginTop: 'auto',
+                        opacity: !selectedResident || isResidentRegistered || registering || activity.status === 'cancelled' || activity.status === 'completed' ? 0.5 : 1,
+                        cursor: !selectedResident || isResidentRegistered || registering || activity.status === 'cancelled' || activity.status === 'completed' ? 'not-allowed' : 'pointer'
+                      }}
+                    >
+                      <UserCheck size={14} />
+                      {isResidentRegistered ? 'Đã đăng ký' : activity.status === 'completed' ? 'Không thể đăng ký' : 'Đăng ký'}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="adm-header" style={{ marginTop: '18px', justifyContent: 'space-between' }}>
+            <span>
+              Trang {page} / {totalPages} — {total} hoạt động
+            </span>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                type="button"
+                className="adm-btn-refresh"
+                disabled={page <= 1}
+                onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
+              >
+                Trước
+              </button>
+              <button
+                type="button"
+                className="adm-btn-refresh"
+                disabled={page >= totalPages}
+                onClick={() => setPage((prev) => Math.min(prev + 1, totalPages))}
+              >
+                Tiếp
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}

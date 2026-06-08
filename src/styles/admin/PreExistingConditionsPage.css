@@ -1,0 +1,27 @@
+/* Page-specific — shell/table: ResidentPage.css */
+
+.pre-existing-status-cell {
+  font-size: 13px;
+  line-height: 1.45;
+  max-width: 320px;
+  color: #475569;
+}
+
+.resident-page .pre-existing-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) minmax(320px, 1.1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 1024px) {
+  .resident-page .pre-existing-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.pre-existing-panel__updated {
+  margin-top: 14px;
+  color: #94a3b8;
+  font-size: 13px;
+}
