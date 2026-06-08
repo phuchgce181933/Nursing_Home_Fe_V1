@@ -401,7 +401,7 @@ export default function CareAppointmentsPage() {
         const residentIdParam = typeof residentIdStr === 'object' ? String(residentIdStr) : residentIdStr;
         const res = await admissionService.adminGetAdmissionList({
           residentId: residentIdParam,
-          status: 'consulting,assessing,contracting,checked_in,cancelled',
+          status: 'new_request,consulting,assessing,contracting,checked_in,cancelled',
           limit: 1,
         });
 
@@ -728,6 +728,11 @@ export default function CareAppointmentsPage() {
                     </td>
                     <td style={{ fontWeight: '600', color: '#475569' }}>
                       {row.appointmentType}
+                      {row.appointmentType === 'Khám lâm sàng đầu vào' && (
+                        <div style={{ marginTop: '4px', fontSize: '11px', color: '#0f766e' }}>
+                          Khám lâm sàng + Đánh giá điều kiện nhập viện
+                        </div>
+                      )}
                     </td>
                     <td>
                       {(row.doctorStaffId?.userId?.fullName || row.doctorStaffId?.fullName) ? (
@@ -780,7 +785,14 @@ export default function CareAppointmentsPage() {
                           <button
                             onClick={() => handleOpenStatus(row)}
                             className="cap-btn-action"
-                            title={row.status === 'completed' ? "Xem kết quả thăm khám" : "Cập nhật trạng thái"}
+                            title={row.appointmentType === 'Khám lâm sàng đầu vào'
+                              ? (row.status === 'completed'
+                                ? 'Xem kết quả khám lâm sàng và đánh giá điều kiện'
+                                : 'Mở wizard khám lâm sàng & đánh giá điều kiện')
+                              : (row.status === 'completed'
+                                ? 'Xem kết quả thăm khám'
+                                : 'Cập nhật trạng thái')
+                            }
                             disabled={row.status === 'cancelled'}
                           >
                             {row.status === 'completed' ? <Eye size={14} /> : <Activity size={14} />}

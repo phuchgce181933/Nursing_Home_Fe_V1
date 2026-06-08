@@ -18,6 +18,7 @@ import {
   Droplet,
   Wind,
   Scale,
+  Wallet,
 } from 'lucide-react';
 import medicalRecordService from '../../services/medicalRecord.service';
 import residentService from '../../services/resident.service';
@@ -580,7 +581,33 @@ export default function HealthMonitoringPage() {
   const [appliedTo, setAppliedTo] = useState('');
 
   // ── Form nhập chỉ số ──
-  const emptyForm = { bloodPressureSystolic: '', bloodPressureDiastolic: '', pulse: '', temperatureCelsius: '', oxygenSaturation: '', bloodSugar: '', weightKg: '', heightCm: '', bloodType: '', summary: '' };
+  const emptyForm = {
+    bloodPressureSystolic: '',
+    bloodPressureDiastolic: '',
+    pulse: '',
+    temperatureCelsius: '',
+    oxygenSaturation: '',
+    bloodSugar: '',
+    weightKg: '',
+    heightCm: '',
+    bloodType: '',
+    summary: '',
+    physicalExamination: '',
+    laboratoryTestResults: '',
+    urinalysisResults: '',
+    ecgResults: '',
+    imagingResults: '',
+    cognitiveFunction: '',
+    functionalStatus: '',
+    fallRisk: '',
+    nutritionalStatus: '',
+    roomCost: '',
+    medicationCost: '',
+    careServiceCost: '',
+    otherCost: '',
+    paymentMethod: 'card',
+    consentToPayment: false,
+  };
   const [form, setForm] = useState(emptyForm);
   const [formSaving, setFormSaving] = useState(false);
   const [formError, setFormError] = useState(null);
@@ -706,7 +733,22 @@ export default function HealthMonitoringPage() {
       if (form.weightKg !== '')             body.weightKg              = parseFloat(form.weightKg);
       if (form.heightCm !== '')             body.heightCm              = parseFloat(form.heightCm);
       if (form.bloodType && form.bloodType !== 'unknown') body.bloodType = form.bloodType;
-      if (form.summary.trim())              body.summary               = form.summary.trim();
+      if (form.summary.trim())               body.summary               = form.summary.trim();
+      if (form.physicalExamination.trim())   body.physicalExamination    = form.physicalExamination.trim();
+      if (form.laboratoryTestResults.trim()) body.laboratoryTestResults  = form.laboratoryTestResults.trim();
+      if (form.urinalysisResults.trim())     body.urinalysisResults      = form.urinalysisResults.trim();
+      if (form.ecgResults.trim())            body.ecgResults             = form.ecgResults.trim();
+      if (form.imagingResults.trim())        body.imagingResults         = form.imagingResults.trim();
+      if (form.cognitiveFunction.trim())     body.cognitiveFunction      = form.cognitiveFunction.trim();
+      if (form.functionalStatus.trim())      body.functionalStatus       = form.functionalStatus.trim();
+      if (form.fallRisk.trim())              body.fallRisk               = form.fallRisk.trim();
+      if (form.nutritionalStatus.trim())     body.nutritionalStatus      = form.nutritionalStatus.trim();
+      if (form.roomCost !== '')              body.roomCost               = parseFloat(form.roomCost);
+      if (form.medicationCost !== '')        body.medicationCost         = parseFloat(form.medicationCost);
+      if (form.careServiceCost !== '')       body.careServiceCost        = parseFloat(form.careServiceCost);
+      if (form.otherCost !== '')             body.otherCost              = parseFloat(form.otherCost);
+      if (form.paymentMethod)                body.paymentMethod          = form.paymentMethod;
+      if (form.consentToPayment)             body.consentToPayment       = true;
 
       await medicalRecordService.recordVitals(selectedResident._id, body);
       setFormSuccess(true);
@@ -1113,6 +1155,78 @@ export default function HealthMonitoringPage() {
                         <div className="hm-form-group full">
                           <label className="hm-form-label" htmlFor="hm-input-summary">Ghi chú / Tóm tắt tình trạng</label>
                           <textarea id="hm-input-summary" className="hm-form-textarea" placeholder="Nhập ghi chú về tình trạng sức khỏe..." value={form.summary} onChange={(e) => setForm(prev => ({ ...prev, summary: e.target.value }))} />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="hm-form-section" style={{ marginTop: '18px' }}>
+                      <div className="hm-form-section-title">
+                        <ClipboardList size={15} /> Khám lâm sàng & cận lâm sàng
+                      </div>
+                      <div className="hm-form-grid">
+                        {[
+                          { key: 'physicalExamination', label: 'Khám thực thể' },
+                          { key: 'laboratoryTestResults', label: 'Kết quả xét nghiệm' },
+                          { key: 'urinalysisResults', label: 'Kết quả nước tiểu' },
+                          { key: 'ecgResults', label: 'Kết quả ECG' },
+                          { key: 'imagingResults', label: 'Kết quả hình ảnh' },
+                          { key: 'cognitiveFunction', label: 'Tình trạng nhận thức' },
+                          { key: 'functionalStatus', label: 'Tình trạng chức năng' },
+                          { key: 'fallRisk', label: 'Nguy cơ té ngã' },
+                          { key: 'nutritionalStatus', label: 'Tình trạng dinh dưỡng' },
+                        ].map(({ key, label }) => (
+                          <div key={key} className="hm-form-group full">
+                            <label className="hm-form-label" htmlFor={`hm-input-${key}`}>{label}</label>
+                            <textarea
+                              id={`hm-input-${key}`}
+                              className="hm-form-textarea"
+                              placeholder={`Nhập ${label.toLowerCase()}...`}
+                              value={form[key]}
+                              onChange={(e) => setForm(prev => ({ ...prev, [key]: e.target.value }))}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="hm-form-section" style={{ marginTop: '18px' }}>
+                      <div className="hm-form-section-title">
+                        <Wallet size={15} /> Chi phí & Thanh toán
+                      </div>
+                      <div className="hm-form-grid">
+                        <div className="hm-form-group">
+                          <label className="hm-form-label" htmlFor="hm-input-roomCost">Chi phí phòng</label>
+                          <input id="hm-input-roomCost" type="number" step="0.01" className="hm-form-input" placeholder="0" value={form.roomCost} onChange={(e) => setForm(prev => ({ ...prev, roomCost: e.target.value }))} />
+                        </div>
+                        <div className="hm-form-group">
+                          <label className="hm-form-label" htmlFor="hm-input-medicationCost">Chi phí thuốc</label>
+                          <input id="hm-input-medicationCost" type="number" step="0.01" className="hm-form-input" placeholder="0" value={form.medicationCost} onChange={(e) => setForm(prev => ({ ...prev, medicationCost: e.target.value }))} />
+                        </div>
+                        <div className="hm-form-group">
+                          <label className="hm-form-label" htmlFor="hm-input-careServiceCost">Chi phí dịch vụ chăm sóc</label>
+                          <input id="hm-input-careServiceCost" type="number" step="0.01" className="hm-form-input" placeholder="0" value={form.careServiceCost} onChange={(e) => setForm(prev => ({ ...prev, careServiceCost: e.target.value }))} />
+                        </div>
+                        <div className="hm-form-group">
+                          <label className="hm-form-label" htmlFor="hm-input-otherCost">Chi phí khác</label>
+                          <input id="hm-input-otherCost" type="number" step="0.01" className="hm-form-input" placeholder="0" value={form.otherCost} onChange={(e) => setForm(prev => ({ ...prev, otherCost: e.target.value }))} />
+                        </div>
+                        <div className="hm-form-group">
+                          <label className="hm-form-label" htmlFor="hm-input-paymentMethod">Phương thức thanh toán</label>
+                          <select id="hm-input-paymentMethod" className="hm-form-select" value={form.paymentMethod} onChange={(e) => setForm(prev => ({ ...prev, paymentMethod: e.target.value }))}>
+                            <option value="card">Thẻ</option>
+                            <option value="bank_transfer">Chuyển khoản</option>
+                            <option value="wallet">Ví điện tử</option>
+                            <option value="cash">Tiền mặt</option>
+                          </select>
+                        </div>
+                        <div className="hm-form-group full" style={{ alignItems: 'center', marginTop: '4px' }}>
+                          <label className="hm-form-label" htmlFor="hm-input-consentToPayment">Đồng ý thanh toán</label>
+                          <input
+                            id="hm-input-consentToPayment"
+                            type="checkbox"
+                            checked={form.consentToPayment}
+                            onChange={(e) => setForm(prev => ({ ...prev, consentToPayment: e.target.checked }))}
+                          />
                         </div>
                       </div>
                     </div>
