@@ -236,6 +236,12 @@ export default function AdmissionDetailDrawer({
   const [invoiceDueDate, setInvoiceDueDate] = useState('');
   const [creatingInvoice, setCreatingInvoice] = useState(false);
 
+  useEffect(() => {
+    if (!showInvoiceModal) return;
+    const defaultPackagePrice = admission?.servicePackageId?.monthlyPrice || '';
+    setCareServiceCost(defaultPackagePrice ? String(defaultPackagePrice) : '');
+  }, [showInvoiceModal, admission?.servicePackageId?.monthlyPrice]);
+
   const [showCheckInModal, setShowCheckInModal] = useState(false);
   const [assignedBedHex, setAssignedBedHex] = useState('');
   const [assignedRoomHex, setAssignedRoomHex] = useState('');
