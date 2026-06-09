@@ -47,6 +47,7 @@ import AdminReportsPage from '../pages/admin/AdminReportsPage';
 import ActivityStatisticsPage from '../pages/admin/ActivityStatisticsPage';
 import ActivityParticipationResultsPage from '../pages/admin/ActivityParticipationResultsPage';
 import CareAppointmentsPage from '../pages/admin/appointments';
+import AdminContractManagementPage from '../pages/admin/AdminContractManagementPage';
 import DoctorDashboardPage from '../pages/doctor/DoctorDashboardPage';
 import NurseDashboardPage from '../pages/nurse/NurseDashboardPage';
 import MedicationPage from '../pages/nurse/MedicationPage';
@@ -127,6 +128,7 @@ function AppRoutes() {
         <Route path="activities/statistics" element={<ActivityStatisticsPage />} />
         <Route path="activities/participation-results" element={<ActivityParticipationResultsPage />} />
         <Route path="reports" element={<AdminReportsPage />} />
+        <Route path="contracts" element={<AdminContractManagementPage />} />
         <Route path="incidents" element={<IncidentManagementPage />} />
         <Route path="*" element={<PlaceholderPage title="Trang quản trị" />} />
       </Route>

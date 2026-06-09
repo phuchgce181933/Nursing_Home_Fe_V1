@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { getAuthToken } from '../../../utils/auth';
 import {
   X,
   User,
@@ -17,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../../hooks/useAuth';
 import admissionService from '../../../services/admission.service';
+import paymentService from '../../../services/payment.service';
 import servicePackageService from '../../../services/servicePackage.service';
 import facilityService from '../../../services/facility.service';
 
@@ -226,6 +228,20 @@ export default function AdmissionDetailDrawer({
   const [contractGenNotes, setContractGenNotes] = useState('');
   const [creatingContract, setCreatingContract] = useState(false);
 
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [roomCost, setRoomCost] = useState('');
+  const [medicationCost, setMedicationCost] = useState('');
+  const [careServiceCost, setCareServiceCost] = useState('');
+  const [otherCost, setOtherCost] = useState('');
+  const [invoiceDueDate, setInvoiceDueDate] = useState('');
+  const [creatingInvoice, setCreatingInvoice] = useState(false);
+
+  useEffect(() => {
+    if (!showInvoiceModal) return;
+    const defaultPackagePrice = admission?.servicePackageId?.monthlyPrice || '';
+    setCareServiceCost(defaultPackagePrice ? String(defaultPackagePrice) : '');
+  }, [showInvoiceModal, admission?.servicePackageId?.monthlyPrice]);
+
   const [showCheckInModal, setShowCheckInModal] = useState(false);
   const [assignedBedHex, setAssignedBedHex] = useState('');
   const [assignedRoomHex, setAssignedRoomHex] = useState('');
@@ -241,6 +257,15 @@ export default function AdmissionDetailDrawer({
   const [floors, setFloors] = useState([]);
   const [rooms, setRooms] = useState([]);
   const [beds, setBeds] = useState([]);
+
+  const openPayosCheckout = (residentId, invoiceId) => {
+    if (!invoiceId || !residentId) return;
+    const resolvedResidentId = residentId?._id || residentId;
+    if (!resolvedResidentId) return;
+    const token = getAuthToken();
+    const url = `/api/residents/${resolvedResidentId}/invoices/payos/checkout/${invoiceId}${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+    window.open(url, '_blank');
+  };
 
   const [loadingBuildings, setLoadingBuildings] = useState(false);
   const [loadingFloors, setLoadingFloors] = useState(false);
@@ -646,6 +671,38 @@ export default function AdmissionDetailDrawer({
       setModalError(err.response?.data?.message || 'Đã xảy ra lỗi khi tạo hợp đồng.');
     } finally {
       setCreatingContract(false);
+    }
+  };
+
+  const handleCreateInvoice = async (e) => {
+    if (e) e.preventDefault();
+    if (!admissionId) return;
+    const residentId = admission?.residentId || admission?.resident?._id;
+    if (!residentId) return;
+
+    try {
+      setCreatingInvoice(true);
+      await paymentService.createInvoice(residentId, {
+        roomCost: roomCost || 0,
+        medicationCost: medicationCost || 0,
+        careServiceCost: careServiceCost || 0,
+        otherCost: otherCost || 0,
+        dueDate: invoiceDueDate || undefined,
+      });
+      setShowInvoiceModal(false);
+      setRoomCost('');
+      setMedicationCost('');
+      setCareServiceCost('');
+      setOtherCost('');
+      setInvoiceDueDate('');
+      if (onCancelSuccess) onCancelSuccess();
+      const res = await admissionService.adminGetAdmissionDetail(admissionId);
+      setAdmission(res?.admission || null);
+    } catch (err) {
+      console.error('Failed to create invoice:', err);
+      setModalError(err.response?.data?.message || 'Đã xảy ra lỗi khi tạo hóa đơn.');
+    } finally {
+      setCreatingInvoice(false);
     }
   };
 
@@ -1058,6 +1115,28 @@ export default function AdmissionDetailDrawer({
                       Phân hạng: <span className="font-bold text-[#2D6A4F] uppercase">{admission.servicePackageId.tier}</span> • Đơn giá: <span className="font-bold text-[#1B365D]">{admission.servicePackageId.monthlyPrice?.toLocaleString()} VND/tháng</span>
                     </div>
                   )}
+                  {admission.latestInvoice ? (
+                    <div className="mt-3 rounded-lg bg-white/80 border border-slate-200 p-3 text-sm">
+                      <p className="text-slate-500">Trạng thái hóa đơn gần nhất</p>
+                      <p className="font-semibold text-slate-800">{admission.latestInvoice.status === 'paid' ? 'Đã thanh toán' : admission.latestInvoice.status === 'partially_paid' ? 'Đã thanh toán một phần' : 'Chưa thanh toán'}</p>
+                      {admission.latestInvoice.dueDate && (
+                        <p className="text-xs text-slate-500 mt-1">Hạn thanh toán: {new Date(admission.latestInvoice.dueDate).toLocaleDateString('vi-VN')}</p>
+                      )}
+                      {admission.latestInvoice.status !== 'paid' && (
+                        <button
+                          type="button"
+                          className="button button-primary mt-3"
+                          onClick={() => openPayosCheckout(admission.residentId || admission?.resident?._id, admission.latestInvoice._id)}
+                        >
+                          Thanh toán qua PayOS
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="mt-3 rounded-lg bg-white/80 border border-slate-200 p-3 text-sm text-slate-600">
+                      Chưa có hóa đơn thanh toán liên quan đến gói dịch vụ.
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1175,7 +1254,7 @@ export default function AdmissionDetailDrawer({
                       </button>
                     )}
 
-                    {isDoctorRole && ['consulting', 'assessing'].includes(admission.status) && (
+                    {isDoctorRole && ['new_request', 'consulting', 'assessing', 'contracting'].includes(admission.status) && (
                       <button
                         type="button"
                         onClick={() => {
@@ -1227,6 +1306,17 @@ export default function AdmissionDetailDrawer({
                         style={{ padding: '8px 16px', fontSize: '12px', borderRadius: '10px', boxShadow: 'none', background: '#1B365D' }}
                       >
                         {admission.contractNumber ? 'Sửa hợp đồng' : 'Tạo hợp đồng'}
+                      </button>
+                    )}
+
+                    {isAdminRole && admission.status === 'contracting' && (admission.servicePackageId || admission.assignedServicePackage) && !admission.latestInvoice && (
+                      <button
+                        type="button"
+                        onClick={() => setShowInvoiceModal(true)}
+                        className="adm-btn-apply"
+                        style={{ padding: '8px 16px', fontSize: '12px', borderRadius: '10px', boxShadow: 'none', background: '#1B365D' }}
+                      >
+                        Tạo hóa đơn
                       </button>
                     )}
 
@@ -1984,6 +2074,128 @@ export default function AdmissionDetailDrawer({
                 >
                   {creatingContract && <Loader2 className="animate-spin mr-1" size={13} />}
                   Ký kết hợp đồng
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 7. Create Invoice Modal */}
+      {showInvoiceModal && (
+        <div className="arh-modal-backdrop" onClick={() => setShowInvoiceModal(false)}>
+          <div className="arh-modal" onClick={(e) => e.stopPropagation()}>
+            <h4 className="arh-modal__title">Tạo hóa đơn thanh toán</h4>
+            <p className="arh-modal__text">
+              Tạo hóa đơn cho cư dân <strong className="text-slate-800">{admission?.applicant?.fullName}</strong> dựa trên gói dịch vụ hiện tại.
+            </p>
+            {modalError && (
+              <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-lg text-xs mb-4 font-sans">
+                {modalError}
+              </div>
+            )}
+
+            <form onSubmit={handleCreateInvoice}>
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
+                    Chi phí phòng
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    className="adm-filter-input"
+                    style={{ paddingLeft: '14px' }}
+                    value={roomCost}
+                    onChange={(e) => setRoomCost(e.target.value)}
+                    placeholder="0"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
+                    Chi phí thuốc men
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    className="adm-filter-input"
+                    style={{ paddingLeft: '14px' }}
+                    value={medicationCost}
+                    onChange={(e) => setMedicationCost(e.target.value)}
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
+                    Chi phí dịch vụ chăm sóc
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    className="adm-filter-input"
+                    style={{ paddingLeft: '14px' }}
+                    value={careServiceCost}
+                    onChange={(e) => setCareServiceCost(e.target.value)}
+                    placeholder="0"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
+                    Chi phí khác
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    className="adm-filter-input"
+                    style={{ paddingLeft: '14px' }}
+                    value={otherCost}
+                    onChange={(e) => setOtherCost(e.target.value)}
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
+                  Hạn thanh toán
+                </label>
+                <input
+                  type="date"
+                  className="adm-filter-input"
+                  style={{ paddingLeft: '14px' }}
+                  value={invoiceDueDate}
+                  onChange={(e) => setInvoiceDueDate(e.target.value)}
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  className="adm-btn-clear flex-1"
+                  style={{ borderRadius: '20px', padding: '10px 24px' }}
+                  onClick={() => {
+                    setShowInvoiceModal(false);
+                    setRoomCost('');
+                    setMedicationCost('');
+                    setCareServiceCost('');
+                    setOtherCost('');
+                    setInvoiceDueDate('');
+                  }}
+                  disabled={creatingInvoice}
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  type="submit"
+                  className="adm-btn-apply flex-1 justify-center"
+                  style={{ borderRadius: '20px', padding: '10px 24px', backgroundColor: '#1B365D' }}
+                  disabled={creatingInvoice}
+                >
+                  {creatingInvoice && <Loader2 className="animate-spin mr-1" size={13} />}
+                  Tạo hóa đơn
                 </button>
               </div>
             </form>

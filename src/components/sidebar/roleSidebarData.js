@@ -45,6 +45,11 @@ export const roleSidebarData = {
       icon: Users,
       path: '/doctor/patients',
     },
+     {
+      title: 'Theo dõi Sức khỏe',
+      icon: HeartPulse,
+      path: '/doctor/health-monitoring',
+    },
     {
       title: 'Thuốc',
       icon: Pill,

@@ -31,26 +31,13 @@ const validate = (form) => {
     errs.username = 'Username 3–30 ký tự, chỉ chữ cái, số và dấu gạch dưới';
   }
 
-  if (form.dateOfBirth) {
-    const dob = new Date(form.dateOfBirth);
-    if (isNaN(dob.getTime())) {
-      errs.dateOfBirth = 'Ngày sinh không hợp lệ';
-    } else if (dob > new Date()) {
-      errs.dateOfBirth = 'Ngày sinh không thể trong tương lai';
-    } else {
-      const minAge = new Date();
-      minAge.setFullYear(minAge.getFullYear() - 18);
-      if (dob > minAge) errs.dateOfBirth = 'Nhân viên phải ít nhất 18 tuổi';
-    }
-  }
-
   return errs;
 };
 
 const emptyForm = {
   fullName: '', email: '', password: '', role: 'nurse',
-  phone: '', username: '', gender: '', dateOfBirth: '',
-  address: '', specialty: '', certifications: '',
+  phone: '', username: '', gender: '',
+  address: '', specialty: '', certificationFiles: [],
 };
 
 export default function StaffCreateModal({
@@ -63,7 +50,9 @@ export default function StaffCreateModal({
   const [errors, setErrors] = useState({});
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState(null);
+  const [certificationFiles, setCertificationFiles] = useState([]);
   const fileRef = useRef();
+  const certFileRef = useRef();
 
   const set = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -77,17 +66,18 @@ export default function StaffCreateModal({
     setAvatarPreview(URL.createObjectURL(file));
   };
 
+  const handleCertificationChange = (e) => {
+    const files = Array.from(e.target.files || []);
+    setCertificationFiles(files);
+  };
+
   const handleSubmit = () => {
     const errs = validate(form);
     if (Object.keys(errs).length) { setErrors(errs); return; }
 
-    const certList = form.certifications
-      ? form.certifications.split(',').map((s) => s.trim()).filter(Boolean)
-      : [];
-
     onSave({
       ...form,
-      certifications: certList,
+      certificationFiles,
       avatarFile: avatarFile || undefined,
     });
   };
@@ -153,11 +143,6 @@ export default function StaffCreateModal({
               <option value="other">Khác</option>
             </select>
           </div>
-          <div className="form-group">
-            <label>Ngày sinh</label>
-            <input type="date" value={form.dateOfBirth} onChange={(e) => set('dateOfBirth', e.target.value)} />
-            {errors.dateOfBirth && <span className="field-error">{errors.dateOfBirth}</span>}
-          </div>
           {field('Địa chỉ', 'address', { placeholder: 'Số nhà, đường, phường...', full: true })}
         </div>
 
@@ -173,7 +158,32 @@ export default function StaffCreateModal({
             {errors.role && <span className="field-error">{errors.role}</span>}
           </div>
           {field('Chuyên môn', 'specialty', { placeholder: 'Nội khoa, Hồi sức...' })}
-          {field('Chứng chỉ', 'certifications', { placeholder: 'BLS, ACLS, ... (cách nhau bằng dấu phẩy)', full: true })}
+          <div className="form-group form-grid--full">
+            <label>Chứng chỉ (DOC/PDF)</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+              <button type="button" className="btn-outline-sm" onClick={() => certFileRef.current?.click()}>
+                Chọn file chứng chỉ
+              </button>
+              <span style={{ color: '#64748b', fontSize: '0.9rem' }}>
+                {certificationFiles.length ? `${certificationFiles.length} file đã chọn` : 'Hỗ trợ PDF, DOC, DOCX'}
+              </span>
+            </div>
+            <input
+              ref={certFileRef}
+              type="file"
+              accept=".pdf,.doc,.docx"
+              multiple
+              style={{ display: 'none' }}
+              onChange={handleCertificationChange}
+            />
+            {certificationFiles.length > 0 && (
+              <ul className="file-list">
+                {certificationFiles.map((file) => (
+                  <li key={file.name}>{file.name}</li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
 
         <div className="modal__actions">
