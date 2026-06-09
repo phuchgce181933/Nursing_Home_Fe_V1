@@ -14,6 +14,8 @@ import {
   Activity,
   CheckCircle,
   UserCheck,
+  Eye,
+  FileText,
 } from 'lucide-react';
 import { useAuth } from '../../../hooks/useAuth';
 import admissionService from '../../../services/admission.service';
@@ -230,6 +232,7 @@ export default function AdmissionDetailDrawer({
   const [assignedBedHex, setAssignedBedHex] = useState('');
   const [assignedRoomHex, setAssignedRoomHex] = useState('');
   const [checkingIn, setCheckingIn] = useState(false);
+  const [showContractViewModal, setShowContractViewModal] = useState(false);
 
   // States for facility drilldown check-in dropdowns
   const [selectedBuildingId, setSelectedBuildingId] = useState('');
@@ -675,6 +678,178 @@ export default function AdmissionDetailDrawer({
     }
   };
 
+  const handlePrintContract = () => {
+    if (!admission) return;
+    const printWindow = window.open('', '_blank', 'width=800,height=600');
+    if (!printWindow) {
+      alert('Vui lòng cho phép trình duyệt mở popup để xuất PDF/In hợp đồng.');
+      return;
+    }
+    
+    const htmlContent = `
+      <html>
+        <head>
+          <title>Hop_dong_nhap_vien_${admission.contractNumber || 'NH'}</title>
+          <style>
+            body {
+              font-family: "Times New Roman", Times, serif, Arial, sans-serif;
+              line-height: 1.5;
+              padding: 40px;
+              color: #000;
+              background: #fff;
+              max-width: 800px;
+              margin: 0 auto;
+            }
+            .header {
+              text-align: center;
+              margin-bottom: 30px;
+              text-transform: uppercase;
+            }
+            .title {
+              text-align: center;
+              font-size: 20px;
+              font-weight: bold;
+              margin: 20px 0;
+              text-transform: uppercase;
+            }
+            .section-title {
+              font-weight: bold;
+              margin-top: 20px;
+              margin-bottom: 10px;
+              text-decoration: underline;
+            }
+            .grid {
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 10px;
+              margin-bottom: 15px;
+            }
+            .item {
+              margin-bottom: 8px;
+            }
+            .label {
+              font-weight: bold;
+            }
+            .terms {
+              border: 1px solid #ccc;
+              padding: 15px;
+              margin: 15px 0;
+              white-space: pre-wrap;
+              font-size: 13px;
+              background: #fafafa;
+            }
+            .signatures {
+              margin-top: 50px;
+              display: flex;
+              justify-content: space-between;
+            }
+            .signature-box {
+              text-align: center;
+              width: 45%;
+            }
+            .signature-space {
+              margin-top: 60px;
+              font-style: italic;
+              color: #555;
+            }
+            @media print {
+              body {
+                padding: 20px;
+              }
+              .no-print {
+                display: none;
+              }
+              .terms {
+                border: none;
+                padding: 0;
+                background: none;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <strong>CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</strong><br/>
+            <strong>Độc lập - Tự do - Hạnh phúc</strong><br/>
+            <span>-----------------------</span>
+          </div>
+          <div class="title">
+            HỢP ĐỒNG CHĂM SÓC VÀ LƯU TRÚ NGƯỜI CAO TUỔI
+          </div>
+          <div style="text-align: center; margin-bottom: 30px;">
+            Số hợp đồng: ${admission.contractNumber || 'Chưa thiết lập'}<br/>
+            Ngày lập: ${formatEnglishDate(admission.contractSignedAt || admission.createdAt)}
+          </div>
+          
+          <div class="section-title">BÊN A: TRUNG TÂM DƯỠNG LÃO NURSING HOME (ĐƠN VỊ CUNG CẤP DỊCH VỤ)</div>
+          <div class="item"><span class="label">Đại diện:</span> Ban Giám Đốc Trung Tâm</div>
+          <div class="item"><span class="label">Địa chỉ:</span> 123 Đường Y Tế, Quận 1, TP.HCM</div>
+          <div class="item"><span class="label">Số điện thoại:</span> 1900 6868</div>
+
+          <div class="section-title">BÊN B: ĐẠI DIỆN GIA ĐÌNH (NGƯỜI BẢO LÃNH)</div>
+          <div class="grid">
+            <div class="item"><span class="label">Họ và tên:</span> ${admission.familyAccount?.fullName || admission.requestedByName || 'N/A'}</div>
+            <div class="item"><span class="label">Số điện thoại:</span> ${admission.requestedByPhone || admission.familyAccount?.phone || 'N/A'}</div>
+            <div class="item" style="grid-column: span 2"><span class="label">Email:</span> ${admission.familyAccount?.email || 'N/A'}</div>
+            <div class="item" style="grid-column: span 2"><span class="label">Quan hệ với người cao tuổi:</span> ${formatRelationship(admission.applicant?.relationshipToRequester)}</div>
+          </div>
+
+          <div class="section-title">ĐỐI TƯỢNG CHĂM SÓC (NGƯỜI CAO TUỔI)</div>
+          <div class="grid">
+            <div class="item"><span class="label">Họ và tên:</span> ${admission.applicant?.fullName || 'N/A'}</div>
+            <div class="item"><span class="label">Ngày sinh:</span> ${formatEnglishDate(admission.applicant?.dateOfBirth)}</div>
+            <div class="item"><span class="label">Giới tính:</span> ${formatGender(admission.applicant?.gender)}</div>
+            <div class="item"><span class="label">Số CCCD:</span> ${admission.applicant?.citizenId || 'N/A'}</div>
+            <div class="item" style="grid-column: span 2"><span class="label">Địa chỉ thường trú:</span> ${admission.applicant?.personalAddress || 'N/A'}</div>
+          </div>
+
+          <div class="section-title">NỘI DUNG VÀ ĐIỀU KHOẢN HỢP ĐỒNG</div>
+          <div class="item"><span class="label">Gói dịch vụ đăng ký:</span> ${admission.servicePackageId?.name || admission.assignedServicePackage || 'N/A'}</div>
+          <div class="item">
+            <span class="label">Phí dịch vụ hàng tháng:</span> 
+            ${admission.servicePackageId?.monthlyPrice ? (admission.servicePackageId.monthlyPrice.toLocaleString() + ' VND/tháng') : 'Theo đơn giá gói'}
+          </div>
+          <div class="item">
+            <span class="label">Thời hạn hợp đồng:</span> 
+            Từ ngày ${formatEnglishDate(admission.contractStartDate)} đến ngày ${formatEnglishDate(admission.contractEndDate)}
+          </div>
+          
+          <div class="label" style="margin-top: 15px;">Các điều khoản thỏa thuận:</div>
+          <div class="terms">${admission.contractTerms || 'Hai bên đồng ý tuân thủ các quy định và nội quy chung của Trung tâm dưỡng lão trong suốt thời gian lưu trú.'}</div>
+
+          <div class="signatures">
+            <div class="signature-box">
+              <strong>ĐẠI DIỆN TRUNG TÂM (BÊN A)</strong>
+              <div class="signature-space">
+                (Ký, ghi rõ họ tên và đóng dấu)
+                <br/><br/>
+                <span style="font-weight: bold; color: #1B365D;">ĐÃ KÝ</span>
+              </div>
+            </div>
+            <div class="signature-box">
+              <strong>ĐẠI DIỆN GIA ĐÌNH (BÊN B)</strong>
+              <div class="signature-space">
+                (Ký và ghi rõ họ tên)
+                <br/><br/>
+                <span style="font-weight: bold; color: #1B365D;">ĐÃ KÝ</span>
+              </div>
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+    
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+    
+    printWindow.onload = () => {
+      printWindow.print();
+      setTimeout(() => {
+        printWindow.close();
+      }, 1000);
+    };
+  };
+
   // Determine if request is cancellable (family mode)
   // Block cancellation once the intake clinical appointment has been completed by the doctor
   const intakeApptCompleted = admission?.assignedCareAppointment?.status === 'completed';
@@ -1100,6 +1275,34 @@ export default function AdmissionDetailDrawer({
                         {admission.assignedBed?.bedCode || admission.assignedBed || admission.assignedBedId ? `Giường ${admission.assignedBed?.bedCode || admission.assignedBed || admission.assignedBedId}` : 'Chưa phân giường'}
                       </p>
                     </div>
+                    {admission.contractNumber && !isDoctorOrNurseRole && (
+                      <div className="flex gap-2.5 mt-3 pt-3 border-t border-indigo-100" style={{ gridColumn: 'span 2' }}>
+                        <button
+                          type="button"
+                          onClick={() => setShowContractViewModal(true)}
+                          className="flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                          style={{
+                            background: 'rgba(79, 70, 229, 0.08)',
+                            color: '#4F46E5',
+                            border: '1px solid rgba(79, 70, 229, 0.15)',
+                          }}
+                        >
+                          <Eye size={13} /> Xem hợp đồng
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handlePrintContract}
+                          className="flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                          style={{
+                            background: '#4F46E5',
+                            color: '#ffffff',
+                            border: '1px solid #4F46E5',
+                          }}
+                        >
+                          <FileText size={13} /> Xuất PDF
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -2145,6 +2348,230 @@ export default function AdmissionDetailDrawer({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Contract View Modal */}
+      {showContractViewModal && (
+        <div
+          className="arh-modal-backdrop animate-fade-in"
+          style={{ zIndex: 3000, background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(10px)' }}
+          onClick={() => setShowContractViewModal(false)}
+        >
+          <div
+            className="font-sans flex animate-pop-in overflow-hidden"
+            style={{
+              maxWidth: '960px',
+              width: '95%',
+              height: '85vh',
+              background: '#f8fafc',
+              borderRadius: '20px',
+              border: '1px solid rgba(255, 255, 255, 0.4)',
+              boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.3)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Left Sidebar: Contract Summary & Actions */}
+            <div
+              className="w-[300px] flex-shrink-0 flex flex-col justify-between p-7 text-white font-sans"
+              style={{
+                background: 'linear-gradient(135deg, #1B365D 0%, #0F2038 100%)',
+                borderRight: '1px solid rgba(255, 255, 255, 0.05)',
+              }}
+            >
+              {/* Sidebar Header */}
+              <div>
+                <div className="flex flex-col items-center text-center pb-6 border-b border-white/10">
+                  <div 
+                    className="w-12 h-12 bg-emerald-500/10 text-emerald-400 rounded-full flex items-center justify-center mb-3"
+                    style={{ boxShadow: '0 0 15px rgba(16, 185, 129, 0.2)', border: '1px solid rgba(16, 185, 129, 0.2)' }}
+                  >
+                    <CheckCircle size={22} className="animate-pulse" />
+                  </div>
+                  <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">Đã xác thực pháp lý</span>
+                  <h3 className="mt-2 font-extrabold text-white text-base tracking-tight">HỢP ĐỒNG CHI TIẾT</h3>
+                  <p className="text-white/60 text-xs mt-1 font-mono">Số: {admission.contractNumber}</p>
+                </div>
+
+                {/* Sidebar Metadata Fields */}
+                <div className="flex flex-col gap-4.5 pt-6 text-white/90 text-xs">
+                  <div>
+                    <span className="block text-white/45 text-[9px] uppercase tracking-wider font-bold mb-1">Đại diện ký kết</span>
+                    <span className="font-semibold text-[13px] text-white">
+                      {admission.familyAccount?.fullName || admission.requestedByName || 'N/A'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="block text-white/45 text-[9px] uppercase tracking-wider font-bold mb-1">Người cao tuổi</span>
+                    <span className="font-semibold text-[13px] text-white/95">
+                      {admission.applicant?.fullName || 'N/A'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="block text-white/45 text-[9px] uppercase tracking-wider font-bold mb-1">Gói dịch vụ</span>
+                    <span className="inline-block bg-emerald-500/10 text-emerald-300 font-bold px-2 py-0.5 rounded text-[11px] border border-emerald-500/20">
+                      {admission.servicePackageId?.name || admission.assignedServicePackage || 'N/A'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="block text-white/45 text-[9px] uppercase tracking-wider font-bold mb-1">Đơn giá định kỳ</span>
+                    <span className="font-semibold text-[13px] text-white/95">
+                      {admission.servicePackageId?.monthlyPrice ? (admission.servicePackageId.monthlyPrice.toLocaleString() + ' VND/tháng') : 'Theo đơn giá gói'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="block text-white/45 text-[9px] uppercase tracking-wider font-bold mb-1">Thời hạn hợp đồng</span>
+                    <span className="font-semibold text-[12.5px] text-white/90">
+                      {formatEnglishDate(admission.contractStartDate)} - {formatEnglishDate(admission.contractEndDate)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Sidebar Action Buttons */}
+              <div className="flex flex-col gap-3 pt-6 border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={handlePrintContract}
+                  className="py-2.5 px-4 bg-emerald-500 hover:bg-emerald-600 active:scale-[0.98] text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-emerald-500/10 border-none"
+                >
+                  <FileText size={14} /> Xuất PDF / In hợp đồng
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowContractViewModal(false)}
+                  className="py-2.5 px-4 bg-white/5 hover:bg-white/10 active:scale-[0.98] text-white/95 border border-white/15 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <X size={14} /> Đóng cửa sổ
+                </button>
+              </div>
+            </div>
+
+            {/* Right Panel: Scrollable Document Page Sheet */}
+            <div className="flex-1 flex flex-col overflow-hidden bg-slate-100">
+              {/* Top Bar showing file format info */}
+              <div className="flex justify-between items-center px-6 py-3 bg-white border-b border-slate-200">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full"></span>
+                  <span className="text-xs text-slate-500 font-bold">Chế độ xem tài liệu chính thức (A4)</span>
+                </div>
+                <div className="text-[11px] text-slate-400 font-medium font-sans">
+                  Sử dụng tổ hợp phím Ctrl + P để in nhanh
+                </div>
+              </div>
+
+              {/* Document Sheet Container */}
+              <div className="flex-1 overflow-y-auto p-8 flex justify-center">
+                <div 
+                  className="p-12 bg-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-200/80 rounded-sm mb-6" 
+                  style={{ 
+                    width: '100%', 
+                    maxWidth: '680px', 
+                    minHeight: '880px', 
+                    fontFamily: '"Times New Roman", Times, serif', 
+                    color: '#1e293b', 
+                    lineHeight: '1.6',
+                    alignSelf: 'flex-start'
+                  }}
+                >
+                  {/* Quốc hiệu tiêu ngữ */}
+                  <div className="text-center mb-6" style={{ fontSize: '13px', color: '#000' }}>
+                    <strong className="tracking-wide text-xs">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</strong><br/>
+                    <strong className="tracking-wider text-xs">Độc lập - Tự do - Hạnh phúc</strong><br/>
+                    <span className="text-slate-400">-----------------------</span>
+                  </div>
+
+                  {/* Tên hợp đồng */}
+                  <h2 className="text-center text-lg font-bold my-4 uppercase tracking-wider text-black">
+                    HỢP ĐỒNG CHĂM SÓC VÀ LƯU TRÚ NGƯỜI CAO TUỔI
+                  </h2>
+                  <div className="text-center text-xs text-slate-500 mb-8 font-sans">
+                    Số hợp đồng: <strong>{admission.contractNumber}</strong><br/>
+                    Ngày lập: {formatEnglishDate(admission.contractSignedAt || admission.createdAt)}
+                  </div>
+
+                  {/* Bên A */}
+                  <div className="mb-4 text-xs">
+                    <h5 className="font-bold border-b border-slate-900 pb-0.5 mb-1.5 text-black uppercase">
+                      BÊN A: TRUNG TÂM DƯỠNG LÃO NURSING HOME (ĐƠN VỊ CUNG CẤP DỊCH VỤ)
+                    </h5>
+                    <div className="grid grid-cols-2 gap-y-1 pl-2 font-serif text-[13px] text-slate-800">
+                      <div><strong>Đại diện:</strong> Ban Giám Đốc Trung Tâm</div>
+                      <div><strong>Số điện thoại:</strong> 1900 6868</div>
+                      <div className="col-span-2"><strong>Địa chỉ:</strong> 123 Đường Y Tế, Quận 1, TP.HCM</div>
+                    </div>
+                  </div>
+
+                  {/* Bên B */}
+                  <div className="mb-4 text-xs">
+                    <h5 className="font-bold border-b border-slate-900 pb-0.5 mb-1.5 text-black uppercase">
+                      BÊN B: ĐẠI DIỆN GIA ĐÌNH (NGƯỜI BẢO LÃNH)
+                    </h5>
+                    <div className="grid grid-cols-2 gap-y-1 pl-2 font-serif text-[13px] text-slate-800">
+                      <div><strong>Họ và tên:</strong> {admission.familyAccount?.fullName || admission.requestedByName || 'N/A'}</div>
+                      <div><strong>Số điện thoại:</strong> {admission.requestedByPhone || admission.familyAccount?.phone || 'N/A'}</div>
+                      <div className="col-span-2"><strong>Email:</strong> {admission.familyAccount?.email || 'N/A'}</div>
+                      <div className="col-span-2"><strong>Quan hệ với người cao tuổi:</strong> {formatRelationship(admission.applicant?.relationshipToRequester)}</div>
+                    </div>
+                  </div>
+
+                  {/* Người cao tuổi */}
+                  <div className="mb-4 text-xs">
+                    <h5 className="font-bold border-b border-slate-900 pb-0.5 mb-1.5 text-black uppercase">
+                      ĐỐI TƯỢNG CHĂM SÓC (NGƯỜI CAO TUỔI)
+                    </h5>
+                    <div className="grid grid-cols-2 gap-y-1 pl-2 font-serif text-[13px] text-slate-800">
+                      <div><strong>Họ và tên:</strong> {admission.applicant?.fullName || 'N/A'}</div>
+                      <div><strong>Ngày sinh:</strong> {formatEnglishDate(admission.applicant?.dateOfBirth)}</div>
+                      <div><strong>Giới tính:</strong> {formatGender(admission.applicant?.gender)}</div>
+                      <div><strong>Số CCCD:</strong> {admission.applicant?.citizenId || 'N/A'}</div>
+                      <div className="col-span-2"><strong>Địa chỉ thường trú:</strong> {admission.applicant?.personalAddress || 'N/A'}</div>
+                    </div>
+                  </div>
+
+                  {/* Nội dung hợp đồng */}
+                  <div className="mb-4 text-xs">
+                    <h5 className="font-bold border-b border-slate-900 pb-0.5 mb-1.5 text-black uppercase">
+                      CHI TIẾT DỊCH VỤ VÀ THỜI HẠN
+                    </h5>
+                    <div className="grid grid-cols-2 gap-y-1 pl-2 font-serif text-[13px] text-slate-800">
+                      <div className="col-span-2"><strong>Gói dịch vụ đăng ký:</strong> {admission.servicePackageId?.name || admission.assignedServicePackage || 'N/A'}</div>
+                      <div className="col-span-2">
+                        <strong>Phí dịch vụ hàng tháng:</strong> {admission.servicePackageId?.monthlyPrice ? (admission.servicePackageId.monthlyPrice.toLocaleString() + ' VND/tháng') : 'Theo đơn giá gói'}
+                      </div>
+                      <div className="col-span-2">
+                        <strong>Thời hạn hợp đồng:</strong> Từ ngày {formatEnglishDate(admission.contractStartDate)} đến ngày {formatEnglishDate(admission.contractEndDate)}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Điều khoản */}
+                  <div className="mb-8 text-xs">
+                    <h5 className="font-bold border-b border-slate-900 pb-0.5 mb-1.5 text-black uppercase">
+                      CÁC ĐIỀU KHOẢN THỎA THUẬN
+                    </h5>
+                    <div className="pl-2 font-serif text-[13px] text-slate-800 whitespace-pre-wrap leading-relaxed">
+                      {admission.contractTerms || 'Hai bên đồng ý tuân thủ các quy định và nội quy chung của Trung tâm dưỡng lão trong suốt thời gian lưu trú.'}
+                    </div>
+                  </div>
+
+                  {/* Chữ ký */}
+                  <div className="grid grid-cols-2 gap-4 mt-12 text-center text-xs font-serif text-black">
+                    <div>
+                      <strong>ĐẠI DIỆN TRUNG TÂM (BÊN A)</strong>
+                      <div className="mt-16 text-slate-500 italic text-[11px]">(Ký, ghi rõ họ tên và đóng dấu)</div>
+                      <div className="mt-4 font-bold text-[#1B365D] tracking-widest text-[14px]">ĐÃ KÝ</div>
+                    </div>
+                    <div>
+                      <strong>ĐẠI DIỆN GIA ĐÌNH (BÊN B)</strong>
+                      <div className="mt-16 text-slate-500 italic text-[11px]">(Ký và ghi rõ họ tên)</div>
+                      <div className="mt-4 font-bold text-[#1B365D] tracking-widest text-[14px]">ĐÃ KÝ</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
