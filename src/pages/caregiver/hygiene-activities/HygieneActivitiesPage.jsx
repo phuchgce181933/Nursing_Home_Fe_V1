@@ -1,4 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import AdminPageShell from '../../../components/admin/AdminPageShell';
+import ListPagination from '../../../components/ui/ListPagination';
+import useClientPagination from '../../../hooks/useClientPagination';
 import hygieneActivityService from '../../../services/hygieneActivity.service';
 import { getLocalDateString } from '../../../utils/dateUtils';
 import { formatVNDate } from '../../../utils/nutritionLabels';
@@ -12,6 +16,7 @@ import HygieneRecordsTable from './components/HygieneRecordsTable';
 const today = () => getLocalDateString();
 
 function HygieneActivitiesPage() {
+  const { t } = useTranslation();
   const [workDate, setWorkDate] = useState(today());
   const [activityCategory, setActivityCategory] = useState('');
   const [residentId, setResidentId] = useState('');
@@ -30,7 +35,7 @@ function HygieneActivitiesPage() {
       const res = await hygieneActivityService.listResidents();
       setResidents(Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : []);
     } catch (e) {
-      setListError(e?.response?.data?.message || 'Không tải được danh sách cư dân');
+      setListError(e?.response?.data?.message || t('caregiver.hygiene.loadResidentsFailed'));
     }
   };
 
@@ -46,7 +51,7 @@ function HygieneActivitiesPage() {
       });
       setRecords(Array.isArray(res?.data) ? res.data : []);
     } catch (e) {
-      setListError(e?.response?.data?.message || 'Không tải được danh sách ghi nhận');
+      setListError(e?.response?.data?.message || t('caregiver.hygiene.loadRecordsFailed'));
       setRecords([]);
     } finally {
       setLoading(false);
@@ -60,6 +65,14 @@ function HygieneActivitiesPage() {
   useEffect(() => {
     loadRecords();
   }, [loadRecords]);
+
+  const {
+    paginatedItems: paginatedRecords,
+    page,
+    setPage,
+    totalPages,
+    total,
+  } = useClientPagination(records);
 
   const handleOpenDelete = (row) => {
     const name = row.residentId?.fullName || row.residentId?.residentCode || '—';
@@ -78,21 +91,15 @@ function HygieneActivitiesPage() {
       setDeleteModal(null);
       loadRecords();
     } catch (e) {
-      setDeleteError(e?.response?.data?.message || 'Xóa thất bại');
+      setDeleteError(e?.response?.data?.message || t('common.deleteFailed'));
     } finally {
       setDeleting(false);
     }
   };
 
   return (
-    <div className="page card hygiene-page">
-      <h1 className="hygiene-page__title">Ghi nhận hoạt động vệ sinh</h1>
-      <p className="hygiene-page__intro">
-        Ghi nhận hỗ trợ vệ sinh cá nhân và dọn dẹp cho cư dân phụ trách. Mỗi loại hoạt động chỉ ghi
-        một lần mỗi ngày cho mỗi cư dân.
-      </p>
-
-      {listError && <p className="form-error">{listError}</p>}
+    <AdminPageShell title={t('caregiver.hygiene.title')} subtitle={t('caregiver.hygiene.subtitle')}>
+      {listError && <div className="resident-page__error">{listError}</div>}
 
       <HygieneListFilters
         workDate={workDate}
@@ -109,11 +116,15 @@ function HygieneActivitiesPage() {
       />
 
       <HygieneRecordsTable
-        records={records}
+        records={paginatedRecords}
         loading={loading}
         onEdit={(row) => setFormModal({ mode: 'edit', id: row._id })}
         onDelete={handleOpenDelete}
       />
+
+      {!loading && records.length > 0 && (
+        <ListPagination page={page} totalPages={totalPages} total={total} onPageChange={setPage} />
+      )}
 
       <HygieneFormModal
         open={Boolean(formModal)}
@@ -137,7 +148,7 @@ function HygieneActivitiesPage() {
         onClose={() => setDeleteModal(null)}
         onConfirm={handleConfirmDelete}
       />
-    </div>
+    </AdminPageShell>
   );
 }
 

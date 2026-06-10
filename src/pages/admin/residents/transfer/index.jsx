@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { usePortalPrefix } from '../../../../hooks/usePortalPrefix';
 import facilityService from '../../../../services/facility.service';
@@ -6,6 +7,9 @@ import residentService, { RESIDENT_TRANSFER_ROUTE_HINT } from '../../../../servi
 import { formatStaffAreasSyncedSummary } from '../../../../utils/staffAreasSynced';
 import { FaEye, FaPen } from 'react-icons/fa';
 import AdminPageShell from '../../../../components/admin/AdminPageShell';
+import ListPagination from '../../../../components/ui/ListPagination';
+import { ADMIN_LIST_PAGE_SIZE } from '../../../../constants/adminListPage';
+import useDebouncedSearch from '../../../../hooks/useDebouncedSearch';
 import '../../../../styles/admin/TransferResidentPage.css';
 import '../../../../styles/admin/residentActionIcons.css';
 import { GENDER_LABELS, RESIDENCY_LABELS } from '../_shared/residentLabels';
@@ -64,12 +68,15 @@ function LocationBlock({ assignment, area }) {
 }
 
 export default function TransferResidentPage() {
+  const { t } = useTranslation();
   const [residents, setResidents] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [search, setSearch] = useState('');
-  const [searchInput, setSearchInput] = useState('');
+  const resetPageOnSearch = useCallback(() => setPage(1), []);
+  const { search, setSearch, debouncedSearch } = useDebouncedSearch({
+    onDebouncedChange: resetPageOnSearch,
+  });
   const [statusFilter, setStatusFilter] = useState('admitted');
   const [listLoading, setListLoading] = useState(false);
   const [listError, setListError] = useState('');
@@ -112,8 +119,8 @@ export default function TransferResidentPage() {
     try {
       const res = await residentService.listForFamilyManagement({
         page,
-        limit: 15,
-        search: search || undefined,
+        limit: ADMIN_LIST_PAGE_SIZE,
+        search: debouncedSearch || undefined,
         status: statusFilter || undefined,
       });
       setResidents(Array.isArray(res.data) ? res.data : []);
@@ -125,7 +132,7 @@ export default function TransferResidentPage() {
     } finally {
       if (!silent) setListLoading(false);
     }
-  }, [page, search, statusFilter]);
+  }, [page, debouncedSearch, statusFilter]);
 
   useEffect(() => {
     loadList();
@@ -180,6 +187,9 @@ export default function TransferResidentPage() {
     setTargetError('');
     try {
       const data = await residentService.getTransferTargets(selectedId, { floorId });
+      // #region agent log
+      fetch('http://127.0.0.1:7774/ingest/dee35c7c-2867-4feb-9059-e3223db025b0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'67518e'},body:JSON.stringify({sessionId:'67518e',location:'transfer/index.jsx:loadTargets',message:'targets loaded',data:{selectedId,floorId,targetsCount:(data?.targets||[]).length,apiMessage:data?.message||null,targetErrorBeforeClear:targetError||null},timestamp:Date.now(),hypothesisId:'A,C'})}).catch(()=>{});
+      // #endregion
       setTargetsData(data);
       setTargetRoomId('');
       setTargetBedId('');
@@ -207,12 +217,6 @@ export default function TransferResidentPage() {
     () => targetsData?.targets?.find((r) => String(r._id) === String(targetRoomId)) || null,
     [targetsData, targetRoomId]
   );
-
-  const handleSearch = (e) => {
-    e.preventDefault();
-    setPage(1);
-    setSearch(searchInput.trim());
-  };
 
   const openViewPopup = async (resident) => {
     clearTransferFeedback();
@@ -258,6 +262,9 @@ export default function TransferResidentPage() {
         targetBedId,
       });
       setPanelMsg(res.message || 'Đã chuyển cư dân sang phòng mới');
+      // #region agent log
+      fetch('http://127.0.0.1:7774/ingest/dee35c7c-2867-4feb-9059-e3223db025b0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'67518e'},body:JSON.stringify({sessionId:'67518e',location:'transfer/index.jsx:handleTransfer',message:'transfer success before refresh',data:{selectedId,targetRoomId,targetBedId,panelMsg:res.message||null},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
 
       const synced = res.staffAreasSynced;
       const summary = formatStaffAreasSyncedSummary(synced, {
@@ -273,6 +280,9 @@ export default function TransferResidentPage() {
       }
 
       await refreshAfterTransfer();
+      // #region agent log
+      fetch('http://127.0.0.1:7774/ingest/dee35c7c-2867-4feb-9059-e3223db025b0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'67518e'},body:JSON.stringify({sessionId:'67518e',location:'transfer/index.jsx:handleTransfer',message:'transfer success after refresh',data:{selectedId,floorId,targetErrorAfter:targetError||null},timestamp:Date.now(),hypothesisId:'A,B'})}).catch(()=>{});
+      // #endregion
     } catch (e) {
       const status = e?.response?.status;
       setTargetError(e.response?.data?.message || 'Chuyển phòng thất bại');
@@ -284,18 +294,18 @@ export default function TransferResidentPage() {
 
   return (
     <AdminPageShell
-      title="Chuyển cư dân sang phòng khác"
-      subtitle="Admin/Manager chọn cư dân, chọn tầng đích và giường đích để thực hiện chuyển phòng."
+      title={t('admin.residents.transfer.title')}
+      subtitle={t('admin.residents.transfer.subtitle')}
     >
-      <form className="resident-page__filters" onSubmit={handleSearch}>
+      <div className="resident-page__filters">
         <div className="resident-page__filter-row">
           <label className="resident-page__filter">
             <span>Tìm kiếm</span>
             <input
-              type="text"
+              type="search"
               placeholder="Tên hoặc mã cư dân..."
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
             />
           </label>
           <label className="resident-page__filter">
@@ -313,13 +323,8 @@ export default function TransferResidentPage() {
               <option value="">Tất cả trạng thái</option>
             </select>
           </label>
-          <div className="resident-page__filter-actions">
-            <button type="submit" className="resident-page__button resident-page__button--primary">
-              Áp dụng
-            </button>
-          </div>
         </div>
-      </form>
+      </div>
 
       {listError && <div className="resident-page__error">{listError}</div>}
       {showRouteHint && <p className="resident-page__hint-box">⚠️ {RESIDENT_TRANSFER_ROUTE_HINT}</p>}
@@ -379,30 +384,13 @@ export default function TransferResidentPage() {
               ))}
           </tbody>
         </table>
-        {!listLoading && totalPages > 1 && (
-          <div className="pagination">
-            <span>
-              {total} cư dân · Trang {page}/{totalPages}
-            </span>
-            <div className="pagination__btns">
-              <button
-                type="button"
-                className="btn btn--ghost btn--sm"
-                disabled={page <= 1}
-                onClick={() => setPage((p) => p - 1)}
-              >
-                ← Trước
-              </button>
-              <button
-                type="button"
-                className="btn btn--ghost btn--sm"
-                disabled={page >= totalPages}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                Sau →
-              </button>
-            </div>
-          </div>
+        {!listLoading && residents.length > 0 && (
+          <ListPagination
+            page={page}
+            totalPages={totalPages}
+            total={total}
+            onPageChange={setPage}
+          />
         )}
       </div>
       {viewPopup && (
@@ -495,12 +483,17 @@ export default function TransferResidentPage() {
                   </div>
                 </div>
                 <form onSubmit={handleTransfer}>
-                  {(targetsData?.targets || []).length === 0 && (
+                  {(targetsData?.targets || []).length === 0 && (() => {
+                    // #region agent log
+                    fetch('http://127.0.0.1:7774/ingest/dee35c7c-2867-4feb-9059-e3223db025b0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'67518e'},body:JSON.stringify({sessionId:'67518e',location:'transfer/index.jsx:render',message:'empty targets warning shown',data:{panelMsg:panelMsg||null,targetError:targetError||null,apiMessage:targetsData?.message||null,saving},timestamp:Date.now(),hypothesisId:'A,C,E'})}).catch(()=>{});
+                    // #endregion
+                    return (
                     <p className="form-error" style={{ marginBottom: 12 }}>
                       {targetsData?.message ||
                         'Không có phòng/giường trống trên tầng đã chọn. Chọn tầng khác hoặc giải phóng giường trước.'}
                     </p>
-                  )}
+                    );
+                  })()}
                   <div className="form-grid">
                     <div className="form-group">
                       <label>Phòng đích</label>

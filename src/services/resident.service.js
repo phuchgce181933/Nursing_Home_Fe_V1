@@ -290,6 +290,32 @@ const listByArea = async (params = {}) => {
   }
 };
 
+const BY_AREA_EXPORT_PAGE_SIZE = 100;
+
+/** Fetch all residents by area matching filters for client-side export (paginated). */
+const fetchAllResidentsByAreaForExport = async (filters = {}) => {
+  const params = {
+    buildingId: filters.buildingId || undefined,
+    floorId: filters.floorId || undefined,
+    roomId: filters.roomId || undefined,
+    search: filters.search || undefined,
+    status: filters.status || undefined,
+    limit: BY_AREA_EXPORT_PAGE_SIZE,
+    page: 1,
+  };
+
+  const first = await listByArea(params);
+  const all = [...(first?.data || [])];
+  const totalPages = first?.totalPages || 1;
+
+  for (let page = 2; page <= totalPages; page += 1) {
+    const next = await listByArea({ ...params, page });
+    all.push(...(next?.data || []));
+  }
+
+  return all;
+};
+
 const buildResidentFromFamily = (family) => {
   const r = family.resident;
   return {
@@ -939,6 +965,7 @@ const transferResidentToRoom = (residentId, body) =>
 const residentService = {
   createResident,
   getResidentList,
+  fetchAllResidentsByAreaForExport,
   getFamilyResidentList,
   updateResidentPersonalInfo,
   updateResidentFamilyInfo,

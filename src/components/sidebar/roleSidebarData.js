@@ -36,6 +36,16 @@ export const roleSidebarData = {
       path: '/doctor/profile',
     },
     {
+      title: 'Ca của tôi',
+      icon: Calendar,
+      path: '/doctor/my-shifts',
+    },
+    {
+      title: 'Nhiệm vụ chăm sóc',
+      icon: ClipboardList,
+      path: '/doctor/care-tasks',
+    },
+    {
       title: 'Lịch khám',
       icon: Calendar,
       path: '/doctor/appointments',
@@ -98,6 +108,11 @@ export const roleSidebarData = {
       path: '/caregiver/assigned-residents',
     },
     {
+      title: 'Ca của tôi',
+      icon: Calendar,
+      path: '/caregiver/my-shifts',
+    },
+    {
       title: 'Lịch chăm sóc',
       icon: ClipboardList,
       path: '/caregiver/daily-care-schedule',
@@ -138,6 +153,16 @@ export const roleSidebarData = {
       title: 'Hồ sơ cá nhân',
       icon: UserCircle,
       path: '/nurse/profile',
+    },
+    {
+      title: 'Ca của tôi',
+      icon: Calendar,
+      path: '/nurse/my-shifts',
+    },
+    {
+      title: 'Nhiệm vụ chăm sóc',
+      icon: ClipboardList,
+      path: '/nurse/care-tasks',
     },
     {
       title: 'Lịch hoạt động',

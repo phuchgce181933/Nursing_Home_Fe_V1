@@ -409,6 +409,19 @@
   white-space: nowrap;
 }
 
+.schedule-split-section {
+  margin-top: 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.schedule-split-section .schedule-column {
+  border-right: none;
+  min-height: 80px;
+}
+
 @media (max-width: 768px) {
   .schedule-columns {
     grid-template-columns: 1fr;

@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Search, RefreshCw, Building2, MapPin } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { Search, RefreshCw, Building2, MapPin, Download } from 'lucide-react';
 import AdminPageShell from '../../../../components/admin/AdminPageShell';
+import ListPagination from '../../../../components/ui/ListPagination';
+import { ADMIN_LIST_PAGE_SIZE } from '../../../../constants/adminListPage';
+import useDebouncedSearch from '../../../../hooks/useDebouncedSearch';
 import facilityService, { getFacilityErrorMessage } from '../../../../services/facility.service';
 import residentService, { RESIDENT_AREA_ROUTE_HINT } from '../../../../services/resident.service';
 import { FaEye } from 'react-icons/fa';
@@ -8,6 +12,18 @@ import { formatLeaveDate } from '../../../../utils/leaveUtils';
 import '../../../../styles/admin/residentActionIcons.css';
 import { GENDER_LABELS, RESIDENCY_LABELS } from '../_shared/residentLabels';
 import { formatResidentAreaLine, pickDrugAllergiesList } from '../../../../utils/residentArea';
+import {
+  exportResidentListToCSV,
+  exportResidentListToPDF,
+} from '../../../../utils/residentListExport';
+import { useAuth } from '../../../../hooks/useAuth';
+
+const STATUS_FILTER_LABELS = {
+  admitted: 'Đang điều trị',
+  pending: 'Chờ nhập viện',
+  discharged: 'Đã xuất viện',
+  '': 'Tất cả trạng thái',
+};
 
 function ResidentDetailModal({ loading, error, resident, onClose }) {
   if (!loading && !error && !resident) return null;
@@ -135,11 +151,16 @@ function ResidentDetailModal({ loading, error, resident, onClose }) {
 }
 
 export default function ResidentsByAreaPage() {
+  const { t } = useTranslation();
+  const { user } = useAuth();
   const [buildings, setBuildings] = useState([]);
   const [buildingId, setBuildingId] = useState('');
   const [statusFilter, setStatusFilter] = useState('admitted');
-  const [searchInput, setSearchInput] = useState('');
-  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const resetPageOnSearch = useCallback(() => setPage(1), []);
+  const { search, setSearch, debouncedSearch } = useDebouncedSearch({
+    onDebouncedChange: resetPageOnSearch,
+  });
 
   const [summary, setSummary] = useState(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
@@ -150,13 +171,13 @@ export default function ResidentsByAreaPage() {
 
   const [residents, setResidents] = useState([]);
   const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [listLoading, setListLoading] = useState(false);
   const [listError, setListError] = useState('');
 
   const [detailModal, setDetailModal] = useState(null);
   const [usingFallbackApi, setUsingFallbackApi] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     facilityService
@@ -203,10 +224,10 @@ export default function ResidentsByAreaPage() {
         buildingId: buildingId || undefined,
         floorId: floorId || undefined,
         roomId: roomId || undefined,
-        search: search || undefined,
+        search: debouncedSearch || undefined,
         status: statusFilter || undefined,
         page,
-        limit: 15,
+        limit: ADMIN_LIST_PAGE_SIZE,
       });
       setResidents(Array.isArray(res.data) ? res.data : []);
       setTotal(res.total ?? 0);
@@ -218,7 +239,7 @@ export default function ResidentsByAreaPage() {
     } finally {
       setListLoading(false);
     }
-  }, [buildingId, floorId, roomId, search, statusFilter, page]);
+  }, [buildingId, floorId, roomId, debouncedSearch, statusFilter, page]);
 
   useEffect(() => {
     setFloorId('');
@@ -230,12 +251,6 @@ export default function ResidentsByAreaPage() {
   useEffect(() => { loadSummary(); }, [loadSummary]);
 
   useEffect(() => { loadList(); }, [loadList]);
-
-  const handleSearch = (e) => {
-    e.preventDefault();
-    setPage(1);
-    setSearch(searchInput.trim());
-  };
 
   const selectFloor = (id) => {
     setFloorId(id);
@@ -276,6 +291,59 @@ export default function ResidentsByAreaPage() {
     : floorId
       ? summary?.floors?.find((f) => String(f._id) === String(floorId))?.label
       : buildings.find((b) => String(b._id) === String(buildingId))?.name || 'Toàn tòa';
+
+  const buildExportFilterSummary = () => {
+    const parts = [];
+    if (activeFilterLabel) parts.push(`Khu vực: ${activeFilterLabel}`);
+    parts.push(`Trạng thái: ${STATUS_FILTER_LABELS[statusFilter] || statusFilter || 'Tất cả'}`);
+    if (search) parts.push(`Tìm kiếm: "${search}"`);
+    return parts.join(' | ');
+  };
+
+  const handleExport = async (format) => {
+    if (!buildingId) {
+      alert('Vui lòng chọn tòa nhà trước khi xuất.');
+      return;
+    }
+    try {
+      setExporting(true);
+      setListError('');
+      const rows = await residentService.fetchAllResidentsByAreaForExport({
+        buildingId,
+        floorId: floorId || undefined,
+        roomId: roomId || undefined,
+        search: debouncedSearch || undefined,
+        status: statusFilter || undefined,
+      });
+      if (!rows.length) {
+        alert('Không có dữ liệu để xuất.');
+        return;
+      }
+      const meta = {
+        title: 'DANH SÁCH CƯ DÂN THEO KHU VỰC',
+        filterSummary: buildExportFilterSummary(),
+        exportedBy: user?.fullName || user?.email || '—',
+        buildingLabel: activeFilterLabel,
+        buildingId,
+        summaryStats: {
+          totalInBuilding: summary?.totalResidents ?? 0,
+          floorCount: summary?.floors?.length ?? 0,
+          filteredCount: rows.length,
+        },
+      };
+      if (format === 'csv') {
+        exportResidentListToCSV(rows, meta);
+      } else {
+        exportResidentListToPDF(rows, meta);
+      }
+    } catch (e) {
+      console.error('Failed to export residents by area:', e);
+      setListError(e.response?.data?.message || 'Không thể xuất danh sách cư dân.');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const floorOptions = summary?.floors || [];
   const selectedFloor = floorOptions.find((f) => String(f._id) === String(floorId));
   const roomOptions = floorId
@@ -307,25 +375,47 @@ export default function ResidentsByAreaPage() {
 
   return (
     <AdminPageShell
-      title="Cư dân theo khu vực"
-      subtitle="Lọc theo tòa, tầng, phòng và xem chi tiết hồ sơ cư dân."
+      title={t('admin.residents.byArea.title')}
+      subtitle={t('admin.residents.byArea.subtitle')}
       actions={
-        <button
-          type="button"
-          className="resident-page__button resident-page__button--ghost"
-          onClick={() => {
-            loadSummary();
-            loadList();
-          }}
-          disabled={listLoading}
-        >
-          <RefreshCw size={16} className={listLoading ? 'spin' : ''} />
-          Làm mới
-        </button>
+        <>
+          <button
+            type="button"
+            className="resident-page__button resident-page__button--ghost"
+            onClick={() => {
+              loadSummary();
+              loadList();
+            }}
+            disabled={listLoading || exporting}
+          >
+            <RefreshCw size={16} className={listLoading ? 'spin' : ''} />
+            Làm mới
+          </button>
+          <button
+            type="button"
+            className="resident-page__button resident-page__button--export"
+            onClick={() => handleExport('csv')}
+            disabled={listLoading || exporting || !buildingId}
+            title="Xuất danh sách Excel (CSV)"
+          >
+            <Download size={16} />
+            {exporting ? 'Đang xuất...' : 'Xuất Excel'}
+          </button>
+          <button
+            type="button"
+            className="resident-page__button resident-page__button--export-pdf"
+            onClick={() => handleExport('pdf')}
+            disabled={listLoading || exporting || !buildingId}
+            title="Xuất báo cáo PDF"
+          >
+            <Download size={16} />
+            Xuất PDF
+          </button>
+        </>
       }
       stats={summary ? pageStats : undefined}
     >
-      <form className="resident-page__filters" onSubmit={handleSearch}>
+      <div className="resident-page__filters">
         <div className="resident-page__filter-row">
           <label className="resident-page__filter">
             <span>Tòa nhà</span>
@@ -378,17 +468,14 @@ export default function ResidentsByAreaPage() {
             <div className="resident-page__filter-input">
               <Search size={16} />
               <input
-                type="text"
+                type="search"
                 placeholder="Tên hoặc mã cư dân..."
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
               />
             </div>
           </label>
           <div className="resident-page__filter-actions">
-            <button type="submit" className="resident-page__button resident-page__button--primary">
-              Áp dụng
-            </button>
             <button
               type="button"
               className="resident-page__button resident-page__button--ghost"
@@ -398,7 +485,7 @@ export default function ResidentsByAreaPage() {
             </button>
           </div>
         </div>
-      </form>
+      </div>
 
       {usingFallbackApi && (
         <p className="resident-page__hint-box">⚠️ {RESIDENT_AREA_ROUTE_HINT}</p>
@@ -465,28 +552,13 @@ export default function ResidentsByAreaPage() {
         </table>
       </div>
 
-      {!listLoading && totalPages > 1 && (
-        <div className="resident-page__pagination">
-          <span>{total} cư dân · Trang {page}/{totalPages}</span>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button
-              type="button"
-              className="resident-page__page-btn"
-              disabled={page <= 1}
-              onClick={() => setPage((p) => p - 1)}
-            >
-              ← Trước
-            </button>
-            <button
-              type="button"
-              className="resident-page__page-btn"
-              disabled={page >= totalPages}
-              onClick={() => setPage((p) => p + 1)}
-            >
-              Sau →
-            </button>
-          </div>
-        </div>
+      {!listLoading && residents.length > 0 && (
+        <ListPagination
+          page={page}
+          totalPages={Math.max(totalPages, 1)}
+          total={total}
+          onPageChange={setPage}
+        />
       )}
 
       {detailModal && (

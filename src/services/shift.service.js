@@ -1,6 +1,6 @@
 import axiosClient from '../api/axiosClient';
 
-// ── Shift Templates  /api/shift-templates (read-only: 3 system shifts) ───────
+// ── Shift Templates  /api/shift-templates (read-only: system shifts incl. SPLIT) ─
 
 /** GET /shift-templates → { data: Template[], totalHoursPerDay } */
 const getTemplates = (params = {}) =>
@@ -11,6 +11,10 @@ const getTemplates = (params = {}) =>
 /** GET /shifts → { data: Shift[], total, totalHours, page, limit, totalPages } */
 const listShifts = (params = {}) =>
   axiosClient.get('/shifts', { params }).then((r) => r.data);
+
+/** GET /shifts/my → shifts assigned to the logged-in staff member */
+const getMyShifts = (params = {}) =>
+  axiosClient.get('/shifts/my', { params }).then((r) => r.data);
 
 const getShift = (id) =>
   axiosClient.get(`/shifts/${id}`).then((r) => r.data);
@@ -28,7 +32,7 @@ const getSchedule = (fromDate, toDate) =>
 /**
  * Preview validation conflicts before create/update.
  * GET /api/shifts/check-conflicts
- * Requires assignedStaffId, workDate, shiftTemplateId.
+ * Requires assignedStaffId, workDate, shiftTemplateId. For SPLIT (ca gãy), also pass startTime and endTime.
  * Returns { conflicts, hasErrors }
  */
 const checkConflicts = (params) =>
@@ -38,7 +42,7 @@ const checkConflicts = (params) =>
   });
 
 /**
- * Create a shift (status = draft). Times are derived from shiftTemplateId.
+ * Create a shift (status = draft). Times from template, or startTime/endTime for SPLIT.
  * Required: shiftTemplateId, workDate, assignedStaffId.
  * Blocked on ERROR-level conflicts (400).
  * On success: { shift, conflicts[] }
@@ -60,7 +64,7 @@ const confirmShift = (id) =>
   axiosClient.put(`/shifts/${id}/confirm`).then((r) => r.data);
 
 /**
- * Update a shift. changeReason is required.
+ * Update a shift. changeReason is optional.
  * Allowed fields: workDate, assignedStaffId, shiftTemplateId, taskDescription, notes.
  * Blocked on ERROR-level conflicts (400).
  * On success: { shift, conflicts[] }
@@ -83,6 +87,7 @@ const deleteShift = (id) =>
 const shiftService = {
   getTemplates,
   listShifts,
+  getMyShifts,
   getShift,
   getSchedule,
   checkConflicts,

@@ -1,40 +1,5 @@
-.hygiene-page {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.hygiene-page__title {
-  margin: 0;
-  padding: 18px 22px;
-  border-radius: 18px;
-  background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%);
-  color: #f8fafc;
-  font-size: 1.75rem;
-  font-weight: 700;
-  box-shadow: 0 18px 34px rgba(15, 118, 110, 0.24);
-}
-
-.hygiene-page__intro {
-  margin: 0;
-  padding: 12px 14px;
-  border: 1px solid #99f6e4;
-  background: #f0fdfa;
-  border-radius: 12px;
-  color: #475569;
-  line-height: 1.6;
-}
-
-.hygiene-page__panel {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 16px;
-  padding: 16px;
-  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.06);
-}
-
-.hygiene-page__panel-title {
-  margin: 0 0 12px;
+.hygiene-page__section-title {
+  margin: 16px 0 8px;
   font-size: 1rem;
   font-weight: 700;
   color: #1e293b;
@@ -89,12 +54,6 @@
   font-size: 0.85rem;
   color: #64748b;
   font-weight: 500;
-}
-
-.hygiene-page__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
 }
 
 .hygiene-page__row-actions {
@@ -210,16 +169,4 @@
 
 .hygiene-page__modal-body {
   padding: 14px 16px 18px;
-}
-
-@media (max-width: 768px) {
-  .hygiene-page__title {
-    font-size: 1.45rem;
-    padding: 14px 16px;
-  }
-
-  .hygiene-page .data-table {
-    display: block;
-    overflow-x: auto;
-  }
 }

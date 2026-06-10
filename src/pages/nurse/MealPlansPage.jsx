@@ -1,4 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import AdminPageShell from '../../components/admin/AdminPageShell';
+import ListPagination from '../../components/ui/ListPagination';
+import useClientPagination from '../../hooks/useClientPagination';
 import mealPlanService from '../../services/mealPlan.service';
 import mealTimeScheduleService from '../../services/mealTimeSchedule.service';
 import specialDietService from '../../services/specialDiet.service';
@@ -62,20 +66,58 @@ function MealPlanTab() {
   const [saving, setSaving] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailPlan, setDetailPlan] = useState(null);
-  const [publishedTimes, setPublishedTimes] = useState({ byResident: {}, source: 'system_default' });
+  const [publishedSchedules, setPublishedSchedules] = useState([]);
+  const [selectedScheduleId, setSelectedScheduleId] = useState('');
+  const [publishedTimes, setPublishedTimes] = useState({ byResident: {}, source: 'none' });
+  const [scheduleEntries, setScheduleEntries] = useState([]);
   const [error, setError] = useState('');
+
+  const residentIdsFromScheduleEntries = (entries) =>
+    [...new Set(
+      (entries || [])
+        .map((e) => String(e.residentId?._id || e.residentId || ''))
+        .filter(Boolean)
+    )];
+
+  const timesFromScheduleEntries = (scheduleEntries) => {
+    const byResident = {};
+    (scheduleEntries || []).forEach((e) => {
+      const rid = String(e.residentId?._id || e.residentId || '');
+      if (!rid) return;
+      byResident[rid] = {
+        breakfast: e.breakfastTime,
+        lunch: e.lunchTime,
+        dinner: e.dinnerTime,
+      };
+    });
+    return byResident;
+  };
 
   const resolveMealTime = (residentId, mealType) => {
     const rid = String(residentId || '');
     const fromSchedule = publishedTimes.byResident?.[rid]?.[mealType];
-    if (fromSchedule) return fromSchedule;
-    return defaultMealTimeByType(mealType);
+    return fromSchedule || '';
   };
 
   const residentMap = useMemo(
     () => Object.fromEntries(residents.map((r) => [String(r._id), r.fullName || r.residentCode])),
     [residents]
   );
+
+  const scheduleResidentOptions = useMemo(() => {
+    const idSet = new Set(selectedResidents);
+    return residents.filter((r) => idSet.has(String(r._id)));
+  }, [residents, selectedResidents]);
+
+  const scheduleResidentLabel = (residentId) => {
+    const rid = String(residentId || '');
+    if (residentMap[rid]) return residentMap[rid];
+    const entry = scheduleEntries.find(
+      (e) => String(e.residentId?._id || e.residentId) === rid
+    );
+    const r = entry?.residentId;
+    return r?.fullName || r?.residentCode || rid;
+  };
 
   const loadBoot = async () => {
     setLoading(true);
@@ -96,21 +138,55 @@ function MealPlanTab() {
     }
   };
 
-  const loadPublishedMealTimes = () => {
-    mealTimeScheduleService
-      .getPublishedTimes({
+  const loadPublishedSchedules = async () => {
+    try {
+      const res = await mealTimeScheduleService.listSchedules({
         workDate: formWorkDate,
-        residentIds: selectedResidents.join(','),
-      })
-      .then((data) => {
-        setPublishedTimes({
-          byResident: data?.byResident || {},
-          source: data?.source || 'system_default',
-        });
-      })
-      .catch(() => {
-        setPublishedTimes({ byResident: {}, source: 'system_default' });
+        status: 'published',
+        limit: 50,
       });
+      const list = Array.isArray(res?.data) ? res.data : [];
+      setPublishedSchedules(list);
+      if (list.length === 1) {
+        setSelectedScheduleId(String(list[0]._id));
+      } else if (!list.some((s) => String(s._id) === String(selectedScheduleId))) {
+        setSelectedScheduleId('');
+        setPublishedTimes({ byResident: {}, source: 'none' });
+        setScheduleEntries([]);
+        setSelectedResidents([]);
+      }
+    } catch {
+      setPublishedSchedules([]);
+      setSelectedScheduleId('');
+      setPublishedTimes({ byResident: {}, source: 'none' });
+      setScheduleEntries([]);
+      setSelectedResidents([]);
+    }
+  };
+
+  const loadScheduleTimes = async (scheduleId) => {
+    if (!scheduleId) {
+      setPublishedTimes({ byResident: {}, source: 'none' });
+      setScheduleEntries([]);
+      setSelectedResidents([]);
+      return;
+    }
+    try {
+      const data = await mealTimeScheduleService.getSchedule(scheduleId);
+      const entries = Array.isArray(data?.entries) ? data.entries : [];
+      const ids = residentIdsFromScheduleEntries(entries);
+      setScheduleEntries(entries);
+      setSelectedResidents(ids);
+      setPublishedTimes({
+        byResident: timesFromScheduleEntries(entries),
+        source: 'published_schedule',
+      });
+      setEntries((prev) => prev.filter((e) => ids.includes(String(e.residentId))));
+    } catch {
+      setPublishedTimes({ byResident: {}, source: 'none' });
+      setScheduleEntries([]);
+      setSelectedResidents([]);
+    }
   };
 
   const loadPlans = async (date) => {
@@ -139,14 +215,27 @@ function MealPlanTab() {
   }, [listDate]);
 
   useEffect(() => {
-    loadPublishedMealTimes();
-  }, [formWorkDate, selectedResidents]);
+    loadPublishedSchedules();
+  }, [formWorkDate]);
+
+  useEffect(() => {
+    loadScheduleTimes(selectedScheduleId);
+  }, [selectedScheduleId]);
+
+  const {
+    paginatedItems: paginatedPlans,
+    page: plansPage,
+    setPage: setPlansPage,
+    totalPages: plansTotalPages,
+    total: plansTotal,
+  } = useClientPagination(plans);
 
   const addFromTemplate = () => {
     setError('');
     const tpl = templates.find((t) => t.key === selectedTemplate);
     if (!tpl) return setError('Vui lòng chọn template');
-    if (selectedResidents.length < 2) return setError('Vui lòng chọn ít nhất 2 cư dân');
+    if (!selectedScheduleId) return setError('Vui lòng chọn lịch giờ ăn đã đăng');
+    if (selectedResidents.length < 1) return setError('Lịch giờ ăn đã chọn không có cư dân');
     const generated = [];
     selectedResidents.forEach((residentId) => {
       tpl.entries.forEach((it) => {
@@ -207,15 +296,18 @@ function MealPlanTab() {
     setTitle('');
     setSelectedTemplate('');
     setSelectedResidents([]);
+    setSelectedScheduleId('');
+    setScheduleEntries([]);
     setEntries([]);
     setEditingId('');
     setError('');
   };
 
   const validate = () => {
+    if (!selectedScheduleId) return 'Vui lòng chọn lịch giờ ăn đã đăng';
     if (!careStage) return 'Vui lòng chọn giai đoạn chăm sóc';
     if (formWorkDate < today()) return 'Không thể tạo meal plan cho ngày quá khứ';
-    if (selectedResidents.length < 2) return 'Vui lòng chọn tối thiểu 2 cư dân';
+    if (selectedResidents.length < 1) return 'Lịch giờ ăn đã chọn không có cư dân';
     if (!entries.length) return 'Vui lòng thêm ít nhất 1 dòng thực đơn';
     const hasInvalid = entries.some((e) => !e.residentId || !e.mealType || !e.mealName?.trim() || !e.mealTime);
     if (hasInvalid) return 'Mỗi dòng phải có cư dân, loại bữa, tên món và giờ';
@@ -224,6 +316,7 @@ function MealPlanTab() {
 
   const buildPayload = () => ({
     workDate: formWorkDate,
+    mealTimeScheduleDayId: selectedScheduleId,
     careStage,
     title,
     entries: entries.map((e) => ({
@@ -275,6 +368,8 @@ function MealPlanTab() {
       setTitle(data.title || '');
       setFormWorkDate((data.workDate || '').slice(0, 10) || today());
       setCareStage(data.careStage || '');
+      const scheduleId = String(data.mealTimeScheduleDayId?._id || data.mealTimeScheduleDayId || '');
+      setSelectedScheduleId(scheduleId);
       const rows = Array.isArray(data.entries) ? data.entries : [];
       setEntries(
         rows.map((r) => ({
@@ -290,8 +385,6 @@ function MealPlanTab() {
           mealTime: r.mealTime || defaultMealTimeByType(r.mealType),
         }))
       );
-      const picked = [...new Set(rows.map((r) => String(r.residentId?._id || r.residentId || '')).filter(Boolean))];
-      setSelectedResidents(picked);
     } catch (e) {
       setError(e?.response?.data?.message || 'Không mở được draft');
     } finally {
@@ -360,6 +453,21 @@ function MealPlanTab() {
               <input type="date" min={today()} value={formWorkDate} onChange={(e) => setFormWorkDate(e.target.value)} />
             </div>
             <div className="form-group">
+              <label>Lịch giờ ăn *</label>
+              <select
+                value={selectedScheduleId}
+                onChange={(e) => setSelectedScheduleId(e.target.value)}
+                disabled={!publishedSchedules.length}
+              >
+                <option value="">— Chọn lịch đã đăng —</option>
+                {publishedSchedules.map((s) => (
+                  <option key={s._id} value={s._id}>
+                    {s.title || 'Lịch giờ ăn'} ({Array.isArray(s.entries) ? s.entries.length : '…'} cư dân)
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
               <label>Giai đoạn chăm sóc *</label>
               <select value={careStage} onChange={(e) => setCareStage(e.target.value)}>
                 <option value="">— Chọn —</option>
@@ -374,32 +482,31 @@ function MealPlanTab() {
             </div>
           </div>
 
-          <div className="meal-page__resident-section">
-            <label className="meal-page__resident-label">Cư dân áp dụng (nhiều người) *</label>
-            <div className="meal-page__resident-grid">
-              {residents.map((r) => {
-                const id = String(r._id);
-                const checked = selectedResidents.includes(id);
-                return (
-                  <label key={id} className="meal-page__resident-item">
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={(e) =>
-                        setSelectedResidents((prev) => (e.target.checked ? [...prev, id] : prev.filter((x) => x !== id)))
-                      }
-                    />{' '}
-                    {r.fullName || r.residentCode}
-                  </label>
-                );
-              })}
+          {selectedScheduleId ? (
+            <div className="meal-page__resident-section">
+              <label className="meal-page__resident-label">
+                Cư dân từ lịch giờ ăn ({selectedResidents.length})
+              </label>
+              {selectedResidents.length === 0 ? (
+                <p className="field-hint field-hint--warn">Lịch đã chọn không có cư dân.</p>
+              ) : (
+                <ul className="meal-page__resident-readonly">
+                  {selectedResidents.map((id) => (
+                    <li key={id}>{scheduleResidentLabel(id)}</li>
+                  ))}
+                </ul>
+              )}
             </div>
-          </div>
+          ) : (
+            <p className="meal-page__hint">Chọn lịch giờ ăn để tự động lấy danh sách cư dân.</p>
+          )}
 
           <p className="meal-page__hint">
-            {publishedTimes.source === 'published_schedule'
-              ? 'Đang dùng giờ từ lịch đã publish cho ngày này.'
-              : 'Chưa có lịch publish — dùng giờ mặc định hệ thống (07:30 / 11:30 / 17:30).'}
+            {selectedScheduleId && publishedTimes.source === 'published_schedule'
+              ? 'Giờ ăn và danh sách cư dân lấy từ lịch giờ ăn đã chọn.'
+              : publishedSchedules.length
+                ? ''
+                : 'Chưa có lịch giờ ăn đã đăng cho ngày này — hãy tạo và đăng ở tab Lịch giờ ăn trước.'}
           </p>
 
           <div className="tab-toolbar">
@@ -408,7 +515,7 @@ function MealPlanTab() {
               {templates.map((t) => <option key={t.key} value={t.key}>{t.name}</option>)}
             </select>
             <button type="button" className="btn-primary" onClick={addFromTemplate}>+ Thêm từ template</button>
-            <button type="button" className="btn-secondary" onClick={addManual}>+ Thêm thủ công</button>
+            <button type="button" className="btn-secondary" onClick={addManual} disabled={!selectedScheduleId}>+ Thêm thủ công</button>
           </div>
 
           <table className="data-table">
@@ -422,9 +529,20 @@ function MealPlanTab() {
               {entries.map((row, idx) => (
                 <tr key={`${idx}-${row.residentId}-${row.mealType}`}>
                   <td>
-                    <select value={row.residentId} onChange={(e) => patchEntry(idx, { residentId: e.target.value })}>
+                    <select
+                      value={row.residentId}
+                      onChange={(e) => patchEntry(idx, { residentId: e.target.value })}
+                      disabled={!selectedScheduleId}
+                    >
                       <option value="">—</option>
-                      {residents.map((r) => <option key={r._id} value={r._id}>{r.fullName || r.residentCode}</option>)}
+                      {scheduleResidentOptions.map((r) => (
+                        <option key={r._id} value={r._id}>{r.fullName || r.residentCode}</option>
+                      ))}
+                      {selectedResidents
+                        .filter((id) => !scheduleResidentOptions.some((r) => String(r._id) === id))
+                        .map((id) => (
+                          <option key={id} value={id}>{scheduleResidentLabel(id)}</option>
+                        ))}
                     </select>
                   </td>
                   <td>
@@ -466,7 +584,7 @@ function MealPlanTab() {
             <thead><tr><th>Tiêu đề</th><th>Giai đoạn</th><th>Ngày</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
             <tbody>
               {plans.length === 0 && <tr><td colSpan={5} className="empty-state">Không có lịch</td></tr>}
-              {plans.map((d) => (
+              {paginatedPlans.map((d) => (
                 <tr key={d._id}>
                   <td>{d.title || '—'}</td>
                   <td>{d.careStage || '—'}</td>
@@ -489,6 +607,14 @@ function MealPlanTab() {
               ))}
             </tbody>
           </table>
+          {plans.length > 0 && (
+            <ListPagination
+              page={plansPage}
+              totalPages={plansTotalPages}
+              total={plansTotal}
+              onPageChange={setPlansPage}
+            />
+          )}
 
           {!!editingId && (
             <p className="meal-page__editing-meta">
@@ -616,11 +742,19 @@ function SpecialDietTab() {
     loadPlans(listDate);
   }, [listDate]);
 
+  const {
+    paginatedItems: paginatedPlans,
+    page: plansPage,
+    setPage: setPlansPage,
+    totalPages: plansTotalPages,
+    total: plansTotal,
+  } = useClientPagination(plans);
+
   const addFromTemplate = () => {
     setError('');
     const tpl = templates.find((t) => t.key === selectedTemplate);
     if (!tpl) return setError('Vui lòng chọn template');
-    if (selectedResidents.length < 2) return setError('Vui lòng chọn ít nhất 2 cư dân');
+    if (selectedResidents.length < 1) return setError('Vui lòng chọn ít nhất 1 cư dân');
     const generated = selectedResidents.map((residentId) => ({
       residentId,
       dietType: tpl.dietType,
@@ -666,7 +800,7 @@ function SpecialDietTab() {
 
   const validate = () => {
     if (workDate < today()) return 'Không thể tạo special diet plan cho ngày quá khứ';
-    if (selectedResidents.length < 2) return 'Vui lòng chọn tối thiểu 2 cư dân';
+    if (selectedResidents.length < 1) return 'Vui lòng chọn tối thiểu 1 cư dân';
     if (!entries.length) return 'Vui lòng thêm ít nhất 1 dòng chế độ ăn đặc biệt';
     const hasInvalid = entries.some((e) => !e.residentId || !e.dietType || !e.effectiveTime);
     if (hasInvalid) return 'Mỗi dòng phải có cư dân, loại chế độ ăn và giờ hiệu lực';
@@ -897,7 +1031,7 @@ function SpecialDietTab() {
             <thead><tr><th>Tiêu đề</th><th>Ngày</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
             <tbody>
               {plans.length === 0 && <tr><td colSpan={4} className="empty-state">Không có lịch</td></tr>}
-              {plans.map((d) => (
+              {paginatedPlans.map((d) => (
                 <tr key={d._id}>
                   <td>{d.title || '—'}</td>
                   <td>{formatVNDate((d.workDate || '').slice(0, 10))}</td>
@@ -919,6 +1053,14 @@ function SpecialDietTab() {
               ))}
             </tbody>
           </table>
+          {plans.length > 0 && (
+            <ListPagination
+              page={plansPage}
+              totalPages={plansTotalPages}
+              total={plansTotal}
+              onPageChange={setPlansPage}
+            />
+          )}
         </>
       )}
 
@@ -1043,11 +1185,19 @@ function MealTimeScheduleTab() {
     loadSchedules(listDate);
   }, [listDate]);
 
+  const {
+    paginatedItems: paginatedSchedules,
+    page: schedulesPage,
+    setPage: setSchedulesPage,
+    totalPages: schedulesTotalPages,
+    total: schedulesTotal,
+  } = useClientPagination(schedules);
+
   const addFromTemplate = () => {
     setError('');
     const tpl = templates.find((t) => t.key === selectedTemplate);
     if (!tpl) return setError('Vui lòng chọn template');
-    if (selectedResidents.length < 2) return setError('Vui lòng chọn ít nhất 2 cư dân');
+    if (selectedResidents.length < 1) return setError('Vui lòng chọn ít nhất 1 cư dân');
     const existing = new Set(entries.map((e) => String(e.residentId)));
     const generated = selectedResidents
       .filter((id) => !existing.has(String(id)))
@@ -1100,7 +1250,7 @@ function MealTimeScheduleTab() {
 
   const validate = () => {
     if (formWorkDate < today()) return 'Không thể tạo lịch giờ ăn cho ngày quá khứ';
-    if (selectedResidents.length < 2) return 'Vui lòng chọn tối thiểu 2 cư dân';
+    if (selectedResidents.length < 1) return 'Vui lòng chọn tối thiểu 1 cư dân';
     if (!entries.length) return 'Vui lòng thêm ít nhất 1 dòng lịch giờ ăn';
     const hasInvalid = entries.some(
       (e) => !e.residentId || !e.breakfastTime || !e.lunchTime || !e.dinnerTime
@@ -1323,7 +1473,7 @@ function MealTimeScheduleTab() {
             <thead><tr><th>Tiêu đề</th><th>Ngày</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
             <tbody>
               {schedules.length === 0 && <tr><td colSpan={4} className="empty-state">Không có lịch</td></tr>}
-              {schedules.map((d) => (
+              {paginatedSchedules.map((d) => (
                 <tr key={d._id}>
                   <td>{d.title || '—'}</td>
                   <td>{formatVNDate((d.workDate || '').slice(0, 10))}</td>
@@ -1345,6 +1495,15 @@ function MealTimeScheduleTab() {
               ))}
             </tbody>
           </table>
+
+          {schedules.length > 0 && (
+            <ListPagination
+              page={schedulesPage}
+              totalPages={schedulesTotalPages}
+              total={schedulesTotal}
+              onPageChange={setSchedulesPage}
+            />
+          )}
 
           {!!editingId && (
             <p className="meal-page__editing-meta">
@@ -1410,27 +1569,29 @@ function MealTimeScheduleTab() {
 }
 
 export default function MealPlansPage() {
+  const { t } = useTranslation();
   const [tab, setTab] = useState('meal');
 
   return (
-    <div className="page card meal-page">
-      <h1 className="meal-page__title">Nurse Nutrition Planning</h1>
+    <AdminPageShell title={t('nurse.mealPlans.title')}>
+      <div className="meal-page">
       <div className="tabs meal-page__tabs">
         <button className={`tab-btn ${tab === 'schedule' ? 'tab-btn--active' : ''}`} onClick={() => setTab('schedule')}>
-          Schedule Meal Times
+          {t('nurse.mealPlans.tabSchedule')}
         </button>
         <button className={`tab-btn ${tab === 'meal' ? 'tab-btn--active' : ''}`} onClick={() => setTab('meal')}>
-          Create Meal Plans
+          {t('nurse.mealPlans.tabMealPlans')}
         </button>
         <button className={`tab-btn ${tab === 'special' ? 'tab-btn--active' : ''}`} onClick={() => setTab('special')}>
-          Assign Special Diets
+          {t('nurse.mealPlans.tabSpecialDiets')}
         </button>
       </div>
 
       {tab === 'schedule' && <MealTimeScheduleTab />}
       {tab === 'meal' && <MealPlanTab />}
       {tab === 'special' && <SpecialDietTab />}
-    </div>
+      </div>
+    </AdminPageShell>
   );
 }
 

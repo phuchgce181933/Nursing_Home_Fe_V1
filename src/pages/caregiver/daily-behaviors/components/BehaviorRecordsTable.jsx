@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { formatVNDateTime } from '../../../../utils/nutritionLabels';
 import {
   behaviorTypeLabel,
@@ -21,66 +22,78 @@ function detailText(row) {
 }
 
 function BehaviorRecordsTable({ records, loading, onEdit, onDelete }) {
+  const { t } = useTranslation();
+
   return (
-    <div className="behavior-page__panel">
-      <h3 className="behavior-page__panel-title">Danh sách ghi nhận</h3>
-      <table className="data-table">
-        <thead>
-          <tr>
-            <th>Cư dân</th>
-            <th>Loại</th>
-            <th>Chi tiết</th>
-            <th>Mức độ</th>
-            <th>Thời điểm quan sát</th>
-            <th>Thao tác</th>
-          </tr>
-        </thead>
-        <tbody>
-          {loading && (
-            <tr>
-              <td colSpan={6} className="empty-state">
-                Đang tải...
-              </td>
+    <>
+      <h3 className="behavior-page__section-title">{t('caregiver.dailyBehaviors.recordsList')}</h3>
+      <div className="resident-page__table">
+        <table className="resident-page__table-element">
+          <thead>
+            <tr className="resident-page__table-header">
+              <th>{t('common.colResident')}</th>
+              <th>{t('caregiver.dailyBehaviors.colType')}</th>
+              <th>{t('caregiver.dailyBehaviors.colDetail')}</th>
+              <th>{t('caregiver.dailyBehaviors.colSeverity')}</th>
+              <th>{t('caregiver.dailyBehaviors.colObservedAt')}</th>
+              <th>{t('common.colActions')}</th>
             </tr>
-          )}
-          {!loading && records.length === 0 && (
-            <tr>
-              <td colSpan={6} className="empty-state">
-                Chưa có ghi nhận trong bộ lọc này
-              </td>
-            </tr>
-          )}
-          {!loading &&
-            records.map((row) => (
-              <tr key={row._id}>
-                <td>{row.residentId?.fullName || row.residentId?.residentCode || '—'}</td>
-                <td>
-                  <span className={`behavior-page__category behavior-page__category--${row.observationCategory}`}>
-                    {observationCategoryLabel(row.observationCategory)}
-                  </span>
-                </td>
-                <td>
-                  <span className="behavior-page__detail">{detailText(row)}</span>
-                </td>
-                <td>
-                  <span className={`behavior-page__severity behavior-page__severity--${row.severity || 'normal'}`}>
-                    {severityLabel(row.severity)}
-                  </span>
-                </td>
-                <td>{formatVNDateTime(row.observedAt)}</td>
-                <td className="behavior-page__row-actions">
-                  <button type="button" className="btn btn--sm btn--edit" onClick={() => onEdit(row)}>
-                    Sửa
-                  </button>
-                  <button type="button" className="btn btn--sm btn--delete" onClick={() => onDelete(row)}>
-                    Xóa
-                  </button>
+          </thead>
+          <tbody>
+            {loading && (
+              <tr>
+                <td colSpan={6} className="empty-state">
+                  {t('common.loading')}
                 </td>
               </tr>
-            ))}
-        </tbody>
-      </table>
-    </div>
+            )}
+            {!loading && records.length === 0 && (
+              <tr>
+                <td colSpan={6} className="empty-state">
+                  {t('caregiver.dailyBehaviors.emptyFiltered')}
+                </td>
+              </tr>
+            )}
+            {!loading &&
+              records.map((row) => (
+                <tr key={row._id}>
+                  <td>{row.residentId?.fullName || row.residentId?.residentCode || '—'}</td>
+                  <td>
+                    <span className={`behavior-page__category behavior-page__category--${row.observationCategory}`}>
+                      {observationCategoryLabel(row.observationCategory)}
+                    </span>
+                  </td>
+                  <td>
+                    <span className="behavior-page__detail">{detailText(row)}</span>
+                  </td>
+                  <td>
+                    <span className={`behavior-page__severity behavior-page__severity--${row.severity || 'normal'}`}>
+                      {severityLabel(row.severity)}
+                    </span>
+                  </td>
+                  <td>{formatVNDateTime(row.observedAt)}</td>
+                  <td className="behavior-page__row-actions">
+                    <button
+                      type="button"
+                      className="resident-page__button resident-page__button--ghost"
+                      onClick={() => onEdit(row)}
+                    >
+                      {t('common.edit')}
+                    </button>
+                    <button
+                      type="button"
+                      className="resident-page__button resident-page__button--ghost"
+                      onClick={() => onDelete(row)}
+                    >
+                      {t('common.delete')}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 }
 

@@ -1,4 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import AdminPageShell from '../../components/admin/AdminPageShell';
+import ListPagination from '../../components/ui/ListPagination';
+import useClientPagination from '../../hooks/useClientPagination';
+import useDebouncedSearch from '../../hooks/useDebouncedSearch';
 import nutritionReportService from '../../services/nutritionReport.service';
 import { getLocalDateString } from '../../utils/dateUtils';
 import {
@@ -18,9 +23,10 @@ const addDays = (dateStr, delta) => {
 };
 
 function NutritionReportsPage() {
+  const { t } = useTranslation();
+  const { search, setSearch, debouncedSearch } = useDebouncedSearch();
   const [to, setTo] = useState(today());
   const [from, setFrom] = useState(addDays(today(), -6));
-  const [search, setSearch] = useState('');
   const [missingOnly, setMissingOnly] = useState(false);
   const [summary, setSummary] = useState(null);
   const [residents, setResidents] = useState([]);
@@ -33,11 +39,11 @@ function NutritionReportsPage() {
     () => ({
       from,
       to,
-      search: search.trim() || undefined,
+      search: debouncedSearch.trim() || undefined,
       missingMealPlan: missingOnly ? 'true' : undefined,
       limit: 100,
     }),
-    [from, to, search, missingOnly]
+    [from, to, debouncedSearch, missingOnly]
   );
 
   const loadData = useCallback(async () => {
@@ -51,7 +57,7 @@ function NutritionReportsPage() {
       setSummary(summaryRes || null);
       setResidents(Array.isArray(listRes?.data) ? listRes.data : []);
     } catch (e) {
-      setError(e?.response?.data?.message || 'Không tải được báo cáo dinh dưỡng');
+      setError(e?.response?.data?.message || t('nurse.nutritionReports.loadFailed'));
       setSummary(null);
       setResidents([]);
     } finally {
@@ -62,6 +68,14 @@ function NutritionReportsPage() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  const {
+    paginatedItems: paginatedResidents,
+    page,
+    setPage,
+    totalPages,
+    total,
+  } = useClientPagination(residents);
 
   const setLast7Days = () => {
     const end = today();
@@ -82,7 +96,7 @@ function NutritionReportsPage() {
       const data = await nutritionReportService.getResidentReport(residentId, { from, to });
       setDetail(data);
     } catch (e) {
-      setError(e?.response?.data?.message || 'Không tải được chi tiết cư dân');
+      setError(e?.response?.data?.message || t('nurse.nutritionReports.detailLoadFailed'));
     } finally {
       setDetailLoading(false);
     }
@@ -97,51 +111,52 @@ function NutritionReportsPage() {
   );
 
   return (
-    <div className="page card nutrition-reports">
-      <h1 className="nutrition-reports__title">Báo cáo dinh dưỡng</h1>
-      <p className="nutrition-reports__intro">
-        Xem tổng hợp thực đơn, chế độ ăn đặc biệt, giờ ăn đã publish và ghi chú ăn uống của cư dân trong khoảng thời gian
-        bạn chọn (chỉ đọc).
-      </p>
+    <AdminPageShell title={t('nurse.nutritionReports.title')} subtitle={t('nurse.nutritionReports.subtitle')}>
+      {error && <div className="resident-page__error">{error}</div>}
 
-      {error && <p className="form-error">{error}</p>}
-
-      <div className="nutrition-reports__filters">
-        <label>
-          Từ ngày
-          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
-        </label>
-        <label>
-          Đến ngày
-          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
-        </label>
-        <label>
-          Tìm cư dân
-          <input
-            type="search"
-            placeholder="Tên hoặc mã"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </label>
-        <label style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <input
-            type="checkbox"
-            checked={missingOnly}
-            onChange={(e) => setMissingOnly(e.target.checked)}
-          />
-          Chỉ thiếu thực đơn
-        </label>
-        <div className="nutrition-reports__filter-actions">
-          <button type="button" className="btn-secondary" onClick={setLast7Days}>
-            7 ngày
-          </button>
-          <button type="button" className="btn-secondary" onClick={setTodayOnly}>
-            Hôm nay
-          </button>
-          <button type="button" className="btn-primary" onClick={loadData} disabled={loading}>
-            {loading ? 'Đang tải...' : 'Tải lại'}
-          </button>
+      <div className="resident-page__filters nutrition-reports__filters">
+        <div className="resident-page__filter-row">
+          <label className="resident-page__filter">
+            <span>{t('nurse.nutritionReports.fromDate')}</span>
+            <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+          </label>
+          <label className="resident-page__filter">
+            <span>{t('nurse.nutritionReports.toDate')}</span>
+            <input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+          </label>
+          <label className="resident-page__filter">
+            <span>{t('nurse.nutritionReports.searchResident')}</span>
+            <input
+              type="search"
+              placeholder={t('common.searchNameOrCode')}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </label>
+          <label className="resident-page__filter nutrition-reports__checkbox-filter">
+            <span>{t('nurse.nutritionReports.missingMealPlanOnly')}</span>
+            <input
+              type="checkbox"
+              checked={missingOnly}
+              onChange={(e) => setMissingOnly(e.target.checked)}
+            />
+          </label>
+          <div className="resident-page__filter-actions">
+            <button type="button" className="resident-page__button resident-page__button--ghost" onClick={setLast7Days}>
+              {t('nurse.nutritionReports.last7Days')}
+            </button>
+            <button type="button" className="resident-page__button resident-page__button--ghost" onClick={setTodayOnly}>
+              {t('nurse.nutritionReports.todayOnly')}
+            </button>
+            <button
+              type="button"
+              className="resident-page__button resident-page__button--primary"
+              onClick={loadData}
+              disabled={loading}
+            >
+              {loading ? t('common.loading') : t('common.reload')}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -149,50 +164,50 @@ function NutritionReportsPage() {
         <div className="nutrition-reports__kpi-grid">
           <div className="nutrition-reports__kpi">
             <div className="nutrition-reports__kpi-value">{summary.totalAdmittedResidents ?? 0}</div>
-            <div className="nutrition-reports__kpi-label">Cư dân đang ở</div>
+            <div className="nutrition-reports__kpi-label">{t('nurse.nutritionReports.kpiAdmitted')}</div>
           </div>
           <div className="nutrition-reports__kpi">
             <div className="nutrition-reports__kpi-value">{summary.residentsWithMealPlan ?? 0}</div>
-            <div className="nutrition-reports__kpi-label">Có thực đơn publish</div>
+            <div className="nutrition-reports__kpi-label">{t('nurse.nutritionReports.kpiWithMealPlan')}</div>
           </div>
           <div className="nutrition-reports__kpi">
             <div className="nutrition-reports__kpi-value">{summary.residentsWithSpecialDiet ?? 0}</div>
-            <div className="nutrition-reports__kpi-label">Có chế độ ăn đặc biệt</div>
+            <div className="nutrition-reports__kpi-label">{t('nurse.nutritionReports.kpiWithSpecialDiet')}</div>
           </div>
           <div className="nutrition-reports__kpi">
             <div className="nutrition-reports__kpi-value">{summary.residentsWithMealTimeSchedule ?? 0}</div>
-            <div className="nutrition-reports__kpi-label">Có lịch giờ ăn</div>
+            <div className="nutrition-reports__kpi-label">{t('nurse.nutritionReports.kpiWithMealTime')}</div>
           </div>
           <div className="nutrition-reports__kpi">
             <div className="nutrition-reports__kpi-value">{summary.totalMealIntakeRecords ?? 0}</div>
-            <div className="nutrition-reports__kpi-label">Ghi nhận intake (CG)</div>
+            <div className="nutrition-reports__kpi-label">{t('nurse.nutritionReports.kpiIntakeRecords')}</div>
           </div>
           <div className="nutrition-reports__kpi">
             <div className="nutrition-reports__kpi-value">{summary.residentsWithMealIntake ?? 0}</div>
-            <div className="nutrition-reports__kpi-label">Cư dân có intake</div>
+            <div className="nutrition-reports__kpi-label">{t('nurse.nutritionReports.kpiWithIntake')}</div>
           </div>
           <div className="nutrition-reports__kpi">
             <div className="nutrition-reports__kpi-value">{summary.totalMealNotes ?? 0}</div>
-            <div className="nutrition-reports__kpi-label">Ghi chú meal (text)</div>
+            <div className="nutrition-reports__kpi-label">{t('nurse.nutritionReports.kpiMealNotes')}</div>
           </div>
           <div className="nutrition-reports__kpi nutrition-reports__kpi--warn">
             <div className="nutrition-reports__kpi-value">{summary.residentsMissingMealPlan ?? 0}</div>
-            <div className="nutrition-reports__kpi-label">Thiếu thực đơn publish</div>
+            <div className="nutrition-reports__kpi-label">{t('nurse.nutritionReports.kpiMissingMealPlan')}</div>
           </div>
         </div>
       )}
 
-      <div className="nutrition-reports__table-wrap">
-        <table className="data-table">
+      <div className="resident-page__table">
+        <table className="resident-page__table-element">
           <thead>
-            <tr>
-              <th>Cư dân</th>
-              <th>Mã</th>
-              <th>Thực đơn</th>
-              <th>Chế độ đặc biệt</th>
-              <th>Giờ ăn</th>
-              <th>Intake (CG)</th>
-              <th>Ghi chú meal</th>
+            <tr className="resident-page__table-header">
+              <th>{t('common.colResident')}</th>
+              <th>{t('common.colCode')}</th>
+              <th>{t('nurse.nutritionReports.colMealPlan')}</th>
+              <th>{t('nurse.nutritionReports.colSpecialDiet')}</th>
+              <th>{t('nurse.nutritionReports.colMealTime')}</th>
+              <th>{t('nurse.nutritionReports.colIntake')}</th>
+              <th>{t('nurse.nutritionReports.colMealNotes')}</th>
               <th />
             </tr>
           </thead>
@@ -200,19 +215,19 @@ function NutritionReportsPage() {
             {loading && (
               <tr>
                 <td colSpan={8} className="empty-state">
-                  Đang tải...
+                  {t('common.loading')}
                 </td>
               </tr>
             )}
             {!loading && residents.length === 0 && (
               <tr>
                 <td colSpan={8} className="empty-state">
-                  Không có cư dân phù hợp bộ lọc
+                  {t('nurse.nutritionReports.emptyFiltered')}
                 </td>
               </tr>
             )}
             {!loading &&
-              residents.map((row) => (
+              paginatedResidents.map((row) => (
                 <tr key={row.residentId}>
                   <td>{row.fullName || '—'}</td>
                   <td>{row.residentCode || '—'}</td>
@@ -230,16 +245,19 @@ function NutritionReportsPage() {
                   <td>
                     <button
                       type="button"
-                      className="btn btn--sm meal-page__btn-view"
+                      className="resident-page__button resident-page__button--ghost"
                       onClick={() => openDetail(row.residentId)}
                     >
-                      Xem chi tiết
+                      {t('common.viewDetails')}
                     </button>
                   </td>
                 </tr>
               ))}
           </tbody>
         </table>
+        {!loading && residents.length > 0 && (
+          <ListPagination page={page} totalPages={totalPages} total={total} onPageChange={setPage} />
+        )}
       </div>
 
       {(detailLoading || detail) && (
@@ -247,7 +265,7 @@ function NutritionReportsPage() {
           <div className="nutrition-reports__modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
             <div className="nutrition-reports__modal-header">
               <h3 className="nutrition-reports__modal-title">
-                Chi tiết dinh dưỡng — {detail?.resident?.fullName || '...'}
+                {t('nurse.nutritionReports.detailTitle', { name: detail?.resident?.fullName || '...' })}
               </h3>
               {!detailLoading && (
                 <button type="button" className="nutrition-reports__modal-close" onClick={closeDetail}>
@@ -256,7 +274,7 @@ function NutritionReportsPage() {
               )}
             </div>
             <div className="nutrition-reports__modal-body">
-              {detailLoading && <p>Đang tải chi tiết...</p>}
+              {detailLoading && <p>{t('nurse.nutritionReports.detailLoading')}</p>}
               {!detailLoading && detail && (
                 <>
                   <p className="nutrition-reports__resident-meta">
@@ -412,7 +430,7 @@ function NutritionReportsPage() {
           </div>
         </div>
       )}
-    </div>
+    </AdminPageShell>
   );
 }
 

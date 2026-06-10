@@ -1,20 +1,23 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import AdminPageShell from '../../components/admin/AdminPageShell';
+import ListPagination from '../../components/ui/ListPagination';
 import ResidentContextBlock from '../../components/resident/ResidentContextBlock';
+import useClientPagination from '../../hooks/useClientPagination';
+import useDebouncedSearch from '../../hooks/useDebouncedSearch';
 import caregiverResidentService from '../../services/caregiverResident.service';
 import { formatResidentAreaLine, pickDrugAllergiesList } from '../../utils/residentArea';
 import '../../styles/caregiver/AssignedResidentsPage.css';
 
-const GENDER_LABELS = { male: 'Nam', female: 'Nữ', other: 'Khác', unknown: 'Không rõ' };
-
-function formatAllergies(row) {
+function formatAllergies(row, t) {
   const drug = pickDrugAllergiesList(row);
   const food = (row.allergies || []).filter(
     (a) => !drug.some((d) => d.toLowerCase() === String(a).toLowerCase())
   );
   const parts = [];
-  if (drug.length) parts.push(`Thuốc: ${drug.join(', ')}`);
-  if (food.length) parts.push(`Khác: ${food.join(', ')}`);
+  if (drug.length) parts.push(`${t('caregiver.assignedResidents.allergiesDrug')}: ${drug.join(', ')}`);
+  if (food.length) parts.push(`${t('caregiver.assignedResidents.allergiesOther')}: ${food.join(', ')}`);
   return parts.length ? parts.join(' · ') : '—';
 }
 
@@ -23,12 +26,7 @@ function formatConditions(row) {
   return list.length ? list.join(', ') : '—';
 }
 
-function formatAdmittedAt(d) {
-  if (!d) return '—';
-  return new Date(d).toLocaleDateString('vi-VN');
-}
-
-function ResidentWarning({ resident }) {
+function ResidentWarning({ resident, t }) {
   if (!resident) return null;
   const drug = pickDrugAllergiesList(resident);
   const food = (resident.allergies || []).filter(Boolean);
@@ -39,24 +37,24 @@ function ResidentWarning({ resident }) {
     <div className="assigned-residents-page__warning">
       {drug.length > 0 && (
         <p>
-          <strong>Dị ứng thuốc:</strong> {drug.join(', ')}
+          <strong>{t('caregiver.assignedResidents.drugAllergies')}:</strong> {drug.join(', ')}
         </p>
       )}
       {food.length > 0 && (
         <p>
-          <strong>Dị ứng khác:</strong> {food.join(', ')}
+          <strong>{t('caregiver.assignedResidents.otherAllergies')}:</strong> {food.join(', ')}
         </p>
       )}
       {conditions.length > 0 && (
         <p>
-          <strong>Bệnh nền:</strong> {conditions.join(', ')}
+          <strong>{t('caregiver.assignedResidents.chronicConditions')}:</strong> {conditions.join(', ')}
         </p>
       )}
     </div>
   );
 }
 
-function ResidentDetailModal({ residentId, onClose }) {
+function ResidentDetailModal({ residentId, onClose, t, locale }) {
   const [loading, setLoading] = useState(true);
   const [resident, setResident] = useState(null);
   const [error, setError] = useState('');
@@ -68,9 +66,14 @@ function ResidentDetailModal({ residentId, onClose }) {
     caregiverResidentService
       .getResident(residentId)
       .then(setResident)
-      .catch((e) => setError(e?.response?.data?.message || 'Không tải được thông tin cư dân'))
+      .catch((e) => setError(e?.response?.data?.message || t('caregiver.assignedResidents.detailLoadFailed')))
       .finally(() => setLoading(false));
-  }, [residentId]);
+  }, [residentId, t]);
+
+  const formatAdmittedAt = (d) => {
+    if (!d) return '—';
+    return new Date(d).toLocaleDateString(locale);
+  };
 
   return (
     <div className="assigned-residents-page__modal-overlay" onClick={onClose}>
@@ -81,31 +84,33 @@ function ResidentDetailModal({ residentId, onClose }) {
         aria-modal="true"
       >
         <div className="assigned-residents-page__modal-header">
-          <h3 className="assigned-residents-page__modal-title">Chi tiết cư dân</h3>
+          <h3 className="assigned-residents-page__modal-title">{t('caregiver.assignedResidents.detailTitle')}</h3>
           <button type="button" className="assigned-residents-page__modal-close" onClick={onClose}>
             ×
           </button>
         </div>
         <div className="assigned-residents-page__modal-body">
-          {loading && <p>Đang tải...</p>}
-          {error && <p className="form-error">{error}</p>}
+          {loading && <p>{t('common.loading')}</p>}
+          {error && <div className="resident-page__error">{error}</div>}
           {!loading && !error && resident && (
             <>
-              <ResidentWarning resident={resident} />
+              <ResidentWarning resident={resident} t={t} />
               <ResidentContextBlock resident={resident} showGender showStatus />
               <div className="assigned-residents-page__meta-block">
                 {resident.bloodType && resident.bloodType !== 'unknown' && (
                   <p>
-                    <strong>Nhóm máu:</strong> {resident.bloodType}
+                    <strong>{t('caregiver.assignedResidents.bloodType')}:</strong> {resident.bloodType}
                   </p>
                 )}
                 {resident.initialHealthCondition && (
                   <p>
-                    <strong>Tình trạng ban đầu:</strong> {resident.initialHealthCondition}
+                    <strong>{t('caregiver.assignedResidents.initialHealth')}:</strong>{' '}
+                    {resident.initialHealthCondition}
                   </p>
                 )}
                 <p>
-                  <strong>Ngày nhập viện:</strong> {formatAdmittedAt(resident.admittedAt)}
+                  <strong>{t('caregiver.assignedResidents.admittedAt')}:</strong>{' '}
+                  {formatAdmittedAt(resident.admittedAt)}
                 </p>
               </div>
             </>
@@ -117,118 +122,126 @@ function ResidentDetailModal({ residentId, onClose }) {
 }
 
 function AssignedResidentsPage() {
-  const [search, setSearch] = useState('');
-  const [searchInput, setSearchInput] = useState('');
+  const { t, i18n } = useTranslation();
+  const locale = i18n.language === 'vi' ? 'vi-VN' : 'en-US';
+  const { search, setSearch, debouncedSearch, resetSearch } = useDebouncedSearch();
   const [residents, setResidents] = useState([]);
   const [emptyMessage, setEmptyMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [detailId, setDetailId] = useState(null);
 
+  const {
+    paginatedItems: paginatedResidents,
+    page: clientPage,
+    setPage: setClientPage,
+    totalPages,
+    total,
+  } = useClientPagination(residents);
+
   const loadResidents = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
       const res = await caregiverResidentService.listResidents({
-        search: search || undefined,
+        search: debouncedSearch || undefined,
       });
       setResidents(Array.isArray(res.data) ? res.data : []);
       setEmptyMessage(res.message || '');
     } catch (e) {
-      setError(e?.response?.data?.message || 'Không tải được danh sách cư dân');
+      setError(e?.response?.data?.message || t('caregiver.assignedResidents.loadFailed'));
       setResidents([]);
     } finally {
       setLoading(false);
     }
-  }, [search]);
+  }, [debouncedSearch, t]);
 
   useEffect(() => {
     loadResidents();
   }, [loadResidents]);
 
-  const handleSearch = (e) => {
-    e.preventDefault();
-    setSearch(searchInput.trim());
+  const formatAdmittedAt = (d) => {
+    if (!d) return '—';
+    return new Date(d).toLocaleDateString(locale);
   };
 
   return (
-    <div className="page card assigned-residents-page">
-      <h1 className="assigned-residents-page__title">Cư dân phụ trách</h1>
-      <p className="assigned-residents-page__intro">
-        Danh sách người cao tuổi được quản lý phân công cho bạn. Chỉ xem thông tin — không thể tự
-        thêm hoặc bỏ phân công tại đây.
-      </p>
-
-      {error && <p className="form-error">{error}</p>}
-
-      <div className="assigned-residents-page__panel">
-        <form className="assigned-residents-page__toolbar" onSubmit={handleSearch}>
-          <label>
-            Tìm theo tên hoặc mã
+    <AdminPageShell
+      title={t('caregiver.assignedResidents.title')}
+      subtitle={t('caregiver.assignedResidents.subtitle')}
+    >
+      <div className="resident-page__filters">
+        <div className="resident-page__filter-row">
+          <label className="resident-page__filter">
+            <span>{t('caregiver.assignedResidents.searchLabel')}</span>
             <input
               type="search"
-              placeholder="Nhập tên hoặc mã cư dân..."
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder={t('caregiver.assignedResidents.searchPlaceholder')}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
             />
           </label>
-          <button type="submit" className="btn-primary" disabled={loading}>
-            Tìm
-          </button>
-          <button
-            type="button"
-            className="btn-secondary"
-            disabled={loading}
-            onClick={() => {
-              setSearchInput('');
-              setSearch('');
-            }}
-          >
-            Xóa lọc
-          </button>
-        </form>
+          {search && (
+            <div className="resident-page__filter-actions">
+              <button
+                type="button"
+                className="resident-page__button resident-page__button--ghost"
+                disabled={loading}
+                onClick={resetSearch}
+              >
+                {t('common.clearFilter')}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
 
-        {!loading && residents.length === 0 && emptyMessage && (
-          <p className="assigned-residents-page__empty-hint">{emptyMessage}</p>
-        )}
+      {error && <div className="resident-page__error">{error}</div>}
 
-        <table className="data-table">
+      {!loading && residents.length === 0 && emptyMessage && (
+        <p className="assigned-residents-page__empty-hint">{emptyMessage}</p>
+      )}
+
+      <div className="resident-page__table">
+        <table className="resident-page__table-element">
           <thead>
-            <tr>
-              <th>Mã</th>
-              <th>Họ tên</th>
-              <th>Giới tính</th>
-              <th>Khu vực</th>
-              <th>Dị ứng</th>
-              <th>Bệnh nền</th>
-              <th>Ngày nhập viện</th>
-              <th>Thao tác</th>
+            <tr className="resident-page__table-header">
+              <th>{t('common.colCode')}</th>
+              <th>{t('common.colFullName')}</th>
+              <th>{t('common.colGender')}</th>
+              <th>{t('common.colArea')}</th>
+              <th>{t('common.colAllergies')}</th>
+              <th>{t('common.colConditions')}</th>
+              <th>{t('common.colAdmittedAt')}</th>
+              <th>{t('common.colActions')}</th>
             </tr>
           </thead>
           <tbody>
             {loading && (
               <tr>
                 <td colSpan={8} className="empty-state">
-                  Đang tải...
+                  {t('common.loading')}
                 </td>
               </tr>
             )}
             {!loading && residents.length === 0 && (
               <tr>
                 <td colSpan={8} className="empty-state">
-                  {search ? 'Không tìm thấy cư dân phù hợp' : 'Chưa có cư dân trong danh sách phụ trách'}
+                  {debouncedSearch
+                    ? t('caregiver.assignedResidents.emptyFiltered')
+                    : t('caregiver.assignedResidents.emptyList')}
                 </td>
               </tr>
             )}
             {!loading &&
-              residents.map((row) => {
-                const allergies = formatAllergies(row);
+              paginatedResidents.map((row) => {
+                const allergies = formatAllergies(row, t);
                 const hasAllergy = allergies !== '—';
                 return (
                   <tr key={row._id}>
                     <td>{row.residentCode || '—'}</td>
                     <td>{row.fullName || '—'}</td>
-                    <td>{GENDER_LABELS[row.gender] || row.gender || '—'}</td>
+                    <td>{t(`common.gender.${row.gender}`, { defaultValue: row.gender || '—' })}</td>
                     <td>{formatResidentAreaLine(row) || '—'}</td>
                     <td className={hasAllergy ? 'assigned-residents-page__allergy-tags' : undefined}>
                       {allergies}
@@ -238,10 +251,10 @@ function AssignedResidentsPage() {
                     <td>
                       <button
                         type="button"
-                        className="btn btn--sm btn--edit"
+                        className="resident-page__button resident-page__button--ghost"
                         onClick={() => setDetailId(row._id)}
                       >
-                        Xem
+                        {t('common.view')}
                       </button>
                     </td>
                   </tr>
@@ -251,13 +264,29 @@ function AssignedResidentsPage() {
         </table>
       </div>
 
-      <p className="assigned-residents-page__intro">
-        <Link to="/caregiver/meal-intake-notes">Ghi nhận bữa ăn</Link> chỉ áp dụng cho cư dân trong
-        danh sách này.
+      {!loading && residents.length > 0 && (
+        <ListPagination
+          page={clientPage}
+          totalPages={totalPages}
+          total={total}
+          onPageChange={setClientPage}
+        />
+      )}
+
+      <p className="assigned-residents-page__footer-link">
+        <Link to="/caregiver/meal-intake-notes">{t('caregiver.assignedResidents.mealIntakeLink')}</Link>{' '}
+        {t('caregiver.assignedResidents.footerLink')}
       </p>
 
-      {detailId && <ResidentDetailModal residentId={detailId} onClose={() => setDetailId(null)} />}
-    </div>
+      {detailId && (
+        <ResidentDetailModal
+          residentId={detailId}
+          onClose={() => setDetailId(null)}
+          t={t}
+          locale={locale}
+        />
+      )}
+    </AdminPageShell>
   );
 }
 

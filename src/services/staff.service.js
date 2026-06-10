@@ -92,6 +92,9 @@ const listResidentsAvailable = (userId, params = {}) =>
 const listAssignedResidents = (userId) =>
   axiosClient.get(`/staff/${userId}/residents/assigned`).then((r) => r.data);
 
+/** Alias for care schedule / assignment UIs */
+const getAssignedResidents = listAssignedResidents;
+
 /**
  * @param {Object} [params]
  * @param {string} [params.date] YYYY-MM-DD
@@ -121,6 +124,7 @@ const staffService = {
   assignResidents,
   listResidentsAvailable,
   listAssignedResidents,
+  getAssignedResidents,
   getAvailability,
   getAreaCoverageStatus,
 };

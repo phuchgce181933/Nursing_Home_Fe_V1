@@ -1,8 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import shiftService from '../../../../services/shift.service';
 import staffService from '../../../../services/staff.service';
-import residentService from '../../../../services/resident.service';
 import careScheduleService from '../../../../services/careSchedule.service';
+import ListPagination from '../../../../components/ui/ListPagination';
+import { ADMIN_LIST_PAGE_SIZE } from '../../../../constants/adminListPage';
+import useDebouncedSearch from '../../../../hooks/useDebouncedSearch';
+import useClientPagination from '../../../../hooks/useClientPagination';
 import {
   CONFLICT_ICON,
   CONFLICT_LABEL,
@@ -10,11 +13,18 @@ import {
   hasBlockingConflicts,
   sortConflicts,
 } from '../../../../constants/shiftConflicts';
-import { getLocalDateString, getUtcDateString } from '../../../../utils/dateUtils';
+import {
+  formatDateTimeVN,
+  getLocalDateString,
+  getUtcDateString,
+  todayVN,
+  toVNDateString,
+} from '../../../../utils/dateUtils';
 import { canAssignShift } from '../../../../utils/staffAssignable';
 import { isStaffOnLeaveForAssignment } from '../../../../utils/leaveUtils';
 import { getApiErrorPayload, blockingCareTasksMessage } from '../../../../utils/blockingCareTasks';
 import BlockingCareTasksAlert from '../../../../components/staff/BlockingCareTasksAlert';
+import { useTranslation } from 'react-i18next';
 import AdminPageShell from '../../../../components/admin/AdminPageShell';
 import '../../../../styles/admin/ShiftManagementPage.css';
 
@@ -24,7 +34,15 @@ const SHIFT_TYPES = [
   { value: 'morning',   label: 'Ca ngày' },
   { value: 'afternoon', label: 'Ca chiều/tối' },
   { value: 'night',     label: 'Ca đêm/sáng sớm' },
+  { value: 'custom',    label: 'Ca gãy' },
 ];
+
+const isFlexibleTemplate = (t) => Boolean(t?.isFlexibleTime || t?.shiftCode === 'SPLIT');
+
+const templateOptionLabel = (t) =>
+  isFlexibleTemplate(t)
+    ? `${t.shiftCode} — ${t.name} (nhập giờ tùy chỉnh)`
+    : `${t.shiftCode} — ${t.name} (${t.startTime}–${t.endTime})`;
 
 const SHIFT_STATUS_LABELS = { draft: 'Nháp', published: 'Đã đăng', confirmed: 'Đã xác nhận', completed: 'Hoàn thành', cancelled: 'Đã hủy' };
 const CARE_TASK_TYPES = [
@@ -55,14 +73,34 @@ const parseTemplateList = (res) => {
 
 const parseShiftList = (res) => {
   const body = unwrapApiData(res);
-  if (Array.isArray(body)) return { shifts: body, totalHours: null };
+  if (Array.isArray(body)) {
+    return {
+      shifts: body,
+      totalHours: null,
+      total: body.length,
+      page: 1,
+      totalPages: 1,
+    };
+  }
   return {
     shifts: body.data || [],
     totalHours: body.totalHours ?? null,
+    total: body.total ?? (body.data || []).length,
+    page: body.page ?? 1,
+    totalPages: body.totalPages ?? 1,
   };
 };
 
 const templateHours = (t) => t?.totalHours ?? t?.durationHours;
+
+const formatTemplateTimeDisplay = (t) =>
+  isFlexibleTemplate(t) ? 'Nhập giờ khi phân công' : `${t.startTime} – ${t.endTime}`;
+
+const formatTemplateDurationDisplay = (t) => {
+  if (isFlexibleTemplate(t)) return 'Theo phân công';
+  const hours = templateHours(t);
+  return hours != null ? `${hours}h` : '—';
+};
 
 const addDays = (dateStr, delta) => {
   const d = new Date(`${dateStr}T12:00:00`);
@@ -97,14 +135,18 @@ const getStaffDisplayName = (shift) => {
 
 const today = () => getLocalDateString();
 
-const buildShiftPayload = (form, { isUpdate = false } = {}) => {
+const buildShiftPayload = (form, { isUpdate = false, template = null } = {}) => {
   if (isUpdate) {
-    const payload = { changeReason: form.changeReason };
+    const payload = { changeReason: form.changeReason?.trim() || '' };
     if (form.shiftTemplateId) payload.shiftTemplateId = form.shiftTemplateId;
     if (form.workDate) payload.workDate = form.workDate;
     if (form.assignedStaffId) payload.assignedStaffId = form.assignedStaffId;
     if (form.taskDescription !== undefined) payload.taskDescription = form.taskDescription;
     if (form.notes !== undefined) payload.notes = form.notes;
+    if (isFlexibleTemplate(template)) {
+      if (form.startTime) payload.startTime = form.startTime;
+      if (form.endTime) payload.endTime = form.endTime;
+    }
     return payload;
   }
 
@@ -115,6 +157,10 @@ const buildShiftPayload = (form, { isUpdate = false } = {}) => {
   };
   if (form.taskDescription) payload.taskDescription = form.taskDescription;
   if (form.notes) payload.notes = form.notes;
+  if (isFlexibleTemplate(template)) {
+    payload.startTime = form.startTime;
+    payload.endTime = form.endTime;
+  }
   return payload;
 };
 
@@ -125,7 +171,15 @@ const nextWeek = () => {
   return getLocalDateString(d);
 };
 
-const emptyShift = { shiftTemplateId: '', workDate: today(), assignedStaffId: '', taskDescription: '', notes: '' };
+const emptyShift = {
+  shiftTemplateId: '',
+  workDate: today(),
+  assignedStaffId: '',
+  startTime: '08:00',
+  endTime: '12:00',
+  taskDescription: '',
+  notes: '',
+};
 
 function useAssignableStaffForDate(workDate) {
   const [staff, setStaff] = useState([]);
@@ -180,13 +234,19 @@ function ConflictList({ conflicts, title }) {
 }
 
 /** Live preview via GET /shifts/check-conflicts (debounced). */
-function useConflictPreview(form, { excludeId } = {}) {
+function useConflictPreview(form, { excludeId, templates = [] } = {}) {
   const [preview, setPreview] = useState([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const { assignedStaffId, workDate, shiftTemplateId } = form;
+    const { assignedStaffId, workDate, shiftTemplateId, startTime, endTime } = form;
     if (!assignedStaffId || !workDate || !shiftTemplateId) {
+      setPreview([]);
+      return undefined;
+    }
+
+    const template = templates.find((x) => x._id === shiftTemplateId);
+    if (isFlexibleTemplate(template) && (!startTime || !endTime)) {
       setPreview([]);
       return undefined;
     }
@@ -194,12 +254,12 @@ function useConflictPreview(form, { excludeId } = {}) {
     const timer = setTimeout(async () => {
       setLoading(true);
       try {
-        const res = await shiftService.checkConflicts({
-          assignedStaffId,
-          workDate,
-          shiftTemplateId,
-          excludeId,
-        });
+        const params = { assignedStaffId, workDate, shiftTemplateId, excludeId };
+        if (isFlexibleTemplate(template)) {
+          params.startTime = startTime;
+          params.endTime = endTime;
+        }
+        const res = await shiftService.checkConflicts(params);
         setPreview(res.conflicts || []);
       } catch {
         setPreview([]);
@@ -213,7 +273,10 @@ function useConflictPreview(form, { excludeId } = {}) {
     form.assignedStaffId,
     form.workDate,
     form.shiftTemplateId,
+    form.startTime,
+    form.endTime,
     excludeId,
+    templates,
   ]);
 
   return { preview, loading };
@@ -230,6 +293,25 @@ function TemplatesTab() {
   const [totalHoursPerDay, setTotalHoursPerDay] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const { search, setSearch, debouncedSearch } = useDebouncedSearch();
+
+  const filteredTemplates = useMemo(() => {
+    const q = debouncedSearch.trim().toLowerCase();
+    if (!q) return templates;
+    return templates.filter(
+      (t) =>
+        (t.shiftCode || '').toLowerCase().includes(q)
+        || (t.name || '').toLowerCase().includes(q)
+    );
+  }, [templates, debouncedSearch]);
+
+  const {
+    paginatedItems: paginatedTemplates,
+    page,
+    setPage,
+    totalPages,
+    total,
+  } = useClientPagination(filteredTemplates);
 
   const load = async () => {
     setLoading(true);
@@ -251,16 +333,26 @@ function TemplatesTab() {
   return (
     <div>
       <p style={{ marginBottom: 12, fontSize: '0.85rem', color: '#64748b' }}>
-        3 ca mặc định hệ thống — Ca Đêm/Sáng sớm (00:00–08:00), Ca Ngày (08:00–16:00), Ca Chiều/Tối (16:00–00:00).
+        4 ca hệ thống — Ca Đêm (00:00–08:00), Ca Ngày (08:00–16:00), Ca Chiều/Tối (16:00–00:00), và Ca gãy (nhập giờ khi phân công).
         {totalHoursPerDay != null && (
-          <> Tổng <strong>{totalHoursPerDay}h</strong>/ngày.</>
+          <> Tổng <strong>{totalHoursPerDay}h</strong>/ngày (3 ca cố định).</>
         )}
-        {' '}Giờ ca được lấy tự động khi phân công.
+        {' '}Ca gãy dùng cho phân công đột xuất trong ngày.
       </p>
 
       {error && <p className="form-error">{error}</p>}
 
+      <div className="tab-toolbar" style={{ marginBottom: 12 }}>
+        <input
+          type="search"
+          placeholder="Tìm mã ca hoặc tên ca..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
+
       {loading ? <p className="loading-text">Đang tải...</p> : (
+        <>
         <table className="data-table">
           <thead>
             <tr>
@@ -273,8 +365,8 @@ function TemplatesTab() {
             </tr>
           </thead>
           <tbody>
-            {templates.length === 0 && <tr><td colSpan={6} className="empty-row">Chưa có mẫu ca nào</td></tr>}
-            {templates.map((t) => (
+            {paginatedTemplates.length === 0 && <tr><td colSpan={6} className="empty-row">Chưa có mẫu ca nào</td></tr>}
+            {paginatedTemplates.map((t) => (
               <tr key={t._id}>
                 <td>
                   <span style={{ fontFamily: 'monospace', background: '#f1f5f9', padding: '2px 6px', borderRadius: 4 }}>
@@ -287,13 +379,17 @@ function TemplatesTab() {
                   {t.crossesMidnight && <span style={{ marginLeft: 6, fontSize: '0.7rem', color: '#7c3aed' }}>🌙 qua ngày</span>}
                 </td>
                 <td>{SHIFT_TYPES.find((x) => x.value === t.shiftType)?.label || t.shiftType}</td>
-                <td>{t.startTime} – {t.endTime}</td>
-                <td>{templateHours(t) != null ? `${templateHours(t)}h` : '—'}</td>
+                <td>{formatTemplateTimeDisplay(t)}</td>
+                <td>{formatTemplateDurationDisplay(t)}</td>
                 <td style={{ fontSize: '0.8rem', color: '#64748b' }}>{t.description || '—'}</td>
               </tr>
             ))}
           </tbody>
         </table>
+        {paginatedTemplates.length > 0 && (
+          <ListPagination page={page} totalPages={totalPages} total={total} onPageChange={setPage} />
+        )}
+        </>
       )}
     </div>
   );
@@ -306,7 +402,7 @@ function CreateShiftModal({ templates, onSave, onClose }) {
   const { staff, loading: staffLoading } = useAssignableStaffForDate(form.workDate);
   const [conflicts, setConflicts] = useState([]);
   const [error, setError] = useState('');
-  const { preview, loading: previewLoading } = useConflictPreview(form);
+  const { preview, loading: previewLoading } = useConflictPreview(form, { templates });
   const set = (k, v) => {
     setConflicts([]);
     setForm((p) => ({ ...p, [k]: v }));
@@ -315,10 +411,16 @@ function CreateShiftModal({ templates, onSave, onClose }) {
   const selectedTemplate = form.shiftTemplateId
     ? templates.find((x) => x._id === form.shiftTemplateId)
     : null;
+  const flexible = isFlexibleTemplate(selectedTemplate);
 
   const handleTemplateSelect = (id) => {
     setConflicts([]);
-    setForm((p) => ({ ...p, shiftTemplateId: id }));
+    const tpl = templates.find((x) => x._id === id);
+    setForm((p) => ({
+      ...p,
+      shiftTemplateId: id,
+      ...(isFlexibleTemplate(tpl) ? { startTime: p.startTime || '08:00', endTime: p.endTime || '12:00' } : {}),
+    }));
   };
 
   const handleSave = async () => {
@@ -332,8 +434,12 @@ function CreateShiftModal({ templates, onSave, onClose }) {
       setError('Vui lòng chọn nhân viên');
       return;
     }
+    if (flexible && (!form.startTime || !form.endTime)) {
+      setError('Vui lòng nhập giờ bắt đầu và kết thúc cho ca gãy');
+      return;
+    }
     try {
-      const payload = buildShiftPayload(form);
+      const payload = buildShiftPayload(form, { template: selectedTemplate });
       const res = await onSave(payload);
       const c = res.conflicts || [];
       setConflicts(c);
@@ -369,7 +475,7 @@ function CreateShiftModal({ templates, onSave, onClose }) {
             <select value={form.shiftTemplateId} onChange={(e) => handleTemplateSelect(e.target.value)}>
               <option value="">— Chọn ca —</option>
               {templates.map((t) => (
-                <option key={t._id} value={t._id}>{t.shiftCode} — {t.name} ({t.startTime}–{t.endTime})</option>
+                <option key={t._id} value={t._id}>{templateOptionLabel(t)}</option>
               ))}
             </select>
           </div>
@@ -380,9 +486,15 @@ function CreateShiftModal({ templates, onSave, onClose }) {
                 <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: selectedTemplate.colorLabel || '#607D8B', marginRight: 6 }} />
                 {selectedTemplate.name} · {selectedTemplate.shiftCode}
               </div>
-              <div>🕐 {selectedTemplate.startTime} – {selectedTemplate.endTime} &nbsp;·&nbsp; ⏱ {templateHours(selectedTemplate)}h</div>
-              {selectedTemplate.crossesMidnight && (
-                <div style={{ marginTop: 4, fontSize: '0.75rem' }}>🌙 Ca qua ngày (kết thúc sáng hôm sau)</div>
+              {flexible ? (
+                <div>Ca đột xuất — nhập khung giờ trong ngày (tối thiểu 1h, tối đa 12h)</div>
+              ) : (
+                <>
+                  <div>🕐 {selectedTemplate.startTime} – {selectedTemplate.endTime} &nbsp;·&nbsp; ⏱ {templateHours(selectedTemplate)}h</div>
+                  {selectedTemplate.crossesMidnight && (
+                    <div style={{ marginTop: 4, fontSize: '0.75rem' }}>🌙 Ca qua ngày (kết thúc sáng hôm sau)</div>
+                  )}
+                </>
               )}
             </div>
           )}
@@ -416,7 +528,20 @@ function CreateShiftModal({ templates, onSave, onClose }) {
             <small className="field-hint">Ngày tính theo UTC (khớp quy tắc PAST_DATE trên server)</small>
           </div>
 
-          {selectedTemplate && (
+          {selectedTemplate && flexible && (
+            <>
+              <div className="form-group">
+                <label>Giờ bắt đầu *</label>
+                <input type="time" value={form.startTime} onChange={(e) => set('startTime', e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label>Giờ kết thúc *</label>
+                <input type="time" value={form.endTime} onChange={(e) => set('endTime', e.target.value)} />
+              </div>
+            </>
+          )}
+
+          {selectedTemplate && !flexible && (
             <>
               <div className="form-group">
                 <label>Giờ bắt đầu</label>
@@ -460,6 +585,8 @@ function UpdateShiftModal({ shift, templates, onSave, onClose }) {
     workDate:        shift.workDate ? shift.workDate.slice(0, 10) : '',
     assignedStaffId: currentUserId?.toString() || '',
     shiftTemplateId: templateId?.toString() || '',
+    startTime:       shift.startTime || '08:00',
+    endTime:         shift.endTime || '12:00',
     taskDescription: shift.taskDescription || '',
     notes:           shift.notes || '',
     changeReason:    '',
@@ -467,7 +594,7 @@ function UpdateShiftModal({ shift, templates, onSave, onClose }) {
   const [conflicts, setConflicts] = useState([]);
   const [error, setError] = useState('');
   const { staff, loading: staffLoading } = useAssignableStaffForDate(form.workDate);
-  const { preview, loading: previewLoading } = useConflictPreview(form, { excludeId: shift._id });
+  const { preview, loading: previewLoading } = useConflictPreview(form, { excludeId: shift._id, templates });
   const set = (k, v) => {
     setConflicts([]);
     setForm((p) => ({ ...p, [k]: v }));
@@ -476,6 +603,7 @@ function UpdateShiftModal({ shift, templates, onSave, onClose }) {
   const selectedTemplate = form.shiftTemplateId
     ? templates.find((x) => x._id === form.shiftTemplateId)
     : null;
+  const flexible = isFlexibleTemplate(selectedTemplate);
 
   const handleSave = async () => {
     setError('');
@@ -484,12 +612,12 @@ function UpdateShiftModal({ shift, templates, onSave, onClose }) {
       setError('Vui lòng chọn ca làm việc');
       return;
     }
-    if (!form.changeReason.trim()) {
-      setError('Bắt buộc nhập lý do thay đổi');
+    if (flexible && (!form.startTime || !form.endTime)) {
+      setError('Vui lòng nhập giờ bắt đầu và kết thúc cho ca gãy');
       return;
     }
     try {
-      const payload = buildShiftPayload(form, { isUpdate: true });
+      const payload = buildShiftPayload(form, { isUpdate: true, template: selectedTemplate });
       const res = await onSave(shift._id, payload);
       const c = res.conflicts || [];
       setConflicts(c);
@@ -525,7 +653,7 @@ function UpdateShiftModal({ shift, templates, onSave, onClose }) {
             <select value={form.shiftTemplateId} onChange={(e) => set('shiftTemplateId', e.target.value)}>
               <option value="">— Chọn ca —</option>
               {templates.map((t) => (
-                <option key={t._id} value={t._id}>{t.shiftCode} — {t.name} ({t.startTime}–{t.endTime})</option>
+                <option key={t._id} value={t._id}>{templateOptionLabel(t)}</option>
               ))}
             </select>
           </div>
@@ -536,8 +664,25 @@ function UpdateShiftModal({ shift, templates, onSave, onClose }) {
                 <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: selectedTemplate.colorLabel || '#607D8B', marginRight: 6 }} />
                 {selectedTemplate.name} · {selectedTemplate.shiftCode}
               </div>
-              <div>🕐 {selectedTemplate.startTime} – {selectedTemplate.endTime} &nbsp;·&nbsp; ⏱ {templateHours(selectedTemplate)}h</div>
+              {flexible ? (
+                <div>Ca đột xuất — chỉnh khung giờ trong ngày</div>
+              ) : (
+                <div>🕐 {selectedTemplate.startTime} – {selectedTemplate.endTime} &nbsp;·&nbsp; ⏱ {templateHours(selectedTemplate)}h</div>
+              )}
             </div>
+          )}
+
+          {flexible && (
+            <>
+              <div className="form-group">
+                <label>Giờ bắt đầu *</label>
+                <input type="time" value={form.startTime} onChange={(e) => set('startTime', e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label>Giờ kết thúc *</label>
+                <input type="time" value={form.endTime} onChange={(e) => set('endTime', e.target.value)} />
+              </div>
+            </>
           )}
 
           <div className="form-group form-grid--full">
@@ -574,12 +719,11 @@ function UpdateShiftModal({ shift, templates, onSave, onClose }) {
             <input value={form.notes} onChange={(e) => set('notes', e.target.value)} />
           </div>
           <div className="form-group form-grid--full">
-            <label>Lý do thay đổi *</label>
+            <label>Lý do thay đổi</label>
             <input
               value={form.changeReason}
               onChange={(e) => set('changeReason', e.target.value)}
-              placeholder="Bắt buộc nhập lý do..."
-              style={{ borderColor: !form.changeReason ? '#fca5a5' : undefined }}
+              placeholder="Tùy chọn — ghi chú lý do nếu cần"
             />
           </div>
         </div>
@@ -601,6 +745,13 @@ function AssignTab() {
   const [filterStatus, setFilterStatus]   = useState('');
   const [filterFrom, setFilterFrom]       = useState(today());
   const [filterTo, setFilterTo]           = useState(nextWeek());
+  const [page, setPage]                   = useState(1);
+  const [totalPages, setTotalPages]       = useState(1);
+  const [shiftTotal, setShiftTotal]       = useState(0);
+  const resetPageOnSearch = useCallback(() => setPage(1), []);
+  const { search, setSearch, debouncedSearch } = useDebouncedSearch({
+    onDebouncedChange: resetPageOnSearch,
+  });
   const [showCreate, setShowCreate]       = useState(false);
   const [editShift, setEditShift]         = useState(null);
   const [actionConflicts, setActConflicts] = useState([]);
@@ -618,13 +769,26 @@ function AssignTab() {
     setBlockingTasks([]);
     try {
       const res = await shiftService.listShifts({
+        page,
+        limit: ADMIN_LIST_PAGE_SIZE,
         status: filterStatus || undefined,
         fromDate: filterFrom,
         toDate: filterTo,
+        search: debouncedSearch || undefined,
       });
-      const { shifts: list, totalHours } = parseShiftList(res);
+      const parsed = parseShiftList(res);
+      let list = parsed.shifts;
+      const q = debouncedSearch.trim().toLowerCase();
+      if (q && parsed.totalPages <= 1 && list.length <= ADMIN_LIST_PAGE_SIZE) {
+        list = list.filter((s) => {
+          const staffName = s.assignedStaffId?.userId?.fullName || s.assignedStaffId?.staffCode || '';
+          return (s.name || '').toLowerCase().includes(q) || staffName.toLowerCase().includes(q);
+        });
+      }
       setShifts(list);
-      setListTotalHours(totalHours);
+      setListTotalHours(parsed.totalHours);
+      setShiftTotal(parsed.total ?? list.length);
+      setTotalPages(parsed.totalPages ?? Math.max(1, Math.ceil((parsed.total ?? list.length) / ADMIN_LIST_PAGE_SIZE)));
     } catch (e) { setError(e.response?.data?.message || 'Tải thất bại'); }
     finally { setLoading(false); }
   };
@@ -632,7 +796,11 @@ function AssignTab() {
   useEffect(() => {
     loadTemplates();
   }, []);
-  useEffect(() => { load(); }, [filterStatus, filterFrom, filterTo]);
+  useEffect(() => { load(); }, [filterStatus, filterFrom, filterTo, page, debouncedSearch]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filterStatus, filterFrom, filterTo]);
 
   const handleCreate = async (form) => {
     const res = await shiftService.createShift(form);
@@ -657,15 +825,6 @@ function AssignTab() {
         alert(msg);
       }
     }
-  };
-
-  const handleConfirm = async (id) => {
-    try {
-      await shiftService.confirmShift(id);
-      alert('Ca đã xác nhận. Trạng thái sẵn sàng khẩn cấp sẽ cập nhật trong vài giây.');
-      load();
-    }
-    catch (e) { alert(e.response?.data?.message || 'Thất bại'); }
   };
 
   const handleCancel = async (s) => {
@@ -713,7 +872,6 @@ function AssignTab() {
 
   const canEdit    = (s) => ['draft', 'published'].includes(s.status);
   const canPublish = (s) => s.status === 'draft';
-  const canConfirm = (s) => s.status === 'published';
   const canCancel  = (s) => ['published', 'confirmed'].includes(s.status);
   const canDelete  = (s) => s.status === 'draft';
 
@@ -727,9 +885,17 @@ function AssignTab() {
           <option value="">Tất cả trạng thái</option>
           {Object.entries(SHIFT_STATUS_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
         </select>
+        <input
+          type="search"
+          placeholder="Tìm tên ca hoặc nhân viên..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
         <button className="btn-primary" onClick={() => setShowCreate(true)}>+ Phân công ca</button>
       </div>
       <p style={{ marginBottom: 12, fontSize: '0.8rem', color: '#64748b' }}>
+        Sau khi <strong>Đăng ca</strong>, nhân viên tự xác nhận trong portal <strong>Ca của tôi</strong>.
+        Ca <strong>Đã đăng</strong> chưa xác nhận trong 30 phút sau giờ bắt đầu sẽ tự động hủy.
         Chỉ ca <strong>Đã xác nhận</strong> mới được tính vào trang Sẵn sàng khẩn cấp.
         Phân công tầng/phòng cho nhân viên ở tab <strong>Phân công khu vực</strong>.
         {listTotalHours != null && shifts.length > 0 && (
@@ -776,7 +942,6 @@ function AssignTab() {
                   <td><StatusBadge value={s.status} map={SHIFT_STATUS_LABELS} prefix="shift" /></td>
                   <td className="action-cell">
                     {canPublish(s) && <button className="action-btn action-btn--publish" onClick={() => handlePublish(s._id)}>Đăng</button>}
-                    {canConfirm(s) && <button className="action-btn action-btn--confirm" onClick={() => handleConfirm(s._id)}>Xác nhận</button>}
                     {canEdit(s)    && <button className="action-btn action-btn--edit"    onClick={() => setEditShift(s)}>Sửa</button>}
                     {canCancel(s)  && <button className="action-btn action-btn--warning" onClick={() => handleCancel(s)}>Hủy</button>}
                     {canDelete(s)  && <button className="action-btn action-btn--danger"  onClick={() => handleDelete(s._id)}>Xóa</button>}
@@ -788,62 +953,88 @@ function AssignTab() {
         </table>
       )}
 
+      {!loading && shifts.length > 0 && (
+        <ListPagination
+          page={page}
+          totalPages={Math.max(totalPages, 1)}
+          total={shiftTotal}
+          onPageChange={setPage}
+        />
+      )}
+
       {showCreate && <CreateShiftModal templates={templates} onSave={handleCreate} onClose={() => setShowCreate(false)} />}
       {editShift && <UpdateShiftModal shift={editShift} templates={templates} onSave={handleUpdate} onClose={() => setEditShift(null)} />}
     </div>
   );
 }
 
-// ── Tab 3: Lịch làm việc (Schedule view — 3 cột / 1 ngày) ───────────────────
+// ── Tab 3: Lịch làm việc (Schedule view — 3 cột ca cố định + ca gãy riêng) ───
+
+function ScheduleColumn({ template, shifts }) {
+  const columnShifts = shiftsForTemplate(shifts, template._id);
+  const accent = template.colorLabel || '#607D8B';
+  const flexible = isFlexibleTemplate(template);
+
+  return (
+    <div className="schedule-column" style={{ borderTopColor: accent }}>
+      <div className="schedule-column__head">
+        <div className="schedule-column__title">{template.name}</div>
+        <div className="schedule-column__time">
+          {flexible
+            ? 'Nhập giờ khi phân công'
+            : `${template.startTime} – ${template.endTime}`}
+          {!flexible && templateHours(template) != null && (
+            <span className="schedule-column__hours"> · {templateHours(template)}h</span>
+          )}
+        </div>
+      </div>
+      <div className="schedule-column__body">
+        {columnShifts.length === 0 ? (
+          <div className="schedule-column__row schedule-column__row--empty">
+            <span className="schedule-column__row-index">1</span>
+            <span className="schedule-column__row-name">Chưa phân công</span>
+          </div>
+        ) : (
+          columnShifts.map((s, i) => (
+            <div key={s._id} className="schedule-column__row">
+              <span className="schedule-column__row-index">{i + 1}</span>
+              <span className="schedule-column__row-name">
+                {getStaffDisplayName(s) || '—'}
+                {flexible && s.startTime && s.endTime && (
+                  <span style={{ display: 'block', fontSize: '0.75rem', color: '#64748b' }}>
+                    {s.startTime} – {s.endTime}
+                  </span>
+                )}
+              </span>
+              <StatusBadge value={s.status} map={SHIFT_STATUS_LABELS} prefix="shift" />
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
 
 function ScheduleDayBoard({ date, templates, shifts }) {
   const sortedTemplates = sortTemplatesByStart(templates);
+  const standardTemplates = sortedTemplates.filter((t) => !isFlexibleTemplate(t));
+  const splitTemplates = sortedTemplates.filter((t) => isFlexibleTemplate(t));
 
   return (
     <div className="schedule-day">
       <div className="schedule-day__header">{formatScheduleDayHeader(date)}</div>
       <div className="schedule-columns">
-        {sortedTemplates.map((template) => {
-          const columnShifts = shiftsForTemplate(shifts, template._id);
-          const accent = template.colorLabel || '#607D8B';
-
-          return (
-            <div
-              key={template._id}
-              className="schedule-column"
-              style={{ borderTopColor: accent }}
-            >
-              <div className="schedule-column__head">
-                <div className="schedule-column__title">{template.name}</div>
-                <div className="schedule-column__time">
-                  {template.startTime} – {template.endTime}
-                  {templateHours(template) != null && (
-                    <span className="schedule-column__hours"> · {templateHours(template)}h</span>
-                  )}
-                </div>
-              </div>
-              <div className="schedule-column__body">
-                {columnShifts.length === 0 ? (
-                  <div className="schedule-column__row schedule-column__row--empty">
-                    <span className="schedule-column__row-index">1</span>
-                    <span className="schedule-column__row-name">Chưa phân công</span>
-                  </div>
-                ) : (
-                  columnShifts.map((s, i) => (
-                    <div key={s._id} className="schedule-column__row">
-                      <span className="schedule-column__row-index">{i + 1}</span>
-                      <span className="schedule-column__row-name">
-                        {getStaffDisplayName(s) || '—'}
-                      </span>
-                      <StatusBadge value={s.status} map={SHIFT_STATUS_LABELS} prefix="shift" />
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          );
-        })}
+        {standardTemplates.map((template) => (
+          <ScheduleColumn key={template._id} template={template} shifts={shifts} />
+        ))}
       </div>
+      {splitTemplates.length > 0 && (
+        <div className="schedule-split-section">
+          {splitTemplates.map((template) => (
+            <ScheduleColumn key={template._id} template={template} shifts={shifts} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -939,9 +1130,10 @@ function ScheduleTab() {
 }
 
 function CreateCareScheduleTab() {
-  const [workDate, setWorkDate] = useState(today());
+  const [workDate, setWorkDate] = useState(todayVN());
   const { staff: staffOptions } = useAssignableStaffForDate(workDate);
   const [residents, setResidents] = useState([]);
+  const [staffResidentsCache, setStaffResidentsCache] = useState({});
   const [templates, setTemplates] = useState([]);
   const [dayShifts, setDayShifts] = useState([]);
   const [selectedResidents, setSelectedResidents] = useState([]);
@@ -952,19 +1144,86 @@ function CreateCareScheduleTab() {
   const [title, setTitle] = useState('');
   const [editingScheduleId, setEditingScheduleId] = useState('');
   const [drafts, setDrafts] = useState([]);
+  const { search: draftSearch, setSearch: setDraftSearch, debouncedSearch: debouncedDraftSearch } = useDebouncedSearch();
+  const filteredDrafts = useMemo(() => {
+    const q = debouncedDraftSearch.trim().toLowerCase();
+    if (!q) return drafts;
+    return drafts.filter(
+      (d) =>
+        (d.title || '').toLowerCase().includes(q)
+        || toVNDateString(d.workDate).includes(q)
+    );
+  }, [drafts, debouncedDraftSearch]);
+  const {
+    paginatedItems: paginatedDrafts,
+    page: draftPage,
+    setPage: setDraftPage,
+    totalPages: draftTotalPages,
+    total: draftTotal,
+  } = useClientPagination(filteredDrafts);
   const [detailSchedule, setDetailSchedule] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const loadResidents = async () => {
+  const userIdForStaffProfile = (staffProfileId) => {
+    if (!staffProfileId) return '';
+    const match = staffOptions.find(
+      (s) => String(s.staffProfile?._id || '') === String(staffProfileId)
+    );
+    return match?._id ? String(match._id) : '';
+  };
+
+  const loadResidentsForStaffProfile = async (staffProfileId) => {
+    if (!staffProfileId) {
+      setResidents([]);
+      return [];
+    }
+    const cached = staffResidentsCache[staffProfileId];
+    if (cached) {
+      setResidents(cached);
+      return cached;
+    }
+    const userId = userIdForStaffProfile(staffProfileId);
+    if (!userId) {
+      setResidents([]);
+      return [];
+    }
     try {
-      const res = await residentService.listForAssignment({ status: 'admitted' });
-      setResidents(Array.isArray(res?.data) ? res.data : []);
+      const res = await staffService.getAssignedResidents(userId);
+      const list = Array.isArray(res?.data) ? res.data : [];
+      setStaffResidentsCache((prev) => ({ ...prev, [staffProfileId]: list }));
+      setResidents(list);
+      return list;
     } catch {
       setResidents([]);
+      return [];
     }
+  };
+
+  const residentsForStaffProfile = (staffProfileId) => {
+    if (!staffProfileId) return [];
+    return staffResidentsCache[staffProfileId] || (String(staffProfileId) === String(commonStaffProfileId) ? residents : []);
+  };
+
+  const selectedResidentSet = useMemo(
+    () => new Set(selectedResidents.map((id) => String(id))),
+    [selectedResidents]
+  );
+
+  /** Cư dân trong dropdown hàng = đã tick phía trên ∩ được phân cho NV của hàng */
+  const residentsForRow = (staffProfileId) =>
+    residentsForStaffProfile(staffProfileId).filter((r) => selectedResidentSet.has(String(r._id)));
+
+  const handleResidentCheckboxChange = (residentId, checked) => {
+    const id = String(residentId);
+    if (checked) {
+      setSelectedResidents((prev) => (prev.includes(id) ? prev : [...prev, id]));
+      return;
+    }
+    setSelectedResidents((prev) => prev.filter((x) => x !== id));
+    setEntries((prev) => prev.filter((row) => String(row.residentId) !== id));
   };
 
   const loadTemplates = async () => {
@@ -989,7 +1248,7 @@ function CreateCareScheduleTab() {
   const loadDrafts = async () => {
     setLoading(true);
     try {
-      const res = await careScheduleService.listSchedules({ workDate, limit: 50 });
+      const res = await careScheduleService.listSchedules({ workDate, limit: 100 });
       const rows = Array.isArray(res?.data) ? res.data : [];
       setDrafts(rows.filter((x) => ['draft', 'published'].includes(x.status)));
     } catch {
@@ -1000,16 +1259,36 @@ function CreateCareScheduleTab() {
   };
 
   useEffect(() => {
-    loadResidents();
     loadTemplates();
   }, []);
 
   useEffect(() => {
     setCommonStaffProfileId('');
     setCommonShiftId('');
+    setResidents([]);
+    setSelectedResidents([]);
+    setStaffResidentsCache({});
     loadShiftsForDay();
     loadDrafts();
   }, [workDate]);
+
+  useEffect(() => {
+    if (!commonStaffProfileId) {
+      setResidents([]);
+      setSelectedResidents([]);
+      return;
+    }
+    let cancelled = false;
+    loadResidentsForStaffProfile(commonStaffProfileId).then((list) => {
+      if (cancelled) return;
+      const validIds = new Set(list.map((r) => String(r._id)));
+      setSelectedResidents((prev) => prev.filter((id) => validIds.has(String(id))));
+      setEntries((prev) =>
+        prev.filter((row) => !row.residentId || validIds.has(String(row.residentId)))
+      );
+    });
+    return () => { cancelled = true; };
+  }, [commonStaffProfileId, staffOptions]);
 
   const shiftsBySelectedStaff = dayShifts.filter(
     (s) => String(s.assignedStaffId?._id || s.assignedStaffId) === String(commonStaffProfileId)
@@ -1022,12 +1301,8 @@ function CreateCareScheduleTab() {
       setError('Vui lòng chọn mẫu lịch.');
       return;
     }
-    if (!selectedResidents.length) {
-      setError('Vui lòng chọn ít nhất 2 cư dân.');
-      return;
-    }
-    if (selectedResidents.length < 2) {
-      setError('Lịch chăm sóc theo ngày yêu cầu tối thiểu 2 cư dân.');
+    if (selectedResidents.length < 1) {
+      setError('Vui lòng chọn ít nhất 1 cư dân.');
       return;
     }
     if (!commonStaffProfileId || !commonShiftId) {
@@ -1054,6 +1329,11 @@ function CreateCareScheduleTab() {
   };
 
   const addManualRow = () => {
+    setError('');
+    if (selectedResidents.length < 1) {
+      setError('Vui lòng chọn ít nhất 1 cư dân trước khi thêm đầu việc.');
+      return;
+    }
     setEntries((prev) => [
       ...prev,
       {
@@ -1085,8 +1365,8 @@ function CreateCareScheduleTab() {
   };
 
   const validateBeforeSave = () => {
-    if (workDate < today()) return 'Không thể tạo lịch cho ngày trong quá khứ.';
-    if (selectedResidents.length < 2) return 'Vui lòng chọn tối thiểu 2 cư dân.';
+    if (workDate < todayVN()) return 'Không thể tạo lịch cho ngày trong quá khứ.';
+    if (selectedResidents.length < 1) return 'Vui lòng chọn tối thiểu 1 cư dân.';
     if (!entries.length) return 'Vui lòng thêm ít nhất một đầu việc.';
     const invalid = entries.find(
       (e) =>
@@ -1098,6 +1378,13 @@ function CreateCareScheduleTab() {
         !e.scheduledTime
     );
     if (invalid) return 'Mỗi đầu việc phải có cư dân, nhân viên, ca, loại việc, mức độ và giờ.';
+    const invalidResident = entries.find((e) => {
+      if (!e.residentId || !e.staffProfileId) return false;
+      return !residentsForRow(e.staffProfileId).some((r) => String(r._id) === String(e.residentId));
+    });
+    if (invalidResident) {
+      return 'Mỗi đầu việc phải dùng cư dân đã tick phía trên và thuộc nhân viên của hàng.';
+    }
     return '';
   };
 
@@ -1132,7 +1419,7 @@ function CreateCareScheduleTab() {
       const data = await careScheduleService.getSchedule(id);
       setEditingScheduleId(data._id);
       setTitle(data.title || '');
-      setWorkDate((data.workDate || '').slice(0, 10) || today());
+      setWorkDate(toVNDateString(data.workDate) || todayVN());
       const rows = Array.isArray(data.entries) ? data.entries : [];
       setEntries(
         rows.map((r) => ({
@@ -1209,7 +1496,7 @@ function CreateCareScheduleTab() {
       <div className="form-grid">
         <div className="form-group">
           <label>Ngày chăm sóc *</label>
-          <input type="date" min={today()} value={workDate} onChange={(e) => setWorkDate(e.target.value)} />
+          <input type="date" min={todayVN()} value={workDate} onChange={(e) => setWorkDate(e.target.value)} />
         </div>
         <div className="form-group">
           <label>Tiêu đề</label>
@@ -1217,7 +1504,15 @@ function CreateCareScheduleTab() {
         </div>
         <div className="form-group">
           <label>Nhân viên phụ trách chung</label>
-          <select value={commonStaffProfileId} onChange={(e) => setCommonStaffProfileId(e.target.value)}>
+          <select
+            value={commonStaffProfileId}
+            onChange={(e) => {
+              setCommonStaffProfileId(e.target.value);
+              setCommonShiftId('');
+              setSelectedResidents([]);
+              setEntries((prev) => prev.map((row) => ({ ...row, residentId: '', shiftId: '' })));
+            }}
+          >
             <option value="">— Chọn nhân viên —</option>
             {staffOptions.map((s) => (
               <option key={s.staffProfile?._id || s._id} value={s.staffProfile?._id || ''}>
@@ -1240,8 +1535,23 @@ function CreateCareScheduleTab() {
       </div>
 
       <div style={{ marginTop: 12, marginBottom: 12 }}>
-        <label style={{ display: 'block', marginBottom: 6, fontWeight: 600 }}>Cư dân áp dụng (chọn nhiều) *</label>
+        <label style={{ display: 'block', marginBottom: 6, fontWeight: 600 }}>
+          Cư dân áp dụng (chọn nhiều) *
+        </label>
+        <p style={{ margin: '0 0 8px', fontSize: '0.8rem', color: '#64748b' }}>
+          Chỉ các cư dân đã tick mới xuất hiện trong bảng đầu việc bên dưới. Bỏ tick sẽ xóa các hàng tương ứng.
+        </p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,minmax(0,1fr))', gap: 8, maxHeight: 160, overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: 8, padding: 8 }}>
+          {!commonStaffProfileId && (
+            <p style={{ gridColumn: '1 / -1', margin: 0, fontSize: '0.85rem', color: '#64748b' }}>
+              Chọn nhân viên phụ trách để xem cư dân được phân.
+            </p>
+          )}
+          {commonStaffProfileId && !residents.length && (
+            <p style={{ gridColumn: '1 / -1', margin: 0, fontSize: '0.85rem', color: '#64748b' }}>
+              Nhân viên chưa được phân cư dân.
+            </p>
+          )}
           {residents.map((r) => {
             const id = String(r._id);
             const checked = selectedResidents.includes(id);
@@ -1250,11 +1560,7 @@ function CreateCareScheduleTab() {
                 <input
                   type="checkbox"
                   checked={checked}
-                  onChange={(e) =>
-                    setSelectedResidents((prev) =>
-                      e.target.checked ? [...prev, id] : prev.filter((x) => x !== id)
-                    )
-                  }
+                  onChange={(e) => handleResidentCheckboxChange(id, e.target.checked)}
                 />{' '}
                 {r.fullName || r.residentCode}
               </label>
@@ -1301,11 +1607,38 @@ function CreateCareScheduleTab() {
               <td>
                 <select value={row.residentId} onChange={(e) => patchEntry(idx, { residentId: e.target.value })}>
                   <option value="">—</option>
-                  {residents.map((r) => <option key={r._id} value={r._id}>{r.fullName || r.residentCode}</option>)}
+                  {residentsForRow(row.staffProfileId).map((r) => (
+                    <option key={r._id} value={r._id}>{r.fullName || r.residentCode}</option>
+                  ))}
                 </select>
               </td>
               <td>
-                <select value={row.staffProfileId} onChange={(e) => patchEntry(idx, { staffProfileId: e.target.value, shiftId: '' })}>
+                <select
+                  value={row.staffProfileId}
+                  onChange={async (e) => {
+                    const staffProfileId = e.target.value;
+                    let nextResidentId = '';
+                    if (staffProfileId && row.residentId && selectedResidentSet.has(String(row.residentId))) {
+                      const stillValid = residentsForStaffProfile(staffProfileId).some(
+                        (r) => String(r._id) === String(row.residentId)
+                      );
+                      if (stillValid) nextResidentId = row.residentId;
+                    }
+                    patchEntry(idx, { staffProfileId, shiftId: '', residentId: nextResidentId });
+                    if (staffProfileId && !staffResidentsCache[staffProfileId]) {
+                      const userId = userIdForStaffProfile(staffProfileId);
+                      if (userId) {
+                        try {
+                          const res = await staffService.getAssignedResidents(userId);
+                          const list = Array.isArray(res?.data) ? res.data : [];
+                          setStaffResidentsCache((prev) => ({ ...prev, [staffProfileId]: list }));
+                        } catch {
+                          setStaffResidentsCache((prev) => ({ ...prev, [staffProfileId]: [] }));
+                        }
+                      }
+                    }
+                  }}
+                >
                   <option value="">—</option>
                   {staffOptions.map((s) => <option key={s.staffProfile?._id || s._id} value={s.staffProfile?._id || ''}>{s.fullName}</option>)}
                 </select>
@@ -1345,19 +1678,28 @@ function CreateCareScheduleTab() {
       </div>
 
       <h4 style={{ marginTop: 20 }}>Lịch trong ngày</h4>
+      <div className="tab-toolbar" style={{ marginBottom: 8 }}>
+        <input
+          type="search"
+          placeholder="Tìm tiêu đề hoặc ngày..."
+          value={draftSearch}
+          onChange={(e) => setDraftSearch(e.target.value)}
+        />
+      </div>
       {loading ? <p className="loading-text">Đang tải...</p> : (
+        <>
         <table className="data-table">
           <thead>
             <tr><th>Tiêu đề</th><th>Ngày</th><th>Trạng thái</th><th>Cập nhật</th><th>Thao tác</th></tr>
           </thead>
           <tbody>
-            {drafts.length === 0 && <tr><td colSpan={5} className="empty-state">Không có lịch</td></tr>}
-            {drafts.map((d) => (
+            {paginatedDrafts.length === 0 && <tr><td colSpan={5} className="empty-state">Không có lịch</td></tr>}
+            {paginatedDrafts.map((d) => (
               <tr key={d._id}>
                 <td>{d.title || '—'}</td>
-                <td>{(d.workDate || '').slice(0, 10)}</td>
+                <td>{toVNDateString(d.workDate)}</td>
                 <td><StatusBadge value={d.status} map={{ draft: 'Nháp', published: 'Đã đăng' }} prefix="shift" /></td>
-                <td>{(d.updatedAt || '').replace('T', ' ').slice(0, 16)}</td>
+                <td>{formatDateTimeVN(d.updatedAt)}</td>
                 <td>
                   {d.status === 'draft' ? (
                     <>
@@ -1377,6 +1719,15 @@ function CreateCareScheduleTab() {
             ))}
           </tbody>
         </table>
+        {paginatedDrafts.length > 0 && (
+          <ListPagination
+            page={draftPage}
+            totalPages={draftTotalPages}
+            total={draftTotal}
+            onPageChange={setDraftPage}
+          />
+        )}
+        </>
       )}
 
       {(detailLoading || detailSchedule) && (
@@ -1388,7 +1739,7 @@ function CreateCareScheduleTab() {
               <>
                 <p style={{ margin: '4px 0 12px', fontSize: '0.85rem', color: '#64748b' }}>
                   Tiêu đề: <strong>{detailSchedule.title || '—'}</strong> · Ngày:{' '}
-                  <strong>{(detailSchedule.workDate || '').slice(0, 10)}</strong>
+                  <strong>{toVNDateString(detailSchedule.workDate)}</strong>
                 </p>
                 <table className="data-table">
                   <thead>
@@ -1443,29 +1794,31 @@ function CreateCareScheduleTab() {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
-const TABS = [
-  { key: 'templates', label: '📋 Mẫu ca làm việc' },
-  { key: 'assign',    label: '👤 Phân công ca' },
-  { key: 'schedule',  label: '📅 Lịch làm việc' },
-  { key: 'care-schedule', label: '🩺 Tạo lịch chăm sóc' },
+const TABS = (t) => [
+  { key: 'templates', label: `📋 ${t('admin.staff.shifts.tabTemplates')}` },
+  { key: 'assign', label: `👤 ${t('admin.staff.shifts.tabAssign')}` },
+  { key: 'schedule', label: `📅 ${t('admin.staff.shifts.tabSchedule')}` },
+  { key: 'care-schedule', label: `🩺 ${t('admin.staff.shifts.tabCareSchedule')}` },
 ];
 
 export default function ShiftManagementPage() {
+  const { t } = useTranslation();
   const [tab, setTab] = useState('templates');
+  const tabs = TABS(t);
 
   return (
     <AdminPageShell
-      title="Quản lý ca làm việc"
-      subtitle="3 ca cố định (DAWN · DAY · EVENING) → Phân công → Kiểm tra xung đột → Xem lịch"
+      title={t('admin.staff.shifts.title')}
+      subtitle={t('admin.staff.shifts.subtitle')}
     >
       <div className="tabs">
-        {TABS.map((t) => (
+        {tabs.map((tabItem) => (
           <button
-            key={t.key}
-            className={`tab-btn ${tab === t.key ? 'tab-btn--active' : ''}`}
-            onClick={() => setTab(t.key)}
+            key={tabItem.key}
+            className={`tab-btn ${tab === tabItem.key ? 'tab-btn--active' : ''}`}
+            onClick={() => setTab(tabItem.key)}
           >
-            {t.label}
+            {tabItem.label}
           </button>
         ))}
       </div>

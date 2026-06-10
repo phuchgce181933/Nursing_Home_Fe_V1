@@ -1,83 +1,88 @@
-import {
-  CARE_TASK_STATUS_LABELS,
-  careTaskTypeLabel,
-} from '../../../../utils/blockingCareTasks';
-import { CARE_LEVEL_LABELS } from '../constants';
+import { useTranslation } from 'react-i18next';
+import { careTaskTypeLabel } from '../../../../utils/blockingCareTasks';
+import '../../../../styles/caregiver/DailyCareSchedulePage.css';
 
-function shiftLabel(shift) {
+function shiftLabel(shift, shiftFallback) {
   if (!shift) return '—';
-  const name = shift.name || 'Ca';
+  const name = shift.name || shiftFallback;
   return `${name} · ${shift.startTime || '—'}–${shift.endTime || '—'}`;
 }
 
 function CareTasksTable({ tasks, loading, onView, onQuickStatus }) {
+  const { t } = useTranslation();
+
   return (
-    <div className="daily-care-page__panel">
-      <h3 className="daily-care-page__panel-title">Nhiệm vụ trong ngày</h3>
-      <table className="data-table">
-        <thead>
-          <tr>
-            <th>Giờ</th>
-            <th>Cư dân</th>
-            <th>Loại nhiệm vụ</th>
-            <th>Mức độ</th>
-            <th>Ca</th>
-            <th>Trạng thái</th>
-            <th>Thao tác</th>
-          </tr>
-        </thead>
-        <tbody>
-          {loading && (
-            <tr>
-              <td colSpan={7} className="empty-state">
-                Đang tải...
-              </td>
+    <>
+      <h3 className="daily-care-page__section-title">{t('caregiver.dailyCareSchedule.tasksToday')}</h3>
+      <div className="resident-page__table">
+        <table className="resident-page__table-element">
+          <thead>
+            <tr className="resident-page__table-header">
+              <th>{t('common.colTime')}</th>
+              <th>{t('common.colResident')}</th>
+              <th>{t('caregiver.dailyCareSchedule.colTaskType')}</th>
+              <th>{t('caregiver.dailyCareSchedule.colCareLevel')}</th>
+              <th>{t('caregiver.dailyCareSchedule.colShift')}</th>
+              <th>{t('common.colStatus')}</th>
+              <th>{t('common.colActions')}</th>
             </tr>
-          )}
-          {!loading && tasks.length === 0 && (
-            <tr>
-              <td colSpan={7} className="empty-state">
-                Không có nhiệm vụ chăm sóc trong ngày này. Nếu bạn kỳ vọng có lịch, vui lòng liên hệ
-                quản lý để publish lịch chăm sóc.
-              </td>
-            </tr>
-          )}
-          {!loading &&
-            tasks.map((t) => (
-              <tr key={t._id}>
-                <td>
-                  <strong>{t.scheduledTime || '—'}</strong>
-                </td>
-                <td>{t.residentId?.fullName || t.residentId?.residentCode || '—'}</td>
-                <td>{careTaskTypeLabel(t.taskType)}</td>
-                <td>{CARE_LEVEL_LABELS[t.careLevel] || t.careLevel || '—'}</td>
-                <td>
-                  <small>{shiftLabel(t.shiftId)}</small>
-                </td>
-                <td>
-                  <span className={`daily-care-page__status daily-care-page__status--${t.status}`}>
-                    {CARE_TASK_STATUS_LABELS[t.status] || t.status}
-                  </span>
-                </td>
-                <td className="daily-care-page__row-actions">
-                  <button type="button" className="btn btn--sm btn--edit" onClick={() => onView(t)}>
-                    Xem
-                  </button>
-                  {(t.status === 'pending' || t.status === 'in_progress') && (
-                    <button
-                      type="button"
-                      className="btn btn--sm btn-secondary"
-                      onClick={() => onQuickStatus(t)}
-                    >
-                      Cập nhật
-                    </button>
-                  )}
+          </thead>
+          <tbody>
+            {loading && (
+              <tr>
+                <td colSpan={7} className="empty-state">
+                  {t('common.loading')}
                 </td>
               </tr>
-            ))}
-        </tbody>
-      </table>
-    </div>
+            )}
+            {!loading && tasks.length === 0 && (
+              <tr>
+                <td colSpan={7} className="empty-state">
+                  {t('caregiver.dailyCareSchedule.emptyTasks')}
+                </td>
+              </tr>
+            )}
+            {!loading &&
+              tasks.map((task) => (
+                <tr key={task._id}>
+                  <td>
+                    <strong>{task.scheduledTime || '—'}</strong>
+                  </td>
+                  <td>{task.residentId?.fullName || task.residentId?.residentCode || '—'}</td>
+                  <td>{careTaskTypeLabel(task.taskType)}</td>
+                  <td>{t(`common.careLevel.${task.careLevel}`, { defaultValue: task.careLevel || '—' })}</td>
+                  <td>
+                    <small>{shiftLabel(task.shiftId, t('caregiver.dailyCareSchedule.colShift'))}</small>
+                  </td>
+                  <td>
+                    <span className={`daily-care-page__status daily-care-page__status--${task.status}`}>
+                      {t(`common.careTaskStatus.${task.status}`, { defaultValue: task.status })}
+                    </span>
+                  </td>
+                  <td className="daily-care-page__row-actions">
+                    <button
+                      type="button"
+                      className="resident-page__button resident-page__button--ghost"
+                      onClick={() => onView(task)}
+                    >
+                      {t('common.view')}
+                    </button>
+                    {(task.status === 'pending' || task.status === 'in_progress') && (
+                      <button
+                        type="button"
+                        className="resident-page__button resident-page__button--primary"
+                        onClick={() => onQuickStatus(task)}
+                      >
+                        {t('caregiver.dailyCareSchedule.update')}
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 }
 

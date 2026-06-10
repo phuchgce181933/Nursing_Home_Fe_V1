@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import staffService from '../../../../services/staff.service';
+import ListPagination from '../../../../components/ui/ListPagination';
+import useClientPagination from '../../../../hooks/useClientPagination';
 import {
   isReadinessRealtimeAvailable,
   subscribeEmergencyReadiness,
@@ -51,6 +54,7 @@ const resolveReadiness = (person) => {
 };
 
 export default function EmergencyAvailabilityPage() {
+  const { t, i18n } = useTranslation();
   const [data, setData] = useState([]);
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -189,6 +193,18 @@ export default function EmergencyAvailabilityPage() {
     return matchAvail && matchSearch;
   });
 
+  const {
+    paginatedItems: paginatedStaff,
+    page,
+    setPage,
+    totalPages,
+    total: filteredTotal,
+  } = useClientPagination(filtered);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, filterAvail, filterRole, filterFloor, checkDate, setPage]);
+
   const stat = (key) => {
     if (summary) {
       const map = { ready: 'ready', caring: 'caring', off_duty: 'offDuty', on_leave: 'onLeave' };
@@ -199,11 +215,11 @@ export default function EmergencyAvailabilityPage() {
 
   return (
     <AdminPageShell
-      title="Sẵn sàng khẩn cấp"
+      title={t('admin.staff.emergency.title')}
       subtitle={
         <>
-          Trạng thái bác sĩ/y tá theo ngày đã chọn — ca đã đăng hoặc đã xác nhận; nhiệm vụ chỉ tính khi cùng ngày và còn ca hợp lệ.
-          {isToday && ' Cập nhật theo thời gian thực khi xem hôm nay.'}
+          {t('admin.staff.emergency.subtitle')}
+          {isToday && t('admin.staff.emergency.subtitleTodaySuffix')}
         </>
       }
     >
@@ -235,49 +251,49 @@ export default function EmergencyAvailabilityPage() {
       <div className="emergency-stats">
         <div className="stat-card stat-card--available">
           <div className="stat-card__value">{stat('ready')}</div>
-          <div className="stat-card__label">🟢 Sẵn sàng</div>
+          <div className="stat-card__label">🟢 {t('admin.staff.emergency.statReady')}</div>
         </div>
         <div className="stat-card stat-card--busy">
           <div className="stat-card__value">{stat('caring')}</div>
-          <div className="stat-card__label">🟡 Đang chăm sóc</div>
+          <div className="stat-card__label">🟡 {t('admin.staff.emergency.statCaring')}</div>
         </div>
         <div className="stat-card stat-card--busy" style={{ opacity: 0.7 }}>
           <div className="stat-card__value">{stat('off_duty')}</div>
-          <div className="stat-card__label">⚫ Không trực</div>
+          <div className="stat-card__label">⚫ {t('admin.staff.emergency.statOffDuty')}</div>
         </div>
         <div className="stat-card stat-card--off">
           <div className="stat-card__value">{stat('on_leave')}</div>
-          <div className="stat-card__label">🔴 Nghỉ phép</div>
+          <div className="stat-card__label">🔴 {t('admin.staff.emergency.statOnLeave')}</div>
         </div>
       </div>
 
       <div className="filter-row">
-        <input type="text" placeholder="Tìm tên..." value={search} onChange={(e) => setSearch(e.target.value)} />
+        <input type="search" placeholder={t('admin.staff.emergency.searchPlaceholder')} value={search} onChange={(e) => setSearch(e.target.value)} />
         <input type="date" value={checkDate} onChange={(e) => setCheckDate(e.target.value)} />
         <select value={filterRole} onChange={(e) => setFilterRole(e.target.value)}>
-          <option value="">Tất cả vai trò</option>
-          <option value="doctor">Bác sĩ</option>
-          <option value="nurse">Y tá</option>
+          <option value="">{t('admin.staff.common.allRoles')}</option>
+          <option value="doctor">{t('common.roles.doctor')}</option>
+          <option value="nurse">{t('common.roles.nurse')}</option>
         </select>
         <select value={filterAvail} onChange={(e) => setFilterAvail(e.target.value)}>
-          <option value="">Tất cả trạng thái</option>
-          <option value="ready">🟢 Sẵn sàng</option>
-          <option value="caring">🟡 Đang chăm sóc</option>
-          <option value="off_duty">⚫ Không trực</option>
-          <option value="on_leave">🔴 Nghỉ phép</option>
+          <option value="">{t('common.allStatuses')}</option>
+          <option value="ready">🟢 {t('admin.staff.emergency.statReady')}</option>
+          <option value="caring">🟡 {t('admin.staff.emergency.statCaring')}</option>
+          <option value="off_duty">⚫ {t('admin.staff.emergency.statOffDuty')}</option>
+          <option value="on_leave">🔴 {t('admin.staff.emergency.statOnLeave')}</option>
         </select>
         <select
           value={filterFloor}
           onChange={(e) => setFilterFloor(e.target.value)}
           style={{ minWidth: 200 }}
         >
-          <option value="">Tất cả tầng</option>
+          <option value="">{t('admin.staff.emergency.allFloors')}</option>
           {floorOptions.map((f) => (
             <option key={f._id} value={f._id}>{floorLabel(f)}</option>
           ))}
         </select>
         <button type="button" className="refresh-btn" onClick={loadFromApi}>
-          🔄 Làm mới
+          {t('admin.staff.common.refresh')}
         </button>
       </div>
 
@@ -287,26 +303,26 @@ export default function EmergencyAvailabilityPage() {
         <table className="resident-page__table-element">
           <thead>
             <tr className="resident-page__table-header">
-              <th>Họ tên</th>
-              <th>Vai trò</th>
-              <th>Tầng phụ trách</th>
-              <th>Nhiệm vụ</th>
-              <th>Mức sẵn sàng</th>
-              <th>Thao tác</th>
+              <th>{t('admin.staff.emergency.colName')}</th>
+              <th>{t('common.colRole')}</th>
+              <th>{t('admin.staff.emergency.colFloors')}</th>
+              <th>{t('admin.staff.emergency.colTasks')}</th>
+              <th>{t('admin.staff.emergency.colReadiness')}</th>
+              <th>{t('common.colActions')}</th>
             </tr>
           </thead>
           <tbody>
             {loading && !data.length && (
               <tr>
-                <td colSpan={6} className="empty-state">Đang tải...</td>
+                <td colSpan={6} className="empty-state">{t('common.loading')}</td>
               </tr>
             )}
             {!loading && filtered.length === 0 && (
               <tr>
-                <td colSpan={6} className="empty-state">Không tìm thấy nhân viên phù hợp</td>
+                <td colSpan={6} className="empty-state">{t('admin.staff.emergency.emptyFiltered')}</td>
               </tr>
             )}
-            {filtered.map((person) => {
+            {paginatedStaff.map((person) => {
               const cfg = resolveReadiness(person);
               const floorLabel = formatResponsibleFloorLabels(person);
               const taskLabel = formatTaskSummary(person);
@@ -321,7 +337,7 @@ export default function EmergencyAvailabilityPage() {
                   </td>
                   <td>
                     <span className={`role-badge role-badge--${person.role}`}>
-                      {ROLE_LABELS[person.role] || person.role}
+                      {t(`common.roles.${person.role}`, { defaultValue: person.role })}
                     </span>
                   </td>
                   <td className="emergency-table-cell--wrap" title={floorLabel}>
@@ -344,7 +360,7 @@ export default function EmergencyAvailabilityPage() {
                       className="emergency-detail-btn"
                       onClick={() => setDetailPerson(person)}
                     >
-                      Chi tiết
+                      {t('admin.staff.emergency.detail')}
                     </button>
                   </td>
                 </tr>
@@ -353,6 +369,15 @@ export default function EmergencyAvailabilityPage() {
           </tbody>
         </table>
       </div>
+
+      {!loading && filtered.length > 0 && (
+        <ListPagination
+          page={page}
+          totalPages={totalPages}
+          total={filteredTotal}
+          onPageChange={setPage}
+        />
+      )}
 
       {detailPerson && (
         <EmergencyStaffDetailModal

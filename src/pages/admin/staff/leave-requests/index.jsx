@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import leaveRequestService from '../../../../services/leaveRequest.service';
+import ListPagination from '../../../../components/ui/ListPagination';
+import useClientPagination from '../../../../hooks/useClientPagination';
 import { calcInclusiveLeaveDays, formatLeaveDate } from '../../../../utils/leaveUtils';
 import BlockingCareTasksAlert from '../../../../components/staff/BlockingCareTasksAlert';
 import {
@@ -251,6 +254,7 @@ function ApproveLeaveModal({ requestRow, onClose, onSuccess }) {
 }
 
 export default function LeaveRequestAdminPage() {
+  const { t } = useTranslation();
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(false);
   const [filterStatus, setFilter] = useState('pending');
@@ -284,6 +288,18 @@ export default function LeaveRequestAdminPage() {
     const name = r.staffId?.fullName || '';
     return name.toLowerCase().includes(search.toLowerCase());
   });
+
+  const {
+    paginatedItems: paginatedRequests,
+    page,
+    setPage,
+    totalPages,
+    total: filteredTotal,
+  } = useClientPagination(filtered);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, filterStatus, setPage]);
 
   const count = (s) => requests.filter((r) => r.status === s).length;
 
@@ -328,15 +344,15 @@ export default function LeaveRequestAdminPage() {
 
   return (
     <AdminPageShell
-      title="Quản lý đơn nghỉ phép"
-      subtitle="Khi duyệt đơn có ca trong kỳ nghỉ, chọn người thế ca cùng vai trò — hệ thống chuyển ca và nhiệm vụ chăm sóc (nếu đủ khu vực), không hủy ca."
+      title={t('admin.staff.leaveRequests.title')}
+      subtitle={t('admin.staff.leaveRequests.subtitle')}
     >
       <div className="leave-stats">
         {[
-          { s: 'pending', icon: '⏳', label: 'Chờ duyệt' },
-          { s: 'approved', icon: '✅', label: 'Đã duyệt' },
-          { s: 'rejected', icon: '❌', label: 'Từ chối' },
-          { s: 'cancelled', icon: '🚫', label: 'Đã hủy' },
+          { s: 'pending', icon: '⏳', label: t('admin.staff.leaveRequests.statPending') },
+          { s: 'approved', icon: '✅', label: t('admin.staff.leaveRequests.statApproved') },
+          { s: 'rejected', icon: '❌', label: t('admin.staff.leaveRequests.statRejected') },
+          { s: 'cancelled', icon: '🚫', label: t('admin.staff.leaveRequests.statCancelled') },
         ].map(({ s, icon, label }) => (
           <div
             key={s}
@@ -375,17 +391,17 @@ export default function LeaveRequestAdminPage() {
 
       <div className="filter-row">
         <input
-          type="text"
-          placeholder="Tìm tên nhân viên..."
+          type="search"
+          placeholder={t('admin.staff.leaveRequests.searchPlaceholder')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
         <select value={filterStatus} onChange={(e) => setFilter(e.target.value)}>
-          <option value="">Tất cả trạng thái</option>
-          <option value="pending">Chờ duyệt</option>
-          <option value="approved">Đã duyệt</option>
-          <option value="rejected">Từ chối</option>
-          <option value="cancelled">Đã hủy</option>
+          <option value="">{t('common.allStatuses')}</option>
+          <option value="pending">{t('common.leaveStatus.pending')}</option>
+          <option value="approved">{t('common.leaveStatus.approved')}</option>
+          <option value="rejected">{t('common.leaveStatus.rejected')}</option>
+          <option value="cancelled">{t('common.leaveStatus.cancelled')}</option>
         </select>
       </div>
 
@@ -395,37 +411,37 @@ export default function LeaveRequestAdminPage() {
         <table className="resident-page__table-element">
           <thead>
             <tr className="resident-page__table-header">
-              <th>Nhân viên</th>
-              <th>Vai trò</th>
-              <th>Loại nghỉ</th>
-              <th>Từ ngày</th>
-              <th>Đến ngày</th>
-              <th>Số ngày</th>
-              <th>Lý do</th>
-              <th>Người thế ca</th>
-              <th>Ngày gửi</th>
-              <th>Trạng thái</th>
-              <th>Ghi chú / Lý do từ chối</th>
-              <th>Thao tác</th>
+              <th>{t('admin.staff.leaveRequests.colStaff')}</th>
+              <th>{t('common.colRole')}</th>
+              <th>{t('admin.staff.leaveRequests.colLeaveType')}</th>
+              <th>{t('admin.staff.leaveRequests.colFrom')}</th>
+              <th>{t('admin.staff.leaveRequests.colTo')}</th>
+              <th>{t('admin.staff.leaveRequests.colDays')}</th>
+              <th>{t('admin.staff.leaveRequests.colReason')}</th>
+              <th>{t('admin.staff.leaveRequests.colReplacement')}</th>
+              <th>{t('admin.staff.leaveRequests.colSubmitted')}</th>
+              <th>{t('common.colStatus')}</th>
+              <th>{t('admin.staff.leaveRequests.colReviewNote')}</th>
+              <th>{t('common.colActions')}</th>
             </tr>
           </thead>
           <tbody>
             {loading && (
               <tr>
                 <td colSpan={12} className="empty-state">
-                  Đang tải...
+                  {t('common.loading')}
                 </td>
               </tr>
             )}
             {!loading && filtered.length === 0 && (
               <tr>
                 <td colSpan={12} className="empty-state">
-                  Không có đơn nghỉ phép nào
+                  {t('admin.staff.leaveRequests.emptyList')}
                 </td>
               </tr>
             )}
             {!loading &&
-              filtered.map((r) => (
+              paginatedRequests.map((r) => (
                 <tr key={r._id}>
                   <td style={{ fontWeight: 600 }}>{r.staffId?.fullName || '—'}</td>
                   <td>
@@ -493,6 +509,15 @@ export default function LeaveRequestAdminPage() {
           </tbody>
         </table>
       </div>
+
+      {!loading && filtered.length > 0 && (
+        <ListPagination
+          page={page}
+          totalPages={totalPages}
+          total={filteredTotal}
+          onPageChange={setPage}
+        />
+      )}
 
       {approveTarget && (
         <ApproveLeaveModal

@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useLocation } from 'react-router-dom';
 import residentService, { RESIDENT_INITIAL_HEALTH_ROUTE_HINT } from '../../../../services/resident.service';
 import { FaEye, FaPen } from 'react-icons/fa';
 import { formatLeaveDate } from '../../../../utils/leaveUtils';
 import AdminPageShell from '../../../../components/admin/AdminPageShell';
+import ListPagination from '../../../../components/ui/ListPagination';
+import { ADMIN_LIST_PAGE_SIZE } from '../../../../constants/adminListPage';
+import useDebouncedSearch from '../../../../hooks/useDebouncedSearch';
 import '../../../../styles/admin/InitialHealthPage.css';
 import '../../../../styles/admin/residentActionIcons.css';
 import { GENDER_LABELS, RESIDENCY_LABELS } from '../_shared/residentLabels';
@@ -20,14 +24,17 @@ const emptyForm = () => ({
 });
 
 export default function InitialHealthPage() {
+  const { t } = useTranslation();
   const location = useLocation();
   const residentBase = location.pathname.startsWith('/manager') ? '/manager' : '/admin';
   const [residents, setResidents] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [search, setSearch] = useState('');
-  const [searchInput, setSearchInput] = useState('');
+  const resetPageOnSearch = useCallback(() => setPage(1), []);
+  const { search, setSearch, debouncedSearch } = useDebouncedSearch({
+    onDebouncedChange: resetPageOnSearch,
+  });
   const [statusFilter, setStatusFilter] = useState('admitted');
   const [recordedFilter, setRecordedFilter] = useState('');
   const [listLoading, setListLoading] = useState(false);
@@ -51,8 +58,8 @@ export default function InitialHealthPage() {
     try {
       const params = {
         page,
-        limit: 15,
-        search: search || undefined,
+        limit: ADMIN_LIST_PAGE_SIZE,
+        search: debouncedSearch || undefined,
         status: statusFilter || undefined,
       };
       if (recordedFilter === 'true') params.recorded = true;
@@ -69,7 +76,7 @@ export default function InitialHealthPage() {
     } finally {
       if (!silent) setListLoading(false);
     }
-  }, [page, search, statusFilter, recordedFilter]);
+  }, [page, debouncedSearch, statusFilter, recordedFilter]);
 
   const loadDetail = useCallback(async (residentId) => {
     if (!residentId) {
@@ -113,12 +120,6 @@ export default function InitialHealthPage() {
   useEffect(() => {
     loadDetail(selectedId);
   }, [selectedId, loadDetail]);
-
-  const handleSearch = (e) => {
-    e.preventDefault();
-    setPage(1);
-    setSearch(searchInput.trim());
-  };
 
   const handleSelect = (r) => {
     setSelectedId(r._id);
@@ -223,23 +224,18 @@ export default function InitialHealthPage() {
 
   return (
     <AdminPageShell
-      title="Ghi nhận tình trạng sức khỏe ban đầu"
-      subtitle={
-        <>
-          Ghi nhận tình trạng sức khỏe của cư dân <strong>khi nhập viện</strong> (khỏe mạnh, yếu, cần chăm 1-1…).
-          Bệnh nền và tiền sử trước khi vào viện ghi ở tab khác; dị ứng thuốc ghi ở tab Dị ứng thuốc.
-        </>
-      }
+      title={t('admin.residents.initialHealth.title')}
+      subtitle={t('admin.residents.initialHealth.subtitle')}
     >
-      <form className="resident-page__filters" onSubmit={handleSearch}>
+      <div className="resident-page__filters">
         <div className="resident-page__filter-row">
           <label className="resident-page__filter">
             <span>Tìm kiếm</span>
             <input
-              type="text"
+              type="search"
               placeholder="Tên hoặc mã cư dân..."
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
             />
           </label>
           <label className="resident-page__filter">
@@ -271,13 +267,8 @@ export default function InitialHealthPage() {
               <option value="true">Đã ghi nhận</option>
             </select>
           </label>
-          <div className="resident-page__filter-actions">
-            <button type="submit" className="resident-page__button resident-page__button--primary">
-              Áp dụng
-            </button>
-          </div>
         </div>
-      </form>
+      </div>
 
       {listError && <div className="resident-page__error">{listError}</div>}
       {usingFallbackApi && (
@@ -347,30 +338,13 @@ export default function InitialHealthPage() {
               ))}
           </tbody>
         </table>
-        {!listLoading && totalPages > 1 && (
-          <div className="resident-page__pagination" style={{ padding: '12px 16px', borderTop: '1px solid #e2e8f0' }}>
-            <span>
-              {total} cư dân · Trang {page}/{totalPages}
-            </span>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                type="button"
-                className="resident-page__page-btn"
-                disabled={page <= 1}
-                onClick={() => setPage((p) => p - 1)}
-              >
-                ← Trước
-              </button>
-              <button
-                type="button"
-                className="resident-page__page-btn"
-                disabled={page >= totalPages}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                Sau →
-              </button>
-            </div>
-          </div>
+        {!listLoading && residents.length > 0 && (
+          <ListPagination
+            page={page}
+            totalPages={Math.max(totalPages, 1)}
+            total={total}
+            onPageChange={setPage}
+          />
         )}
       </div>
 

@@ -75,6 +75,40 @@
   color: #0f766e;
 }
 
+.resident-page__button--export {
+  background: #ecfdf5;
+  border: 1px solid #99f6e4;
+  color: #0f766e;
+}
+
+.resident-page__button--export:hover:not(:disabled) {
+  background: #d1fae5;
+  border-color: #0f766e;
+}
+
+.resident-page__button--export-pdf {
+  background: #fee2e2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+}
+
+.resident-page__button--export-pdf:hover:not(:disabled) {
+  background: #fecaca;
+  border-color: #dc2626;
+}
+
+.resident-page__button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.resident-form-fieldset {
+  border: none;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
 .spin {
   animation: spin 1s linear infinite;
 }

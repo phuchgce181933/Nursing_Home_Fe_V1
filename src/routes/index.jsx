@@ -10,6 +10,7 @@ import AdminLayout from '../layouts/AdminLayout';
 import ManagerLayout from '../layouts/ManagerLayout';
 import ManagerDashboardPage from '../pages/manager/DashboardPage';
 import ManagerProfile from '../pages/manager/ManagerProfile';
+import ManagerResidentsPage from '../pages/manager/residents';
 import ManagerFamilyManagementPage from '../pages/manager/residents/family';
 import ManagerResidentsByAreaPage from '../pages/manager/residents/by-area';
 import ManagerInitialHealthPage from '../pages/manager/residents/initial-health';
@@ -36,6 +37,7 @@ import StaffAssignmentPage from '../pages/admin/staff/assignments';
 import EmergencyAvailabilityPage from '../pages/admin/staff/emergency';
 import LeaveRequestAdminPage from '../pages/admin/staff/leave-requests';
 import LeaveRequestPage from '../pages/shared/LeaveRequestPage';
+import MyShiftsPage from '../pages/shared/MyShiftsPage';
 import AdminProfile from '../pages/admin/AdminProfile';
 import AdminAccountsPage from '../pages/admin/AdminAccountsPage';
 import AdminAdmissionRequestsPage from '../pages/admin/AdminAdmissionRequestsPage';
@@ -143,6 +145,7 @@ function AppRoutes() {
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<ManagerDashboardPage />} />
         <Route path="profile" element={<ManagerProfile />} />
+        <Route path="residents" element={<ManagerResidentsPage />} />
         <Route path="residents/family" element={<ManagerFamilyManagementPage />} />
         <Route path="residents/by-area" element={<ManagerResidentsByAreaPage />} />
         <Route path="residents/initial-health" element={<ManagerInitialHealthPage />} />
@@ -176,6 +179,8 @@ function AppRoutes() {
         <Route path="health-monitoring" element={<HealthMonitoringPage />} />
         <Route path="medications" element={<DoctorMedicationPage />} />
         <Route path="care-notes" element={<CareNotesPage />} />
+        <Route path="my-shifts" element={<MyShiftsPage />} />
+        <Route path="care-tasks" element={<DailyCareSchedulePage />} />
         <Route path="leave" element={<LeaveRequestPage />} />
         <Route path="messages" element={<PlaceholderPage title="Tin nhắn" />} />
         <Route path="incidents" element={<IncidentManagementPage />} />
@@ -203,6 +208,8 @@ function AppRoutes() {
         <Route path="care-notes" element={<CareNotesPage />} />
 
         <Route path="medications" element={<MedicationPage />} />
+        <Route path="my-shifts" element={<MyShiftsPage />} />
+        <Route path="care-tasks" element={<DailyCareSchedulePage />} />
         <Route path="activity-schedule" element={<ActivitySchedulePage />} />
         <Route path="leave" element={<LeaveRequestPage />} />
         <Route path="messages" element={<PlaceholderPage title="Tin nhắn" />} />
@@ -221,6 +228,7 @@ function AppRoutes() {
         <Route path="dashboard" element={<CaregiverDashboardPage />} />
         <Route path="profile" element={<ProfilePage />} />
         <Route path="assigned-residents" element={<AssignedResidentsPage />} />
+        <Route path="my-shifts" element={<MyShiftsPage />} />
         <Route path="daily-care-schedule" element={<DailyCareSchedulePage />} />
         <Route path="meal-intake-notes" element={<MealIntakeNotesPage />} />
         <Route path="hygiene-activities" element={<HygieneActivitiesPage />} />
