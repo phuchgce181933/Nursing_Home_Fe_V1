@@ -12,6 +12,7 @@ import {
   Home,
 } from 'lucide-react';
 import residentService from '../../../services/resident.service';
+import { useAuth } from '../../../hooks/useAuth';
 import '../../../styles/admin/ResidentPage.css';
 
 const GENDERS = [
@@ -128,6 +129,10 @@ const emptyPersonalForm = {
 };
 
 function ResidentPage({ defaultMode }) {
+  const { user } = useAuth();
+  const isManager = user?.role === 'manager';
+  const canManageResidents = !isManager;
+
   const [residents, setResidents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -471,13 +476,15 @@ function ResidentPage({ defaultMode }) {
             <RefreshCw size={16} className={loading ? 'spin' : ''} />
             Làm mới
           </button>
-          <button
-            className="resident-page__button resident-page__button--primary"
-            onClick={handleOpenCreate}
-          >
-            <Plus size={16} />
-            Thêm cư dân
-          </button>
+          {canManageResidents && (
+            <button
+              className="resident-page__button resident-page__button--primary"
+              onClick={handleOpenCreate}
+            >
+              <Plus size={16} />
+              Thêm cư dân
+            </button>
+          )}
         </div>
       </div>
 
@@ -994,7 +1001,11 @@ function ResidentPage({ defaultMode }) {
             <div className="resident-modal__header">
               <div>
                 <h2>Hồ sơ cư dân</h2>
-                <p>Xem và cập nhật thông tin cá nhân hoặc gia đình.</p>
+                <p>
+                  {canManageResidents
+                    ? 'Xem và cập nhật thông tin cá nhân hoặc gia đình.'
+                    : 'Xem thông tin cá nhân và gia đình (chỉ đọc).'}
+                </p>
               </div>
               <button className="resident-modal__close" onClick={handleCloseDetail}>
                 <X size={18} />
@@ -1031,14 +1042,17 @@ function ResidentPage({ defaultMode }) {
                 <form className="resident-form-section" onSubmit={handleSavePersonalInfo}>
                   <div className="resident-form-section__header">
                     <h3>Thông tin cá nhân</h3>
-                    <button
-                      className="resident-page__button resident-page__button--primary"
-                      type="submit"
-                      disabled={personalSaving}
-                    >
-                      {personalSaving ? 'Đang lưu...' : 'Lưu thông tin cá nhân'}
-                    </button>
+                    {canManageResidents && (
+                      <button
+                        className="resident-page__button resident-page__button--primary"
+                        type="submit"
+                        disabled={personalSaving}
+                      >
+                        {personalSaving ? 'Đang lưu...' : 'Lưu thông tin cá nhân'}
+                      </button>
+                    )}
                   </div>
+                  <fieldset className="resident-form-fieldset" disabled={!canManageResidents}>
                   <div className="resident-form-grid">
                     <label>
                       Họ tên *
@@ -1151,30 +1165,36 @@ function ResidentPage({ defaultMode }) {
                       />
                     </label>
                   </div>
+                  </fieldset>
                   {personalError && <p className="resident-form-error">{personalError}</p>}
                 </form>
 
                 <form className="resident-form-section" onSubmit={handleSaveFamilyInfo}>
                   <div className="resident-form-section__header">
                     <h3>Thông tin gia đình</h3>
-                    <button
-                      className="resident-page__button resident-page__button--primary"
-                      type="submit"
-                      disabled={familySaving}
-                    >
-                      {familySaving ? 'Đang lưu...' : 'Lưu thông tin gia đình'}
-                    </button>
+                    {canManageResidents && (
+                      <button
+                        className="resident-page__button resident-page__button--primary"
+                        type="submit"
+                        disabled={familySaving}
+                      >
+                        {familySaving ? 'Đang lưu...' : 'Lưu thông tin gia đình'}
+                      </button>
+                    )}
                   </div>
 
+                  <fieldset className="resident-form-fieldset" disabled={!canManageResidents}>
                   <div className="resident-form-section__header sub">
                     <h4>Liên hệ khẩn cấp</h4>
-                    <button
-                      type="button"
-                      className="resident-page__button resident-page__button--ghost"
-                      onClick={() => addContactRow(setFamilyContacts, familyContacts)}
-                    >
-                      Thêm liên hệ
-                    </button>
+                    {canManageResidents && (
+                      <button
+                        type="button"
+                        className="resident-page__button resident-page__button--ghost"
+                        onClick={() => addContactRow(setFamilyContacts, familyContacts)}
+                      >
+                        Thêm liên hệ
+                      </button>
+                    )}
                   </div>
 
                   {familyContacts.length === 0 && (
@@ -1251,6 +1271,7 @@ function ResidentPage({ defaultMode }) {
                       placeholder="Dán ID tài khoản thành viên gia đình vào đây"
                     />
                   </div>
+                  </fieldset>
 
                   {familyError && <p className="resident-form-error">{familyError}</p>}
                 </form>

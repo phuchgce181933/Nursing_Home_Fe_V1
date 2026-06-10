@@ -1,4 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import AdminPageShell from '../../../components/admin/AdminPageShell';
+import ListPagination from '../../../components/ui/ListPagination';
+import useClientPagination from '../../../hooks/useClientPagination';
 import dailyBehaviorService from '../../../services/dailyBehavior.service';
 import { getLocalDateString } from '../../../utils/dateUtils';
 import { formatVNDate } from '../../../utils/nutritionLabels';
@@ -24,6 +28,7 @@ function detailSummary(row) {
 }
 
 function DailyBehaviorsPage() {
+  const { t } = useTranslation();
   const [workDate, setWorkDate] = useState(today());
   const [observationCategory, setObservationCategory] = useState('');
   const [severity, setSeverity] = useState('');
@@ -43,7 +48,7 @@ function DailyBehaviorsPage() {
       const res = await dailyBehaviorService.listResidents();
       setResidents(Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : []);
     } catch (e) {
-      setListError(e?.response?.data?.message || 'Không tải được danh sách cư dân');
+      setListError(e?.response?.data?.message || t('caregiver.dailyBehaviors.loadResidentsFailed'));
     }
   };
 
@@ -60,7 +65,7 @@ function DailyBehaviorsPage() {
       });
       setRecords(Array.isArray(res?.data) ? res.data : []);
     } catch (e) {
-      setListError(e?.response?.data?.message || 'Không tải được danh sách ghi nhận');
+      setListError(e?.response?.data?.message || t('caregiver.dailyBehaviors.loadRecordsFailed'));
       setRecords([]);
     } finally {
       setLoading(false);
@@ -74,6 +79,14 @@ function DailyBehaviorsPage() {
   useEffect(() => {
     loadRecords();
   }, [loadRecords]);
+
+  const {
+    paginatedItems: paginatedRecords,
+    page,
+    setPage,
+    totalPages,
+    total,
+  } = useClientPagination(records);
 
   const handleOpenDelete = (row) => {
     const name = row.residentId?.fullName || row.residentId?.residentCode || '—';
@@ -92,21 +105,15 @@ function DailyBehaviorsPage() {
       setDeleteModal(null);
       loadRecords();
     } catch (e) {
-      setDeleteError(e?.response?.data?.message || 'Xóa thất bại');
+      setDeleteError(e?.response?.data?.message || t('common.deleteFailed'));
     } finally {
       setDeleting(false);
     }
   };
 
   return (
-    <div className="page card behavior-page">
-      <h1 className="behavior-page__title">Ghi nhận hành vi hằng ngày</h1>
-      <p className="behavior-page__intro">
-        Ghi nhận tâm trạng, hành vi hoặc biểu hiện bất thường của cư dân phụ trách trong ngày. Bạn có
-        thể tạo nhiều bản ghi cho cùng một cư dân trong một ngày.
-      </p>
-
-      {listError && <p className="form-error">{listError}</p>}
+    <AdminPageShell title={t('caregiver.dailyBehaviors.title')} subtitle={t('caregiver.dailyBehaviors.subtitle')}>
+      {listError && <div className="resident-page__error">{listError}</div>}
 
       <BehaviorListFilters
         workDate={workDate}
@@ -125,11 +132,15 @@ function DailyBehaviorsPage() {
       />
 
       <BehaviorRecordsTable
-        records={records}
+        records={paginatedRecords}
         loading={loading}
         onEdit={(row) => setFormModal({ mode: 'edit', id: row._id })}
         onDelete={handleOpenDelete}
       />
+
+      {!loading && records.length > 0 && (
+        <ListPagination page={page} totalPages={totalPages} total={total} onPageChange={setPage} />
+      )}
 
       <BehaviorFormModal
         open={Boolean(formModal)}
@@ -153,7 +164,7 @@ function DailyBehaviorsPage() {
         onClose={() => setDeleteModal(null)}
         onConfirm={handleConfirmDelete}
       />
-    </div>
+    </AdminPageShell>
   );
 }
 

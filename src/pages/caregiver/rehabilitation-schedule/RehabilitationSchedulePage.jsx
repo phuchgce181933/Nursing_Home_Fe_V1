@@ -1,4 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import AdminPageShell from '../../../components/admin/AdminPageShell';
+import ListPagination from '../../../components/ui/ListPagination';
+import useClientPagination from '../../../hooks/useClientPagination';
+import useDebouncedSearch from '../../../hooks/useDebouncedSearch';
 import caregiverRehabilitationScheduleService from '../../../services/caregiverRehabilitationSchedule.service';
 import { getLocalDateString } from '../../../utils/dateUtils';
 import { formatVNDate } from '../../../utils/nutritionLabels';
@@ -16,9 +21,10 @@ function StatusCell({ ok }) {
 }
 
 function RehabilitationSchedulePage() {
+  const { t } = useTranslation();
+  const { search, setSearch, debouncedSearch } = useDebouncedSearch();
   const [workDate, setWorkDate] = useState(today());
   const [residentId, setResidentId] = useState('');
-  const [search, setSearch] = useState('');
   const [residents, setResidents] = useState([]);
   const [rows, setRows] = useState([]);
   const [dayMeta, setDayMeta] = useState(null);
@@ -34,7 +40,7 @@ function RehabilitationSchedulePage() {
       const res = await caregiverRehabilitationScheduleService.listResidents();
       setResidents(Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : []);
     } catch (e) {
-      setError(e?.response?.data?.message || 'Không tải được danh sách cư dân');
+      setError(e?.response?.data?.message || t('caregiver.rehabSchedule.loadFailed'));
     }
   };
 
@@ -45,7 +51,7 @@ function RehabilitationSchedulePage() {
       const res = await caregiverRehabilitationScheduleService.listOverview({
         workDate,
         residentId: residentId || undefined,
-        search: search.trim() || undefined,
+        search: debouncedSearch.trim() || undefined,
       });
       setRows(Array.isArray(res?.data) ? res.data : []);
       setDayMeta({
@@ -53,13 +59,13 @@ function RehabilitationSchedulePage() {
         planTitle: res.planTitle,
       });
     } catch (e) {
-      setError(e?.response?.data?.message || 'Không tải được lịch phục hồi');
+      setError(e?.response?.data?.message || t('caregiver.rehabSchedule.loadFailed'));
       setRows([]);
       setDayMeta(null);
     } finally {
       setLoading(false);
     }
-  }, [workDate, residentId, search]);
+  }, [workDate, residentId, debouncedSearch, t]);
 
   useEffect(() => {
     loadResidents();
@@ -68,6 +74,14 @@ function RehabilitationSchedulePage() {
   useEffect(() => {
     loadOverview();
   }, [loadOverview]);
+
+  const {
+    paginatedItems: paginatedRows,
+    page,
+    setPage,
+    totalPages,
+    total,
+  } = useClientPagination(rows);
 
   const openDetail = async (rid) => {
     setDetailOpen(true);
@@ -78,7 +92,7 @@ function RehabilitationSchedulePage() {
       const data = await caregiverRehabilitationScheduleService.getResidentSchedule(rid, { workDate });
       setDetail(data);
     } catch (e) {
-      setError(e?.response?.data?.message || 'Không tải được chi tiết lịch phục hồi');
+      setError(e?.response?.data?.message || t('caregiver.rehabSchedule.detailLoadFailed'));
       setDetailOpen(false);
     } finally {
       setDetailLoading(false);
@@ -91,26 +105,19 @@ function RehabilitationSchedulePage() {
   };
 
   return (
-    <div className="page card rehab-schedule-page">
-      <h1 className="rehab-schedule-page__title">Lịch phục hồi chức năng</h1>
-      <p className="rehab-schedule-page__intro">
-        Xem lịch trị liệu / phục hồi đã publish cho cư dân phụ trách — giờ, địa điểm và ghi chú đưa đón. Chỉ
-        xem, không chỉnh sửa.
-      </p>
+    <AdminPageShell title={t('caregiver.rehabSchedule.title')} subtitle={t('caregiver.rehabSchedule.subtitle')}>
+      {error && <div className="resident-page__error">{error}</div>}
 
-      {error && <p className="form-error">{error}</p>}
-
-      <div className="rehab-schedule-page__panel">
-        <h3 className="rehab-schedule-page__panel-title">Bộ lọc</h3>
-        <div className="rehab-schedule-page__filters">
-          <label>
-            Ngày
+      <div className="resident-page__filters">
+        <div className="resident-page__filter-row">
+          <label className="resident-page__filter">
+            <span>{t('common.date')}</span>
             <input type="date" value={workDate} onChange={(e) => setWorkDate(e.target.value)} />
           </label>
-          <label>
-            Cư dân
+          <label className="resident-page__filter">
+            <span>{t('common.resident')}</span>
             <select value={residentId} onChange={(e) => setResidentId(e.target.value)}>
-              <option value="">Tất cả</option>
+              <option value="">{t('common.all')}</option>
               {residents.map((r) => (
                 <option key={r._id} value={r._id}>
                   {r.fullName || r.residentCode}
@@ -118,60 +125,57 @@ function RehabilitationSchedulePage() {
               ))}
             </select>
           </label>
-          <label>
-            Tìm kiếm
+          <label className="resident-page__filter">
+            <span>{t('common.search')}</span>
             <input
               type="search"
-              placeholder="Tên hoặc mã cư dân"
+              placeholder={t('common.searchResidentPlaceholder')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </label>
-          <div className="rehab-schedule-page__filter-actions">
-            <button type="button" className="btn-secondary" disabled={loading} onClick={loadOverview}>
-              {loading ? 'Đang tải...' : 'Tải lại'}
-            </button>
-          </div>
         </div>
       </div>
 
       {dayMeta && (
         <p className="rehab-schedule-page__day-banner">
-          Ngày {formatVNDate(workDate)}:{' '}
+          {t('caregiver.rehabSchedule.dayBanner', { date: formatVNDate(workDate) })}{' '}
           {dayMeta.hasPublishedRehabDay
-            ? `Có lịch phục hồi publish${dayMeta.planTitle ? ` (${dayMeta.planTitle})` : ''}`
-            : 'Chưa có lịch phục hồi publish cho ngày này'}
+            ? t('caregiver.rehabSchedule.hasRehabPlan', {
+                title: dayMeta.planTitle ? ` (${dayMeta.planTitle})` : '',
+              })
+            : t('caregiver.rehabSchedule.noRehabPlan')}
         </p>
       )}
 
-      <div className="rehab-schedule-page__panel">
-        <h3 className="rehab-schedule-page__panel-title">Cư dân phụ trách</h3>
-        <table className="data-table">
+      <h3 className="rehab-schedule-page__section-title">{t('caregiver.rehabSchedule.assignedResidents')}</h3>
+      <div className="resident-page__table">
+        <table className="resident-page__table-element">
           <thead>
-            <tr>
-              <th>Cư dân</th>
-              <th>Có lịch PHCN</th>
-              <th>Số buổi</th>
-              <th>Thao tác</th>
+            <tr className="resident-page__table-header">
+              <th>{t('common.colResident')}</th>
+              <th>{t('caregiver.rehabSchedule.colHasSchedule')}</th>
+              <th>{t('caregiver.rehabSchedule.colSessionCount')}</th>
+              <th>{t('common.colActions')}</th>
             </tr>
           </thead>
           <tbody>
             {loading && (
               <tr>
                 <td colSpan={4} className="empty-state">
-                  Đang tải...
+                  {t('common.loading')}
                 </td>
               </tr>
             )}
             {!loading && rows.length === 0 && (
               <tr>
                 <td colSpan={4} className="empty-state">
-                  Không có cư dân phù hợp bộ lọc
+                  {t('caregiver.rehabSchedule.emptyFiltered')}
                 </td>
               </tr>
             )}
             {!loading &&
-              rows.map((row) => (
+              paginatedRows.map((row) => (
                 <tr key={row.residentId}>
                   <td>
                     <div>{row.fullName || '—'}</div>
@@ -182,8 +186,12 @@ function RehabilitationSchedulePage() {
                   </td>
                   <td>{row.sessionCount ?? 0}</td>
                   <td className="rehab-schedule-page__row-actions">
-                    <button type="button" className="btn btn--sm btn--edit" onClick={() => openDetail(row.residentId)}>
-                      Chi tiết
+                    <button
+                      type="button"
+                      className="resident-page__button resident-page__button--ghost"
+                      onClick={() => openDetail(row.residentId)}
+                    >
+                      {t('common.viewDetails')}
                     </button>
                   </td>
                 </tr>
@@ -192,6 +200,10 @@ function RehabilitationSchedulePage() {
         </table>
       </div>
 
+      {!loading && rows.length > 0 && (
+        <ListPagination page={page} totalPages={totalPages} total={total} onPageChange={setPage} />
+      )}
+
       <RehabScheduleDetailModal
         open={detailOpen}
         loading={detailLoading}
@@ -199,7 +211,7 @@ function RehabilitationSchedulePage() {
         workDate={workDate}
         onClose={closeDetail}
       />
-    </div>
+    </AdminPageShell>
   );
 }
 

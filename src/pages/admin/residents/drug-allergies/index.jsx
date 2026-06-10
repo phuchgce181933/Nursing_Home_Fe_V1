@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import residentService, { RESIDENT_DRUG_ALLERGIES_ROUTE_HINT } from '../../../../services/resident.service';
 import ResidentContextBlock from '../../../../components/resident/ResidentContextBlock';
 import { FaEye, FaPen } from 'react-icons/fa';
 import { formatLeaveDate } from '../../../../utils/leaveUtils';
 import AdminPageShell from '../../../../components/admin/AdminPageShell';
+import ListPagination from '../../../../components/ui/ListPagination';
+import { ADMIN_LIST_PAGE_SIZE } from '../../../../constants/adminListPage';
+import useDebouncedSearch from '../../../../hooks/useDebouncedSearch';
 import '../../../../styles/admin/DrugAllergiesPage.css';
 import '../../../../styles/admin/residentActionIcons.css';
 import { GENDER_LABELS, RESIDENCY_LABELS } from '../_shared/residentLabels';
@@ -17,12 +21,15 @@ const parseCommaList = (value) =>
 const joinList = (items) => (Array.isArray(items) ? items.join(', ') : '');
 
 export default function DrugAllergiesPage() {
+  const { t } = useTranslation();
   const [residents, setResidents] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [search, setSearch] = useState('');
-  const [searchInput, setSearchInput] = useState('');
+  const resetPageOnSearch = useCallback(() => setPage(1), []);
+  const { search, setSearch, debouncedSearch } = useDebouncedSearch({
+    onDebouncedChange: resetPageOnSearch,
+  });
   const [statusFilter, setStatusFilter] = useState('admitted');
   const [recordedFilter, setRecordedFilter] = useState('');
   const [listLoading, setListLoading] = useState(false);
@@ -46,8 +53,8 @@ export default function DrugAllergiesPage() {
     try {
       const params = {
         page,
-        limit: 15,
-        search: search || undefined,
+        limit: ADMIN_LIST_PAGE_SIZE,
+        search: debouncedSearch || undefined,
         status: statusFilter || undefined,
       };
       if (recordedFilter === 'true') params.recorded = true;
@@ -64,7 +71,7 @@ export default function DrugAllergiesPage() {
     } finally {
       if (!silent) setListLoading(false);
     }
-  }, [page, search, statusFilter, recordedFilter]);
+  }, [page, debouncedSearch, statusFilter, recordedFilter]);
 
   const loadDetail = useCallback(async (residentId) => {
     if (!residentId) {
@@ -105,12 +112,6 @@ export default function DrugAllergiesPage() {
   useEffect(() => {
     loadDetail(selectedId);
   }, [selectedId, loadDetail]);
-
-  const handleSearch = (e) => {
-    e.preventDefault();
-    setPage(1);
-    setSearch(searchInput.trim());
-  };
 
   const openViewPopup = (resident) => {
     const residentKey = resident._id || resident.residentCode;
@@ -172,18 +173,18 @@ export default function DrugAllergiesPage() {
 
   return (
     <AdminPageShell
-      title="Quản lý dị ứng thuốc"
-      subtitle="Ghi nhận dị ứng thuốc qua tab riêng (không ghi trên tab sức khỏe ban đầu khi nhập viện)."
+      title={t('admin.residents.drugAllergies.title')}
+      subtitle={t('admin.residents.drugAllergies.subtitle')}
     >
-      <form className="resident-page__filters" onSubmit={handleSearch}>
+      <div className="resident-page__filters">
         <div className="resident-page__filter-row">
           <label className="resident-page__filter">
             <span>Tìm kiếm</span>
             <input
-              type="text"
+              type="search"
               placeholder="Tên hoặc mã cư dân..."
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
             />
           </label>
           <label className="resident-page__filter">
@@ -215,13 +216,8 @@ export default function DrugAllergiesPage() {
               <option value="true">Đã ghi nhận</option>
             </select>
           </label>
-          <div className="resident-page__filter-actions">
-            <button type="submit" className="resident-page__button resident-page__button--primary">
-              Áp dụng
-            </button>
-          </div>
         </div>
-      </form>
+      </div>
 
       {listError && <div className="resident-page__error">{listError}</div>}
       {showRouteHint && (
@@ -283,30 +279,13 @@ export default function DrugAllergiesPage() {
               ))}
           </tbody>
         </table>
-        {!listLoading && totalPages > 1 && (
-          <div className="pagination">
-            <span>
-              {total} cư dân · Trang {page}/{totalPages}
-            </span>
-            <div className="pagination__btns">
-              <button
-                type="button"
-                className="btn btn--ghost btn--sm"
-                disabled={page <= 1}
-                onClick={() => setPage((p) => p - 1)}
-              >
-                ← Trước
-              </button>
-              <button
-                type="button"
-                className="btn btn--ghost btn--sm"
-                disabled={page >= totalPages}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                Sau →
-              </button>
-            </div>
-          </div>
+        {!listLoading && residents.length > 0 && (
+          <ListPagination
+            page={page}
+            totalPages={Math.max(totalPages, 1)}
+            total={total}
+            onPageChange={setPage}
+          />
         )}
       </div>
       {viewPopup && (

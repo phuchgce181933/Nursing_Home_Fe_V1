@@ -1,4 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import AdminPageShell from '../../../components/admin/AdminPageShell';
+import ListPagination from '../../../components/ui/ListPagination';
+import useClientPagination from '../../../hooks/useClientPagination';
+import useDebouncedSearch from '../../../hooks/useDebouncedSearch';
 import caregiverDietPlanService from '../../../services/caregiverDietPlan.service';
 import { getLocalDateString } from '../../../utils/dateUtils';
 import { formatVNDate } from '../../../utils/nutritionLabels';
@@ -12,9 +17,10 @@ function StatusCell({ ok }) {
 }
 
 function DietPlansPage() {
+  const { t } = useTranslation();
+  const { search, setSearch, debouncedSearch } = useDebouncedSearch();
   const [workDate, setWorkDate] = useState(today());
   const [residentId, setResidentId] = useState('');
-  const [search, setSearch] = useState('');
   const [residents, setResidents] = useState([]);
   const [rows, setRows] = useState([]);
   const [dayMeta, setDayMeta] = useState(null);
@@ -29,7 +35,7 @@ function DietPlansPage() {
       const res = await caregiverDietPlanService.listResidents();
       setResidents(Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : []);
     } catch (e) {
-      setError(e?.response?.data?.message || 'Không tải được danh sách cư dân');
+      setError(e?.response?.data?.message || t('caregiver.dietPlans.loadFailed'));
     }
   };
 
@@ -40,7 +46,7 @@ function DietPlansPage() {
       const res = await caregiverDietPlanService.listOverview({
         workDate,
         residentId: residentId || undefined,
-        search: search.trim() || undefined,
+        search: debouncedSearch.trim() || undefined,
       });
       setRows(Array.isArray(res?.data) ? res.data : []);
       setDayMeta({
@@ -50,13 +56,13 @@ function DietPlansPage() {
         specialDietDayTitle: res.specialDietDayTitle,
       });
     } catch (e) {
-      setError(e?.response?.data?.message || 'Không tải được chế độ ăn');
+      setError(e?.response?.data?.message || t('caregiver.dietPlans.loadFailed'));
       setRows([]);
       setDayMeta(null);
     } finally {
       setLoading(false);
     }
-  }, [workDate, residentId, search]);
+  }, [workDate, residentId, debouncedSearch, t]);
 
   useEffect(() => {
     loadResidents();
@@ -65,6 +71,14 @@ function DietPlansPage() {
   useEffect(() => {
     loadOverview();
   }, [loadOverview]);
+
+  const {
+    paginatedItems: paginatedRows,
+    page,
+    setPage,
+    totalPages,
+    total,
+  } = useClientPagination(rows);
 
   const openDetail = async (rid) => {
     setDetailOpen(true);
@@ -75,7 +89,7 @@ function DietPlansPage() {
       const data = await caregiverDietPlanService.getResidentPlan(rid, { workDate });
       setDetail(data);
     } catch (e) {
-      setError(e?.response?.data?.message || 'Không tải được chi tiết chế độ ăn');
+      setError(e?.response?.data?.message || t('caregiver.dietPlans.detailLoadFailed'));
       setDetailOpen(false);
     } finally {
       setDetailLoading(false);
@@ -88,26 +102,19 @@ function DietPlansPage() {
   };
 
   return (
-    <div className="page card diet-plans-page">
-      <h1 className="diet-plans-page__title">Xem chế độ ăn uống</h1>
-      <p className="diet-plans-page__intro">
-        Xem thực đơn và chế độ ăn đặc biệt đã được điều dưỡng publish cho cư dân phụ trách. Chỉ xem — không
-        chỉnh sửa tại đây.
-      </p>
+    <AdminPageShell title={t('caregiver.dietPlans.title')} subtitle={t('caregiver.dietPlans.subtitle')}>
+      {error && <div className="resident-page__error">{error}</div>}
 
-      {error && <p className="form-error">{error}</p>}
-
-      <div className="diet-plans-page__panel">
-        <h3 className="diet-plans-page__panel-title">Bộ lọc</h3>
-        <div className="diet-plans-page__filters">
-          <label>
-            Ngày
+      <div className="resident-page__filters">
+        <div className="resident-page__filter-row">
+          <label className="resident-page__filter">
+            <span>{t('common.date')}</span>
             <input type="date" value={workDate} onChange={(e) => setWorkDate(e.target.value)} />
           </label>
-          <label>
-            Cư dân
+          <label className="resident-page__filter">
+            <span>{t('common.resident')}</span>
             <select value={residentId} onChange={(e) => setResidentId(e.target.value)}>
-              <option value="">Tất cả</option>
+              <option value="">{t('common.all')}</option>
               {residents.map((r) => (
                 <option key={r._id} value={r._id}>
                   {r.fullName || r.residentCode}
@@ -115,66 +122,65 @@ function DietPlansPage() {
               ))}
             </select>
           </label>
-          <label>
-            Tìm kiếm
+          <label className="resident-page__filter">
+            <span>{t('common.search')}</span>
             <input
               type="search"
-              placeholder="Tên hoặc mã cư dân"
+              placeholder={t('common.searchResidentPlaceholder')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </label>
-          <div className="diet-plans-page__filter-actions">
-            <button type="button" className="btn-secondary" disabled={loading} onClick={loadOverview}>
-              {loading ? 'Đang tải...' : 'Tải lại'}
-            </button>
-          </div>
         </div>
       </div>
 
       {dayMeta && (
         <p className="diet-plans-page__day-banner">
-          Ngày {formatVNDate(workDate)}:{' '}
+          {t('caregiver.dietPlans.dayBanner', { date: formatVNDate(workDate) })}{' '}
           {dayMeta.hasPublishedMealPlanDay
-            ? `Có thực đơn publish${dayMeta.mealPlanDayTitle ? ` (${dayMeta.mealPlanDayTitle})` : ''}`
-            : 'Chưa có thực đơn publish cho ngày này'}
+            ? t('caregiver.dietPlans.hasMealPlan', {
+                title: dayMeta.mealPlanDayTitle ? ` (${dayMeta.mealPlanDayTitle})` : '',
+              })
+            : t('caregiver.dietPlans.noMealPlan')}
           {' · '}
           {dayMeta.hasPublishedSpecialDietDay
-            ? `Có chế độ đặc biệt${dayMeta.specialDietDayTitle ? ` (${dayMeta.specialDietDayTitle})` : ''}`
-            : 'Chưa có chế độ đặc biệt publish'}
+            ? t('caregiver.dietPlans.hasSpecialDiet', {
+                title: dayMeta.specialDietDayTitle ? ` (${dayMeta.specialDietDayTitle})` : '',
+              })
+            : t('caregiver.dietPlans.noSpecialDiet')}
         </p>
       )}
 
-      <div className="diet-plans-page__panel">
-        <h3 className="diet-plans-page__panel-title">Cư dân phụ trách</h3>
-        <table className="data-table">
+      <h3 className="diet-plans-page__section-title">{t('caregiver.dietPlans.assignedResidents')}</h3>
+      <div className="resident-page__table">
+        <table className="resident-page__table-element">
           <thead>
-            <tr>
-              <th>Cư dân</th>
-              <th>Thực đơn</th>
-              <th>Chế độ đặc biệt</th>
-              <th>Giờ ăn riêng</th>
-              <th>Dị ứng</th>
-              <th>Thao tác</th>
+            <tr className="resident-page__table-header">
+              <th>{t('common.colResident')}</th>
+              <th>{t('caregiver.dietPlans.colMealPlan')}</th>
+              <th>{t('caregiver.dietPlans.colSpecialDiet')}</th>
+              <th>{t('caregiver.dietPlans.colMealTimes')}</th>
+              <th>{t('caregiver.dietPlans.colAllergies')}</th>
+              <th>{t('common.colActions')}</th>
             </tr>
           </thead>
           <tbody>
             {loading && (
               <tr>
                 <td colSpan={6} className="empty-state">
-                  Đang tải...
+                  {t('common.loading')}
                 </td>
               </tr>
             )}
             {!loading && rows.length === 0 && (
               <tr>
                 <td colSpan={6} className="empty-state">
-                  Không có cư dân phù hợp bộ lọc
+                  {t('caregiver.dietPlans.emptyFiltered')}
                 </td>
               </tr>
             )}
             {!loading &&
-              rows.map((row) => (
+              paginatedRows.map((row) => (
                 <tr key={row.residentId}>
                   <td>
                     <div>{row.fullName || '—'}</div>
@@ -205,10 +211,10 @@ function DietPlansPage() {
                   <td className="diet-plans-page__row-actions">
                     <button
                       type="button"
-                      className="btn btn--sm btn--edit"
+                      className="resident-page__button resident-page__button--ghost"
                       onClick={() => openDetail(row.residentId)}
                     >
-                      Chi tiết
+                      {t('common.viewDetails')}
                     </button>
                   </td>
                 </tr>
@@ -217,6 +223,10 @@ function DietPlansPage() {
         </table>
       </div>
 
+      {!loading && rows.length > 0 && (
+        <ListPagination page={page} totalPages={totalPages} total={total} onPageChange={setPage} />
+      )}
+
       <DietPlanDetailModal
         open={detailOpen}
         loading={detailLoading}
@@ -224,7 +234,7 @@ function DietPlansPage() {
         workDate={workDate}
         onClose={closeDetail}
       />
-    </div>
+    </AdminPageShell>
   );
 }
 

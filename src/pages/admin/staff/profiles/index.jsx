@@ -1,6 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Search, Plus, RefreshCw, Users } from 'lucide-react';
 import AdminPageShell from '../../../../components/admin/AdminPageShell';
+import ListPagination from '../../../../components/ui/ListPagination';
+import { ADMIN_LIST_PAGE_SIZE } from '../../../../constants/adminListPage';
+import useDebouncedSearch from '../../../../hooks/useDebouncedSearch';
+import useClientPagination from '../../../../hooks/useClientPagination';
 import staffService from '../../../../services/staff.service';
 import useAuth from '../../../../hooks/useAuth';
 import {
@@ -23,6 +28,7 @@ const emptyEditForm = {
 };
 
 export default function StaffManagementPage() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const actorRole = user?.role;
   const roleOptions = useMemo(() => getCreatableRoleOptions(actorRole), [actorRole]);
@@ -31,10 +37,18 @@ export default function StaffManagementPage() {
 
   const [staff, setStaff] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [staffTotal, setStaffTotal] = useState(0);
+  const resetPageOnSearch = useCallback(() => setPage(1), []);
+  const { search, setSearch, debouncedSearch } = useDebouncedSearch({
+    onDebouncedChange: resetPageOnSearch,
+  });
   const [filterRole, setFilterRole] = useState('');
   const [filterBanned, setFilterBanned] = useState('');
   const [pageError, setPageError] = useState('');
+  const [useClientFallback, setUseClientFallback] = useState(false);
+  const [allStaff, setAllStaff] = useState([]);
 
   // Modal state
   const [detailStaff, setDetailStaff] = useState(null);
@@ -48,26 +62,63 @@ export default function StaffManagementPage() {
   const [createError, setCreateError] = useState('');
 
   /* ---- Data loading ---- */
-  const loadStaff = async () => {
+  const loadStaff = useCallback(async () => {
     setLoading(true);
     setPageError('');
     try {
       const res = await staffService.getAll({
+        page,
+        limit: ADMIN_LIST_PAGE_SIZE,
         role: filterRole || undefined,
-        search: search || undefined,
+        search: debouncedSearch || undefined,
         isBanned: filterBanned !== '' ? filterBanned : undefined,
       });
-      setStaff(res.data || res);
+
+      if (Array.isArray(res)) {
+        setUseClientFallback(true);
+        setAllStaff(res);
+        setStaffTotal(res.length);
+        setTotalPages(Math.max(1, Math.ceil(res.length / ADMIN_LIST_PAGE_SIZE)));
+      } else {
+        setUseClientFallback(false);
+        setAllStaff([]);
+        const data = res.data || [];
+        setStaff(data);
+        setStaffTotal(res.total ?? data.length);
+        setTotalPages(res.totalPages ?? Math.max(1, Math.ceil((res.total ?? data.length) / ADMIN_LIST_PAGE_SIZE)));
+      }
     } catch (e) {
       setPageError(e.response?.data?.message || 'Không thể tải danh sách nhân viên');
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, debouncedSearch, filterRole, filterBanned]);
 
-  useEffect(() => { loadStaff(); }, [filterRole, filterBanned]);
+  const {
+    paginatedItems: clientPaginatedStaff,
+    page: clientPage,
+    setPage: setClientPage,
+    totalPages: clientTotalPages,
+    total: clientTotal,
+    resetPage: resetClientPage,
+  } = useClientPagination(useClientFallback ? allStaff : [], ADMIN_LIST_PAGE_SIZE);
 
-  const handleSearch = (e) => { e.preventDefault(); loadStaff(); };
+  const displayStaff = useClientFallback ? clientPaginatedStaff : staff;
+  const displayPage = useClientFallback ? clientPage : page;
+  const displayTotalPages = useClientFallback ? clientTotalPages : totalPages;
+  const displayTotal = useClientFallback ? clientTotal : staffTotal;
+  const handlePageChange = useClientFallback ? setClientPage : setPage;
+
+  useEffect(() => {
+    loadStaff();
+  }, [loadStaff]);
+
+  useEffect(() => {
+    setPage(1);
+    if (useClientFallback) {
+      resetClientPage();
+    }
+  }, [filterRole, filterBanned, useClientFallback, resetClientPage]);
 
   /* ---- View detail ---- */
   const handleView = (s) => setDetailStaff(s);
@@ -175,16 +226,16 @@ export default function StaffManagementPage() {
     }
   };
 
-  const activeCount = staff.filter((s) => s.isActive && !s.isBanned).length;
-  const bannedCount = staff.filter((s) => s.isBanned).length;
+  const activeCount = displayStaff.filter((s) => s.isActive && !s.isBanned).length;
+  const bannedCount = displayStaff.filter((s) => s.isBanned).length;
 
   return (
     <AdminPageShell
-      title="Hồ sơ nhân viên"
+      title={t('admin.staff.profiles.title')}
       subtitle={
         actorRole === 'manager'
-          ? 'Quản lý nhân viên vận hành (bác sĩ, y tá, chăm sóc). Không tạo hoặc sửa tài khoản admin/quản lý.'
-          : 'Quản lý và phân loại vai trò nhân viên'
+          ? t('admin.staff.profiles.subtitleManager')
+          : t('admin.staff.profiles.subtitle')
       }
       actions={
         <>
@@ -195,7 +246,7 @@ export default function StaffManagementPage() {
             disabled={loading}
           >
             <RefreshCw size={16} className={loading ? 'spin' : ''} />
-            Làm mới
+            {t('admin.staff.common.refresh')}
           </button>
           <button
             type="button"
@@ -206,75 +257,79 @@ export default function StaffManagementPage() {
             }}
           >
             <Plus size={16} />
-            Thêm nhân viên
+            {t('admin.staff.common.addStaff')}
           </button>
         </>
       }
       stats={[
-        { label: 'Tổng nhân viên', value: String(staff.length).padStart(2, '0'), icon: <Users size={20} /> },
+        { label: t('admin.staff.common.statTotal'), value: String(displayTotal).padStart(2, '0'), icon: <Users size={20} /> },
         {
-          label: 'Đang làm việc',
+          label: t('admin.staff.common.statActive'),
           value: String(activeCount).padStart(2, '0'),
           icon: <Users size={20} />,
           iconClass: 'resident-stat__icon--admitted',
         },
         {
-          label: 'Đang bị ban',
+          label: t('admin.staff.common.statBanned'),
           value: String(bannedCount).padStart(2, '0'),
           icon: <Users size={20} />,
           iconClass: 'resident-stat__icon--inactive',
         },
       ]}
     >
-      <form className="resident-page__filters" onSubmit={handleSearch}>
+      <div className="resident-page__filters">
         <div className="resident-page__filter-row">
           <label className="resident-page__filter">
-            <span>Tìm kiếm</span>
+            <span>{t('common.search')}</span>
             <div className="resident-page__filter-input">
               <Search size={16} />
               <input
-                type="text"
-                placeholder="Tên, email, username..."
+                type="search"
+                placeholder={t('admin.staff.common.searchPlaceholder')}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
           </label>
           <label className="resident-page__filter">
-            <span>Vai trò</span>
+            <span>{t('admin.staff.common.roleFilter')}</span>
             <select value={filterRole} onChange={(e) => setFilterRole(e.target.value)}>
-              <option value="">Tất cả vai trò</option>
+              <option value="">{t('admin.staff.common.allRoles')}</option>
               {filterRoleOptions.map((r) => (
                 <option key={r.value} value={r.value}>{r.label}</option>
               ))}
             </select>
           </label>
           <label className="resident-page__filter">
-            <span>Trạng thái</span>
+            <span>{t('admin.staff.common.banStatus')}</span>
             <select value={filterBanned} onChange={(e) => setFilterBanned(e.target.value)}>
-              <option value="">Tất cả</option>
-              <option value="false">Không bị ban</option>
-              <option value="true">Đang bị ban</option>
+              <option value="">{t('common.all')}</option>
+              <option value="false">{t('admin.staff.common.notBanned')}</option>
+              <option value="true">{t('admin.staff.common.banned')}</option>
             </select>
           </label>
-          <div className="resident-page__filter-actions">
-            <button type="submit" className="resident-page__button resident-page__button--primary">
-              Áp dụng
-            </button>
-          </div>
         </div>
-      </form>
+      </div>
 
       {pageError && <div className="resident-page__error">{pageError}</div>}
 
       <StaffTable
-        staff={staff}
+        staff={displayStaff}
         loading={loading}
         onView={handleView}
         onEdit={handleEdit}
         onBan={handleBanOpen}
         canManage={canManage}
       />
+
+      {!loading && displayStaff.length > 0 && (
+        <ListPagination
+          page={displayPage}
+          totalPages={Math.max(displayTotalPages, 1)}
+          total={displayTotal}
+          onPageChange={handlePageChange}
+        />
+      )}
 
       {/* Detail modal */}
       {detailStaff && (

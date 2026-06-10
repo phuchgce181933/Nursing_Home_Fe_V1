@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { CATEGORY_FILTER_OPTIONS } from '../constants';
 
 function HygieneListFilters({
@@ -13,12 +14,13 @@ function HygieneListFilters({
   onOpenCreate,
   onReload,
 }) {
+  const { t } = useTranslation();
+
   return (
-    <div className="hygiene-page__panel hygiene-page__filters">
-      <h3 className="hygiene-page__panel-title">Bộ lọc</h3>
-      <div className="hygiene-page__form-grid">
-        <label>
-          Ngày
+    <div className="resident-page__filters">
+      <div className="resident-page__filter-row">
+        <label className="resident-page__filter">
+          <span>{t('common.date')}</span>
           <input
             type="date"
             max={maxDate}
@@ -26,8 +28,8 @@ function HygieneListFilters({
             onChange={(e) => onWorkDateChange(e.target.value)}
           />
         </label>
-        <label>
-          Nhóm hoạt động
+        <label className="resident-page__filter">
+          <span>{t('caregiver.hygiene.colCategory')}</span>
           <select value={activityCategory} onChange={(e) => onActivityCategoryChange(e.target.value)}>
             {CATEGORY_FILTER_OPTIONS.map((o) => (
               <option key={o.value || 'all'} value={o.value}>
@@ -36,10 +38,10 @@ function HygieneListFilters({
             ))}
           </select>
         </label>
-        <label>
-          Cư dân
+        <label className="resident-page__filter">
+          <span>{t('common.resident')}</span>
           <select value={residentId} onChange={(e) => onResidentIdChange(e.target.value)}>
-            <option value="">Tất cả</option>
+            <option value="">{t('common.all')}</option>
             {residents.map((r) => (
               <option key={r._id} value={r._id}>
                 {r.fullName || r.residentCode}
@@ -47,14 +49,23 @@ function HygieneListFilters({
             ))}
           </select>
         </label>
-      </div>
-      <div className="hygiene-page__actions">
-        <button type="button" className="btn-primary" onClick={onOpenCreate}>
-          + Ghi nhận mới
-        </button>
-        <button type="button" className="btn-secondary" disabled={loading} onClick={onReload}>
-          {loading ? 'Đang tải...' : 'Tải lại'}
-        </button>
+        <div className="resident-page__filter-actions">
+          <button
+            type="button"
+            className="resident-page__button resident-page__button--primary"
+            onClick={onOpenCreate}
+          >
+            {t('caregiver.hygiene.addRecord')}
+          </button>
+          <button
+            type="button"
+            className="resident-page__button resident-page__button--ghost"
+            disabled={loading}
+            onClick={onReload}
+          >
+            {loading ? t('common.loading') : t('common.reload')}
+          </button>
+        </div>
       </div>
     </div>
   );

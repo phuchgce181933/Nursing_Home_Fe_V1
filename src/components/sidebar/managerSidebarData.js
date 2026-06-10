@@ -23,6 +23,10 @@ export const managerSidebarData = [
     icon: Users,
     children: [
       {
+        title: 'Quản lý cư dân',
+        path: '/manager/residents',
+      },
+      {
         title: 'Thông tin thân nhân',
         path: '/manager/residents/family',
       },

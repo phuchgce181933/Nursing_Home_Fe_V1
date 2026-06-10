@@ -1,14 +1,23 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import staffService from '../../../../services/staff.service';
 import careTaskService from '../../../../services/careTask.service';
 import facilityService from '../../../../services/facility.service';
+import ListPagination from '../../../../components/ui/ListPagination';
+import useDebouncedSearch from '../../../../hooks/useDebouncedSearch';
+import useClientPagination from '../../../../hooks/useClientPagination';
 import { floorLabel, roomLabel } from '../../../../components/facility/FloorRoomSelect';
-import { canAssignAreas, canAssignResidents, NON_ASSIGNABLE_ROLES } from '../../../../utils/staffAssignable';
+import {
+  canAssignAreas,
+  canAssignResidents,
+  canReceiveCareTask,
+  NON_ASSIGNABLE_ROLES,
+} from '../../../../utils/staffAssignable';
 import { isStaffOnLeaveForAssignment } from '../../../../utils/leaveUtils';
 import { getApiErrorPayload, blockingCareTasksMessage } from '../../../../utils/blockingCareTasks';
 import BlockingCareTasksAlert from '../../../../components/staff/BlockingCareTasksAlert';
 import AdminPageShell from '../../../../components/admin/AdminPageShell';
-import { getLocalDateString } from '../../../../utils/dateUtils';
+import { filterShiftsNotEnded, getLocalDateString, todayVN } from '../../../../utils/dateUtils';
 import '../../../../styles/admin/StaffAssignmentPage.css';
 
 const CARE_TASK_TAB_HINT =
@@ -46,6 +55,37 @@ const filterEligibleShifts = (shifts) =>
 const buildShiftTimeLabel = (shifts) =>
   shifts.length ? shifts.map((s) => `${s.startTime} – ${s.endTime}`).join(', ') : '';
 
+const resolveShiftSummaryForDisplay = (summary, assignmentDate, now = new Date()) => {
+  if (!summary) return null;
+  const active = filterShiftsNotEnded(
+    filterEligibleShifts(summary.shiftsOnDate),
+    assignmentDate,
+    now
+  );
+  return {
+    ...summary,
+    shiftsOnDate: active,
+    hasShiftOnDate: active.length > 0,
+    shiftTimeLabel: buildShiftTimeLabel(active),
+  };
+};
+
+const hasActiveShiftOnDate = (staff, assignmentDate, displayNow) => {
+  const resolved = resolveShiftSummaryForDisplay(staff?.shiftSummary, assignmentDate, displayNow);
+  return Boolean(resolved?.hasShiftOnDate);
+};
+
+/** Re-render every minute when viewing today so ended shifts disappear without reload. */
+function useMinuteNow(enabled) {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    if (!enabled) return undefined;
+    const id = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(id);
+  }, [enabled]);
+  return now;
+}
+
 function formatDateVi(iso) {
   if (!iso) return '';
   const d = new Date(`${iso}T00:00:00`);
@@ -57,35 +97,46 @@ function NonAssignableBadge() {
 }
 
 /** Badge ca trong ngày (từ shiftSummary trên GET /api/staff?assignmentDate=) */
-function ShiftSummaryBadge({ summary, assignable = true }) {
+function ShiftSummaryBadge({ summary, assignmentDate, displayNow, assignable = true }) {
   if (!assignable) return <NonAssignableBadge />;
   if (!summary) return <span className="shift-badge shift-badge--muted">—</span>;
-  if (summary.onLeave) return <span className="shift-badge shift-badge--leave">Nghỉ phép</span>;
-  if (summary.hasShiftOnDate) {
+  const resolved = resolveShiftSummaryForDisplay(summary, assignmentDate, displayNow);
+  if (resolved.onLeave) return <span className="shift-badge shift-badge--leave">Nghỉ phép</span>;
+  if (resolved.hasShiftOnDate) {
+    const shifts = resolved.shiftsOnDate || [];
     return (
-      <span className="shift-badge shift-badge--on" title={summary.shiftTimeLabel}>
-        {summary.shiftTimeLabel || 'Có ca'}
-      </span>
+      <div className="shift-badge-group">
+        {shifts.map((sh) => (
+          <span
+            key={sh._id}
+            className="shift-badge shift-badge--on"
+            title={[sh.name, `${sh.startTime} – ${sh.endTime}`].filter(Boolean).join(' · ')}
+          >
+            {sh.startTime} – {sh.endTime}
+          </span>
+        ))}
+      </div>
     );
   }
   return <span className="shift-badge shift-badge--off">Không có ca</span>;
 }
 
 /** Chi tiết ca trong panel phải — dùng shiftSummary.shiftsOnDate */
-function ShiftDetailPanel({ summary, assignmentDate }) {
+function ShiftDetailPanel({ summary, assignmentDate, displayNow }) {
   if (!summary) return null;
-  const dateLabel = assignmentDate || summary.assignmentDate;
+  const resolved = resolveShiftSummaryForDisplay(summary, assignmentDate, displayNow);
+  const dateLabel = assignmentDate || resolved.assignmentDate;
   return (
     <div className="shift-detail-panel">
       <div className="shift-detail-panel__title">Ca làm việc — {formatDateVi(dateLabel)}</div>
-      {summary.onLeave && (
+      {resolved.onLeave && (
         <p className="shift-detail-panel__hint shift-detail-panel__hint--warn">
           Nhân viên có đơn nghỉ phép đã duyệt trong ngày này.
         </p>
       )}
-      {!summary.onLeave && summary.shiftsOnDate?.length > 0 ? (
+      {!resolved.onLeave && resolved.shiftsOnDate?.length > 0 ? (
         <ul className="shift-detail-panel__list">
-          {summary.shiftsOnDate.map((sh) => (
+          {resolved.shiftsOnDate.map((sh) => (
             <li key={sh._id} className="shift-detail-panel__item">
               <span className="shift-detail-panel__name">{sh.name}</span>
               <span className="shift-detail-panel__time">{sh.startTime} – {sh.endTime}</span>
@@ -96,7 +147,7 @@ function ShiftDetailPanel({ summary, assignmentDate }) {
           ))}
         </ul>
       ) : (
-        !summary.onLeave && (
+        !resolved.onLeave && (
           <p className="shift-detail-panel__hint">Chưa có ca đã đăng hoặc đã xác nhận trong ngày này.</p>
         )
       )}
@@ -120,7 +171,7 @@ function Alert({ type, msg }) {
 }
 
 // ── Tab 1: Area Assignment ────────────────────────────────────────────────────
-function AreaTab({ staff, loading, assignmentDate, onStaffUpdated }) {
+function AreaTab({ staff, staffPool, loading, assignmentDate, displayNow, onStaffUpdated, staffPagination }) {
   const [selected, setSelected]         = useState(null);
   const [selectedFloorIds, setSelectedFloorIds] = useState([]);
   const [selectedRoomIds, setSelectedRoomIds]   = useState([]);
@@ -201,7 +252,27 @@ function AreaTab({ staff, loading, assignmentDate, onStaffUpdated }) {
 
   useEffect(() => {
     setSelected(null);
+    setSelectedFloorIds([]);
+    setSelectedRoomIds([]);
+    setSuccess('');
+    setError('');
+    setBlockingTasks([]);
+    setInfos([]);
   }, [assignmentDate]);
+
+  useEffect(() => {
+    if (!selected) return;
+    const stillInPool = staffPool?.some((s) => s._id === selected._id);
+    if (!stillInPool || !hasActiveShiftOnDate(selected, assignmentDate, displayNow)) {
+      setSelected(null);
+      setSelectedFloorIds([]);
+      setSelectedRoomIds([]);
+      setSuccess('');
+      setError('');
+      setBlockingTasks([]);
+      setInfos([]);
+    }
+  }, [staffPool, selected, assignmentDate, displayNow]);
 
   const handleSelect = (s) => {
     if (!canAssignAreas(s) || isStaffOnLeaveForAssignment(s)) return;
@@ -267,33 +338,59 @@ function AreaTab({ staff, loading, assignmentDate, onStaffUpdated }) {
   };
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+    <div className="assignment-tab-layout">
       {/* Staff list */}
-      <div className="data-table-wrap">
-        <table className="data-table">
-          <thead><tr><th>Nhân viên</th><th>Vai trò</th><th>Ca trong ngày</th><th>Tầng phụ trách</th><th></th></tr></thead>
+      <div className="data-table-wrap assignment-table-wrap">
+        <table className="data-table assignment-table">
+          <colgroup>
+            <col className="assignment-col assignment-col--name" />
+            <col className="assignment-col assignment-col--role" />
+            <col className="assignment-col assignment-col--shift" />
+            <col className="assignment-col assignment-col--area" />
+            <col className="assignment-col assignment-col--action" />
+          </colgroup>
+          <thead>
+            <tr>
+              <th>Nhân viên</th>
+              <th title="Vai trò">Vai trò</th>
+              <th title="Ca trong ngày">Ca</th>
+              <th title="Khu vực phụ trách">Khu vực</th>
+              <th aria-label="Thao tác" />
+            </tr>
+          </thead>
           <tbody>
             {loading && <tr><td colSpan={5} className="empty-state">Đang tải...</td></tr>}
-            {!loading && staff.length === 0 && <tr><td colSpan={5} className="empty-state">Không có nhân viên</td></tr>}
+            {!loading && staff.length === 0 && (
+              <tr><td colSpan={5} className="empty-state">Không có nhân viên có ca trong ngày này</td></tr>
+            )}
             {!loading && staff.map((s) => {
               const areas = s.staffProfile?.responsibleAreaIds || [];
               return (
                 <tr key={s._id} style={{ background: selected?._id === s._id ? '#eff6ff' : undefined }}>
-                  <td style={{ fontWeight: 600 }}>{s.fullName}</td>
+                  <td className="assignment-table__cell--name">{s.fullName}</td>
                   <td>{ROLE_LABELS[s.role] || s.role}</td>
-                  <td>
-                    <ShiftSummaryBadge summary={s.shiftSummary} assignable={canAssignAreas(s)} />
+                  <td className="assignment-table__cell--badges">
+                    <ShiftSummaryBadge
+                      summary={s.shiftSummary}
+                      assignmentDate={assignmentDate}
+                      displayNow={displayNow}
+                      assignable={canAssignAreas(s)}
+                    />
                   </td>
-                  <td>
-                    {areas.length
-                      ? areas.map((a) => (
-                          <span key={typeof a === 'object' ? a._id : a} className="area-badge" style={{ marginRight: 4 }}>
+                  <td className="assignment-table__cell--badges">
+                    {areas.length ? (
+                      <div className="assignment-cell-badges">
+                        {areas.map((a) => (
+                          <span key={typeof a === 'object' ? a._id : a} className="area-badge">
                             {resolveAreaLabel(a)}
                           </span>
-                        ))
-                      : <span style={{ color: '#94a3b8', fontSize: '0.8rem' }}>Chưa phân công</span>}
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="assignment-table__empty">Chưa phân công</span>
+                    )}
                   </td>
-                  <td>
+                  <td className="assignment-table__cell--actions">
                     {canAssignAreas(s) ? (
                       isStaffOnLeaveForAssignment(s) ? (
                         <span className="shift-badge shift-badge--leave">Nghỉ phép</span>
@@ -316,10 +413,18 @@ function AreaTab({ staff, loading, assignmentDate, onStaffUpdated }) {
             })}
           </tbody>
         </table>
+        {!loading && staff.length > 0 && staffPagination && (
+          <ListPagination
+            page={staffPagination.page}
+            totalPages={staffPagination.totalPages}
+            total={staffPagination.total}
+            onPageChange={staffPagination.onPageChange}
+          />
+        )}
       </div>
 
       {/* Edit panel */}
-      <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 20 }}>
+      <div className="assignment-panel">
         {!selected ? (
           <div className="empty-state">Chọn nhân viên để phân công khu vực</div>
         ) : !canAssignAreas(selected) ? (
@@ -349,7 +454,11 @@ function AreaTab({ staff, loading, assignmentDate, onStaffUpdated }) {
             )}
             {infos.map((msg, i) => <Alert key={i} type="warning" msg={`ℹ️ ${msg}`} />)}
 
-            <ShiftDetailPanel summary={selected.shiftSummary} assignmentDate={assignmentDate} />
+            <ShiftDetailPanel
+              summary={selected.shiftSummary}
+              assignmentDate={assignmentDate}
+              displayNow={displayNow}
+            />
 
             <p style={{ fontSize: '0.78rem', color: '#64748b', marginBottom: 12, lineHeight: 1.45 }}>
               Tầng/phòng lưu cố định trên hồ sơ nhân viên (master data). Ca làm việc theo ngày xem ở trên — phân công ca tại mục Quản lý ca làm việc.
@@ -432,7 +541,7 @@ function residentPickerLabel(r) {
 }
 
 // ── Tab 2: Resident Assignment ────────────────────────────────────────────────
-function ResidentTab({ staff, loading, assignmentDate, onStaffUpdated }) {
+function ResidentTab({ staff, staffPool, loading, assignmentDate, displayNow, onStaffUpdated, staffPagination }) {
   const [selected, setSelected]           = useState(null);
   const [selectedResidentIds, setSelectedResidentIds] = useState([]);
   const [residentOptions, setResidentOptions] = useState([]);
@@ -450,7 +559,26 @@ function ResidentTab({ staff, loading, assignmentDate, onStaffUpdated }) {
     setResidentOptions([]);
     setSelectedResidentIds([]);
     setBlockingTasks([]);
+    setSuccess('');
+    setError('');
+    setResidentHint('');
+    setResidentSearch('');
   }, [assignmentDate]);
+
+  useEffect(() => {
+    if (!selected) return;
+    const stillInPool = staffPool?.some((s) => s._id === selected._id);
+    if (!stillInPool || !hasActiveShiftOnDate(selected, assignmentDate, displayNow)) {
+      setSelected(null);
+      setResidentOptions([]);
+      setSelectedResidentIds([]);
+      setBlockingTasks([]);
+      setSuccess('');
+      setError('');
+      setResidentHint('');
+      setResidentSearch('');
+    }
+  }, [staffPool, selected, assignmentDate, displayNow]);
 
   const areaScopeKey = useMemo(() => {
     if (!selected?._id) return '';
@@ -602,30 +730,50 @@ function ResidentTab({ staff, loading, assignmentDate, onStaffUpdated }) {
   };
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
-      <div className="data-table-wrap">
-        <table className="data-table">
-          <thead><tr><th>Nhân viên</th><th>Vai trò</th><th>Ca trong ngày</th><th>Cư dân đang chăm sóc</th><th></th></tr></thead>
+    <div className="assignment-tab-layout">
+      <div className="data-table-wrap assignment-table-wrap">
+        <table className="data-table assignment-table">
+          <colgroup>
+            <col className="assignment-col assignment-col--name" />
+            <col className="assignment-col assignment-col--role" />
+            <col className="assignment-col assignment-col--shift" />
+            <col className="assignment-col assignment-col--area" />
+            <col className="assignment-col assignment-col--action" />
+          </colgroup>
+          <thead>
+            <tr>
+              <th>Nhân viên</th>
+              <th title="Vai trò">Vai trò</th>
+              <th title="Ca trong ngày">Ca</th>
+              <th title="Cư dân đang chăm sóc">Cư dân</th>
+              <th aria-label="Thao tác" />
+            </tr>
+          </thead>
           <tbody>
             {loading && <tr><td colSpan={5} className="empty-state">Đang tải...</td></tr>}
             {!loading && staff.length === 0 && (
-              <tr><td colSpan={5} className="empty-state">Không có nhân viên</td></tr>
+              <tr><td colSpan={5} className="empty-state">Không có nhân viên có ca trong ngày này</td></tr>
             )}
             {!loading && staff.map((s) => {
               const residents = s.staffProfile?.assignedResidentIds || [];
               return (
                 <tr key={s._id} style={{ background: selected?._id === s._id ? '#eff6ff' : undefined }}>
-                  <td style={{ fontWeight: 600 }}>{s.fullName}</td>
+                  <td className="assignment-table__cell--name">{s.fullName}</td>
                   <td>{ROLE_LABELS[s.role] || s.role}</td>
-                  <td>
-                    <ShiftSummaryBadge summary={s.shiftSummary} assignable={canAssignResidents(s)} />
+                  <td className="assignment-table__cell--badges">
+                    <ShiftSummaryBadge
+                      summary={s.shiftSummary}
+                      assignmentDate={assignmentDate}
+                      displayNow={displayNow}
+                      assignable={canAssignResidents(s)}
+                    />
                   </td>
                   <td>
                     {residents.length
-                      ? <span style={{ color: '#1d4ed8', fontWeight: 600 }}>{residents.length} cư dân</span>
-                      : <span style={{ color: '#94a3b8', fontSize: '0.8rem' }}>Chưa giao</span>}
+                      ? <span className="assignment-table__count">{residents.length} cư dân</span>
+                      : <span className="assignment-table__empty">Chưa giao</span>}
                   </td>
-                  <td>
+                  <td className="assignment-table__cell--actions">
                     {canAssignResidents(s) ? (
                       isStaffOnLeaveForAssignment(s) ? (
                         <span className="shift-badge shift-badge--leave">Nghỉ phép</span>
@@ -648,9 +796,17 @@ function ResidentTab({ staff, loading, assignmentDate, onStaffUpdated }) {
             })}
           </tbody>
         </table>
+        {!loading && staff.length > 0 && staffPagination && (
+          <ListPagination
+            page={staffPagination.page}
+            totalPages={staffPagination.totalPages}
+            total={staffPagination.total}
+            onPageChange={staffPagination.onPageChange}
+          />
+        )}
       </div>
 
-      <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 20 }}>
+      <div className="assignment-panel">
         {!selected ? (
           <div className="empty-state">Chọn nhân viên để phân công cư dân phụ trách</div>
         ) : !canAssignResidents(selected) ? (
@@ -678,7 +834,11 @@ function ResidentTab({ staff, loading, assignmentDate, onStaffUpdated }) {
             ) : (
               <Alert type="error" msg={error} />
             )}
-            <ShiftDetailPanel summary={selected.shiftSummary} assignmentDate={assignmentDate} />
+            <ShiftDetailPanel
+              summary={selected.shiftSummary}
+              assignmentDate={assignmentDate}
+              displayNow={displayNow}
+            />
 
             <p style={{ fontSize: '0.78rem', color: '#64748b', marginBottom: 12, lineHeight: 1.45 }}>
               {residentFilterMode === 'rooms'
@@ -751,9 +911,10 @@ const TASK_STATUS_LABELS = {
   skipped: 'Bỏ qua',
   missed: 'Bỏ lỡ',
 };
-const TASK_STATUS_NEXT = {
-  pending: ['in_progress', 'skipped'],
-  in_progress: ['completed', 'skipped'],
+/** Admin/manager may only skip (not in_progress/completed) */
+const TASK_STATUS_ADMIN_NEXT = {
+  pending: ['skipped'],
+  in_progress: ['skipped'],
 };
 
 const toMinutes = (hhmm) => {
@@ -793,7 +954,7 @@ const buildAssignmentContextFallback = (staffList) => ({
     .map((s) => {
       const shiftsOnDate = filterEligibleShifts(s.shiftSummary?.shiftsOnDate);
       if (!shiftsOnDate.length || !s.staffProfile?._id) return null;
-      if (NON_ASSIGNABLE_ROLES.includes(String(s.role || '').toLowerCase())) return null;
+      if (!canReceiveCareTask(s)) return null;
       return {
         staffProfileId: s.staffProfile._id,
         userId: s._id,
@@ -814,6 +975,23 @@ function CareTaskTab({ assignmentDate, staff }) {
   const [tasks, setTasks]               = useState([]);
   const [loading, setLoading]           = useState(false);
   const [error, setError]               = useState('');
+  const { search: taskSearch, setSearch: setTaskSearch, debouncedSearch: debouncedTaskSearch } = useDebouncedSearch();
+  const filteredTasks = useMemo(() => {
+    const q = debouncedTaskSearch.trim().toLowerCase();
+    if (!q) return tasks;
+    return tasks.filter((t) => {
+      const staffName = t.staffProfileId?.userId?.fullName || t.staffProfileId?.staffCode || '';
+      const resident = t.residentId?.fullName || t.residentId?.residentCode || '';
+      return staffName.toLowerCase().includes(q) || resident.toLowerCase().includes(q);
+    });
+  }, [tasks, debouncedTaskSearch]);
+  const {
+    paginatedItems: paginatedTasks,
+    page: taskPage,
+    setPage: setTaskPage,
+    totalPages: taskTotalPages,
+    total: taskTotal,
+  } = useClientPagination(filteredTasks);
   const [filterDate, setFilterDate]     = useState(assignmentDate);
   const [showForm, setShowForm]         = useState(false);
   const [form, setForm]                 = useState(emptyTaskForm(assignmentDate));
@@ -852,7 +1030,7 @@ function CareTaskTab({ assignmentDate, staff }) {
       staffWithShifts.filter(
         (s) =>
           !onLeaveByUserId[String(s.userId)]
-          && !NON_ASSIGNABLE_ROLES.includes(String(s.role || '').toLowerCase())
+          && canReceiveCareTask(s)
       ),
     [staffWithShifts, onLeaveByUserId]
   );
@@ -1075,6 +1253,13 @@ function CareTaskTab({ assignmentDate, staff }) {
           onChange={(e) => setFilterDate(e.target.value)}
           style={{ padding: '7px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: '0.875rem', outline: 'none' }}
         />
+        <input
+          type="search"
+          placeholder="Tìm nhân viên hoặc cư dân..."
+          value={taskSearch}
+          onChange={(e) => setTaskSearch(e.target.value)}
+          style={{ padding: '7px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: '0.875rem', outline: 'none', minWidth: 220 }}
+        />
         <button className="btn btn--primary" onClick={handleOpenForm}>+ Giao nhiệm vụ</button>
       </div>
 
@@ -1233,7 +1418,8 @@ function CareTaskTab({ assignmentDate, staff }) {
       {loading ? (
         <p style={{ color: '#94a3b8', textAlign: 'center', padding: 32 }}>Đang tải...</p>
       ) : (
-        <table className="data-table">
+        <div className="data-table-wrap assignment-table-wrap">
+        <table className="data-table assignment-table assignment-table--tasks">
           <thead>
             <tr>
               <th>Nhân viên</th><th>Cư dân</th><th>Ca</th><th>Loại nhiệm vụ</th><th>Mức độ</th>
@@ -1241,17 +1427,17 @@ function CareTaskTab({ assignmentDate, staff }) {
             </tr>
           </thead>
           <tbody>
-            {tasks.length === 0 && (
+            {paginatedTasks.length === 0 && (
               <tr><td colSpan={8} className="empty-state">Không có nhiệm vụ nào ngày này</td></tr>
             )}
-            {tasks.map((t) => {
+            {paginatedTasks.map((t) => {
               const staffName = t.staffProfileId?.userId?.fullName || t.staffProfileId?.staffCode || '—';
               const resident = t.residentId?.fullName || t.residentId?.residentCode || '—';
               const shift = t.shiftId;
               const shiftLabel = shift
                 ? `${shift.name || 'Ca'} · ${shift.startTime}–${shift.endTime}`
                 : '—';
-              const next = TASK_STATUS_NEXT[t.status] || [];
+              const next = TASK_STATUS_ADMIN_NEXT[t.status] || [];
               return (
                 <tr key={t._id}>
                   <td>{staffName}</td>
@@ -1268,12 +1454,12 @@ function CareTaskTab({ assignmentDate, staff }) {
                       <small className="field-hint" style={{ display: 'block' }}>Hết ca</small>
                     )}
                   </td>
-                  <td>
+                  <td className="assignment-table__cell--actions">
+                    <div className="assignment-action-group">
                     {next.map((s) => (
                       <button
                         key={s}
                         className="btn btn--sm btn--edit"
-                        style={{ marginRight: 4 }}
                         onClick={() => handleStatus(t._id, s)}
                       >
                         {TASK_STATUS_LABELS[s]}
@@ -1282,29 +1468,71 @@ function CareTaskTab({ assignmentDate, staff }) {
                     {t.status === 'pending' && (
                       <button className="btn btn--sm btn--delete" onClick={() => handleDelete(t._id)}>Xóa</button>
                     )}
+                    </div>
                   </td>
                 </tr>
               );
             })}
           </tbody>
         </table>
+        {!loading && paginatedTasks.length > 0 && (
+          <ListPagination
+            page={taskPage}
+            totalPages={taskTotalPages}
+            total={taskTotal}
+            onPageChange={setTaskPage}
+          />
+        )}
+        </div>
       )}
     </div>
   );
 }
 
 // ── Main page ─────────────────────────────────────────────────────────────────
-const TABS = [
-  { key: 'area',      label: '🏢 Khu vực phụ trách' },
-  { key: 'residents', label: '👴 Cư dân phụ trách' },
-  { key: 'tasks',     label: '📋 Nhiệm vụ chăm sóc' },
+const TABS = (t) => [
+  { key: 'area', label: `🏢 ${t('admin.staff.assignments.tabArea')}` },
+  { key: 'residents', label: `👴 ${t('admin.staff.assignments.tabResidents')}` },
+  { key: 'tasks', label: `📋 ${t('admin.staff.assignments.tabTasks')}` },
 ];
 
 export default function StaffAssignmentPage() {
+  const { t } = useTranslation();
+  const tabs = TABS(t);
   const [activeTab, setActiveTab] = useState('area');
   const [assignmentDate, setAssignmentDate] = useState(today());
-  const [staff, setStaff]         = useState([]);
+  const [allStaff, setAllStaff]   = useState([]);
   const [loading, setLoading]     = useState(false);
+  const { search: staffSearch, setSearch: setStaffSearch, debouncedSearch: debouncedStaffSearch } = useDebouncedSearch();
+  const displayNow = useMinuteNow(assignmentDate === todayVN());
+
+  const filteredStaff = useMemo(() => {
+    const withShift = allStaff.filter((s) =>
+      hasActiveShiftOnDate(s, assignmentDate, displayNow)
+    );
+    const q = debouncedStaffSearch.trim().toLowerCase();
+    if (!q) return withShift;
+    return withShift.filter(
+      (s) =>
+        (s.fullName || '').toLowerCase().includes(q)
+        || (s.staffProfile?.staffCode || '').toLowerCase().includes(q)
+    );
+  }, [allStaff, debouncedStaffSearch, assignmentDate, displayNow]);
+
+  const {
+    paginatedItems: paginatedStaff,
+    page: staffPage,
+    setPage: setStaffPage,
+    totalPages: staffTotalPages,
+    total: staffTotal,
+  } = useClientPagination(filteredStaff);
+
+  const staffPagination = {
+    page: staffPage,
+    totalPages: staffTotalPages,
+    total: staffTotal,
+    onPageChange: setStaffPage,
+  };
 
   useEffect(() => {
     const minDate = today();
@@ -1315,9 +1543,9 @@ export default function StaffAssignmentPage() {
     setLoading(true);
     try {
       const res = await staffService.getAll({ limit: 100, assignmentDate });
-      setStaff(filterAssignableStaff(res.data));
+      setAllStaff(filterAssignableStaff(res.data || res));
     } catch {
-      setStaff([]);
+      setAllStaff([]);
     } finally {
       setLoading(false);
     }
@@ -1329,12 +1557,12 @@ export default function StaffAssignmentPage() {
 
   return (
     <AdminPageShell
-      title="Phân công nhân viên"
-      subtitle="Khu vực phụ trách, cư dân chăm sóc và nhiệm vụ theo ca"
+      title={t('admin.staff.assignments.title')}
+      subtitle={t('admin.staff.assignments.subtitle')}
     >
       <div className="assignment-toolbar">
         <label className="assignment-toolbar__label" htmlFor="assignment-date">
-          Ngày phân công
+          {t('admin.staff.assignments.assignmentDate')}
         </label>
         <input
           id="assignment-date"
@@ -1346,18 +1574,26 @@ export default function StaffAssignmentPage() {
         />
         <span className="assignment-toolbar__hint">{formatDateVi(assignmentDate)}</span>
         <span className="assignment-toolbar__note">
-          Ca hiển thị: đã đăng / đã xác nhận · Tầng/phòng lưu cố định trên hồ sơ
+          Chỉ hiển thị nhân viên có ca trong ngày đã chọn · Ca: đã đăng / đã xác nhận, chưa kết thúc (giờ VN) · Tầng/phòng lưu cố định trên hồ sơ
         </span>
+        <input
+          type="search"
+          className="assignment-toolbar__search"
+          placeholder="Tìm tên nhân viên..."
+          value={staffSearch}
+          onChange={(e) => setStaffSearch(e.target.value)}
+          style={{ marginLeft: 'auto', padding: '7px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: '0.875rem' }}
+        />
       </div>
 
       <div className="tabs">
-        {TABS.map((t) => (
+        {tabs.map((tabItem) => (
           <button
-            key={t.key}
-            className={`tab-btn ${activeTab === t.key ? 'tab-btn--active' : ''}`}
-            onClick={() => setActiveTab(t.key)}
+            key={tabItem.key}
+            className={`tab-btn ${activeTab === tabItem.key ? 'tab-btn--active' : ''}`}
+            onClick={() => setActiveTab(tabItem.key)}
           >
-            {t.label}
+            {tabItem.label}
           </button>
         ))}
       </div>
@@ -1365,22 +1601,28 @@ export default function StaffAssignmentPage() {
       <div className="tab-content">
         {activeTab === 'area'      && (
           <AreaTab
-            staff={staff}
+            staff={paginatedStaff}
+            staffPool={filteredStaff}
             loading={loading}
             assignmentDate={assignmentDate}
+            displayNow={displayNow}
             onStaffUpdated={loadStaff}
+            staffPagination={staffPagination}
           />
         )}
         {activeTab === 'residents' && (
           <ResidentTab
-            staff={staff}
+            staff={paginatedStaff}
+            staffPool={filteredStaff}
             loading={loading}
             assignmentDate={assignmentDate}
+            displayNow={displayNow}
             onStaffUpdated={loadStaff}
+            staffPagination={staffPagination}
           />
         )}
         {activeTab === 'tasks'     && (
-          <CareTaskTab assignmentDate={assignmentDate} staff={staff} />
+          <CareTaskTab assignmentDate={assignmentDate} staff={allStaff} />
         )}
       </div>
     </AdminPageShell>

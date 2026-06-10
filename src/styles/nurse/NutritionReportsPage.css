@@ -1,69 +1,12 @@
-.nutrition-reports {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.nutrition-reports__title {
-  margin: 0;
-  padding: 18px 22px;
-  border-radius: 18px;
-  background: linear-gradient(135deg, #0f172a 0%, #134e4a 100%);
-  color: #f8fafc;
-  font-size: 1.75rem;
-  font-weight: 700;
-  box-shadow: 0 18px 34px rgba(15, 23, 42, 0.24);
-}
-
-.nutrition-reports__intro {
-  margin: 0;
-  padding: 12px 14px;
-  border: 1px solid #dbeafe;
-  background: #f8fafc;
-  border-radius: 12px;
-  color: #475569;
-  line-height: 1.6;
-}
-
-.nutrition-reports__filters,
-.nutrition-reports__kpi-grid,
-.nutrition-reports__table-wrap,
-.nutrition-reports__day-block {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 16px;
-  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.06);
-}
-
-.nutrition-reports__filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  align-items: flex-end;
-  padding: 16px;
-}
-
-.nutrition-reports__filters label {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #475569;
-}
-
-.nutrition-reports__filters input[type='date'],
-.nutrition-reports__filters input[type='search'] {
-  padding: 8px 10px;
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  min-width: 140px;
-}
-
-.nutrition-reports__filter-actions {
-  display: flex;
-  flex-wrap: wrap;
+.nutrition-reports__checkbox-filter {
+  flex-direction: row !important;
+  align-items: center;
   gap: 8px;
+}
+
+.nutrition-reports__checkbox-filter input[type='checkbox'] {
+  width: auto;
+  min-width: 0;
 }
 
 .nutrition-reports__kpi-grid {
@@ -71,6 +14,11 @@
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   gap: 12px;
   padding: 16px;
+  margin-bottom: 16px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.06);
 }
 
 .nutrition-reports__kpi {
@@ -94,11 +42,6 @@
 
 .nutrition-reports__kpi--warn .nutrition-reports__kpi-value {
   color: #b45309;
-}
-
-.nutrition-reports__table-wrap {
-  padding: 0;
-  overflow-x: auto;
 }
 
 .nutrition-reports__status-yes {
@@ -168,6 +111,10 @@
 .nutrition-reports__day-block {
   margin-bottom: 12px;
   padding: 12px 14px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.06);
 }
 
 .nutrition-reports__day-title {
@@ -201,4 +148,10 @@
   font-size: 0.75rem;
   color: #64748b;
   margin-bottom: 4px;
+}
+
+@media (max-width: 768px) {
+  .nutrition-reports__kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
