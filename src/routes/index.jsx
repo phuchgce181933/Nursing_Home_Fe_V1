@@ -79,6 +79,8 @@ import HealthMonitoringPage from '../pages/shared/HealthMonitoringPage';
 import CareNotesPage from '../pages/shared/CareNotesPage';
 import ManagerActivityDashboard from '../pages/manager/ActivityDashboard';
 import ProtectedRoute from '../components/ProtectedRoute';
+import MessagesPage from '../pages/shared/MessagesPage';
+import GuestContact from '../pages/shared/GuestContact';
 
 function AppRoutes() {
   return (
@@ -120,6 +122,7 @@ function AppRoutes() {
         <Route path="staff/leave-requests" element={<LeaveRequestAdminPage />} />
         <Route path="residents/create" element={<ResidentPage defaultMode="create" />} />
         <Route path="profile" element={<AdminProfile />} />
+        <Route path="messages" element={<MessagesPage />} />
         <Route path="accounts" element={<AdminAccountsPage />} />
         <Route path="admission-requests" element={<AdminAdmissionRequestsPage />} />
         <Route path="appointments" element={<CareAppointmentsPage />} />
@@ -182,7 +185,7 @@ function AppRoutes() {
         <Route path="my-shifts" element={<MyShiftsPage />} />
         <Route path="care-tasks" element={<DailyCareSchedulePage />} />
         <Route path="leave" element={<LeaveRequestPage />} />
-        <Route path="messages" element={<PlaceholderPage title="Tin nhắn" />} />
+        <Route path="messages" element={<MessagesPage />} />
         <Route path="incidents" element={<IncidentManagementPage />} />
       </Route>
 
@@ -212,7 +215,7 @@ function AppRoutes() {
         <Route path="care-tasks" element={<DailyCareSchedulePage />} />
         <Route path="activity-schedule" element={<ActivitySchedulePage />} />
         <Route path="leave" element={<LeaveRequestPage />} />
-        <Route path="messages" element={<PlaceholderPage title="Tin nhắn" />} />
+        <Route path="messages" element={<MessagesPage />} />
         <Route path="incidents" element={<IncidentManagementPage />} />
       </Route>
 
@@ -289,10 +292,11 @@ function AppRoutes() {
         <Route path="activities" element={<FamilyActivityPage />} />
         <Route path="resident" element={<PlaceholderPage title="Hồ sơ người thân" />} />
         <Route path="notifications" element={<PlaceholderPage title="Thông báo" />} />
-        <Route path="messages" element={<PlaceholderPage title="Tin nhắn" />} />
+        <Route path="messages" element={<MessagesPage />} />
       </Route>
 
       <Route path="/services" element={<ServicesPage />} />
+      <Route path="/guest-contact" element={<GuestContact />} />
       <Route path="/" element={<HomePage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
