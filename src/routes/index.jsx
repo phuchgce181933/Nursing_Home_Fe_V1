@@ -119,6 +119,7 @@ function AppRoutes() {
         <Route path="floors" element={<FacilitiesPage defaultTab="floors" />} />
         <Route path="rooms" element={<FacilitiesPage defaultTab="rooms" />} />
         <Route path="beds" element={<FacilitiesPage defaultTab="beds" />} />
+        <Route path="equipment" element={<FacilitiesPage defaultTab="equipment" />} />
         <Route path="staff/profiles" element={<StaffProfilesPage />} />
         <Route path="staff/shifts" element={<ShiftManagementPage />} />
         <Route path="staff/assignments" element={<StaffAssignmentPage />} />
