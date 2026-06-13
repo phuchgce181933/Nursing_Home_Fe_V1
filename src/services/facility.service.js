@@ -50,6 +50,21 @@ const deleteFloor = (id) =>
 const createRoom = (data) =>
   axiosClient.post('/facilities/rooms', data).then(unwrap);
 
+const updateRoom = (id, data) =>
+  axiosClient.put(`/facilities/rooms/${id}`, data).then(unwrap);
+
+const deleteRoom = (id) =>
+  axiosClient.delete(`/facilities/rooms/${id}`).then(unwrap);
+
+const listBedsByRoom = (roomId, params = {}) =>
+  axiosClient.get(`/facilities/rooms/${roomId}/beds`, { params }).then(unwrap);
+
+const createBed = (data) =>
+  axiosClient.post('/facilities/beds', data).then(unwrap);
+
+const updateBed = (id, data) =>
+  axiosClient.put(`/facilities/beds/${id}`, data).then(unwrap);
+
 const facilityService = {
   listBuildings,
   listFloors,
@@ -63,6 +78,11 @@ const facilityService = {
   updateFloor,
   deleteFloor,
   createRoom,
+  updateRoom,
+  deleteRoom,
+  listBedsByRoom,
+  createBed,
+  updateBed,
 };
 
 export default facilityService;

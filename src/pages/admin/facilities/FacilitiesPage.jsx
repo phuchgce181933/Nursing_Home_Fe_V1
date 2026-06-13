@@ -72,14 +72,30 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
   const [formFloorDescription, setFormFloorDescription] = useState('');
   const [formFloorIsActive, setFormFloorIsActive] = useState(true);
 
-  // 3. Modals & Form States for Room (Branch 2 - Room Creation only)
+  // 3. Modals & Form States for Room (Branch 2 - Room Creation only, Branch 3 - Edit & Delete)
   const [showCreateRoomModal, setShowCreateRoomModal] = useState(false);
+  const [showEditRoomModal, setShowEditRoomModal] = useState(false);
+  const [showDeleteRoomModal, setShowDeleteRoomModal] = useState(false);
+  const [selectedRoom, setSelectedRoom] = useState(null);
+
   const [formRoomBuildingId, setFormRoomBuildingId] = useState('');
   const [formRoomFloorId, setFormRoomFloorId] = useState('');
   const [formRoomNumber, setFormRoomNumber] = useState('');
   const [formRoomType, setFormRoomType] = useState('standard');
   const [formRoomCapacity, setFormRoomCapacity] = useState(2);
+  const [formRoomStatus, setFormRoomStatus] = useState('available');
   const [formRoomNotes, setFormRoomNotes] = useState('');
+
+  // 4. Modals & Form States for Bed (Branch 3 - Bed Create & Edit)
+  const [showCreateBedModal, setShowCreateBedModal] = useState(false);
+  const [showEditBedModal, setShowEditBedModal] = useState(false);
+  const [selectedBed, setSelectedBed] = useState(null);
+
+  const [formBedCode, setFormBedCode] = useState('');
+  const [formBedType, setFormBedType] = useState('normal');
+  const [formBedCondition, setFormBedCondition] = useState('good');
+  const [formBedStatus, setFormBedStatus] = useState('available');
+  const [formBedNotes, setFormBedNotes] = useState('');
 
   // Sync tab state when defaultTab prop changes
   useEffect(() => {
@@ -150,13 +166,13 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
     fetchRooms();
   }, [activeTab, selectedFloorId]);
 
-  // Fetch beds when active tab is beds and selectedRoomId changes
+  // Fetch beds when active tab is beds and selectedRoomId changes (fetch ALL beds for admin management)
   useEffect(() => {
     const fetchBeds = async () => {
       if (activeTab === 'beds' && selectedRoomId) {
         try {
           setLoading(true);
-          const loadedBeds = await facilityService.listAvailableBedsByRoom(selectedRoomId);
+          const loadedBeds = await facilityService.listBedsByRoom(selectedRoomId, { all: true });
           setBeds(loadedBeds || []);
         } catch (err) {
           console.error(err);
@@ -404,6 +420,162 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
     }
   };
 
+  // ----------------------------------------------------
+  // Room Edit/Delete Handlers (Branch 3)
+  // ----------------------------------------------------
+  const handleOpenEditRoom = (r) => {
+    setSelectedRoom(r);
+    setFormRoomBuildingId(r.buildingId?._id || r.buildingId || '');
+    setFormRoomFloorId(r.floorId?._id || r.floorId || '');
+    setFormRoomNumber(r.roomNumber || '');
+    setFormRoomType(r.roomType || 'standard');
+    setFormRoomCapacity(r.capacity || 2);
+    setFormRoomStatus(r.status || 'available');
+    setFormRoomNotes(r.notes || '');
+    setFormError(null);
+    setShowEditRoomModal(true);
+  };
+
+  const handleOpenDeleteRoom = (r) => {
+    setSelectedRoom(r);
+    setShowDeleteRoomModal(true);
+  };
+
+  const handleUpdateRoom = async (e) => {
+    e.preventDefault();
+    if (!selectedRoom?._id) return;
+    if (!formRoomNumber.trim()) return setFormError('Số phòng là bắt buộc');
+    if (formRoomCapacity < 1) return setFormError('Sức chứa phải từ 1 trở lên');
+
+    try {
+      setSubmitting(true);
+      setFormError(null);
+      await facilityService.updateRoom(selectedRoom._id, {
+        roomNumber: formRoomNumber.trim(),
+        roomType: formRoomType,
+        capacity: Number(formRoomCapacity),
+        status: formRoomStatus,
+        notes: formRoomNotes.trim(),
+      });
+      setShowEditRoomModal(false);
+      // Refresh current floor's rooms
+      if (selectedFloorId) {
+        setLoading(true);
+        const loadedRooms = await facilityService.listRoomsByFloor(selectedFloorId);
+        setRooms(loadedRooms || []);
+      }
+      fetchData();
+    } catch (err) {
+      console.error(err);
+      setFormError(err.response?.data?.message || 'Cập nhật phòng thất bại.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeleteRoom = async () => {
+    if (!selectedRoom?._id) return;
+    try {
+      setSubmitting(true);
+      await facilityService.deleteRoom(selectedRoom._id);
+      setShowDeleteRoomModal(false);
+      // Refresh current floor's rooms
+      if (selectedFloorId) {
+        setLoading(true);
+        const loadedRooms = await facilityService.listRoomsByFloor(selectedFloorId);
+        setRooms(loadedRooms || []);
+      }
+      fetchData();
+    } catch (err) {
+      console.error(err);
+      alert(err.response?.data?.message || 'Đóng phòng thất bại.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // ----------------------------------------------------
+  // Bed CRUD Handlers (Branch 3)
+  // ----------------------------------------------------
+  const handleOpenCreateBed = () => {
+    setFormBedCode('');
+    setFormBedType('normal');
+    setFormBedCondition('good');
+    setFormBedStatus('available');
+    setFormBedNotes('');
+    setFormError(null);
+    setShowCreateBedModal(true);
+  };
+
+  const handleOpenEditBed = (b) => {
+    setSelectedBed(b);
+    setFormBedCode(b.bedCode || '');
+    setFormBedType(b.bedType || 'normal');
+    setFormBedCondition(b.condition || 'good');
+    setFormBedStatus(b.status || 'available');
+    setFormBedNotes(b.notes || '');
+    setFormError(null);
+    setShowEditBedModal(true);
+  };
+
+  const handleCreateBed = async (e) => {
+    e.preventDefault();
+    if (!selectedRoomId) return setFormError('Vui lòng chọn phòng');
+    if (!formBedCode.trim()) return setFormError('Mã giường là bắt buộc');
+
+    try {
+      setSubmitting(true);
+      setFormError(null);
+      await facilityService.createBed({
+        roomId: selectedRoomId,
+        bedCode: formBedCode.trim(),
+        bedType: formBedType,
+        condition: formBedCondition,
+        notes: formBedNotes.trim(),
+      });
+      setShowCreateBedModal(false);
+      // Refresh beds for this room
+      setLoading(true);
+      const loadedBeds = await facilityService.listBedsByRoom(selectedRoomId, { all: true });
+      setBeds(loadedBeds || []);
+      fetchData();
+    } catch (err) {
+      console.error(err);
+      setFormError(err.response?.data?.message || 'Tạo giường thất bại.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleUpdateBed = async (e) => {
+    e.preventDefault();
+    if (!selectedBed?._id) return;
+    if (!formBedCode.trim()) return setFormError('Mã giường là bắt buộc');
+
+    try {
+      setSubmitting(true);
+      setFormError(null);
+      await facilityService.updateBed(selectedBed._id, {
+        bedCode: formBedCode.trim(),
+        bedType: formBedType,
+        condition: formBedCondition,
+        status: formBedStatus,
+        notes: formBedNotes.trim(),
+      });
+      setShowEditBedModal(false);
+      // Refresh beds for this room
+      setLoading(true);
+      const loadedBeds = await facilityService.listBedsByRoom(selectedRoomId, { all: true });
+      setBeds(loadedBeds || []);
+      fetchData();
+    } catch (err) {
+      console.error(err);
+      setFormError(err.response?.data?.message || 'Cập nhật giường thất bại.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   // Filter buildings by search term
   const filteredBuildings = buildings.filter(b => 
     b.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -431,6 +603,11 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
         {activeTab === 'rooms' && (
           <button onClick={handleOpenCreateRoom} className="fac-btn-primary">
             <Plus size={16} /> Thêm Phòng
+          </button>
+        )}
+        {activeTab === 'beds' && selectedRoomId && (
+          <button onClick={handleOpenCreateBed} className="fac-btn-primary">
+            <Plus size={16} /> Thêm Giường
           </button>
         )}
       </div>
@@ -704,9 +881,9 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                   ))}
               </select>
             </div>
-            <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs px-3 py-2 rounded-xl flex items-center gap-2">
-              <AlertTriangle size={14} />
-              <span>Chỉnh sửa và Xóa Phòng sẽ khả dụng trong phân đoạn tiếp theo.</span>
+            <div className="bg-blue-50 border border-blue-200 text-blue-800 text-xs px-3 py-2 rounded-xl flex items-center gap-2">
+              <Activity size={14} />
+              <span>Quản lý danh sách phòng và giường.</span>
             </div>
           </div>
 
@@ -737,6 +914,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                     <th>Sức Chứa</th>
                     <th>Đang Ở</th>
                     <th>Trạng thái</th>
+                    <th style={{ textAlign: 'right' }}>Hành động</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -752,8 +930,27 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                           r.status === 'full' ? 'fac-badge--warning' : 'fac-badge--danger'
                         }`}>
                           {r.status === 'available' ? 'Còn giường' :
-                           r.status === 'full' ? 'Đã đầy' : 'Bảo trì/Đóng'}
+                           r.status === 'full' ? 'Đã đầy' :
+                           r.status === 'maintenance' ? 'Bảo trì' : 'Đóng'}
                         </span>
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        <button
+                          onClick={() => handleOpenEditRoom(r)}
+                          className="fac-btn-icon fac-btn-icon--edit"
+                          title="Sửa"
+                        >
+                          <Edit size={16} />
+                        </button>
+                        {r.status !== 'closed' && (
+                          <button
+                            onClick={() => handleOpenDeleteRoom(r)}
+                            className="fac-btn-icon fac-btn-icon--delete"
+                            title="Xóa"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -832,7 +1029,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
           ) : beds.length === 0 ? (
             <div className="fac-table-card">
               <div className="fac-empty-box">
-                Không có giường trống nào trong phòng này (hoặc phòng đã đầy).
+                Không tìm thấy giường nào trong phòng này. Bạn có thể nhấn nút "Thêm Giường" để tạo mới.
               </div>
             </div>
           ) : (
@@ -844,6 +1041,8 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                     <th>Loại Giường</th>
                     <th>Trạng thái</th>
                     <th>Tình trạng</th>
+                    <th>Ghi chú</th>
+                    <th style={{ textAlign: 'right' }}>Hành động</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -852,8 +1051,13 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                       <td style={{ fontWeight: '600' }}>{b.bedCode}</td>
                       <td style={{ textTransform: 'capitalize' }}>{b.bedType}</td>
                       <td>
-                        <span className={`fac-badge ${b.status === 'available' ? 'fac-badge--success' : 'fac-badge--danger'}`}>
-                          {b.status === 'available' ? 'Trống' : b.status}
+                        <span className={`fac-badge ${
+                          b.status === 'available' ? 'fac-badge--success' :
+                          b.status === 'occupied' ? 'fac-badge--danger' : 'fac-badge--warning'
+                        }`}>
+                          {b.status === 'available' ? 'Trống' :
+                           b.status === 'occupied' ? 'Đang sử dụng' :
+                           b.status === 'reserved' ? 'Đặt trước' : 'Bảo trì'}
                         </span>
                       </td>
                       <td>
@@ -863,6 +1067,16 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                         }`}>
                           {b.condition === 'good' ? 'Tốt' : b.condition === 'fair' ? 'Trung bình' : 'Hỏng'}
                         </span>
+                      </td>
+                      <td>{b.notes || '—'}</td>
+                      <td style={{ textAlign: 'right' }}>
+                        <button
+                          onClick={() => handleOpenEditBed(b)}
+                          className="fac-btn-icon fac-btn-icon--edit"
+                          title="Sửa"
+                        >
+                          <Edit size={16} />
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -1344,6 +1558,301 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                 </button>
                 <button type="submit" disabled={submitting} className="fac-btn fac-btn--primary">
                   {submitting ? 'Đang tạo...' : 'Tạo mới'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT ROOM MODAL */}
+      {showEditRoomModal && (
+        <div className="fac-modal-backdrop" onClick={() => setShowEditRoomModal(false)}>
+          <div className="fac-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="fac-modal-header">
+              <h3>Chỉnh Sửa Phòng</h3>
+              <button onClick={() => setShowEditRoomModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleUpdateRoom}>
+              <div className="fac-modal-body">
+                {formError && (
+                  <div className="bg-red-50 border border-red-200 text-red-600 text-xs p-3 rounded-lg mb-4">
+                    {formError}
+                  </div>
+                )}
+                <div className="fac-form-group">
+                  <label>Số Phòng *</label>
+                  <input
+                    type="text"
+                    className="fac-form-control"
+                    value={formRoomNumber}
+                    onChange={(e) => setFormRoomNumber(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="fac-form-group">
+                    <label>Loại Phòng</label>
+                    <select
+                      className="fac-form-control"
+                      value={formRoomType}
+                      onChange={(e) => setFormRoomType(e.target.value)}
+                    >
+                      <option value="standard">Standard</option>
+                      <option value="premium">Premium</option>
+                      <option value="icu">ICU</option>
+                      <option value="isolation">Isolation</option>
+                    </select>
+                  </div>
+                  <div className="fac-form-group">
+                    <label>Sức Chứa (Giường) *</label>
+                    <input
+                      type="number"
+                      className="fac-form-control"
+                      min="1"
+                      value={formRoomCapacity}
+                      onChange={(e) => setFormRoomCapacity(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="fac-form-group">
+                  <label>Trạng Thái Phòng</label>
+                  <select
+                    className="fac-form-control"
+                    value={formRoomStatus}
+                    onChange={(e) => setFormRoomStatus(e.target.value)}
+                  >
+                    <option value="available">Còn giường / Trống</option>
+                    <option value="full">Đã đầy</option>
+                    <option value="maintenance">Bảo trì</option>
+                    <option value="closed">Đóng / Tạm khóa</option>
+                  </select>
+                </div>
+                <div className="fac-form-group">
+                  <label>Ghi Chú</label>
+                  <textarea
+                    className="fac-form-control"
+                    style={{ minHeight: '60px' }}
+                    value={formRoomNotes}
+                    onChange={(e) => setFormRoomNotes(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="fac-modal-footer">
+                <button type="button" onClick={() => setShowEditRoomModal(false)} className="fac-btn fac-btn--secondary">
+                  Hủy
+                </button>
+                <button type="submit" disabled={submitting} className="fac-btn fac-btn--primary">
+                  {submitting ? 'Đang lưu...' : 'Lưu Thay Đổi'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE ROOM MODAL */}
+      {showDeleteRoomModal && (
+        <div className="fac-modal-backdrop" onClick={() => setShowDeleteRoomModal(false)}>
+          <div className="fac-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="fac-modal-header" style={{ background: '#fef2f2' }}>
+              <h3 style={{ color: '#dc2626' }}>Đóng Phòng?</h3>
+              <button onClick={() => setShowDeleteRoomModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+                <X size={18} />
+              </button>
+            </div>
+            <div className="fac-modal-body">
+              <div className="flex gap-3" style={{ alignItems: 'flex-start' }}>
+                <AlertTriangle size={36} className="text-red-500" style={{ flexShrink: 0 }} />
+                <div>
+                  <p style={{ margin: '0 0 10px 0', fontWeight: '600' }}>
+                    Bạn có chắc chắn muốn đóng phòng <strong>{selectedRoom?.roomNumber}</strong>?
+                  </p>
+                  <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>
+                    Hành động này sẽ thiết lập trạng thái phòng thành Đóng (Closed) và tự động chuyển toàn bộ giường trong phòng này sang trạng thái Bảo trì (Maintenance).
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="fac-modal-footer">
+              <button type="button" onClick={() => setShowDeleteRoomModal(false)} className="fac-btn fac-btn--secondary">
+                Hủy
+              </button>
+              <button type="button" onClick={handleDeleteRoom} disabled={submitting} className="fac-btn fac-btn--danger">
+                {submitting ? 'Đang đóng...' : 'Xác Nhận Đóng'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CREATE BED MODAL */}
+      {showCreateBedModal && (
+        <div className="fac-modal-backdrop" onClick={() => setShowCreateBedModal(false)}>
+          <div className="fac-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="fac-modal-header">
+              <h3>Thêm Giường Mới</h3>
+              <button onClick={() => setShowCreateBedModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleCreateBed}>
+              <div className="fac-modal-body">
+                {formError && (
+                  <div className="bg-red-50 border border-red-200 text-red-600 text-xs p-3 rounded-lg mb-4">
+                    {formError}
+                  </div>
+                )}
+                <div className="fac-form-group">
+                  <label>Mã Giường *</label>
+                  <input
+                    type="text"
+                    className="fac-form-control"
+                    placeholder="Ví dụ: G101A, G101B"
+                    value={formBedCode}
+                    onChange={(e) => setFormBedCode(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="fac-form-group">
+                    <label>Loại Giường</label>
+                    <select
+                      className="fac-form-control"
+                      value={formBedType}
+                      onChange={(e) => setFormBedType(e.target.value)}
+                    >
+                      <option value="normal">Normal</option>
+                      <option value="electric">Electric</option>
+                      <option value="icu">ICU</option>
+                    </select>
+                  </div>
+                  <div className="fac-form-group">
+                    <label>Tình Trạng</label>
+                    <select
+                      className="fac-form-control"
+                      value={formBedCondition}
+                      onChange={(e) => setFormBedCondition(e.target.value)}
+                    >
+                      <option value="good">Tốt</option>
+                      <option value="fair">Trung bình</option>
+                      <option value="broken">Hỏng</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="fac-form-group">
+                  <label>Ghi Chú</label>
+                  <textarea
+                    className="fac-form-control"
+                    style={{ minHeight: '60px' }}
+                    placeholder="Nhập ghi chú giường..."
+                    value={formBedNotes}
+                    onChange={(e) => setFormBedNotes(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="fac-modal-footer">
+                <button type="button" onClick={() => setShowCreateBedModal(false)} className="fac-btn fac-btn--secondary">
+                  Hủy
+                </button>
+                <button type="submit" disabled={submitting} className="fac-btn fac-btn--primary">
+                  {submitting ? 'Đang tạo...' : 'Tạo mới'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT BED MODAL */}
+      {showEditBedModal && (
+        <div className="fac-modal-backdrop" onClick={() => setShowEditBedModal(false)}>
+          <div className="fac-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="fac-modal-header">
+              <h3>Chỉnh Sửa Giường</h3>
+              <button onClick={() => setShowEditBedModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleUpdateBed}>
+              <div className="fac-modal-body">
+                {formError && (
+                  <div className="bg-red-50 border border-red-200 text-red-600 text-xs p-3 rounded-lg mb-4">
+                    {formError}
+                  </div>
+                )}
+                <div className="fac-form-group">
+                  <label>Mã Giường *</label>
+                  <input
+                    type="text"
+                    className="fac-form-control"
+                    value={formBedCode}
+                    onChange={(e) => setFormBedCode(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="fac-form-group">
+                    <label>Loại Giường</label>
+                    <select
+                      className="fac-form-control"
+                      value={formBedType}
+                      onChange={(e) => setFormBedType(e.target.value)}
+                    >
+                      <option value="normal">Normal</option>
+                      <option value="electric">Electric</option>
+                      <option value="icu">ICU</option>
+                    </select>
+                  </div>
+                  <div className="fac-form-group">
+                    <label>Tình Trạng</label>
+                    <select
+                      className="fac-form-control"
+                      value={formBedCondition}
+                      onChange={(e) => setFormBedCondition(e.target.value)}
+                    >
+                      <option value="good">Tốt</option>
+                      <option value="fair">Trung bình</option>
+                      <option value="broken">Hỏng</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="fac-form-group">
+                  <label>Trạng Thái Giường</label>
+                  <select
+                    className="fac-form-control"
+                    value={formBedStatus}
+                    onChange={(e) => setFormBedStatus(e.target.value)}
+                    disabled={selectedBed?.status === 'occupied'}
+                  >
+                    <option value="available">Trống</option>
+                    <option value="occupied" disabled>Đang sử dụng</option>
+                    <option value="reserved">Đặt trước</option>
+                    <option value="maintenance">Bảo trì</option>
+                  </select>
+                  {selectedBed?.status === 'occupied' && (
+                    <p className="text-xs text-amber-600 mt-1">Giường đang được sử dụng bởi cư dân, không thể chuyển trạng thái thủ công.</p>
+                  )}
+                </div>
+                <div className="fac-form-group">
+                  <label>Ghi Chú</label>
+                  <textarea
+                    className="fac-form-control"
+                    style={{ minHeight: '60px' }}
+                    value={formBedNotes}
+                    onChange={(e) => setFormBedNotes(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="fac-modal-footer">
+                <button type="button" onClick={() => setShowEditBedModal(false)} className="fac-btn fac-btn--secondary">
+                  Hủy
+                </button>
+                <button type="submit" disabled={submitting} className="fac-btn fac-btn--primary">
+                  {submitting ? 'Đang lưu...' : 'Lưu Thay Đổi'}
                 </button>
               </div>
             </form>
