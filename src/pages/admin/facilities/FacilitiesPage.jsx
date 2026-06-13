@@ -44,20 +44,42 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
   const [selectedFloorId, setSelectedFloorId] = useState('');
   const [selectedRoomId, setSelectedRoomId] = useState('');
 
-  // Modals for Building CRUD (Branch 1)
+  // Submitting/Form statuses
+  const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState(null);
+
+  // 1. Modals & Form States for Building (Branch 1)
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedBuilding, setSelectedBuilding] = useState(null);
 
-  // Form states for Building
   const [formCode, setFormCode] = useState('');
   const [formName, setFormName] = useState('');
   const [formAddress, setFormAddress] = useState('');
   const [formDescription, setFormDescription] = useState('');
   const [formIsActive, setFormIsActive] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [formError, setFormError] = useState(null);
+
+  // 2. Modals & Form States for Floor (Branch 2)
+  const [showCreateFloorModal, setShowCreateFloorModal] = useState(false);
+  const [showEditFloorModal, setShowEditFloorModal] = useState(false);
+  const [showDeleteFloorModal, setShowDeleteFloorModal] = useState(false);
+  const [selectedFloor, setSelectedFloor] = useState(null);
+
+  const [formFloorBuildingId, setFormFloorBuildingId] = useState('');
+  const [formFloorNumber, setFormFloorNumber] = useState('');
+  const [formFloorName, setFormFloorName] = useState('');
+  const [formFloorDescription, setFormFloorDescription] = useState('');
+  const [formFloorIsActive, setFormFloorIsActive] = useState(true);
+
+  // 3. Modals & Form States for Room (Branch 2 - Room Creation only)
+  const [showCreateRoomModal, setShowCreateRoomModal] = useState(false);
+  const [formRoomBuildingId, setFormRoomBuildingId] = useState('');
+  const [formRoomFloorId, setFormRoomFloorId] = useState('');
+  const [formRoomNumber, setFormRoomNumber] = useState('');
+  const [formRoomType, setFormRoomType] = useState('standard');
+  const [formRoomCapacity, setFormRoomCapacity] = useState(2);
+  const [formRoomNotes, setFormRoomNotes] = useState('');
 
   // Sync tab state when defaultTab prop changes
   useEffect(() => {
@@ -68,7 +90,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
   const handleTabChange = (tab) => {
     setActiveTab(tab);
     if (tab === 'buildings') {
-      // Since there's no direct route for /admin/buildings, we stay on the current route but update activeTab
+      // Stay on the current route but update activeTab
     } else {
       navigate(`/admin/${tab}`);
     }
@@ -90,7 +112,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
       setStats({
         buildingsCount: loadedBuildings?.length || 0,
         floorsCount: loadedFloors?.length || 0,
-        roomsCount: 0, // Will load if needed
+        roomsCount: 0,
         bedsCount: 0,
       });
 
@@ -110,10 +132,10 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
     fetchData();
   }, [fetchData]);
 
-  // Fetch rooms when active tab is rooms and selectedFloorId changes
+  // Fetch rooms when active tab is rooms/beds and selectedFloorId changes
   useEffect(() => {
     const fetchRooms = async () => {
-      if (activeTab === 'rooms' && selectedFloorId) {
+      if ((activeTab === 'rooms' || activeTab === 'beds') && selectedFloorId) {
         try {
           setLoading(true);
           const loadedRooms = await facilityService.listRoomsByFloor(selectedFloorId);
@@ -146,7 +168,9 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
     fetchBeds();
   }, [activeTab, selectedRoomId]);
 
-  // Building CRUD Handlers
+  // ----------------------------------------------------
+  // Building CRUD Handlers (Branch 1)
+  // ----------------------------------------------------
   const handleOpenCreate = () => {
     setFormCode('');
     setFormName('');
@@ -191,7 +215,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
       fetchData();
     } catch (err) {
       console.error(err);
-      setFormError(err.response?.data?.message || 'Không thể tạo tòa nhà. Vui lòng kiểm tra lại mã tòa nhà.');
+      setFormError(err.response?.data?.message || 'Không thể tạo tòa nhà.');
     } finally {
       setSubmitting(false);
     }
@@ -238,6 +262,148 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
     }
   };
 
+  // ----------------------------------------------------
+  // Floor CRUD Handlers (Branch 2)
+  // ----------------------------------------------------
+  const handleOpenCreateFloor = () => {
+    setFormFloorBuildingId(buildings[0]?._id || '');
+    setFormFloorNumber('');
+    setFormFloorName('');
+    setFormFloorDescription('');
+    setFormFloorIsActive(true);
+    setFormError(null);
+    setShowCreateFloorModal(true);
+  };
+
+  const handleOpenEditFloor = (f) => {
+    setSelectedFloor(f);
+    setFormFloorBuildingId(f.buildingId?._id || f.buildingId || '');
+    setFormFloorNumber(f.floorNumber || '');
+    setFormFloorName(f.name || '');
+    setFormFloorDescription(f.description || '');
+    setFormFloorIsActive(f.isActive !== false);
+    setFormError(null);
+    setShowEditFloorModal(true);
+  };
+
+  const handleOpenDeleteFloor = (f) => {
+    setSelectedFloor(f);
+    setShowDeleteFloorModal(true);
+  };
+
+  const handleCreateFloor = async (e) => {
+    e.preventDefault();
+    if (!formFloorBuildingId) return setFormError('Vui lòng chọn tòa nhà');
+    if (!formFloorNumber) return setFormError('Số tầng là bắt buộc');
+
+    try {
+      setSubmitting(true);
+      setFormError(null);
+      await facilityService.createFloor({
+        buildingId: formFloorBuildingId,
+        floorNumber: Number(formFloorNumber),
+        name: formFloorName.trim(),
+        description: formFloorDescription.trim(),
+      });
+      setShowCreateFloorModal(false);
+      fetchData();
+    } catch (err) {
+      console.error(err);
+      setFormError(err.response?.data?.message || 'Không thể tạo tầng.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleUpdateFloor = async (e) => {
+    e.preventDefault();
+    if (!selectedFloor?._id) return;
+    if (!formFloorNumber) return setFormError('Số tầng là bắt buộc');
+
+    try {
+      setSubmitting(true);
+      setFormError(null);
+      await facilityService.updateFloor(selectedFloor._id, {
+        floorNumber: Number(formFloorNumber),
+        name: formFloorName.trim(),
+        description: formFloorDescription.trim(),
+        isActive: formFloorIsActive,
+      });
+      setShowEditFloorModal(false);
+      fetchData();
+    } catch (err) {
+      console.error(err);
+      setFormError(err.response?.data?.message || 'Cập nhật tầng thất bại.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeleteFloor = async () => {
+    if (!selectedFloor?._id) return;
+    try {
+      setSubmitting(true);
+      await facilityService.deleteFloor(selectedFloor._id);
+      setShowDeleteFloorModal(false);
+      fetchData();
+    } catch (err) {
+      console.error(err);
+      alert(err.response?.data?.message || 'Vô hiệu hóa tầng thất bại.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // ----------------------------------------------------
+  // Room CRUD Handlers (Branch 2 - Create Room)
+  // ----------------------------------------------------
+  const handleOpenCreateRoom = () => {
+    const defaultBld = buildings[0]?._id || '';
+    setFormRoomBuildingId(defaultBld);
+    const relatedFloors = floors.filter(f => f.buildingId === defaultBld || f.buildingId?._id === defaultBld);
+    setFormRoomFloorId(relatedFloors[0]?._id || '');
+    setFormRoomNumber('');
+    setFormRoomType('standard');
+    setFormRoomCapacity(2);
+    setFormRoomNotes('');
+    setFormError(null);
+    setShowCreateRoomModal(true);
+  };
+
+  const handleCreateRoom = async (e) => {
+    e.preventDefault();
+    if (!formRoomBuildingId) return setFormError('Vui lòng chọn tòa nhà');
+    if (!formRoomFloorId) return setFormError('Vui lòng chọn tầng');
+    if (!formRoomNumber.trim()) return setFormError('Số phòng là bắt buộc');
+    if (formRoomCapacity < 1) return setFormError('Sức chứa phải từ 1 trở lên');
+
+    try {
+      setSubmitting(true);
+      setFormError(null);
+      await facilityService.createRoom({
+        buildingId: formRoomBuildingId,
+        floorId: formRoomFloorId,
+        roomNumber: formRoomNumber.trim(),
+        roomType: formRoomType,
+        capacity: Number(formRoomCapacity),
+        notes: formRoomNotes.trim(),
+      });
+      setShowCreateRoomModal(false);
+      // Refresh current floor's rooms if activeTab is rooms and matches
+      if (activeTab === 'rooms' && selectedFloorId === formRoomFloorId) {
+        setLoading(true);
+        const loadedRooms = await facilityService.listRoomsByFloor(selectedFloorId);
+        setRooms(loadedRooms || []);
+      }
+      fetchData();
+    } catch (err) {
+      console.error(err);
+      setFormError(err.response?.data?.message || 'Tạo phòng thất bại.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   // Filter buildings by search term
   const filteredBuildings = buildings.filter(b => 
     b.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -255,6 +421,16 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
         {activeTab === 'buildings' && (
           <button onClick={handleOpenCreate} className="fac-btn-primary">
             <Plus size={16} /> Thêm Tòa Nhà
+          </button>
+        )}
+        {activeTab === 'floors' && (
+          <button onClick={handleOpenCreateFloor} className="fac-btn-primary">
+            <Plus size={16} /> Thêm Tầng
+          </button>
+        )}
+        {activeTab === 'rooms' && (
+          <button onClick={handleOpenCreateRoom} className="fac-btn-primary">
+            <Plus size={16} /> Thêm Phòng
           </button>
         )}
       </div>
@@ -409,7 +585,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
         </>
       )}
 
-      {/* TAB CONTENT: FLOORS (Read Only in Branch 1) */}
+      {/* TAB CONTENT: FLOORS (CRUD Enabled in Branch 2) */}
       {activeTab === 'floors' && (
         <>
           <div className="fac-action-row">
@@ -426,18 +602,14 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                 ))}
               </select>
             </div>
-            <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs px-3 py-2 rounded-xl flex items-center gap-2">
-              <AlertTriangle size={14} />
-              <span>Thao tác quản trị Tầng (Thêm/Sửa/Xóa) sẽ khả dụng trong phân đoạn tiếp theo.</span>
-            </div>
           </div>
 
-          {loading ? (
+          {loading && floors.length === 0 ? (
             <div className="fac-loading-box">
               <Loader2 className="animate-spin mb-3 text-indigo-600" size={32} />
               <p>Đang tải dữ liệu tầng...</p>
             </div>
-          ) : floors.filter(f => !selectedBuildingId || f.buildingId === selectedBuildingId).length === 0 ? (
+          ) : floors.filter(f => !selectedBuildingId || f.buildingId === selectedBuildingId || f.buildingId?._id === selectedBuildingId).length === 0 ? (
             <div className="fac-table-card">
               <div className="fac-empty-box">
                 Không tìm thấy tầng nào thuộc tòa nhà đã chọn.
@@ -453,21 +625,40 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                     <th>Tòa nhà</th>
                     <th>Mô tả</th>
                     <th>Trạng thái</th>
+                    <th style={{ textAlign: 'right' }}>Hành động</th>
                   </tr>
                 </thead>
                 <tbody>
                   {floors
-                    .filter(f => !selectedBuildingId || f.buildingId === selectedBuildingId)
+                    .filter(f => !selectedBuildingId || f.buildingId === selectedBuildingId || f.buildingId?._id === selectedBuildingId)
                     .map((f) => (
                       <tr key={f._id}>
                         <td>Tầng {f.floorNumber}</td>
                         <td style={{ fontWeight: '550' }}>{f.name || `Tầng ${f.floorNumber}`}</td>
-                        <td>{f.building?.name || '—'}</td>
+                        <td>{f.building?.name || f.buildingId?.name || '—'}</td>
                         <td>{f.description || '—'}</td>
                         <td>
                           <span className={`fac-badge ${f.isActive !== false ? 'fac-badge--success' : 'fac-badge--danger'}`}>
-                            {f.isActive !== false ? 'Hoạt động' : 'Vô hiệu'}
+                            {f.isActive !== false ? 'Hoạt động' : 'Tạm khóa'}
                           </span>
+                        </td>
+                        <td style={{ textAlign: 'right' }}>
+                          <button
+                            onClick={() => handleOpenEditFloor(f)}
+                            className="fac-btn-icon fac-btn-icon--edit"
+                            title="Sửa"
+                          >
+                            <Edit size={16} />
+                          </button>
+                          {f.isActive !== false && (
+                            <button
+                              onClick={() => handleOpenDeleteFloor(f)}
+                              className="fac-btn-icon fac-btn-icon--delete"
+                              title="Vô hiệu hóa"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -478,7 +669,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
         </>
       )}
 
-      {/* TAB CONTENT: ROOMS (Read Only in Branch 1) */}
+      {/* TAB CONTENT: ROOMS (Creation Enabled in Branch 2) */}
       {activeTab === 'rooms' && (
         <>
           <div className="fac-action-row">
@@ -507,7 +698,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
               >
                 <option value="">Chọn Tầng...</option>
                 {floors
-                  .filter(f => f.buildingId === selectedBuildingId)
+                  .filter(f => (f.buildingId === selectedBuildingId || f.buildingId?._id === selectedBuildingId) && f.isActive !== false)
                   .map(f => (
                     <option key={f._id} value={f._id}>{f.name || `Tầng ${f.floorNumber}`}</option>
                   ))}
@@ -515,7 +706,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
             </div>
             <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs px-3 py-2 rounded-xl flex items-center gap-2">
               <AlertTriangle size={14} />
-              <span>Thao tác quản lý Phòng sẽ khả dụng trong phân đoạn tiếp theo.</span>
+              <span>Chỉnh sửa và Xóa Phòng sẽ khả dụng trong phân đoạn tiếp theo.</span>
             </div>
           </div>
 
@@ -525,7 +716,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                 Vui lòng chọn tòa nhà và tầng cụ thể để xem danh sách phòng.
               </div>
             </div>
-          ) : loading ? (
+          ) : loading && rooms.length === 0 ? (
             <div className="fac-loading-box">
               <Loader2 className="animate-spin mb-3 text-indigo-600" size={32} />
               <p>Đang tải danh sách phòng...</p>
@@ -533,7 +724,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
           ) : rooms.length === 0 ? (
             <div className="fac-table-card">
               <div className="fac-empty-box">
-                Không tìm thấy phòng nào ở tầng này.
+                Không tìm thấy phòng nào ở tầng này. Bạn có thể nhấn nút "Thêm Phòng" để tạo mới.
               </div>
             </div>
           ) : (
@@ -573,7 +764,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
         </>
       )}
 
-      {/* TAB CONTENT: BEDS (Read Only in Branch 1) */}
+      {/* TAB CONTENT: BEDS */}
       {activeTab === 'beds' && (
         <>
           <div className="fac-action-row">
@@ -606,7 +797,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
               >
                 <option value="">Chọn Tầng...</option>
                 {floors
-                  .filter(f => f.buildingId === selectedBuildingId)
+                  .filter(f => f.buildingId === selectedBuildingId || f.buildingId?._id === selectedBuildingId)
                   .map(f => (
                     <option key={f._id} value={f._id}>{f.name || `Tầng ${f.floorNumber}`}</option>
                   ))}
@@ -625,10 +816,6 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                 ))}
               </select>
             </div>
-            <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs px-3 py-2 rounded-xl flex items-center gap-2">
-              <AlertTriangle size={14} />
-              <span>Thao tác quản lý Giường sẽ khả dụng trong phân đoạn tiếp theo.</span>
-            </div>
           </div>
 
           {!selectedRoomId ? (
@@ -637,7 +824,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                 Vui lòng chọn tòa nhà, tầng và phòng cụ thể để xem danh sách giường.
               </div>
             </div>
-          ) : loading ? (
+          ) : loading && beds.length === 0 ? (
             <div className="fac-loading-box">
               <Loader2 className="animate-spin mb-3 text-indigo-600" size={32} />
               <p>Đang tải danh sách giường...</p>
@@ -838,7 +1025,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
         </div>
       )}
 
-      {/* DEACTIVATE CONFIRMATION MODAL */}
+      {/* DEACTIVATE BUILDING CONFIRMATION MODAL */}
       {showDeleteModal && (
         <div className="fac-modal-backdrop" onClick={() => setShowDeleteModal(false)}>
           <div className="fac-modal" onClick={(e) => e.stopPropagation()}>
@@ -869,6 +1056,297 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                 {submitting ? 'Đang khóa...' : 'Xác Nhận Khóa'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* CREATE FLOOR MODAL */}
+      {showCreateFloorModal && (
+        <div className="fac-modal-backdrop" onClick={() => setShowCreateFloorModal(false)}>
+          <div className="fac-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="fac-modal-header">
+              <h3>Thêm Tầng Mới</h3>
+              <button onClick={() => setShowCreateFloorModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleCreateFloor}>
+              <div className="fac-modal-body">
+                {formError && (
+                  <div className="bg-red-50 border border-red-200 text-red-600 text-xs p-3 rounded-lg mb-4">
+                    {formError}
+                  </div>
+                )}
+                <div className="fac-form-group">
+                  <label>Chọn Tòa Nhà *</label>
+                  <select
+                    className="fac-form-control"
+                    value={formFloorBuildingId}
+                    onChange={(e) => setFormFloorBuildingId(e.target.value)}
+                    required
+                  >
+                    {buildings.map(b => (
+                      <option key={b._id} value={b._id}>{b.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="fac-form-group">
+                  <label>Số Tầng (Phải là số) *</label>
+                  <input
+                    type="number"
+                    className="fac-form-control"
+                    placeholder="Ví dụ: 1, 2, 3"
+                    value={formFloorNumber}
+                    onChange={(e) => setFormFloorNumber(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="fac-form-group">
+                  <label>Tên Tầng (Tùy chọn)</label>
+                  <input
+                    type="text"
+                    className="fac-form-control"
+                    placeholder="Ví dụ: Tầng 1 - Khu A"
+                    value={formFloorName}
+                    onChange={(e) => setFormFloorName(e.target.value)}
+                  />
+                </div>
+                <div className="fac-form-group">
+                  <label>Mô Tả</label>
+                  <textarea
+                    className="fac-form-control"
+                    style={{ minHeight: '80px' }}
+                    placeholder="Nhập mô tả tầng..."
+                    value={formFloorDescription}
+                    onChange={(e) => setFormFloorDescription(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="fac-modal-footer">
+                <button type="button" onClick={() => setShowCreateFloorModal(false)} className="fac-btn fac-btn--secondary">
+                  Hủy
+                </button>
+                <button type="submit" disabled={submitting} className="fac-btn fac-btn--primary">
+                  {submitting ? 'Đang tạo...' : 'Tạo mới'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT FLOOR MODAL */}
+      {showEditFloorModal && (
+        <div className="fac-modal-backdrop" onClick={() => setShowEditFloorModal(false)}>
+          <div className="fac-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="fac-modal-header">
+              <h3>Chỉnh Sửa Tầng</h3>
+              <button onClick={() => setShowEditFloorModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleUpdateFloor}>
+              <div className="fac-modal-body">
+                {formError && (
+                  <div className="bg-red-50 border border-red-200 text-red-600 text-xs p-3 rounded-lg mb-4">
+                    {formError}
+                  </div>
+                )}
+                <div className="fac-form-group">
+                  <label>Số Tầng *</label>
+                  <input
+                    type="number"
+                    className="fac-form-control"
+                    value={formFloorNumber}
+                    onChange={(e) => setFormFloorNumber(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="fac-form-group">
+                  <label>Tên Tầng</label>
+                  <input
+                    type="text"
+                    className="fac-form-control"
+                    value={formFloorName}
+                    onChange={(e) => setFormFloorName(e.target.value)}
+                  />
+                </div>
+                <div className="fac-form-group">
+                  <label>Mô Tả</label>
+                  <textarea
+                    className="fac-form-control"
+                    style={{ minHeight: '80px' }}
+                    value={formFloorDescription}
+                    onChange={(e) => setFormFloorDescription(e.target.value)}
+                  />
+                </div>
+                <div className="fac-form-group flex items-center gap-2 mt-2">
+                  <input
+                    type="checkbox"
+                    id="floorIsActive"
+                    checked={formFloorIsActive}
+                    onChange={(e) => setFormFloorIsActive(e.target.checked)}
+                  />
+                  <label htmlFor="floorIsActive" style={{ margin: 0, cursor: 'pointer' }}>Tầng đang hoạt động</label>
+                </div>
+              </div>
+              <div className="fac-modal-footer">
+                <button type="button" onClick={() => setShowEditFloorModal(false)} className="fac-btn fac-btn--secondary">
+                  Hủy
+                </button>
+                <button type="submit" disabled={submitting} className="fac-btn fac-btn--primary">
+                  {submitting ? 'Đang lưu...' : 'Lưu Thay Đổi'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* DEACTIVATE FLOOR CONFIRMATION MODAL */}
+      {showDeleteFloorModal && (
+        <div className="fac-modal-backdrop" onClick={() => setShowDeleteFloorModal(false)}>
+          <div className="fac-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="fac-modal-header" style={{ background: '#fef2f2' }}>
+              <h3 style={{ color: '#dc2626' }}>Vô Hiệu Hóa Tầng?</h3>
+              <button onClick={() => setShowDeleteFloorModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+                <X size={18} />
+              </button>
+            </div>
+            <div className="fac-modal-body">
+              <div className="flex gap-3" style={{ alignItems: 'flex-start' }}>
+                <AlertTriangle size={36} className="text-red-500" style={{ flexShrink: 0 }} />
+                <div>
+                  <p style={{ margin: '0 0 10px 0', fontWeight: '600' }}>
+                    Bạn có chắc chắn muốn vô hiệu hóa tầng <strong>{selectedFloor?.name || `Tầng ${selectedFloor?.floorNumber}`}</strong>?
+                  </p>
+                  <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>
+                    Hành động này sẽ tạm khóa tầng này và chuyển trạng thái toàn bộ phòng thuộc tầng này sang Đóng (Closed).
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="fac-modal-footer">
+              <button type="button" onClick={() => setShowDeleteFloorModal(false)} className="fac-btn fac-btn--secondary">
+                Hủy
+              </button>
+              <button type="button" onClick={handleDeleteFloor} disabled={submitting} className="fac-btn fac-btn--danger">
+                {submitting ? 'Đang khóa...' : 'Xác Nhận Khóa'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CREATE ROOM MODAL */}
+      {showCreateRoomModal && (
+        <div className="fac-modal-backdrop" onClick={() => setShowCreateRoomModal(false)}>
+          <div className="fac-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="fac-modal-header">
+              <h3>Thêm Phòng Mới</h3>
+              <button onClick={() => setShowCreateRoomModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleCreateRoom}>
+              <div className="fac-modal-body">
+                {formError && (
+                  <div className="bg-red-50 border border-red-200 text-red-600 text-xs p-3 rounded-lg mb-4">
+                    {formError}
+                  </div>
+                )}
+                <div className="fac-form-group">
+                  <label>Chọn Tòa Nhà *</label>
+                  <select
+                    className="fac-form-control"
+                    value={formRoomBuildingId}
+                    onChange={(e) => {
+                      setFormRoomBuildingId(e.target.value);
+                      const relatedFloors = floors.filter(f => f.buildingId === e.target.value || f.buildingId?._id === e.target.value);
+                      setFormRoomFloorId(relatedFloors[0]?._id || '');
+                    }}
+                    required
+                  >
+                    <option value="">-- Chọn tòa nhà --</option>
+                    {buildings.map(b => (
+                      <option key={b._id} value={b._id}>{b.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="fac-form-group">
+                  <label>Chọn Tầng *</label>
+                  <select
+                    className="fac-form-control"
+                    value={formRoomFloorId}
+                    onChange={(e) => setFormRoomFloorId(e.target.value)}
+                    required
+                    disabled={!formRoomBuildingId}
+                  >
+                    <option value="">-- Chọn tầng --</option>
+                    {floors
+                      .filter(f => (f.buildingId === formRoomBuildingId || f.buildingId?._id === formRoomBuildingId) && f.isActive !== false)
+                      .map(f => (
+                        <option key={f._id} value={f._id}>{f.name || `Tầng ${f.floorNumber}`}</option>
+                      ))}
+                  </select>
+                </div>
+                <div className="fac-form-group">
+                  <label>Số Phòng *</label>
+                  <input
+                    type="text"
+                    className="fac-form-control"
+                    placeholder="Ví dụ: 101, 102, 201"
+                    value={formRoomNumber}
+                    onChange={(e) => setFormRoomNumber(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="fac-form-group">
+                    <label>Loại Phòng</label>
+                    <select
+                      className="fac-form-control"
+                      value={formRoomType}
+                      onChange={(e) => setFormRoomType(e.target.value)}
+                    >
+                      <option value="standard">Standard</option>
+                      <option value="premium">Premium</option>
+                      <option value="icu">ICU</option>
+                      <option value="isolation">Isolation</option>
+                    </select>
+                  </div>
+                  <div className="fac-form-group">
+                    <label>Sức Chứa (Giường) *</label>
+                    <input
+                      type="number"
+                      className="fac-form-control"
+                      min="1"
+                      value={formRoomCapacity}
+                      onChange={(e) => setFormRoomCapacity(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="fac-form-group">
+                  <label>Ghi Chú</label>
+                  <textarea
+                    className="fac-form-control"
+                    style={{ minHeight: '60px' }}
+                    placeholder="Ghi chú thêm về phòng..."
+                    value={formRoomNotes}
+                    onChange={(e) => setFormRoomNotes(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="fac-modal-footer">
+                <button type="button" onClick={() => setShowCreateRoomModal(false)} className="fac-btn fac-btn--secondary">
+                  Hủy
+                </button>
+                <button type="submit" disabled={submitting} className="fac-btn fac-btn--primary">
+                  {submitting ? 'Đang tạo...' : 'Tạo mới'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
