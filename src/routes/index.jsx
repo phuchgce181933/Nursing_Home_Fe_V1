@@ -25,6 +25,7 @@ import ManagerLeaveRequestAdminPage from '../pages/manager/staff/leave-requests'
 import RoleLayout from '../layouts/RoleLayout';
 import DashboardPage from '../pages/admin/DashboardPage';
 import ResidentPage from '../pages/admin/residents';
+import FacilitiesPage from '../pages/admin/facilities/FacilitiesPage';
 import FamilyManagementPage from '../pages/admin/residents/family';
 import ResidentsByAreaPage from '../pages/admin/residents/by-area';
 import InitialHealthPage from '../pages/admin/residents/initial-health';
@@ -115,6 +116,9 @@ function AppRoutes() {
         <Route path="residents/pre-existing-conditions" element={<PreExistingConditionsPage />} />
         <Route path="residents/drug-allergies" element={<DrugAllergiesPage />} />
         <Route path="residents/transfer-room" element={<TransferResidentPage />} />
+        <Route path="floors" element={<FacilitiesPage defaultTab="floors" />} />
+        <Route path="rooms" element={<FacilitiesPage defaultTab="rooms" />} />
+        <Route path="beds" element={<FacilitiesPage defaultTab="beds" />} />
         <Route path="staff/profiles" element={<StaffProfilesPage />} />
         <Route path="staff/shifts" element={<ShiftManagementPage />} />
         <Route path="staff/assignments" element={<StaffAssignmentPage />} />

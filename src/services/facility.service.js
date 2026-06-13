@@ -29,12 +29,24 @@ const listRoomsByFloor = (floorId) =>
 const listAvailableBedsByRoom = (roomId) =>
   axiosClient.get(`/facilities/rooms/${roomId}/beds`).then(unwrap);
 
+const createBuilding = (data) =>
+  axiosClient.post('/facilities/buildings', data).then(unwrap);
+
+const updateBuilding = (id, data) =>
+  axiosClient.put(`/facilities/buildings/${id}`, data).then(unwrap);
+
+const deleteBuilding = (id) =>
+  axiosClient.delete(`/facilities/buildings/${id}`).then(unwrap);
+
 const facilityService = {
   listBuildings,
   listFloors,
   getFloor,
   listRoomsByFloor,
   listAvailableBedsByRoom,
+  createBuilding,
+  updateBuilding,
+  deleteBuilding,
 };
 
 export default facilityService;
