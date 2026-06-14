@@ -20,6 +20,9 @@ const listBuildings = (params = {}) =>
 const listFloors = (params = {}) =>
   axiosClient.get('/facilities/floors', { params }).then(unwrap);
 
+const getStats = () =>
+  axiosClient.get('/facilities/stats').then(unwrap);
+
 const getFloor = (floorId) =>
   axiosClient.get(`/facilities/floors/${floorId}`).then(unwrap);
 
@@ -83,6 +86,7 @@ const deleteEquipment = (id) =>
 const facilityService = {
   listBuildings,
   listFloors,
+  getStats,
   getFloor,
   listRoomsByFloor,
   listAvailableBedsByRoom,

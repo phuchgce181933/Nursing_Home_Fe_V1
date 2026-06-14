@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   Building,
   Layers,
@@ -25,6 +26,7 @@ import '../../../styles/admin/FacilitiesPage.css';
 
 export default function FacilitiesPage({ defaultTab = 'buildings' }) {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState(defaultTab);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -153,18 +155,21 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
       setLoading(true);
       setError(null);
       
-      const loadedBuildings = await facilityService.listBuildings({ activeOnly: false });
-      setBuildings(loadedBuildings || []);
+      const [loadedBuildings, loadedFloors, statsData] = await Promise.all([
+        facilityService.listBuildings({ activeOnly: false }),
+        facilityService.listFloors({ activeOnly: false }),
+        facilityService.getStats(),
+      ]);
 
-      const loadedFloors = await facilityService.listFloors({ activeOnly: false });
+      setBuildings(loadedBuildings || []);
       setFloors(loadedFloors || []);
 
-      // Calculate stats
+      // Use real counts from /stats endpoint
       setStats({
-        buildingsCount: loadedBuildings?.length || 0,
-        floorsCount: loadedFloors?.length || 0,
-        roomsCount: 0,
-        bedsCount: 0,
+        buildingsCount: statsData?.buildingsCount ?? loadedBuildings?.length ?? 0,
+        floorsCount: statsData?.floorsCount ?? loadedFloors?.length ?? 0,
+        roomsCount: statsData?.roomsCount ?? 0,
+        bedsCount: statsData?.bedsCount ?? 0,
       });
 
       // Default selection
@@ -845,32 +850,32 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
       {/* Banner Header */}
       <div className="fac-header">
         <div>
-          <h1>Cấu trúc tòa nhà & Cơ sở vật chất</h1>
-          <p>Cấu hình hệ thống tòa nhà, tầng, phòng và giường phục vụ việc tiếp nhận và quản lý cư trú.</p>
+          <h1>{t('facilities.pageTitle')}</h1>
+          <p>{t('facilities.pageSubtitle')}</p>
         </div>
         {activeTab === 'buildings' && (
           <button onClick={handleOpenCreate} className="fac-btn-primary">
-            <Plus size={16} /> Thêm Tòa Nhà
+            <Plus size={16} /> {t('facilities.addBuilding')}
           </button>
         )}
         {activeTab === 'floors' && (
           <button onClick={handleOpenCreateFloor} className="fac-btn-primary">
-            <Plus size={16} /> Thêm Tầng
+            <Plus size={16} /> {t('facilities.addFloor')}
           </button>
         )}
         {activeTab === 'rooms' && (
           <button onClick={handleOpenCreateRoom} className="fac-btn-primary">
-            <Plus size={16} /> Thêm Phòng
+            <Plus size={16} /> {t('facilities.addRoom')}
           </button>
         )}
         {activeTab === 'beds' && selectedRoomId && (
           <button onClick={handleOpenCreateBed} className="fac-btn-primary">
-            <Plus size={16} /> Thêm Giường
+            <Plus size={16} /> {t('facilities.addBed')}
           </button>
         )}
         {activeTab === 'equipment' && (
           <button onClick={handleOpenCreateEq} className="fac-btn-primary">
-            <Plus size={16} /> Thêm Thiết Bị
+            <Plus size={16} /> {t('facilities.addEquipment')}
           </button>
         )}
       </div>
@@ -882,7 +887,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
             <Building size={20} />
           </div>
           <div className="fac-stat-info">
-            <span className="fac-stat-label">Tổng số Tòa nhà</span>
+            <span className="fac-stat-label">{t('facilities.totalBuildings')}</span>
             <span className="fac-stat-value">{stats.buildingsCount}</span>
           </div>
         </div>
@@ -892,7 +897,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
             <Layers size={20} />
           </div>
           <div className="fac-stat-info">
-            <span className="fac-stat-label">Tổng số Tầng</span>
+            <span className="fac-stat-label">{t('facilities.totalFloors')}</span>
             <span className="fac-stat-value">{stats.floorsCount}</span>
           </div>
         </div>
@@ -902,8 +907,8 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
             <DoorOpen size={20} />
           </div>
           <div className="fac-stat-info">
-            <span className="fac-stat-label">Tổng số Phòng</span>
-            <span className="fac-stat-value">Đang quản lý</span>
+            <span className="fac-stat-label">{t('facilities.totalRooms')}</span>
+            <span className="fac-stat-value">{stats.roomsCount}</span>
           </div>
         </div>
 
@@ -912,8 +917,8 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
             <BedIcon size={20} />
           </div>
           <div className="fac-stat-info">
-            <span className="fac-stat-label">Tổng số Giường</span>
-            <span className="fac-stat-value">Đang quản lý</span>
+            <span className="fac-stat-label">{t('facilities.totalBeds')}</span>
+            <span className="fac-stat-value">{stats.bedsCount}</span>
           </div>
         </div>
       </div>
@@ -924,31 +929,31 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
           onClick={() => handleTabChange('buildings')}
           className={`fac-tab-btn ${activeTab === 'buildings' ? 'active' : ''}`}
         >
-          <Building size={16} /> Tòa nhà
+          <Building size={16} /> {t('facilities.tabBuildings')}
         </button>
         <button
           onClick={() => handleTabChange('floors')}
           className={`fac-tab-btn ${activeTab === 'floors' ? 'active' : ''}`}
         >
-          <Layers size={16} /> Tầng
+          <Layers size={16} /> {t('facilities.tabFloors')}
         </button>
         <button
           onClick={() => handleTabChange('rooms')}
           className={`fac-tab-btn ${activeTab === 'rooms' ? 'active' : ''}`}
         >
-          <DoorOpen size={16} /> Phòng
+          <DoorOpen size={16} /> {t('facilities.tabRooms')}
         </button>
         <button
           onClick={() => handleTabChange('beds')}
           className={`fac-tab-btn ${activeTab === 'beds' ? 'active' : ''}`}
         >
-          <BedIcon size={16} /> Giường
+          <BedIcon size={16} /> {t('facilities.tabBeds')}
         </button>
         <button
           onClick={() => handleTabChange('equipment')}
           className={`fac-tab-btn ${activeTab === 'equipment' ? 'active' : ''}`}
         >
-          <Activity size={16} /> Thiết bị y tế
+          <Activity size={16} /> {t('facilities.tabEquipment')}
         </button>
       </div>
 
@@ -960,7 +965,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
               <Search className="fac-search-icon" size={16} />
               <input
                 type="text"
-                placeholder="Tìm kiếm tòa nhà theo tên hoặc mã..."
+                placeholder={t('facilities.searchBuilding')}
                 className="fac-search-input"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -971,12 +976,12 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
           {loading && buildings.length === 0 ? (
             <div className="fac-loading-box">
               <Loader2 className="animate-spin mb-3 text-indigo-600" size={32} />
-              <p>Đang tải dữ liệu tòa nhà...</p>
+              <p>{t('facilities.loadingBuildings')}</p>
             </div>
           ) : filteredBuildings.length === 0 ? (
             <div className="fac-table-card">
               <div className="fac-empty-box">
-                Không tìm thấy tòa nhà nào phù hợp.
+                {t('facilities.emptyBuildings')}
               </div>
             </div>
           ) : (
@@ -984,12 +989,12 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
               <table className="fac-table">
                 <thead>
                   <tr>
-                    <th>Mã Tòa</th>
-                    <th>Tên Tòa Nhà</th>
-                    <th>Địa chỉ</th>
-                    <th>Mô tả</th>
-                    <th>Trạng thái</th>
-                    <th style={{ textAlign: 'right' }}>Hành động</th>
+                    <th>{t('facilities.colBuildingCode')}</th>
+                    <th>{t('facilities.colBuildingName')}</th>
+                    <th>{t('facilities.colAddress')}</th>
+                    <th>{t('facilities.colDescription2')}</th>
+                    <th>{t('facilities.colStatus')}</th>
+                    <th style={{ textAlign: 'right' }}>{t('facilities.colActions')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1001,14 +1006,14 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                       <td>{b.description || '—'}</td>
                       <td>
                         <span className={`fac-badge ${b.isActive !== false ? 'fac-badge--success' : 'fac-badge--danger'}`}>
-                          {b.isActive !== false ? 'Hoạt động' : 'Tạm khóa'}
+                          {b.isActive !== false ? t('facilities.active') : t('facilities.inactive')}
                         </span>
                       </td>
                       <td style={{ textAlign: 'right' }}>
                         <button
                           onClick={() => handleOpenEdit(b)}
                           className="fac-btn-icon fac-btn-icon--edit"
-                          title="Sửa"
+                          title={t('facilities.edit')}
                         >
                           <Edit size={16} />
                         </button>
@@ -1016,7 +1021,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                           <button
                             onClick={() => handleOpenDelete(b)}
                             className="fac-btn-icon fac-btn-icon--delete"
-                            title="Vô hiệu hóa"
+                            title={t('facilities.delete')}
                           >
                             <Trash2 size={16} />
                           </button>
@@ -1031,7 +1036,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
         </>
       )}
 
-      {/* TAB CONTENT: FLOORS (CRUD Enabled in Branch 2) */}
+      {/* TAB CONTENT: FLOORS */}
       {activeTab === 'floors' && (
         <>
           <div className="fac-action-row">
@@ -1042,7 +1047,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                 value={selectedBuildingId}
                 onChange={(e) => setSelectedBuildingId(e.target.value)}
               >
-                <option value="">Lọc theo Tòa nhà...</option>
+                <option value="">{t('facilities.selectBuilding')}</option>
                 {buildings.map(b => (
                   <option key={b._id} value={b._id}>{b.name}</option>
                 ))}
@@ -1053,12 +1058,12 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
           {loading && floors.length === 0 ? (
             <div className="fac-loading-box">
               <Loader2 className="animate-spin mb-3 text-indigo-600" size={32} />
-              <p>Đang tải dữ liệu tầng...</p>
+              <p>{t('facilities.loadingFloors')}</p>
             </div>
           ) : floors.filter(f => !selectedBuildingId || f.buildingId === selectedBuildingId || f.buildingId?._id === selectedBuildingId).length === 0 ? (
             <div className="fac-table-card">
               <div className="fac-empty-box">
-                Không tìm thấy tầng nào thuộc tòa nhà đã chọn.
+                {t('facilities.emptyFloors')}
               </div>
             </div>
           ) : (
@@ -1066,12 +1071,12 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
               <table className="fac-table">
                 <thead>
                   <tr>
-                    <th>Số Tầng</th>
-                    <th>Tên Tầng</th>
-                    <th>Tòa nhà</th>
-                    <th>Mô tả</th>
-                    <th>Trạng thái</th>
-                    <th style={{ textAlign: 'right' }}>Hành động</th>
+                    <th>{t('facilities.colFloorNumber')}</th>
+                    <th>{t('facilities.colFloorName')}</th>
+                    <th>{t('facilities.colBuilding')}</th>
+                    <th>{t('facilities.colDescription2')}</th>
+                    <th>{t('facilities.colStatus')}</th>
+                    <th style={{ textAlign: 'right' }}>{t('facilities.colActions')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1079,20 +1084,20 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                     .filter(f => !selectedBuildingId || f.buildingId === selectedBuildingId || f.buildingId?._id === selectedBuildingId)
                     .map((f) => (
                       <tr key={f._id}>
-                        <td>Tầng {f.floorNumber}</td>
-                        <td style={{ fontWeight: '550' }}>{f.name || `Tầng ${f.floorNumber}`}</td>
+                        <td>{t('facilities.floor')} {f.floorNumber}</td>
+                        <td style={{ fontWeight: '550' }}>{f.name || `${t('facilities.floor')} ${f.floorNumber}`}</td>
                         <td>{f.building?.name || f.buildingId?.name || '—'}</td>
                         <td>{f.description || '—'}</td>
                         <td>
                           <span className={`fac-badge ${f.isActive !== false ? 'fac-badge--success' : 'fac-badge--danger'}`}>
-                            {f.isActive !== false ? 'Hoạt động' : 'Tạm khóa'}
+                            {f.isActive !== false ? t('facilities.active') : t('facilities.inactive')}
                           </span>
                         </td>
                         <td style={{ textAlign: 'right' }}>
                           <button
                             onClick={() => handleOpenEditFloor(f)}
                             className="fac-btn-icon fac-btn-icon--edit"
-                            title="Sửa"
+                            title={t('facilities.edit')}
                           >
                             <Edit size={16} />
                           </button>
@@ -1100,7 +1105,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                             <button
                               onClick={() => handleOpenDeleteFloor(f)}
                               className="fac-btn-icon fac-btn-icon--delete"
-                              title="Vô hiệu hóa"
+                              title={t('facilities.delete')}
                             >
                               <Trash2 size={16} />
                             </button>
@@ -1245,7 +1250,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                   setSelectedRoomId('');
                 }}
               >
-                <option value="">Chọn Tòa nhà...</option>
+                <option value="">{t('facilities.selectBuilding')}</option>
                 {buildings.map(b => (
                   <option key={b._id} value={b._id}>{b.name}</option>
                 ))}
@@ -1261,11 +1266,11 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                 }}
                 disabled={!selectedBuildingId}
               >
-                <option value="">Chọn Tầng...</option>
+                <option value="">{t('facilities.selectFloor')}</option>
                 {floors
                   .filter(f => f.buildingId === selectedBuildingId || f.buildingId?._id === selectedBuildingId)
                   .map(f => (
-                    <option key={f._id} value={f._id}>{f.name || `Tầng ${f.floorNumber}`}</option>
+                    <option key={f._id} value={f._id}>{f.name || `${t('facilities.floor')} ${f.floorNumber}`}</option>
                   ))}
               </select>
 
@@ -1276,9 +1281,9 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                 onChange={(e) => setSelectedRoomId(e.target.value)}
                 disabled={!selectedFloorId}
               >
-                <option value="">Chọn Phòng...</option>
+                <option value="">{t('facilities.selectRoom')}</option>
                 {rooms.map(r => (
-                  <option key={r._id} value={r._id}>Phòng {r.roomNumber}</option>
+                  <option key={r._id} value={r._id}>{t('facilities.room')} {r.roomNumber}</option>
                 ))}
               </select>
             </div>
@@ -1292,7 +1297,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                     bedViewMode === 'grid' ? 'bg-white text-indigo-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  <Grid size={14} /> Sơ đồ
+                  <Grid size={14} /> {t('facilities.viewGrid')}
                 </button>
                 <button
                   type="button"
@@ -1301,7 +1306,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                     bedViewMode === 'table' ? 'bg-white text-indigo-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  <List size={14} /> Danh sách
+                  <List size={14} /> {t('facilities.viewTable')}
                 </button>
               </div>
             )}
@@ -1316,84 +1321,153 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
           ) : loading && beds.length === 0 ? (
             <div className="fac-loading-box">
               <Loader2 className="animate-spin mb-3 text-indigo-600" size={32} />
-              <p>Đang tải danh sách giường...</p>
+              <p>{t('facilities.loadingBeds')}</p>
             </div>
           ) : beds.length === 0 ? (
             <div className="fac-table-card">
               <div className="fac-empty-box">
-                Không tìm thấy giường nào trong phòng này. Bạn có thể nhấn nút "Thêm Giường" để tạo mới.
+                {t('facilities.emptyBeds')}
               </div>
             </div>
           ) : bedViewMode === 'grid' ? (
-            /* VISUAL GRID VIEW (PREMIUM) */
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5 animate-fadeIn">
-              {beds.map((b) => (
-                <div
-                  key={b._id}
-                  className={`flex flex-col p-5 bg-white border rounded-2xl shadow-sm relative transition-all duration-200 hover:-translate-y-1 hover:shadow-md ${
-                    b.status === 'available' ? 'border-emerald-200 bg-emerald-50/20' :
-                    b.status === 'occupied' ? 'border-rose-200 bg-rose-50/10' : 'border-amber-200 bg-amber-50/10'
-                  }`}
-                >
-                  <div className="flex justify-between items-start mb-4">
-                    <div className={`p-3 rounded-xl ${
-                      b.status === 'available' ? 'bg-emerald-100 text-emerald-700' :
-                      b.status === 'occupied' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'
-                    }`}>
-                      <BedIcon size={22} />
-                    </div>
-                    <div className="flex gap-1">
-                      <button
-                        onClick={() => handleOpenEditBed(b)}
-                        className="p-1.5 text-sky-600 hover:bg-sky-50 rounded-lg transition"
-                        title="Sửa"
-                      >
-                        <Edit size={14} />
-                      </button>
-                      {b.status !== 'occupied' && (
+            /* VISUAL GRID VIEW (PREMIUM REDESIGN) */
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 animate-fadeIn">
+              {beds.map((b) => {
+                const isAvailable = b.status === 'available';
+                const isOccupied  = b.status === 'occupied';
+                const isReserved  = b.status === 'reserved';
+
+                const statusColor = isAvailable ? '#10b981' : isOccupied ? '#f43f5e' : isReserved ? '#8b5cf6' : '#f59e0b';
+                const statusBg    = isAvailable ? 'rgba(16,185,129,0.08)' : isOccupied ? 'rgba(244,63,94,0.07)' : isReserved ? 'rgba(139,92,246,0.08)' : 'rgba(245,158,11,0.08)';
+                const statusLabel = isAvailable ? t('facilities.statusAvailable') : isOccupied ? t('facilities.statusOccupied') : isReserved ? t('facilities.statusReserved') : t('facilities.statusMaintenance');
+
+                const condColor = b.condition === 'good' ? '#10b981' : b.condition === 'fair' ? '#f59e0b' : '#f43f5e';
+                const condLabel = b.condition === 'good' ? t('facilities.conditionGood') : b.condition === 'fair' ? t('facilities.conditionFair') : t('facilities.conditionBroken');
+
+                const bedTypeLabel = {
+                  normal: t('facilities.bedTypeNormal'), electric: t('facilities.bedTypeElectric'), icu: t('facilities.bedTypeIcu'), recliner: t('facilities.bedTypeRecliner'), stretcher: t('facilities.bedTypeStretcher')
+                }[b.bedType] || b.bedType;
+
+                return (
+                  <div
+                    key={b._id}
+                    style={{
+                      background: '#fff',
+                      borderRadius: '16px',
+                      border: `1.5px solid ${statusColor}30`,
+                      boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+                      overflow: 'hidden',
+                      transition: 'transform 0.2s, box-shadow 0.2s',
+                      cursor: 'default',
+                      position: 'relative',
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = `0 8px 24px ${statusColor}25`; }}
+                    onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 2px 12px rgba(0,0,0,0.06)'; }}
+                  >
+                    {/* Status stripe at top */}
+                    <div style={{ height: '4px', background: `linear-gradient(90deg, ${statusColor}, ${statusColor}99)` }} />
+
+                    {/* Header */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 14px 10px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{
+                          width: '40px', height: '40px', borderRadius: '12px',
+                          background: `linear-gradient(135deg, ${statusColor}22, ${statusColor}44)`,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          color: statusColor, flexShrink: 0
+                        }}>
+                          <BedIcon size={20} />
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: '700', fontSize: '15px', color: '#1e293b', letterSpacing: '0.01em' }}>{b.bedCode}</div>
+                          <div style={{
+                            display: 'inline-flex', alignItems: 'center',
+                            background: statusBg, color: statusColor,
+                            fontSize: '11px', fontWeight: '600',
+                            padding: '1px 8px', borderRadius: '20px', marginTop: '2px'
+                          }}>
+                            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: statusColor, marginRight: '5px', display: 'inline-block' }} />
+                            {statusLabel}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Action buttons */}
+                      <div style={{ display: 'flex', gap: '4px' }}>
                         <button
-                          onClick={() => handleOpenDeleteBed(b)}
-                          className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition"
-                          title="Xóa"
+                          onClick={() => handleOpenEditBed(b)}
+                          title={t('facilities.edit')}
+                          style={{
+                            width: '30px', height: '30px', borderRadius: '8px', border: 'none',
+                            background: '#eff6ff', color: '#3b82f6', cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            transition: 'background 0.15s'
+                          }}
+                          onMouseEnter={e => e.currentTarget.style.background = '#dbeafe'}
+                          onMouseLeave={e => e.currentTarget.style.background = '#eff6ff'}
                         >
-                          <Trash2 size={14} />
+                          <Edit size={13} />
                         </button>
-                      )}
+                        {b.status !== 'occupied' && (
+                          <button
+                            onClick={() => handleOpenDeleteBed(b)}
+                            title={t('facilities.delete')}
+                            style={{
+                              width: '30px', height: '30px', borderRadius: '8px', border: 'none',
+                              background: '#fff1f2', color: '#f43f5e', cursor: 'pointer',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              transition: 'background 0.15s'
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.background = '#ffe4e6'}
+                            onMouseLeave={e => e.currentTarget.style.background = '#fff1f2'}
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </div>
 
-                  <h4 className="font-bold text-slate-800 text-base mb-1">{b.bedCode}</h4>
-                  <div className="flex gap-2 mb-3">
-                    <span className="text-xs text-slate-500 capitalize bg-slate-100 px-2 py-0.5 rounded">
-                      Loại: {b.bedType}
-                    </span>
-                  </div>
+                    {/* Body */}
+                    <div style={{ padding: '0 14px 14px' }}>
+                      {/* Bed type tag */}
+                      <div style={{ marginBottom: '10px' }}>
+                        <span style={{
+                          fontSize: '11px', fontWeight: '500', color: '#64748b',
+                          background: '#f1f5f9', borderRadius: '6px',
+                          padding: '3px 10px', display: 'inline-block'
+                        }}>
+                          {bedTypeLabel}
+                        </span>
+                      </div>
 
-                  <div className="mt-auto flex flex-col gap-2 border-t border-slate-100 pt-3">
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="text-slate-500">Trạng thái:</span>
-                      <span className={`font-semibold ${
-                        b.status === 'available' ? 'text-emerald-600' :
-                        b.status === 'occupied' ? 'text-rose-600' : 'text-amber-600'
-                      }`}>
-                        {b.status === 'available' ? 'Trống' :
-                         b.status === 'occupied' ? 'Đang sử dụng' :
-                         b.status === 'reserved' ? 'Đặt trước' : 'Bảo trì'}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="text-slate-500">Tình trạng:</span>
-                      <span className={`font-semibold ${
-                        b.condition === 'good' ? 'text-emerald-600' :
-                        b.condition === 'fair' ? 'text-amber-600' : 'text-rose-600'
-                      }`}>
-                        {b.condition === 'good' ? 'Tốt' :
-                         b.condition === 'fair' ? 'Trung bình' : 'Hỏng'}
-                      </span>
+                      {/* Divider */}
+                      <div style={{ height: '1px', background: '#f1f5f9', margin: '0 0 10px' }} />
+
+                      {/* Info rows */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: '12px', color: '#94a3b8' }}>{t('facilities.statusLabel')}</span>
+                          <span style={{
+                            fontSize: '12px', fontWeight: '600', color: statusColor,
+                            background: statusBg, padding: '2px 8px', borderRadius: '6px'
+                          }}>
+                            {statusLabel}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: '12px', color: '#94a3b8' }}>{t('facilities.conditionLabel')}</span>
+                          <span style={{
+                            fontSize: '12px', fontWeight: '600', color: condColor,
+                            background: `${condColor}14`, padding: '2px 8px', borderRadius: '6px'
+                          }}>
+                            {condLabel}
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             /* TABLE VIEW */
@@ -1401,12 +1475,12 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
               <table className="fac-table">
                 <thead>
                   <tr>
-                    <th>Mã Giường</th>
-                    <th>Loại Giường</th>
-                    <th>Trạng thái</th>
-                    <th>Tình trạng</th>
-                    <th>Ghi chú</th>
-                    <th style={{ textAlign: 'right' }}>Hành động</th>
+                    <th>{t('facilities.colBedCode')}</th>
+                    <th>{t('facilities.colBedType')}</th>
+                    <th>{t('facilities.colStatus')}</th>
+                    <th>{t('facilities.colCondition')}</th>
+                    <th>{t('facilities.colNotes')}</th>
+                    <th style={{ textAlign: 'right' }}>{t('facilities.colActions')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1419,9 +1493,9 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                           b.status === 'available' ? 'fac-badge--success' :
                           b.status === 'occupied' ? 'fac-badge--danger' : 'fac-badge--warning'
                         }`}>
-                          {b.status === 'available' ? 'Trống' :
-                           b.status === 'occupied' ? 'Đang sử dụng' :
-                           b.status === 'reserved' ? 'Đặt trước' : 'Bảo trì'}
+                          {b.status === 'available' ? t('facilities.statusAvailable') :
+                           b.status === 'occupied' ? t('facilities.statusOccupied') :
+                           b.status === 'reserved' ? t('facilities.statusReserved') : t('facilities.statusMaintenance')}
                         </span>
                       </td>
                       <td>
@@ -1429,7 +1503,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                           b.condition === 'good' ? 'fac-badge--success' :
                           b.condition === 'fair' ? 'fac-badge--warning' : 'fac-badge--danger'
                         }`}>
-                          {b.condition === 'good' ? 'Tốt' : b.condition === 'fair' ? 'Trung bình' : 'Hỏng'}
+                          {b.condition === 'good' ? t('facilities.conditionGood') : b.condition === 'fair' ? t('facilities.conditionFair') : t('facilities.conditionBroken')}
                         </span>
                       </td>
                       <td>{b.notes || '—'}</td>
@@ -1437,7 +1511,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                         <button
                           onClick={() => handleOpenEditBed(b)}
                           className="fac-btn-icon fac-btn-icon--edit"
-                          title="Sửa"
+                          title={t('facilities.edit')}
                         >
                           <Edit size={16} />
                         </button>
@@ -1445,7 +1519,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                           <button
                             onClick={() => handleOpenDeleteBed(b)}
                             className="fac-btn-icon fac-btn-icon--delete"
-                            title="Xóa"
+                            title={t('facilities.delete')}
                           >
                             <Trash2 size={16} />
                           </button>
@@ -1468,7 +1542,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
               <Search className="fac-search-icon" size={16} />
               <input
                 type="text"
-                placeholder="Tìm thiết bị theo tên hoặc mã..."
+                placeholder={t('facilities.searchEquipment')}
                 className="fac-search-input"
                 value={eqSearchTerm}
                 onChange={(e) => setEqSearchTerm(e.target.value)}
@@ -1481,11 +1555,11 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                 value={eqStatusFilter}
                 onChange={(e) => setEqStatusFilter(e.target.value)}
               >
-                <option value="">Lọc Trạng thái...</option>
-                <option value="available">Sẵn sàng sử dụng</option>
-                <option value="in_use">Đang được sử dụng</option>
-                <option value="maintenance">Bảo trì</option>
-                <option value="retired">Đã thanh lý / Hưu trí</option>
+                <option value="">{t('facilities.filterStatus')}</option>
+                <option value="available">{t('facilities.equipStatusAvailable')}</option>
+                <option value="in_use">{t('facilities.equipStatusInUse')}</option>
+                <option value="maintenance">{t('facilities.equipStatusMaintenance')}</option>
+                <option value="retired">{t('facilities.equipStatusRetired')}</option>
               </select>
             </div>
           </div>
@@ -1493,7 +1567,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
           {loading && equipment.length === 0 ? (
             <div className="fac-loading-box">
               <Loader2 className="animate-spin mb-3 text-indigo-600" size={32} />
-              <p>Đang tải danh sách thiết bị y tế...</p>
+              <p>{t('facilities.loadingEquipment')}</p>
             </div>
           ) : equipment.filter(eq => 
             (!eqStatusFilter || eq.status === eqStatusFilter) &&
@@ -1501,7 +1575,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
           ).length === 0 ? (
             <div className="fac-table-card">
               <div className="fac-empty-box">
-                Không tìm thấy thiết bị nào phù hợp. Bạn có thể bấm nút "Thêm Thiết Bị" để tạo mới.
+                {t('facilities.emptyEquipment')}
               </div>
             </div>
           ) : (
@@ -1509,13 +1583,13 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
               <table className="fac-table">
                 <thead>
                   <tr>
-                    <th>Mã Thiết Bị</th>
-                    <th>Tên Thiết Bị</th>
-                    <th>Danh mục</th>
-                    <th>Vị trí</th>
-                    <th>Hạn Bảo Trì</th>
-                    <th>Trạng thái</th>
-                    <th style={{ textAlign: 'right' }}>Hành động</th>
+                    <th>{t('facilities.colEquipCode')}</th>
+                    <th>{t('facilities.colEquipName')}</th>
+                    <th>{t('facilities.colCategory')}</th>
+                    <th>{t('facilities.colLocation')}</th>
+                    <th>{t('facilities.colMaintenanceDue')}</th>
+                    <th>{t('facilities.colStatus')}</th>
+                    <th style={{ textAlign: 'right' }}>{t('facilities.colActions')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1532,11 +1606,11 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                         <td>
                           <span className="flex items-center gap-1.5 text-xs text-slate-600 bg-slate-100 px-2 py-1 rounded-lg w-fit">
                             <MapPin size={12} className="text-slate-400" />
-                            {eq.locationType === 'storage' && 'Kho lưu trữ'}
-                            {eq.locationType === 'building' && `Tòa: ${eq.buildingId?.name || eq.buildingId?.code || '—'}`}
-                            {eq.locationType === 'floor' && `Tầng: ${eq.floorId?.name || eq.floorId?.floorNumber || '—'}`}
-                            {eq.locationType === 'room' && `Phòng: ${eq.roomId?.roomNumber || '—'}`}
-                            {eq.locationType === 'bed' && `Giường: ${eq.bedId?.bedCode || '—'}`}
+                            {eq.locationType === 'storage' && t('facilities.locationStorage')}
+                            {eq.locationType === 'building' && `${t('facilities.locationBuilding')}: ${eq.buildingId?.name || eq.buildingId?.code || '—'}`}
+                            {eq.locationType === 'floor' && `${t('facilities.locationFloor')}: ${eq.floorId?.name || eq.floorId?.floorNumber || '—'}`}
+                            {eq.locationType === 'room' && `${t('facilities.locationRoom')}: ${eq.roomId?.roomNumber || '—'}`}
+                            {eq.locationType === 'bed' && `${t('facilities.locationBed')}: ${eq.bedId?.bedCode || '—'}`}
                           </span>
                         </td>
                         <td>
@@ -1588,7 +1662,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
         <div className="fac-modal-backdrop" onClick={() => setShowCreateModal(false)}>
           <div className="fac-modal" onClick={(e) => e.stopPropagation()}>
             <div className="fac-modal-header">
-              <h3>Thêm Tòa Nhà Mới</h3>
+              <h3>{t('facilities.modalCreateBuilding')}</h3>
               <button onClick={() => setShowCreateModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
                 <X size={18} />
               </button>
@@ -1601,43 +1675,43 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                   </div>
                 )}
                 <div className="fac-form-group">
-                  <label>Mã Tòa Nhà *</label>
+                  <label>{t('facilities.fieldBuildingCode')}</label>
                   <input
                     type="text"
                     className="fac-form-control"
-                    placeholder="Ví dụ: TOAA, TOAB"
+                    placeholder={t('facilities.placeholderBuildingCode')}
                     value={formCode}
                     onChange={(e) => setFormCode(e.target.value)}
                     required
                   />
                 </div>
                 <div className="fac-form-group">
-                  <label>Tên Tòa Nhà *</label>
+                  <label>{t('facilities.fieldBuildingName')}</label>
                   <input
                     type="text"
                     className="fac-form-control"
-                    placeholder="Ví dụ: Tòa Nhà A - Khu Điều Dưỡng"
+                    placeholder={t('facilities.placeholderBuildingName')}
                     value={formName}
                     onChange={(e) => setFormName(e.target.value)}
                     required
                   />
                 </div>
                 <div className="fac-form-group">
-                  <label>Địa Chỉ</label>
+                  <label>{t('facilities.fieldAddress')}</label>
                   <input
                     type="text"
                     className="fac-form-control"
-                    placeholder="Ví dụ: Phân khu phía Nam"
+                    placeholder={t('facilities.placeholderAddress')}
                     value={formAddress}
                     onChange={(e) => setFormAddress(e.target.value)}
                   />
                 </div>
                 <div className="fac-form-group">
-                  <label>Mô Tả</label>
+                  <label>{t('facilities.fieldDescription')}</label>
                   <textarea
                     className="fac-form-control"
                     style={{ minHeight: '80px' }}
-                    placeholder="Nhập mô tả chi tiết..."
+                    placeholder={t('facilities.placeholderDescription')}
                     value={formDescription}
                     onChange={(e) => setFormDescription(e.target.value)}
                   />
@@ -1645,10 +1719,10 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
               </div>
               <div className="fac-modal-footer">
                 <button type="button" onClick={() => setShowCreateModal(false)} className="fac-btn fac-btn--secondary">
-                  Hủy
+                  {t('facilities.btnCancel')}
                 </button>
                 <button type="submit" disabled={submitting} className="fac-btn fac-btn--primary">
-                  {submitting ? 'Đang tạo...' : 'Tạo mới'}
+                  {submitting ? t('facilities.btnCreating') : t('facilities.btnCreate')}
                 </button>
               </div>
             </form>
@@ -1661,7 +1735,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
         <div className="fac-modal-backdrop" onClick={() => setShowEditModal(false)}>
           <div className="fac-modal" onClick={(e) => e.stopPropagation()}>
             <div className="fac-modal-header">
-              <h3>Chỉnh Sửa Tòa Nhà</h3>
+              <h3>{t('facilities.modalEditBuilding')}</h3>
               <button onClick={() => setShowEditModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
                 <X size={18} />
               </button>
@@ -1674,18 +1748,18 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                   </div>
                 )}
                 <div className="fac-form-group">
-                  <label>Mã Tòa Nhà *</label>
+                  <label>{t('facilities.fieldBuildingCode')}</label>
                   <input
                     type="text"
                     className="fac-form-control"
-                    placeholder="Ví dụ: TOAA"
+                    placeholder={t('facilities.placeholderBuildingCode')}
                     value={formCode}
                     onChange={(e) => setFormCode(e.target.value)}
                     required
                   />
                 </div>
                 <div className="fac-form-group">
-                  <label>Tên Tòa Nhà *</label>
+                  <label>{t('facilities.fieldBuildingName')}</label>
                   <input
                     type="text"
                     className="fac-form-control"
@@ -1695,7 +1769,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                   />
                 </div>
                 <div className="fac-form-group">
-                  <label>Địa Chỉ</label>
+                  <label>{t('facilities.fieldAddress')}</label>
                   <input
                     type="text"
                     className="fac-form-control"
@@ -1704,7 +1778,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                   />
                 </div>
                 <div className="fac-form-group">
-                  <label>Mô Tả</label>
+                  <label>{t('facilities.fieldDescription')}</label>
                   <textarea
                     className="fac-form-control"
                     style={{ minHeight: '80px' }}
@@ -1719,15 +1793,15 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                     checked={formIsActive}
                     onChange={(e) => setFormIsActive(e.target.checked)}
                   />
-                  <label htmlFor="isActive" style={{ margin: 0, cursor: 'pointer' }}>Tòa nhà đang hoạt động</label>
+                  <label htmlFor="isActive" style={{ margin: 0, cursor: 'pointer' }}>{t('facilities.fieldIsActive')}</label>
                 </div>
               </div>
               <div className="fac-modal-footer">
                 <button type="button" onClick={() => setShowEditModal(false)} className="fac-btn fac-btn--secondary">
-                  Hủy
+                  {t('facilities.btnCancel')}
                 </button>
                 <button type="submit" disabled={submitting} className="fac-btn fac-btn--primary">
-                  {submitting ? 'Đang lưu...' : 'Lưu Thay Đổi'}
+                  {submitting ? t('facilities.btnSaving') : t('facilities.btnSave')}
                 </button>
               </div>
             </form>
@@ -1740,7 +1814,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
         <div className="fac-modal-backdrop" onClick={() => setShowDeleteModal(false)}>
           <div className="fac-modal" onClick={(e) => e.stopPropagation()}>
             <div className="fac-modal-header" style={{ background: '#fef2f2' }}>
-              <h3 style={{ color: '#dc2626' }}>Vô Hiệu Hóa Tòa Nhà?</h3>
+              <h3 style={{ color: '#dc2626' }}>{t('facilities.modalDeleteBuilding')}</h3>
               <button onClick={() => setShowDeleteModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
                 <X size={18} />
               </button>
@@ -1750,10 +1824,10 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                 <AlertTriangle size={36} className="text-red-500" style={{ flexShrink: 0 }} />
                 <div>
                   <p style={{ margin: '0 0 10px 0', fontWeight: '600' }}>
-                    Bạn có chắc chắn muốn vô hiệu hóa tòa nhà <strong>{selectedBuilding?.name}</strong> ({selectedBuilding?.code})?
+                    {t('facilities.deactivateBuildingConfirm', { name: selectedBuilding?.name, code: selectedBuilding?.code })}
                   </p>
                   <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>
-                    Hành động này sẽ tạm khóa tòa nhà. Tất cả các tầng, phòng và giường thuộc tòa nhà này cũng sẽ bị vô hiệu hóa hoặc chuyển sang trạng thái đóng.
+                    {t('facilities.deactivateBuildingWarning', { name: selectedBuilding?.name, code: selectedBuilding?.code })}
                   </p>
                 </div>
               </div>
@@ -1775,7 +1849,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
         <div className="fac-modal-backdrop" onClick={() => setShowCreateFloorModal(false)}>
           <div className="fac-modal" onClick={(e) => e.stopPropagation()}>
             <div className="fac-modal-header">
-              <h3>Thêm Tầng Mới</h3>
+              <h3>{t('facilities.modalCreateFloor')}</h3>
               <button onClick={() => setShowCreateFloorModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
                 <X size={18} />
               </button>
@@ -1788,7 +1862,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                   </div>
                 )}
                 <div className="fac-form-group">
-                  <label>Chọn Tòa Nhà *</label>
+                  <label>{t('facilities.fieldSelectBuilding')}</label>
                   <select
                     className="fac-form-control"
                     value={formFloorBuildingId}
@@ -1801,32 +1875,32 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                   </select>
                 </div>
                 <div className="fac-form-group">
-                  <label>Số Tầng (Phải là số) *</label>
+                  <label>{t('facilities.fieldFloorNumber')}</label>
                   <input
                     type="number"
                     className="fac-form-control"
-                    placeholder="Ví dụ: 1, 2, 3"
+                    placeholder={t('facilities.placeholderFloorNumber')}
                     value={formFloorNumber}
                     onChange={(e) => setFormFloorNumber(e.target.value)}
                     required
                   />
                 </div>
                 <div className="fac-form-group">
-                  <label>Tên Tầng (Tùy chọn)</label>
+                  <label>{t('facilities.fieldFloorName')}</label>
                   <input
                     type="text"
                     className="fac-form-control"
-                    placeholder="Ví dụ: Tầng 1 - Khu A"
+                    placeholder={t('facilities.placeholderFloorName')}
                     value={formFloorName}
                     onChange={(e) => setFormFloorName(e.target.value)}
                   />
                 </div>
                 <div className="fac-form-group">
-                  <label>Mô Tả</label>
+                  <label>{t('facilities.fieldDescription')}</label>
                   <textarea
                     className="fac-form-control"
                     style={{ minHeight: '80px' }}
-                    placeholder="Nhập mô tả tầng..."
+                    placeholder={t('facilities.placeholderDescription')}
                     value={formFloorDescription}
                     onChange={(e) => setFormFloorDescription(e.target.value)}
                   />
@@ -1834,10 +1908,10 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
               </div>
               <div className="fac-modal-footer">
                 <button type="button" onClick={() => setShowCreateFloorModal(false)} className="fac-btn fac-btn--secondary">
-                  Hủy
+                  {t('facilities.btnCancel')}
                 </button>
                 <button type="submit" disabled={submitting} className="fac-btn fac-btn--primary">
-                  {submitting ? 'Đang tạo...' : 'Tạo mới'}
+                  {submitting ? t('facilities.btnCreating') : t('facilities.btnCreate')}
                 </button>
               </div>
             </form>
@@ -1850,7 +1924,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
         <div className="fac-modal-backdrop" onClick={() => setShowEditFloorModal(false)}>
           <div className="fac-modal" onClick={(e) => e.stopPropagation()}>
             <div className="fac-modal-header">
-              <h3>Chỉnh Sửa Tầng</h3>
+              <h3>{t('facilities.modalEditFloor')}</h3>
               <button onClick={() => setShowEditFloorModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
                 <X size={18} />
               </button>
@@ -1863,7 +1937,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                   </div>
                 )}
                 <div className="fac-form-group">
-                  <label>Số Tầng *</label>
+                  <label>{t('facilities.fieldFloorNumber')}</label>
                   <input
                     type="number"
                     className="fac-form-control"
@@ -1873,7 +1947,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                   />
                 </div>
                 <div className="fac-form-group">
-                  <label>Tên Tầng</label>
+                  <label>{t('facilities.fieldFloorName')}</label>
                   <input
                     type="text"
                     className="fac-form-control"
@@ -1882,7 +1956,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                   />
                 </div>
                 <div className="fac-form-group">
-                  <label>Mô Tả</label>
+                  <label>{t('facilities.fieldDescription')}</label>
                   <textarea
                     className="fac-form-control"
                     style={{ minHeight: '80px' }}
@@ -1897,15 +1971,15 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                     checked={formFloorIsActive}
                     onChange={(e) => setFormFloorIsActive(e.target.checked)}
                   />
-                  <label htmlFor="floorIsActive" style={{ margin: 0, cursor: 'pointer' }}>Tầng đang hoạt động</label>
+                  <label htmlFor="floorIsActive" style={{ margin: 0, cursor: 'pointer' }}>{t('facilities.fieldFloorIsActive')}</label>
                 </div>
               </div>
               <div className="fac-modal-footer">
                 <button type="button" onClick={() => setShowEditFloorModal(false)} className="fac-btn fac-btn--secondary">
-                  Hủy
+                  {t('facilities.btnCancel')}
                 </button>
                 <button type="submit" disabled={submitting} className="fac-btn fac-btn--primary">
-                  {submitting ? 'Đang lưu...' : 'Lưu Thay Đổi'}
+                  {submitting ? t('facilities.btnSaving') : t('facilities.btnSave')}
                 </button>
               </div>
             </form>
@@ -1918,7 +1992,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
         <div className="fac-modal-backdrop" onClick={() => setShowDeleteFloorModal(false)}>
           <div className="fac-modal" onClick={(e) => e.stopPropagation()}>
             <div className="fac-modal-header" style={{ background: '#fef2f2' }}>
-              <h3 style={{ color: '#dc2626' }}>Vô Hiệu Hóa Tầng?</h3>
+              <h3 style={{ color: '#dc2626' }}>{t('facilities.modalDeleteFloor')}</h3>
               <button onClick={() => setShowDeleteFloorModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
                 <X size={18} />
               </button>
@@ -1938,10 +2012,10 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
             </div>
             <div className="fac-modal-footer">
               <button type="button" onClick={() => setShowDeleteFloorModal(false)} className="fac-btn fac-btn--secondary">
-                Hủy
+                {t('facilities.btnCancel')}
               </button>
               <button type="button" onClick={handleDeleteFloor} disabled={submitting} className="fac-btn fac-btn--danger">
-                {submitting ? 'Đang khóa...' : 'Xác Nhận Khóa'}
+                {submitting ? t('facilities.btnDeactivating') : t('facilities.btnConfirmDeactivate')}
               </button>
             </div>
           </div>
@@ -1953,7 +2027,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
         <div className="fac-modal-backdrop" onClick={() => setShowCreateRoomModal(false)}>
           <div className="fac-modal" onClick={(e) => e.stopPropagation()}>
             <div className="fac-modal-header">
-              <h3>Thêm Phòng Mới</h3>
+              <h3>{t('facilities.modalCreateRoom')}</h3>
               <button onClick={() => setShowCreateRoomModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
                 <X size={18} />
               </button>
@@ -1977,7 +2051,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                     }}
                     required
                   >
-                    <option value="">-- Chọn tòa nhà --</option>
+                    <option value="">{t('facilities.selectBuilding')}</option>
                     {buildings.map(b => (
                       <option key={b._id} value={b._id}>{b.name}</option>
                     ))}
@@ -1992,20 +2066,20 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                     required
                     disabled={!formRoomBuildingId}
                   >
-                    <option value="">-- Chọn tầng --</option>
+                    <option value="">{t('facilities.selectFloor')}</option>
                     {floors
                       .filter(f => (f.buildingId === formRoomBuildingId || f.buildingId?._id === formRoomBuildingId) && f.isActive !== false)
                       .map(f => (
-                        <option key={f._id} value={f._id}>{f.name || `Tầng ${f.floorNumber}`}</option>
+                        <option key={f._id} value={f._id}>{f.name || `${t('facilities.floor')} ${f.floorNumber}`}</option>
                       ))}
                   </select>
                 </div>
                 <div className="fac-form-group">
-                  <label>Số Phòng *</label>
+                  <label>{t('facilities.fieldRoomNumber')}</label>
                   <input
                     type="text"
                     className="fac-form-control"
-                    placeholder="Ví dụ: 101, 102, 201"
+                    placeholder={t('facilities.placeholderRoomNumber')}
                     value={formRoomNumber}
                     onChange={(e) => setFormRoomNumber(e.target.value)}
                     required
@@ -2013,7 +2087,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="fac-form-group">
-                    <label>Loại Phòng</label>
+                    <label>{t('facilities.fieldRoomType')}</label>
                     <select
                       className="fac-form-control"
                       value={formRoomType}
@@ -2026,7 +2100,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                     </select>
                   </div>
                   <div className="fac-form-group">
-                    <label>Sức Chứa (Giường) *</label>
+                    <label>{t('facilities.fieldCapacity')}</label>
                     <input
                       type="number"
                       className="fac-form-control"
@@ -2038,11 +2112,11 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                   </div>
                 </div>
                 <div className="fac-form-group">
-                  <label>Ghi Chú</label>
+                  <label>{t('facilities.fieldRoomNotes')}</label>
                   <textarea
                     className="fac-form-control"
                     style={{ minHeight: '60px' }}
-                    placeholder="Ghi chú thêm về phòng..."
+                    placeholder={t('facilities.placeholderRoomNotes')}
                     value={formRoomNotes}
                     onChange={(e) => setFormRoomNotes(e.target.value)}
                   />
@@ -2050,10 +2124,10 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
               </div>
               <div className="fac-modal-footer">
                 <button type="button" onClick={() => setShowCreateRoomModal(false)} className="fac-btn fac-btn--secondary">
-                  Hủy
+                  {t('facilities.btnCancel')}
                 </button>
                 <button type="submit" disabled={submitting} className="fac-btn fac-btn--primary">
-                  {submitting ? 'Đang tạo...' : 'Tạo mới'}
+                  {submitting ? t('facilities.btnCreating') : t('facilities.btnCreate')}
                 </button>
               </div>
             </form>
@@ -2066,7 +2140,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
         <div className="fac-modal-backdrop" onClick={() => setShowEditRoomModal(false)}>
           <div className="fac-modal" onClick={(e) => e.stopPropagation()}>
             <div className="fac-modal-header">
-              <h3>Chỉnh Sửa Phòng</h3>
+              <h3>{t('facilities.modalEditRoom')}</h3>
               <button onClick={() => setShowEditRoomModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
                 <X size={18} />
               </button>
@@ -2079,7 +2153,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                   </div>
                 )}
                 <div className="fac-form-group">
-                  <label>Số Phòng *</label>
+                  <label>{t('facilities.fieldRoomNumber')}</label>
                   <input
                     type="text"
                     className="fac-form-control"
@@ -2090,7 +2164,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="fac-form-group">
-                    <label>Loại Phòng</label>
+                    <label>{t('facilities.fieldRoomType')}</label>
                     <select
                       className="fac-form-control"
                       value={formRoomType}
@@ -2103,7 +2177,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                     </select>
                   </div>
                   <div className="fac-form-group">
-                    <label>Sức Chứa (Giường) *</label>
+                    <label>{t('facilities.fieldCapacity')}</label>
                     <input
                       type="number"
                       className="fac-form-control"
@@ -2115,20 +2189,20 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                   </div>
                 </div>
                 <div className="fac-form-group">
-                  <label>Trạng Thái Phòng</label>
+                  <label>{t('facilities.fieldRoomStatus')}</label>
                   <select
                     className="fac-form-control"
                     value={formRoomStatus}
                     onChange={(e) => setFormRoomStatus(e.target.value)}
                   >
-                    <option value="available">Còn giường / Trống</option>
-                    <option value="full">Đã đầy</option>
-                    <option value="maintenance">Bảo trì</option>
-                    <option value="closed">Đóng / Tạm khóa</option>
+                    <option value="available">{t('facilities.statusAvailable')}</option>
+                    <option value="full">{t('facilities.statusFull')}</option>
+                    <option value="maintenance">{t('facilities.statusMaintenance')}</option>
+                    <option value="closed">{t('facilities.statusClosed')}</option>
                   </select>
                 </div>
                 <div className="fac-form-group">
-                  <label>Ghi Chú</label>
+                  <label>{t('facilities.fieldRoomNotes')}</label>
                   <textarea
                     className="fac-form-control"
                     style={{ minHeight: '60px' }}
@@ -2139,10 +2213,10 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
               </div>
               <div className="fac-modal-footer">
                 <button type="button" onClick={() => setShowEditRoomModal(false)} className="fac-btn fac-btn--secondary">
-                  Hủy
+                  {t('facilities.btnCancel')}
                 </button>
                 <button type="submit" disabled={submitting} className="fac-btn fac-btn--primary">
-                  {submitting ? 'Đang lưu...' : 'Lưu Thay Đổi'}
+                  {submitting ? t('facilities.btnSaving') : t('facilities.btnSave')}
                 </button>
               </div>
             </form>
@@ -2155,7 +2229,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
         <div className="fac-modal-backdrop" onClick={() => setShowDeleteRoomModal(false)}>
           <div className="fac-modal" onClick={(e) => e.stopPropagation()}>
             <div className="fac-modal-header" style={{ background: '#fef2f2' }}>
-              <h3 style={{ color: '#dc2626' }}>Đóng Phòng?</h3>
+              <h3 style={{ color: '#dc2626' }}>{t('facilities.modalDeleteRoom')}</h3>
               <button onClick={() => setShowDeleteRoomModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
                 <X size={18} />
               </button>
@@ -2175,10 +2249,10 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
             </div>
             <div className="fac-modal-footer">
               <button type="button" onClick={() => setShowDeleteRoomModal(false)} className="fac-btn fac-btn--secondary">
-                Hủy
+                {t('facilities.btnCancel')}
               </button>
               <button type="button" onClick={handleDeleteRoom} disabled={submitting} className="fac-btn fac-btn--danger">
-                {submitting ? 'Đang đóng...' : 'Xác Nhận Đóng'}
+                {submitting ? t('facilities.btnClosing') : t('facilities.btnConfirmClose')}
               </button>
             </div>
           </div>
@@ -2190,7 +2264,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
         <div className="fac-modal-backdrop" onClick={() => setShowCreateBedModal(false)}>
           <div className="fac-modal" onClick={(e) => e.stopPropagation()}>
             <div className="fac-modal-header">
-              <h3>Thêm Giường Mới</h3>
+              <h3>{t('facilities.modalCreateBed')}</h3>
               <button onClick={() => setShowCreateBedModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
                 <X size={18} />
               </button>
@@ -2203,11 +2277,11 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                   </div>
                 )}
                 <div className="fac-form-group">
-                  <label>Mã Giường *</label>
+                  <label>{t('facilities.fieldBedCode')}</label>
                   <input
                     type="text"
                     className="fac-form-control"
-                    placeholder="Ví dụ: G101A, G101B"
+                    placeholder={t('facilities.placeholderBedCode')}
                     value={formBedCode}
                     onChange={(e) => setFormBedCode(e.target.value)}
                     required
@@ -2215,7 +2289,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="fac-form-group">
-                    <label>Loại Giường</label>
+                    <label>{t('facilities.fieldBedType')}</label>
                     <select
                       className="fac-form-control"
                       value={formBedType}
@@ -2240,11 +2314,11 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                   </div>
                 </div>
                 <div className="fac-form-group">
-                  <label>Ghi Chú</label>
+                  <label>{t('facilities.fieldBedNotes')}</label>
                   <textarea
                     className="fac-form-control"
                     style={{ minHeight: '60px' }}
-                    placeholder="Nhập ghi chú giường..."
+                    placeholder={t('facilities.placeholderBedNotes')}
                     value={formBedNotes}
                     onChange={(e) => setFormBedNotes(e.target.value)}
                   />
@@ -2252,10 +2326,10 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
               </div>
               <div className="fac-modal-footer">
                 <button type="button" onClick={() => setShowCreateBedModal(false)} className="fac-btn fac-btn--secondary">
-                  Hủy
+                  {t('facilities.btnCancel')}
                 </button>
                 <button type="submit" disabled={submitting} className="fac-btn fac-btn--primary">
-                  {submitting ? 'Đang tạo...' : 'Tạo mới'}
+                  {submitting ? t('facilities.btnCreating') : t('facilities.btnCreate')}
                 </button>
               </div>
             </form>
@@ -2268,7 +2342,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
         <div className="fac-modal-backdrop" onClick={() => setShowEditBedModal(false)}>
           <div className="fac-modal" onClick={(e) => e.stopPropagation()}>
             <div className="fac-modal-header">
-              <h3>Chỉnh Sửa Giường</h3>
+              <h3>{t('facilities.modalEditBed')}</h3>
               <button onClick={() => setShowEditBedModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
                 <X size={18} />
               </button>
@@ -2281,7 +2355,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                   </div>
                 )}
                 <div className="fac-form-group">
-                  <label>Mã Giường *</label>
+                  <label>{t('facilities.fieldBedCode')}</label>
                   <input
                     type="text"
                     className="fac-form-control"
@@ -2292,7 +2366,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="fac-form-group">
-                    <label>Loại Giường</label>
+                    <label>{t('facilities.fieldBedType')}</label>
                     <select
                       className="fac-form-control"
                       value={formBedType}
@@ -2317,24 +2391,24 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                   </div>
                 </div>
                 <div className="fac-form-group">
-                  <label>Trạng Thái Giường</label>
+                  <label>{t('facilities.fieldBedStatus')}</label>
                   <select
                     className="fac-form-control"
                     value={formBedStatus}
                     onChange={(e) => setFormBedStatus(e.target.value)}
                     disabled={selectedBed?.status === 'occupied'}
                   >
-                    <option value="available">Trống</option>
-                    <option value="occupied" disabled>Đang sử dụng</option>
-                    <option value="reserved">Đặt trước</option>
-                    <option value="maintenance">Bảo trì</option>
+                    <option value="available">{t('facilities.statusAvailable')}</option>
+                    <option value="occupied" disabled>{t('facilities.statusOccupied')}</option>
+                    <option value="reserved">{t('facilities.statusReserved')}</option>
+                    <option value="maintenance">{t('facilities.statusMaintenance')}</option>
                   </select>
                   {selectedBed?.status === 'occupied' && (
                     <p className="text-xs text-amber-600 mt-1">Giường đang được sử dụng bởi cư dân, không thể chuyển trạng thái thủ công.</p>
                   )}
                 </div>
                 <div className="fac-form-group">
-                  <label>Ghi Chú</label>
+                  <label>{t('facilities.fieldBedNotes')}</label>
                   <textarea
                     className="fac-form-control"
                     style={{ minHeight: '60px' }}
@@ -2345,10 +2419,10 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
               </div>
               <div className="fac-modal-footer">
                 <button type="button" onClick={() => setShowEditBedModal(false)} className="fac-btn fac-btn--secondary">
-                  Hủy
+                  {t('facilities.btnCancel')}
                 </button>
                 <button type="submit" disabled={submitting} className="fac-btn fac-btn--primary">
-                  {submitting ? 'Đang lưu...' : 'Lưu Thay Đổi'}
+                  {submitting ? t('facilities.btnSaving') : t('facilities.btnSave')}
                 </button>
               </div>
             </form>
@@ -2361,7 +2435,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
         <div className="fac-modal-backdrop" onClick={() => setShowDeleteBedModal(false)}>
           <div className="fac-modal" onClick={(e) => e.stopPropagation()}>
             <div className="fac-modal-header" style={{ background: '#fef2f2' }}>
-              <h3 style={{ color: '#dc2626' }}>Xóa Giường?</h3>
+              <h3 style={{ color: '#dc2626' }}>{t('facilities.modalDeleteBed')}</h3>
               <button onClick={() => setShowDeleteBedModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
                 <X size={18} />
               </button>
@@ -2381,10 +2455,10 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
             </div>
             <div className="fac-modal-footer">
               <button type="button" onClick={() => setShowDeleteBedModal(false)} className="fac-btn fac-btn--secondary">
-                Hủy
+                {t('facilities.btnCancel')}
               </button>
               <button type="button" onClick={handleDeleteBed} disabled={submitting} className="fac-btn fac-btn--danger">
-                {submitting ? 'Đang xóa...' : 'Xác Nhận Xóa'}
+                {submitting ? t('facilities.btnDeleting') : t('facilities.btnConfirmDelete')}
               </button>
             </div>
           </div>
@@ -2396,7 +2470,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
         <div className="fac-modal-backdrop" onClick={() => setShowCreateEqModal(false)}>
           <div className="fac-modal" style={{ maxWidth: '550px' }} onClick={(e) => e.stopPropagation()}>
             <div className="fac-modal-header">
-              <h3>Thêm Thiết Bị Y Tế</h3>
+              <h3>{t('facilities.modalCreateEquipment')}</h3>
               <button onClick={() => setShowCreateEqModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
                 <X size={18} />
               </button>
@@ -2410,22 +2484,22 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                 )}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="fac-form-group">
-                    <label>Mã Thiết Bị *</label>
+                    <label>{t('facilities.fieldEquipCode')}</label>
                     <input
                       type="text"
                       className="fac-form-control"
-                      placeholder="Ví dụ: MAYTHO01"
+                      placeholder={t('facilities.placeholderEquipCode')}
                       value={formEqCode}
                       onChange={(e) => setFormEqCode(e.target.value)}
                       required
                     />
                   </div>
                   <div className="fac-form-group">
-                    <label>Tên Thiết Bị *</label>
+                    <label>{t('facilities.fieldEquipName')}</label>
                     <input
                       type="text"
                       className="fac-form-control"
-                      placeholder="Ví dụ: Máy trợ thở Philips"
+                      placeholder={t('facilities.placeholderEquipName')}
                       value={formEqName}
                       onChange={(e) => setFormEqName(e.target.value)}
                       required
@@ -2435,17 +2509,17 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="fac-form-group">
-                    <label>Danh Mục</label>
+                    <label>{t('facilities.fieldEquipCategory')}</label>
                     <input
                       type="text"
                       className="fac-form-control"
-                      placeholder="Ví dụ: Hỗ trợ hô hấp"
+                      placeholder={t('facilities.placeholderEquipCategory')}
                       value={formEqCategory}
                       onChange={(e) => setFormEqCategory(e.target.value)}
                     />
                   </div>
                   <div className="fac-form-group">
-                    <label>Hạn Bảo Trì Định Kỳ</label>
+                    <label>{t('facilities.fieldMaintenanceDue')}</label>
                     <input
                       type="date"
                       className="fac-form-control"
@@ -2457,30 +2531,30 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="fac-form-group">
-                    <label>Trạng Thái Thiết Bị</label>
+                    <label>{t('facilities.fieldEquipStatus')}</label>
                     <select
                       className="fac-form-control"
                       value={formEqStatus}
                       onChange={(e) => setFormEqStatus(e.target.value)}
                     >
-                      <option value="available">Sẵn sàng</option>
-                      <option value="in_use">Đang sử dụng</option>
-                      <option value="maintenance">Bảo trì</option>
-                      <option value="retired">Thanh lý / Hưu trí</option>
+                      <option value="available">{t('facilities.equipStatusAvailable')}</option>
+                      <option value="in_use">{t('facilities.equipStatusInUse')}</option>
+                      <option value="maintenance">{t('facilities.equipStatusMaintenance')}</option>
+                      <option value="retired">{t('facilities.equipStatusRetired')}</option>
                     </select>
                   </div>
                   <div className="fac-form-group">
-                    <label>Loại Vị Trí</label>
+                    <label>{t('facilities.fieldLocationType')}</label>
                     <select
                       className="fac-form-control"
                       value={formEqLocationType}
                       onChange={(e) => setFormEqLocationType(e.target.value)}
                     >
-                      <option value="storage">Kho lưu trữ</option>
-                      <option value="building">Tòa nhà</option>
-                      <option value="floor">Tầng</option>
-                      <option value="room">Phòng</option>
-                      <option value="bed">Giường bệnh</option>
+                      <option value="storage">{t('facilities.locationStorage')}</option>
+                      <option value="building">{t('facilities.locationBuilding')}</option>
+                      <option value="floor">{t('facilities.locationFloor')}</option>
+                      <option value="room">{t('facilities.locationRoom')}</option>
+                      <option value="bed">{t('facilities.locationBed')}</option>
                     </select>
                   </div>
                 </div>
@@ -2492,14 +2566,14 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                     </span>
 
                     <div className="fac-form-group mb-1">
-                      <label>Chọn Tòa Nhà *</label>
+                      <label>{t('facilities.fieldSelectBuilding')}</label>
                       <select
                         className="fac-form-control"
                         value={formEqBuildingId}
                         onChange={(e) => setFormEqBuildingId(e.target.value)}
                         required
                       >
-                        <option value="">-- Chọn tòa nhà --</option>
+                        <option value="">{t('facilities.selectBuilding')}</option>
                         {buildings.map(b => (
                           <option key={b._id} value={b._id}>{b.name}</option>
                         ))}
@@ -2508,7 +2582,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
 
                     {(formEqLocationType === 'floor' || formEqLocationType === 'room' || formEqLocationType === 'bed') && (
                       <div className="fac-form-group mb-1">
-                        <label>Chọn Tầng *</label>
+                        <label>{t('facilities.selectFloor')}</label>
                         <select
                           className="fac-form-control"
                           value={formEqFloorId}
@@ -2516,9 +2590,9 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                           required
                           disabled={!formEqBuildingId}
                         >
-                          <option value="">-- Chọn tầng --</option>
+                          <option value="">{t('facilities.selectFloor')}</option>
                           {modalFloors.map(f => (
-                            <option key={f._id} value={f._id}>{f.name || `Tầng ${f.floorNumber}`}</option>
+                            <option key={f._id} value={f._id}>{f.name || `${t('facilities.floor')} ${f.floorNumber}`}</option>
                           ))}
                         </select>
                       </div>
@@ -2526,7 +2600,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
 
                     {(formEqLocationType === 'room' || formEqLocationType === 'bed') && (
                       <div className="fac-form-group mb-1">
-                        <label>Chọn Phòng *</label>
+                        <label>{t('facilities.selectRoom')}</label>
                         <select
                           className="fac-form-control"
                           value={formEqRoomId}
@@ -2534,9 +2608,9 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                           required
                           disabled={!formEqFloorId}
                         >
-                          <option value="">-- Chọn phòng --</option>
+                          <option value="">{t('facilities.selectRoom')}</option>
                           {modalRooms.map(r => (
-                            <option key={r._id} value={r._id}>Phòng {r.roomNumber}</option>
+                            <option key={r._id} value={r._id}>{t('facilities.room')} {r.roomNumber}</option>
                           ))}
                         </select>
                       </div>
@@ -2544,7 +2618,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
 
                     {formEqLocationType === 'bed' && (
                       <div className="fac-form-group mb-1">
-                        <label>Chọn Giường *</label>
+                        <label>{t('facilities.bed')}</label>
                         <select
                           className="fac-form-control"
                           value={formEqBedId}
@@ -2552,7 +2626,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                           required
                           disabled={!formEqRoomId}
                         >
-                          <option value="">-- Chọn giường --</option>
+                          <option value="">{t('facilities.selectRoom')}</option>
                           {modalBeds.map(b => (
                             <option key={b._id} value={b._id}>{b.bedCode}</option>
                           ))}
@@ -2563,11 +2637,11 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                 )}
 
                 <div className="fac-form-group mt-3">
-                  <label>Ghi Chú & Lịch sử bảo trì</label>
+                  <label>{t('facilities.fieldEquipNotes')}</label>
                   <textarea
                     className="fac-form-control"
                     style={{ minHeight: '60px' }}
-                    placeholder="Nhập ghi chú thêm..."
+                    placeholder={t('facilities.placeholderEquipNotes')}
                     value={formEqNotes}
                     onChange={(e) => setFormEqNotes(e.target.value)}
                   />
@@ -2575,10 +2649,10 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
               </div>
               <div className="fac-modal-footer">
                 <button type="button" onClick={() => setShowCreateEqModal(false)} className="fac-btn fac-btn--secondary">
-                  Hủy
+                  {t('facilities.btnCancel')}
                 </button>
                 <button type="submit" disabled={submitting} className="fac-btn fac-btn--primary">
-                  {submitting ? 'Đang tạo...' : 'Tạo mới'}
+                  {submitting ? t('facilities.btnCreating') : t('facilities.btnCreate')}
                 </button>
               </div>
             </form>
@@ -2591,7 +2665,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
         <div className="fac-modal-backdrop" onClick={() => setShowEditEqModal(false)}>
           <div className="fac-modal" style={{ maxWidth: '550px' }} onClick={(e) => e.stopPropagation()}>
             <div className="fac-modal-header">
-              <h3>Chỉnh Sửa Thiết Bị</h3>
+              <h3>{t('facilities.modalEditEquipment')}</h3>
               <button onClick={() => setShowEditEqModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
                 <X size={18} />
               </button>
@@ -2605,7 +2679,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                 )}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="fac-form-group">
-                    <label>Mã Thiết Bị *</label>
+                    <label>{t('facilities.fieldEquipCode')}</label>
                     <input
                       type="text"
                       className="fac-form-control"
@@ -2615,7 +2689,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                     />
                   </div>
                   <div className="fac-form-group">
-                    <label>Tên Thiết Bị *</label>
+                    <label>{t('facilities.fieldEquipName')}</label>
                     <input
                       type="text"
                       className="fac-form-control"
@@ -2628,7 +2702,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="fac-form-group">
-                    <label>Danh Mục</label>
+                    <label>{t('facilities.fieldEquipCategory')}</label>
                     <input
                       type="text"
                       className="fac-form-control"
@@ -2637,7 +2711,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                     />
                   </div>
                   <div className="fac-form-group">
-                    <label>Hạn Bảo Trì Định Kỳ</label>
+                    <label>{t('facilities.fieldMaintenanceDue')}</label>
                     <input
                       type="date"
                       className="fac-form-control"
@@ -2649,30 +2723,30 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="fac-form-group">
-                    <label>Trạng Thái Thiết Bị</label>
+                    <label>{t('facilities.fieldEquipStatus')}</label>
                     <select
                       className="fac-form-control"
                       value={formEqStatus}
                       onChange={(e) => setFormEqStatus(e.target.value)}
                     >
-                      <option value="available">Sẵn sàng</option>
-                      <option value="in_use">Đang sử dụng</option>
-                      <option value="maintenance">Bảo trì</option>
-                      <option value="retired">Thanh lý / Hưu trí</option>
+                      <option value="available">{t('facilities.equipStatusAvailable')}</option>
+                      <option value="in_use">{t('facilities.equipStatusInUse')}</option>
+                      <option value="maintenance">{t('facilities.equipStatusMaintenance')}</option>
+                      <option value="retired">{t('facilities.equipStatusRetired')}</option>
                     </select>
                   </div>
                   <div className="fac-form-group">
-                    <label>Loại Vị Trí</label>
+                    <label>{t('facilities.fieldLocationType')}</label>
                     <select
                       className="fac-form-control"
                       value={formEqLocationType}
                       onChange={(e) => setFormEqLocationType(e.target.value)}
                     >
-                      <option value="storage">Kho lưu trữ</option>
-                      <option value="building">Tòa nhà</option>
-                      <option value="floor">Tầng</option>
-                      <option value="room">Phòng</option>
-                      <option value="bed">Giường bệnh</option>
+                      <option value="storage">{t('facilities.locationStorage')}</option>
+                      <option value="building">{t('facilities.locationBuilding')}</option>
+                      <option value="floor">{t('facilities.locationFloor')}</option>
+                      <option value="room">{t('facilities.locationRoom')}</option>
+                      <option value="bed">{t('facilities.locationBed')}</option>
                     </select>
                   </div>
                 </div>
@@ -2684,14 +2758,14 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                     </span>
 
                     <div className="fac-form-group mb-1">
-                      <label>Chọn Tòa Nhà *</label>
+                      <label>{t('facilities.fieldSelectBuilding')}</label>
                       <select
                         className="fac-form-control"
                         value={formEqBuildingId}
                         onChange={(e) => setFormEqBuildingId(e.target.value)}
                         required
                       >
-                        <option value="">-- Chọn tòa nhà --</option>
+                        <option value="">{t('facilities.selectBuilding')}</option>
                         {buildings.map(b => (
                           <option key={b._id} value={b._id}>{b.name}</option>
                         ))}
@@ -2700,7 +2774,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
 
                     {(formEqLocationType === 'floor' || formEqLocationType === 'room' || formEqLocationType === 'bed') && (
                       <div className="fac-form-group mb-1">
-                        <label>Chọn Tầng *</label>
+                        <label>{t('facilities.selectFloor')}</label>
                         <select
                           className="fac-form-control"
                           value={formEqFloorId}
@@ -2708,9 +2782,9 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                           required
                           disabled={!formEqBuildingId}
                         >
-                          <option value="">-- Chọn tầng --</option>
+                          <option value="">{t('facilities.selectFloor')}</option>
                           {modalFloors.map(f => (
-                            <option key={f._id} value={f._id}>{f.name || `Tầng ${f.floorNumber}`}</option>
+                            <option key={f._id} value={f._id}>{f.name || `${t('facilities.floor')} ${f.floorNumber}`}</option>
                           ))}
                         </select>
                       </div>
@@ -2718,7 +2792,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
 
                     {(formEqLocationType === 'room' || formEqLocationType === 'bed') && (
                       <div className="fac-form-group mb-1">
-                        <label>Chọn Phòng *</label>
+                        <label>{t('facilities.selectRoom')}</label>
                         <select
                           className="fac-form-control"
                           value={formEqRoomId}
@@ -2726,9 +2800,9 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                           required
                           disabled={!formEqFloorId}
                         >
-                          <option value="">-- Chọn phòng --</option>
+                          <option value="">{t('facilities.selectRoom')}</option>
                           {modalRooms.map(r => (
-                            <option key={r._id} value={r._id}>Phòng {r.roomNumber}</option>
+                            <option key={r._id} value={r._id}>{t('facilities.room')} {r.roomNumber}</option>
                           ))}
                         </select>
                       </div>
@@ -2736,7 +2810,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
 
                     {formEqLocationType === 'bed' && (
                       <div className="fac-form-group mb-1">
-                        <label>Chọn Giường *</label>
+                        <label>{t('facilities.bed')}</label>
                         <select
                           className="fac-form-control"
                           value={formEqBedId}
@@ -2744,7 +2818,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                           required
                           disabled={!formEqRoomId}
                         >
-                          <option value="">-- Chọn giường --</option>
+                          <option value="">{t('facilities.selectRoom')}</option>
                           {modalBeds.map(b => (
                             <option key={b._id} value={b._id}>{b.bedCode}</option>
                           ))}
@@ -2755,7 +2829,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                 )}
 
                 <div className="fac-form-group mt-3">
-                  <label>Ghi Chú & Lịch sử bảo trì</label>
+                  <label>{t('facilities.fieldEquipNotes')}</label>
                   <textarea
                     className="fac-form-control"
                     style={{ minHeight: '60px' }}
@@ -2766,10 +2840,10 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
               </div>
               <div className="fac-modal-footer">
                 <button type="button" onClick={() => setShowEditEqModal(false)} className="fac-btn fac-btn--secondary">
-                  Hủy
+                  {t('facilities.btnCancel')}
                 </button>
                 <button type="submit" disabled={submitting} className="fac-btn fac-btn--primary">
-                  {submitting ? 'Đang lưu...' : 'Lưu Thay Đổi'}
+                  {submitting ? t('facilities.btnSaving') : t('facilities.btnSave')}
                 </button>
               </div>
             </form>
@@ -2782,7 +2856,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
         <div className="fac-modal-backdrop" onClick={() => setShowDeleteEqModal(false)}>
           <div className="fac-modal" onClick={(e) => e.stopPropagation()}>
             <div className="fac-modal-header" style={{ background: '#fef2f2' }}>
-              <h3 style={{ color: '#dc2626' }}>Xóa Thiết Bị Y Tế?</h3>
+              <h3 style={{ color: '#dc2626' }}>{t('facilities.modalDeleteEquipment')}</h3>
               <button onClick={() => setShowDeleteEqModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
                 <X size={18} />
               </button>
@@ -2802,10 +2876,10 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
             </div>
             <div className="fac-modal-footer">
               <button type="button" onClick={() => setShowDeleteEqModal(false)} className="fac-btn fac-btn--secondary">
-                Hủy
+                {t('facilities.btnCancel')}
               </button>
               <button type="button" onClick={handleDeleteEq} disabled={submitting} className="fac-btn fac-btn--danger">
-                {submitting ? 'Đang xóa...' : 'Xác Nhận Xóa'}
+                {submitting ? t('facilities.btnDeleting') : t('facilities.btnConfirmDelete')}
               </button>
             </div>
           </div>

@@ -116,6 +116,7 @@ function AppRoutes() {
         <Route path="residents/pre-existing-conditions" element={<PreExistingConditionsPage />} />
         <Route path="residents/drug-allergies" element={<DrugAllergiesPage />} />
         <Route path="residents/transfer-room" element={<TransferResidentPage />} />
+        <Route path="buildings" element={<FacilitiesPage defaultTab="buildings" />} />
         <Route path="floors" element={<FacilitiesPage defaultTab="floors" />} />
         <Route path="rooms" element={<FacilitiesPage defaultTab="rooms" />} />
         <Route path="beds" element={<FacilitiesPage defaultTab="beds" />} />
