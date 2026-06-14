@@ -55,6 +55,7 @@ export const sidebarData = [
     title: 'sidebar.buildingsFacilities',
     icon: Building2,
     children: [
+      { title: 'sidebar.buildings', path: '/admin/buildings' },
       { title: 'sidebar.floors', path: '/admin/floors' },
       { title: 'sidebar.rooms', path: '/admin/rooms' },
       { title: 'sidebar.beds', path: '/admin/beds' },
