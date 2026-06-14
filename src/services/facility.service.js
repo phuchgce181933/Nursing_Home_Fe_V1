@@ -83,10 +83,14 @@ const updateEquipment = (id, data) =>
 const deleteEquipment = (id) =>
   axiosClient.delete(`/facilities/equipment/${id}`).then(unwrap);
 
+const getBuildingStats = (buildingId) =>
+  axiosClient.get(`/facilities/buildings/${buildingId}/stats`).then(unwrap);
+
 const facilityService = {
   listBuildings,
   listFloors,
   getStats,
+  getBuildingStats,
   getFloor,
   listRoomsByFloor,
   listAvailableBedsByRoom,

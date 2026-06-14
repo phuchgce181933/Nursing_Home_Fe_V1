@@ -405,3 +405,11 @@
   color: #94a3b8;
   font-weight: 500;
 }
+
+.fac-btn-icon--stats {
+  color: #6366f1;
+}
+
+.fac-btn-icon--stats:hover {
+  background: #e0e7ff;
+}

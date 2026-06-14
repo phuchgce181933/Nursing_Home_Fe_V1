@@ -19,7 +19,8 @@ import {
   Calendar,
   MapPin,
   Grid,
-  List
+  List,
+  BarChart3
 } from 'lucide-react';
 import facilityService from '../../../services/facility.service';
 import '../../../styles/admin/FacilitiesPage.css';
@@ -60,6 +61,10 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedBuilding, setSelectedBuilding] = useState(null);
+  const [showStatsModal, setShowStatsModal] = useState(false);
+  const [selectedBuildingStats, setSelectedBuildingStats] = useState(null);
+  const [loadingStats, setLoadingStats] = useState(false);
+  const [statsError, setStatsError] = useState(null);
 
   const [formCode, setFormCode] = useState('');
   const [formName, setFormName] = useState('');
@@ -322,6 +327,22 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
   const handleOpenDelete = (b) => {
     setSelectedBuilding(b);
     setShowDeleteModal(true);
+  };
+
+  const handleOpenStats = async (b) => {
+    try {
+      setSelectedBuilding(b);
+      setLoadingStats(true);
+      setStatsError(null);
+      setShowStatsModal(true);
+      const data = await facilityService.getBuildingStats(b._id);
+      setSelectedBuildingStats(data);
+    } catch (err) {
+      console.error(err);
+      setStatsError(t('facilities.statsError'));
+    } finally {
+      setLoadingStats(false);
+    }
   };
 
   const handleCreateBuilding = async (e) => {
@@ -1000,8 +1021,20 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                 <tbody>
                   {filteredBuildings.map((b) => (
                     <tr key={b._id}>
-                      <td style={{ fontWeight: '600', color: '#1e293b' }}>{b.code}</td>
-                      <td style={{ fontWeight: '550' }}>{b.name}</td>
+                      <td 
+                        onClick={() => handleOpenStats(b)}
+                        style={{ fontWeight: '600', color: '#4f46e5', cursor: 'pointer' }}
+                        title={t('facilities.viewStats')}
+                      >
+                        {b.code}
+                      </td>
+                      <td 
+                        onClick={() => handleOpenStats(b)}
+                        style={{ fontWeight: '550', color: '#1e293b', cursor: 'pointer' }}
+                        title={t('facilities.viewStats')}
+                      >
+                        {b.name}
+                      </td>
                       <td>{b.address || '—'}</td>
                       <td>{b.description || '—'}</td>
                       <td>
@@ -1010,6 +1043,14 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                         </span>
                       </td>
                       <td style={{ textAlign: 'right' }}>
+                        <button
+                          onClick={() => handleOpenStats(b)}
+                          className="fac-btn-icon fac-btn-icon--stats"
+                          title={t('facilities.viewStats')}
+                          style={{ marginRight: '4px' }}
+                        >
+                          <BarChart3 size={16} />
+                        </button>
                         <button
                           onClick={() => handleOpenEdit(b)}
                           className="fac-btn-icon fac-btn-icon--edit"
@@ -1844,6 +1885,264 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
         </div>
       )}
 
+      {/* BUILDING STATISTICS MODAL */}
+      {showStatsModal && (
+        <div className="fac-modal-backdrop" onClick={() => setShowStatsModal(false)}>
+          <div className="fac-modal" style={{ maxWidth: '550px' }} onClick={(e) => e.stopPropagation()}>
+            <div className="fac-modal-header">
+              <h3>{t('facilities.modalBuildingStats')}</h3>
+              <button onClick={() => setShowStatsModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+                <X size={18} />
+              </button>
+            </div>
+            <div className="fac-modal-body">
+              {loadingStats ? (
+                <div className="flex flex-col items-center justify-center py-10 text-slate-500">
+                  <Loader2 className="animate-spin mb-3 text-indigo-600" size={32} />
+                  <p>{t('facilities.loadingStats')}</p>
+                </div>
+              ) : statsError ? (
+                <div className="bg-red-50 border border-red-200 text-red-600 text-sm p-4 rounded-xl text-center">
+                  {statsError}
+                </div>
+              ) : selectedBuildingStats ? (
+                <div className="animate-fadeIn">
+                  {/* Building Meta Header */}
+                  <div className="mb-6 pb-4 border-b border-slate-100 flex items-center justify-between" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '16px', marginBottom: '24px' }}>
+                    <div>
+                      <div className="flex items-center gap-2.5" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <h4 style={{ margin: 0, fontSize: '18px', fontWeight: '600', color: '#0f172a' }}>
+                          {selectedBuildingStats.building.name}
+                        </h4>
+                        <span style={{
+                          fontSize: '11px',
+                          fontWeight: '600',
+                          backgroundColor: '#e0f2fe',
+                          color: '#0369a1',
+                          padding: '2px 8px',
+                          borderRadius: '4px',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em'
+                        }}>
+                          {selectedBuildingStats.building.code}
+                        </span>
+                      </div>
+                      <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{
+                          width: '6px',
+                          height: '6px',
+                          borderRadius: '50%',
+                          backgroundColor: selectedBuildingStats.building.isActive ? '#10b981' : '#cbd5e1',
+                          display: 'inline-block'
+                        }} />
+                        {selectedBuildingStats.building.isActive ? t('facilities.active') : t('facilities.inactive')}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* High Level Stats Grid */}
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(3, 1fr)',
+                    background: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '8px',
+                    padding: '16px 0',
+                    marginBottom: '24px'
+                  }}>
+                    <div style={{ textAlign: 'center', borderRight: '1px solid #e2e8f0' }}>
+                      <div style={{ fontSize: '11px', fontWeight: '600', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>
+                        {t('facilities.statsFloorsCount')}
+                      </div>
+                      <div style={{ fontSize: '24px', fontWeight: '600', color: '#0f172a' }}>
+                        {selectedBuildingStats.floorsCount}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'center', borderRight: '1px solid #e2e8f0' }}>
+                      <div style={{ fontSize: '11px', fontWeight: '600', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>
+                        {t('facilities.statsRoomsCount')}
+                      </div>
+                      <div style={{ fontSize: '24px', fontWeight: '600', color: '#0f172a' }}>
+                        {selectedBuildingStats.roomsCount}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: '11px', fontWeight: '600', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>
+                        {t('facilities.statsBedsCount')}
+                      </div>
+                      <div style={{ fontSize: '24px', fontWeight: '600', color: '#0f172a' }}>
+                        {selectedBuildingStats.bedsCount}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Beds Breakdown Header */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '12px' }}>
+                    <span style={{ fontSize: '14px', fontWeight: '600', color: '#1e293b' }}>
+                      {t('facilities.tabBeds')}
+                    </span>
+                    <span style={{ fontSize: '12px', color: '#64748b' }}>
+                      {t('facilities.statsTotalBedsCount', { count: selectedBuildingStats.bedsCount })}
+                    </span>
+                  </div>
+
+                  {/* Segmented Progress Bar */}
+                  {selectedBuildingStats.bedsCount > 0 ? (
+                    <>
+                      <div style={{ width: '100%', height: '8px', background: '#f1f5f9', borderRadius: '4px', overflow: 'hidden', display: 'flex', marginBottom: '24px' }}>
+                        {/* Occupied */}
+                        <div
+                          style={{
+                            width: `${(selectedBuildingStats.bedStats.occupied / selectedBuildingStats.bedsCount) * 100}%`,
+                            backgroundColor: '#f43f5e',
+                            transition: 'width 0.3s ease'
+                          }}
+                          title={`${t('facilities.statsBedStatusOccupied')}: ${selectedBuildingStats.bedStats.occupied}`}
+                        />
+                        {/* Available */}
+                        <div
+                          style={{
+                            width: `${(selectedBuildingStats.bedStats.available / selectedBuildingStats.bedsCount) * 100}%`,
+                            backgroundColor: '#10b981',
+                            transition: 'width 0.3s ease'
+                          }}
+                          title={`${t('facilities.statsBedStatusAvailable')}: ${selectedBuildingStats.bedStats.available}`}
+                        />
+                        {/* Reserved */}
+                        <div
+                          style={{
+                            width: `${(selectedBuildingStats.bedStats.reserved / selectedBuildingStats.bedsCount) * 100}%`,
+                            backgroundColor: '#8b5cf6',
+                            transition: 'width 0.3s ease'
+                          }}
+                          title={`${t('facilities.statsBedStatusReserved')}: ${selectedBuildingStats.bedStats.reserved}`}
+                        />
+                        {/* Maintenance */}
+                        <div
+                          style={{
+                            width: `${(selectedBuildingStats.bedStats.maintenance / selectedBuildingStats.bedsCount) * 100}%`,
+                            backgroundColor: '#f59e0b',
+                            transition: 'width 0.3s ease'
+                          }}
+                          title={`${t('facilities.statsBedStatusMaintenance')}: ${selectedBuildingStats.bedStats.maintenance}`}
+                        />
+                      </div>
+
+                      {/* Legends */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
+                        <div style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          padding: '12px 0',
+                          borderBottom: '1px solid #f1f5f9'
+                        }}>
+                          <span style={{ fontSize: '14px', color: '#475569', fontWeight: '500' }}>
+                            {t('facilities.statsBedStatusAvailable')}
+                          </span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <span style={{ fontSize: '14px', fontWeight: '600', color: '#0f172a' }}>
+                              {selectedBuildingStats.bedStats.available}
+                            </span>
+                            <span style={{
+                              width: '4px',
+                              height: '14px',
+                              borderRadius: '2px',
+                              backgroundColor: '#10b981',
+                              display: 'inline-block'
+                            }} />
+                          </div>
+                        </div>
+
+                        <div style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          padding: '12px 0',
+                          borderBottom: '1px solid #f1f5f9'
+                        }}>
+                          <span style={{ fontSize: '14px', color: '#475569', fontWeight: '500' }}>
+                            {t('facilities.statsBedStatusOccupied')}
+                          </span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <span style={{ fontSize: '14px', fontWeight: '600', color: '#0f172a' }}>
+                              {selectedBuildingStats.bedStats.occupied}
+                            </span>
+                            <span style={{
+                              width: '4px',
+                              height: '14px',
+                              borderRadius: '2px',
+                              backgroundColor: '#f43f5e',
+                              display: 'inline-block'
+                            }} />
+                          </div>
+                        </div>
+
+                        <div style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          padding: '12px 0',
+                          borderBottom: '1px solid #f1f5f9'
+                        }}>
+                          <span style={{ fontSize: '14px', color: '#475569', fontWeight: '500' }}>
+                            {t('facilities.statsBedStatusReserved')}
+                          </span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <span style={{ fontSize: '14px', fontWeight: '600', color: '#0f172a' }}>
+                              {selectedBuildingStats.bedStats.reserved}
+                            </span>
+                            <span style={{
+                              width: '4px',
+                              height: '14px',
+                              borderRadius: '2px',
+                              backgroundColor: '#8b5cf6',
+                              display: 'inline-block'
+                            }} />
+                          </div>
+                        </div>
+
+                        <div style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          padding: '12px 0'
+                        }}>
+                          <span style={{ fontSize: '14px', color: '#475569', fontWeight: '500' }}>
+                            {t('facilities.statsBedStatusMaintenance')}
+                          </span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <span style={{ fontSize: '14px', fontWeight: '600', color: '#0f172a' }}>
+                              {selectedBuildingStats.bedStats.maintenance}
+                            </span>
+                            <span style={{
+                              width: '4px',
+                              height: '14px',
+                              borderRadius: '2px',
+                              backgroundColor: '#f59e0b',
+                              display: 'inline-block'
+                            }} />
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', textAlign: 'center', padding: '24px', color: '#94a3b8', borderRadius: '12px', fontSize: '14px', fontWeight: '500' }}>
+                      {t('facilities.noBedsInBuilding')}
+                    </div>
+                  )}
+                </div>
+              ) : null}
+            </div>
+            <div className="fac-modal-footer">
+              <button type="button" onClick={() => setShowStatsModal(false)} className="fac-btn fac-btn--secondary">
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* CREATE FLOOR MODAL */}
       {showCreateFloorModal && (
         <div className="fac-modal-backdrop" onClick={() => setShowCreateFloorModal(false)}>
@@ -2194,12 +2493,18 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                     className="fac-form-control"
                     value={formRoomStatus}
                     onChange={(e) => setFormRoomStatus(e.target.value)}
+                    disabled={selectedRoom?.occupiedCount > 0}
                   >
                     <option value="available">{t('facilities.statusAvailable')}</option>
                     <option value="full">{t('facilities.statusFull')}</option>
                     <option value="maintenance">{t('facilities.statusMaintenance')}</option>
                     <option value="closed">{t('facilities.statusClosed')}</option>
                   </select>
+                  {selectedRoom?.occupiedCount > 0 && (
+                    <p className="text-xs text-amber-600 mt-1">
+                      {t('facilities.roomOccupiedWarning')}
+                    </p>
+                  )}
                 </div>
                 <div className="fac-form-group">
                   <label>{t('facilities.fieldRoomNotes')}</label>
@@ -2404,7 +2709,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                     <option value="maintenance">{t('facilities.statusMaintenance')}</option>
                   </select>
                   {selectedBed?.status === 'occupied' && (
-                    <p className="text-xs text-amber-600 mt-1">Giường đang được sử dụng bởi cư dân, không thể chuyển trạng thái thủ công.</p>
+                    <p className="text-xs text-amber-600 mt-1">{t('facilities.bedOccupiedWarning')}</p>
                   )}
                 </div>
                 <div className="fac-form-group">
