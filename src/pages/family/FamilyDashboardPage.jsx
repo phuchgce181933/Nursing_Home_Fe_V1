@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AlertTriangle, CheckCircle, CreditCard, Package, Users } from 'lucide-react';
+import { AlertTriangle, CheckCircle, CreditCard, Package, Users, Wallet, PlusCircle } from 'lucide-react';
 import { getAuthToken } from '../../utils/auth';
 import residentService from '../../services/resident.service';
 import familyPortalService from '../../services/familyPortal.service';
@@ -32,6 +32,12 @@ function FamilyDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [creatingInvoiceFor, setCreatingInvoiceFor] = useState(null);
+  const [walletInfo, setWalletInfo] = useState({ balance: 0, totalTopup: 0, totalSpent: 0 });
+  const [walletLoading, setWalletLoading] = useState(true);
+  const [walletError, setWalletError] = useState(null);
+  const [topupAmount, setTopupAmount] = useState(500000);
+  const [isTopupProcessing, setIsTopupProcessing] = useState(false);
+  const [isWalletPaymentProcessing, setIsWalletPaymentProcessing] = useState(false);
 
   useEffect(() => {
     const loadResidents = async () => {
@@ -70,11 +76,79 @@ function FamilyDashboardPage() {
     loadSummaries();
   }, [residents]);
 
+  useEffect(() => {
+    const loadWallet = async () => {
+      try {
+        setWalletLoading(true);
+        setWalletError(null);
+        const payload = await familyPortalService.getWalletBalance();
+        setWalletInfo(payload);
+      } catch (err) {
+        setWalletError(err?.response?.data?.message || err.message || 'Không thể tải số dư ví');
+      } finally {
+        setWalletLoading(false);
+      }
+    };
+
+    loadWallet();
+  }, []);
+
   const handleOpenCheckout = (residentId, invoiceId) => {
     if (!invoiceId) return;
     const token = getAuthToken();
     const url = `/api/residents/${residentId}/invoices/payos/checkout/${invoiceId}${token ? `?token=${encodeURIComponent(token)}` : ''}`;
     window.open(url, '_blank');
+  };
+
+  const handleWalletTopup = async () => {
+    if (!topupAmount || topupAmount <= 0) {
+      setWalletError('Số tiền nạp phải lớn hơn 0');
+      return;
+    }
+
+    try {
+      setIsTopupProcessing(true);
+      setWalletError(null);
+      const payload = await familyPortalService.generateWalletTopupUrl(topupAmount);
+      if (payload?.checkoutUrl) {
+        window.open(payload.checkoutUrl, '_blank');
+      }
+    } catch (err) {
+      console.error('Wallet topup error:', err);
+      setWalletError(err?.response?.data?.message || err.message || 'Không thể tạo yêu cầu nạp tiền');
+    } finally {
+      setIsTopupProcessing(false);
+    }
+  };
+
+  const handlePayWithWallet = async (residentId, invoiceId, amount) => {
+    if (walletInfo.balance < amount) {
+      setWalletError('Số dư ví không đủ để thanh toán hóa đơn.');
+      return;
+    }
+
+    try {
+      setWalletError(null);
+      setIsWalletPaymentProcessing(true);
+      await familyPortalService.payInvoice(residentId, invoiceId, {
+        paymentMethod: 'wallet',
+        amount,
+      });
+      const [updatedSummary, updatedWallet] = await Promise.all([
+        familyPortalService.getResidentBillingSummary(residentId),
+        familyPortalService.getWalletBalance(),
+      ]);
+      setBillingSummaries((prev) => ({
+        ...prev,
+        [residentId]: updatedSummary,
+      }));
+      setWalletInfo(updatedWallet);
+    } catch (err) {
+      console.error('Wallet payment failed:', err);
+      setWalletError(err?.response?.data?.message || err.message || 'Không thể thanh toán bằng ví');
+    } finally {
+      setIsWalletPaymentProcessing(false);
+    }
   };
 
   const handleCreateInvoice = async (resident) => {
@@ -119,6 +193,70 @@ function FamilyDashboardPage() {
           <p>Xem gói dịch vụ đã đăng ký và các khoản phí cần thanh toán cho cư dân của bạn.</p>
         </div>
       </header>
+
+      <section className="wallet-summary-card">
+        <div className="wallet-summary-header">
+          <div>
+            <h2>Ví điện tử</h2>
+            <p>Quản lý số dư và nạp tiền nhanh bằng PayOS.</p>
+          </div>
+          <div className="wallet-icon">
+            <Wallet size={24} />
+          </div>
+        </div>
+
+        <div className="wallet-summary-body">
+          {walletLoading ? (
+            <div className="wallet-loading">Đang tải số dư ví...</div>
+          ) : (
+            <>
+              <div className="wallet-balance-row">
+                <span>Số dư hiện tại</span>
+                <strong>{formatMoney(walletInfo.balance)}</strong>
+              </div>
+              <div className="wallet-metrics-row">
+                <div>
+                  <span>Tổng đã nạp </span>
+                  <strong>{formatMoney(walletInfo.totalTopup)}</strong>
+                </div>
+                <div>
+                  <span>Tổng đã chi </span>
+                  <strong> {formatMoney(walletInfo.totalSpent)}</strong>
+                </div>
+              </div>
+            </>
+          )}
+
+          {walletError && (
+            <div className="alert alert-error wallet-alert">
+              <AlertTriangle size={16} /> {walletError}
+            </div>
+          )}
+
+          <div className="wallet-topup-form">
+            <label htmlFor="wallet-topup-amount">Số tiền nạp (VND)</label>
+            <div className="wallet-topup-input-group">
+              <input
+                id="wallet-topup-amount"
+                type="number"
+                min="1000"
+                step="1000"
+                value={topupAmount}
+                onChange={(event) => setTopupAmount(Number(event.target.value))}
+              />
+              <button
+                type="button"
+                className="button button-primary"
+                onClick={handleWalletTopup}
+                disabled={isTopupProcessing || walletLoading}
+              >
+                {isTopupProcessing ? 'Đang tạo yêu cầu...' : 'Nạp tiền vào ví'}
+                <PlusCircle size={16} />
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {loading && (
         <div className="loading-state">Đang tải thông tin cư dân...</div>
@@ -231,13 +369,23 @@ function FamilyDashboardPage() {
               <div className="card-actions">
                 {invoice ? (
                   invoice.status !== 'paid' ? (
-                    <button
-                      type="button"
-                      className="button button-primary"
-                      onClick={() => handleOpenCheckout(resident._id, invoice._id)}
-                    >
-                      Thanh toán qua PayOS
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        className="button button-primary"
+                        onClick={() => handleOpenCheckout(resident._id, invoice._id)}
+                      >
+                        Thanh toán qua PayOS
+                      </button>
+                      <button
+                        type="button"
+                        className="button button-secondary"
+                        onClick={() => handlePayWithWallet(resident._id, invoice._id, invoice.totalAmount)}
+                        disabled={walletLoading || isWalletPaymentProcessing || walletInfo.balance < invoice.totalAmount}
+                      >
+                        {isWalletPaymentProcessing ? 'Đang thanh toán...' : 'Thanh toán bằng ví'}
+                      </button>
+                    </>
                   ) : (
                     <button type="button" className="button button-secondary" disabled>
                       Đã thanh toán

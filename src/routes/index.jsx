@@ -47,6 +47,7 @@ import ServicePackagesPage from '../pages/admin/ServicePackagesPage';
 import PharmacyPage from '../pages/pharmacist/PharmacyPage';
 import AdminActivitiesPage from '../pages/admin/AdminActivitiesPage';
 import AdminReportsPage from '../pages/admin/AdminReportsPage';
+import AuditLogsPage from '../pages/admin/AuditLogsPage';
 import ActivityStatisticsPage from '../pages/admin/ActivityStatisticsPage';
 import ActivityParticipationResultsPage from '../pages/admin/ActivityParticipationResultsPage';
 import CareAppointmentsPage from '../pages/admin/appointments';
@@ -139,6 +140,7 @@ function AppRoutes() {
         <Route path="activities/statistics" element={<ActivityStatisticsPage />} />
         <Route path="activities/participation-results" element={<ActivityParticipationResultsPage />} />
         <Route path="reports" element={<AdminReportsPage />} />
+        <Route path="audit-logs" element={<AuditLogsPage />} />
         <Route path="contracts" element={<AdminContractManagementPage />} />
         <Route path="incidents" element={<IncidentManagementPage />} />
         <Route path="*" element={<PlaceholderPage title="Trang quản trị" />} />
