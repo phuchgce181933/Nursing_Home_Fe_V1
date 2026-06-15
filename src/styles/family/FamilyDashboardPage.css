@@ -219,3 +219,119 @@
   color: #334155;
   font-weight: 600;
 }
+.wallet-summary-card {
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  padding: 24px;
+  box-shadow: 0 16px 34px rgba(15, 23, 42, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.wallet-summary-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+}
+
+.wallet-summary-header h2 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.wallet-summary-header p {
+  margin: 6px 0 0;
+  color: #475569;
+  font-size: 14px;
+}
+
+.wallet-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 18px;
+  background: rgba(37, 99, 235, 0.12);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #1d4ed8;
+}
+
+.wallet-summary-body {
+  display: grid;
+  gap: 14px;
+}
+
+.wallet-loading {
+  padding: 18px;
+  border-radius: 14px;
+  background: #f8fafc;
+  color: #334155;
+}
+
+.wallet-balance-row,
+.wallet-metrics-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  padding: 16px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+}
+
+.wallet-metrics-row {
+  flex-wrap: wrap;
+}
+
+.wallet-metrics-row > div {
+  flex: 1;
+  min-width: 160px;
+}
+
+.wallet-balance-row span,
+.wallet-metrics-row span {
+  color: #64748b;
+}
+
+.wallet-balance-row strong,
+.wallet-metrics-row strong {
+  color: #0f172a;
+}
+
+.wallet-topup-form {
+  display: grid;
+  gap: 12px;
+}
+
+.wallet-topup-form label {
+  font-size: 14px;
+  color: #334155;
+  font-weight: 600;
+}
+
+.wallet-topup-input-group {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.wallet-topup-input-group input {
+  padding: 14px 16px;
+  border: 1px solid #cbd5e1;
+  border-radius: 14px;
+  font-size: 14px;
+  color: #0f172a;
+  width: 100%;
+  background: #ffffff;
+}
+
+.wallet-alert {
+  margin: 0;
+}

@@ -27,6 +27,7 @@ export const sidebarData = [
     children: [
       { title: 'sidebar.myProfile', path: '/admin/profile' },
       { title: 'sidebar.accounts', path: '/admin/accounts' },
+      { title: 'sidebar.auditLogs', path: '/admin/audit-logs' },
     ],
   },
   {
