@@ -259,17 +259,118 @@
   gap: 10px;
 }
 
-.adm-btn-clear {
-  padding: 9px 18px;
-  font-size: 13.5px;
-  font-weight: 600;
-  color: #64748b;
-  background-color: #ffffff;
-  border: 1.5px solid #e2e8f0;
-  border-radius: 10px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
+  .adm-detail-panel {
+    background-color: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 18px;
+    padding: 24px;
+    margin-top: 28px;
+    box-shadow: 0 10px 25px rgba(15, 23, 42, 0.06);
+  }
+
+  .adm-detail-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+  }
+
+  .adm-detail-header h2 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 800;
+    color: #1b365d;
+  }
+
+  .adm-detail-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.5);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    z-index: 1100;
+  }
+
+  .adm-detail-modal {
+    width: min(100%, 820px);
+    max-height: 90vh;
+    overflow-y: auto;
+    background: #ffffff;
+    border-radius: 24px;
+    box-shadow: 0 32px 80px rgba(15, 23, 42, 0.25);
+    border: 1px solid rgba(226, 232, 240, 0.7);
+    padding: 24px;
+    animation: admModalUp 0.28s ease-out;
+  }
+
+  @keyframes admModalUp {
+    from {
+      transform: translateY(20px);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
+  .adm-detail-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+  }
+
+  .adm-detail-header h2 {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 800;
+    color: #1b365d;
+  }
+
+  .adm-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 18px;
+  }
+
+  .adm-detail-item {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 16px;
+    border-radius: 14px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    min-height: 92px;
+  }
+
+  .adm-detail-item--full {
+    grid-column: 1 / -1;
+  }
+
+  .adm-detail-label {
+    font-size: 12px;
+    text-transform: uppercase;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: #64748b;
+  }
+
+  .adm-detail-value {
+    font-size: 15px;
+    font-weight: 600;
+    color: #0f172a;
+    line-height: 1.5;
+    word-break: break-word;
+  }
 
 .adm-btn-clear:hover {
   background-color: #f8fafc;
@@ -422,6 +523,50 @@
 }
 
 .status-badge-custom-adm--cancelled {
+  background-color: #f8fafc;
+  color: #64748b;
+  border: 1px solid #cbd5e1;
+}
+
+.adm-status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 999px;
+  line-height: 1;
+  text-transform: none;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.adm-status-badge--issued {
+  background-color: #eff6ff;
+  color: #2563eb;
+  border: 1px solid #bfdbfe;
+}
+
+.adm-status-badge--partially-paid {
+  background-color: #fffbeb;
+  color: #c2410c;
+  border: 1px solid #fde68a;
+}
+
+.adm-status-badge--paid {
+  background-color: #ecfdf5;
+  color: #166534;
+  border: 1px solid #a7f3d0;
+}
+
+.adm-status-badge--overdue {
+  background-color: #fff1f2;
+  color: #b91c1c;
+  border: 1px solid #fecdd3;
+}
+
+.adm-status-badge--cancelled {
   background-color: #f8fafc;
   color: #64748b;
   border: 1px solid #cbd5e1;

@@ -164,8 +164,7 @@ function FamilyDashboardPage() {
         careServiceCost: packagePrice,
         dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       };
-      const response = await familyPortalService.createInvoice(resident._id, payload);
-      const createdInvoice = response.data;
+      const createdInvoice = await familyPortalService.createInvoice(resident._id, payload);
       setBillingSummaries((prev) => ({
         ...prev,
         [resident._id]: {
@@ -278,6 +277,8 @@ function FamilyDashboardPage() {
         {residents.map((resident) => {
           const summary = billingSummaries[resident._id] || {};
           const invoice = summary.latestInvoice;
+          const invoiceStatus = invoice?.status?.toString().toUpperCase?.();
+          const invoiceTotalAmount = invoice?.totalAmount ?? invoice?.total ?? invoice?.subTotal ?? 0;
           const hasServicePackage = Boolean(resident.servicePackage);
 
           return (
@@ -289,7 +290,7 @@ function FamilyDashboardPage() {
                 </div>
                 <div className="status-pill">
                   {invoice ? (
-                    invoice.status === 'paid' ? (
+                    invoiceStatus === 'PAID' ? (
                       <span className="status-paid"><CheckCircle size={16} /> Đã thanh toán</span>
                     ) : (
                       <span className="status-due"><CreditCard size={16} /> Chưa thanh toán</span>
@@ -327,27 +328,27 @@ function FamilyDashboardPage() {
                     </div>
                     <div className="info-row info-row--status">
                       <strong>Trạng thái thanh toán:</strong>
-                      <span>{invoice.status === 'paid' ? 'Đã đóng' : invoice.status === 'partially_paid' ? 'Đã đóng một phần' : 'Chưa đóng'}</span>
+                      <span>{invoiceStatus === 'PAID' ? 'Đã đóng' : invoiceStatus === 'PARTIALLY_PAID' ? 'Đã đóng một phần' : 'Chưa đóng'}</span>
                     </div>
                     <div className="info-row info-row--fee">
                       <strong>Phí xét nghiệm / khám:</strong>
-                      <span>{formatMoney(invoice.roomCost)} <small>{invoice.status === 'paid' ? '(Đã đóng)' : '(Chưa đóng)'}</small></span>
+                      <span>{formatMoney(invoice.roomCost)} <small>{invoiceStatus === 'PAID' ? '(Đã đóng)' : '(Chưa đóng)'}</small></span>
                     </div>
                     <div className="info-row info-row--fee">
                       <strong>Phí thuốc:</strong>
-                      <span>{formatMoney(invoice.medicationCost)} <small>{invoice.status === 'paid' ? '(Đã đóng)' : '(Chưa đóng)'}</small></span>
+                      <span>{formatMoney(invoice.medicationCost)} <small>{invoiceStatus === 'PAID' ? '(Đã đóng)' : '(Chưa đóng)'}</small></span>
                     </div>
                     <div className="info-row info-row--fee">
                       <strong>Phí dịch vụ chăm sóc:</strong>
-                      <span>{formatMoney(invoice.careServiceCost)} <small>{invoice.status === 'paid' ? '(Đã đóng)' : '(Chưa đóng)'}</small></span>
+                      <span>{formatMoney(invoice.careServiceCost)} <small>{invoiceStatus === 'PAID' ? '(Đã đóng)' : '(Chưa đóng)'}</small></span>
                     </div>
                     <div className="info-row info-row--fee">
                       <strong>Chi phí khác:</strong>
-                      <span>{formatMoney(invoice.otherCost)} <small>{invoice.status === 'paid' ? '(Đã đóng)' : '(Chưa đóng)'}</small></span>
+                      <span>{formatMoney(invoice.otherCost)} <small>{invoiceStatus === 'PAID' ? '(Đã đóng)' : '(Chưa đóng)'}</small></span>
                     </div>
                     <div className="info-row info-row--total">
                       <strong>Tổng phí phải trả:</strong>
-                      <span>{formatMoney(invoice.totalAmount)} <small>{invoice.status === 'paid' ? '(Đã đóng)' : invoice.status === 'partially_paid' ? '(Thanh toán một phần)' : '(Chưa đóng)'}</small></span>
+                      <span>{formatMoney(invoiceTotalAmount)} <small>{invoiceStatus === 'PAID' ? '(Đã đóng)' : invoiceStatus === 'PARTIALLY_PAID' ? '(Thanh toán một phần)' : '(Chưa đóng)'}</small></span>
                     </div>
                   </>
                 ) : (
@@ -368,7 +369,7 @@ function FamilyDashboardPage() {
 
               <div className="card-actions">
                 {invoice ? (
-                  invoice.status !== 'paid' ? (
+                  invoiceStatus !== 'PAID' ? (
                     <>
                       <button
                         type="button"
@@ -380,8 +381,8 @@ function FamilyDashboardPage() {
                       <button
                         type="button"
                         className="button button-secondary"
-                        onClick={() => handlePayWithWallet(resident._id, invoice._id, invoice.totalAmount)}
-                        disabled={walletLoading || isWalletPaymentProcessing || walletInfo.balance < invoice.totalAmount}
+                        onClick={() => handlePayWithWallet(resident._id, invoice._id, invoiceTotalAmount)}
+                        disabled={walletLoading || isWalletPaymentProcessing || walletInfo.balance < invoiceTotalAmount}
                       >
                         {isWalletPaymentProcessing ? 'Đang thanh toán...' : 'Thanh toán bằng ví'}
                       </button>
