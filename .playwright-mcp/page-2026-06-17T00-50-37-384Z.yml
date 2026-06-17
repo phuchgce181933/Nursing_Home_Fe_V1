@@ -1,0 +1,17 @@
+- generic [ref=e2]:
+  - generic [ref=e4]:
+    - banner [ref=e5]:
+      - heading "Nursing Home" [level=1] [ref=e6]
+      - paragraph [ref=e7]: Hệ thống quản lý viện dưỡng lão
+    - generic [ref=e20]: Invalid credentials
+    - generic [ref=e8]:
+      - generic [ref=e9]:
+        - generic [ref=e10]: Email
+        - textbox "Nhập email" [ref=e11]: nurse@test.com
+      - generic [ref=e12]:
+        - generic [ref=e13]: Mật khẩu
+        - textbox "Nhập mật khẩu" [ref=e14]: password123
+      - button "Đăng nhập" [ref=e15] [cursor=pointer]
+    - link "Quên mật khẩu?" [ref=e17] [cursor=pointer]:
+      - /url: /forgot-password
+  - button "Chat" [ref=e19]

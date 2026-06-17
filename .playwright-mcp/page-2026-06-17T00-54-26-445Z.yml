@@ -1,0 +1,421 @@
+- generic [ref=e2]:
+  - generic [ref=e8]:
+    - complementary [ref=e9]:
+      - generic [ref=e10]:
+        - generic [ref=e11]:
+          - img "Nursing Home" [ref=e12]
+          - generic [ref=e13]:
+            - generic [ref=e14]: Nursing Home
+            - generic [ref=e15]: Hệ thống quản lý viện dưỡng lão
+        - generic [ref=e16]:
+          - generic [ref=e17]: "Ngôn ngữ:"
+          - combobox "Ngôn ngữ:" [ref=e18]:
+            - option "Tiếng Việt" [selected]
+            - option "English"
+      - generic [ref=e19]:
+        - link "Dashboard Điều dưỡng" [ref=e21] [cursor=pointer]:
+          - /url: /nurse/dashboard
+          - img [ref=e22]
+          - generic [ref=e27]: Dashboard Điều dưỡng
+        - link "Hồ sơ cá nhân" [ref=e29] [cursor=pointer]:
+          - /url: /nurse/profile
+          - img [ref=e30]
+          - generic [ref=e34]: Hồ sơ cá nhân
+        - link "Ca của tôi" [ref=e36] [cursor=pointer]:
+          - /url: /nurse/my-shifts
+          - img [ref=e37]
+          - generic [ref=e39]: Ca của tôi
+        - link "Nhiệm vụ chăm sóc" [ref=e41] [cursor=pointer]:
+          - /url: /nurse/care-tasks
+          - img [ref=e42]
+          - generic [ref=e45]: Nhiệm vụ chăm sóc
+        - link "Lịch hoạt động" [ref=e47] [cursor=pointer]:
+          - /url: /nurse/activity-schedule
+          - img [ref=e48]
+          - generic [ref=e50]: Lịch hoạt động
+        - link "Ghi chú chăm sóc" [ref=e52] [cursor=pointer]:
+          - /url: /nurse/care-notes
+          - img [ref=e53]
+          - generic [ref=e55]: Ghi chú chăm sóc
+        - link "Theo dõi Sức khỏe" [ref=e57] [cursor=pointer]:
+          - /url: /nurse/health-monitoring
+          - img [ref=e58]
+          - generic [ref=e61]: Theo dõi Sức khỏe
+        - link "Kế hoạch bữa ăn" [ref=e63] [cursor=pointer]:
+          - /url: /nurse/meal-plans
+          - img [ref=e64]
+          - generic [ref=e70]: Kế hoạch bữa ăn
+        - link "Báo cáo dinh dưỡng" [ref=e72] [cursor=pointer]:
+          - /url: /nurse/nutrition-reports
+          - img [ref=e73]
+          - generic [ref=e75]: Báo cáo dinh dưỡng
+        - link "Thuốc" [ref=e77] [cursor=pointer]:
+          - /url: /nurse/medications
+          - img [ref=e78]
+          - generic [ref=e81]: Thuốc
+        - link "Yêu cầu Nhập viện" [ref=e83] [cursor=pointer]:
+          - /url: /nurse/admission-requests
+          - img [ref=e84]
+          - generic [ref=e87]: Yêu cầu Nhập viện
+        - link "Gói Dịch vụ" [ref=e89] [cursor=pointer]:
+          - /url: /nurse/service-packages
+          - img [ref=e90]
+          - generic [ref=e93]: Gói Dịch vụ
+        - link "Sự cố" [ref=e95] [cursor=pointer]:
+          - /url: /nurse/incidents
+          - img [ref=e96]
+          - generic [ref=e99]: Sự cố
+        - link "Nghỉ phép" [ref=e101] [cursor=pointer]:
+          - /url: /nurse/leave
+          - img [ref=e102]
+          - generic [ref=e106]: Nghỉ phép
+        - link "Tin nhắn" [ref=e108] [cursor=pointer]:
+          - /url: /nurse/messages
+          - img [ref=e109]
+          - generic [ref=e111]: Tin nhắn
+    - main [ref=e112]:
+      - generic [ref=e114]:
+        - generic [ref=e115]:
+          - generic [ref=e116]:
+            - heading "Ghi chú chăm sóc" [level=1] [ref=e117]
+            - paragraph [ref=e118]: Quản lý ghi chú bữa ăn, hoạt động, sinh hoạt hằng ngày và sức khỏe của cư dân
+          - button "Tạo ghi chú" [ref=e119] [cursor=pointer]:
+            - img [ref=e120]
+            - text: Tạo ghi chú
+        - generic [ref=e585]: Ghi chú đã được tạo thành công.
+        - generic [ref=e122]:
+          - generic [ref=e123]:
+            - img [ref=e124]
+            - textbox "Tìm kiếm nội dung ghi chú..." [ref=e127]
+          - combobox [ref=e128] [cursor=pointer]:
+            - option "Tất cả loại" [selected]
+            - option "Bữa ăn"
+            - option "Hoạt động"
+            - option "Sinh hoạt hằng ngày"
+            - option "Sức khỏe"
+            - option "Chung"
+          - combobox [ref=e129] [cursor=pointer]:
+            - option "Tất cả cư dân" [selected]
+            - option "Bà Lê Thị Phương — RES003"
+            - option "Cụ Nguyễn Thị Dung — RES001"
+            - option "Ông Trần Văn Em — RES002"
+          - generic [ref=e130]: "Từ:"
+          - textbox [ref=e131] [cursor=pointer]
+          - generic [ref=e132]: "Đến:"
+          - textbox [ref=e133] [cursor=pointer]
+        - generic [ref=e134]:
+          - button "Tất cả ghi chú (27)" [ref=e586] [cursor=pointer]
+          - button "Ghi chú của tôi" [ref=e136] [cursor=pointer]
+        - table [ref=e588]:
+          - rowgroup [ref=e589]:
+            - row "Cư dân Loại Nội dung Tác giả Thời gian Thao tác" [ref=e590]:
+              - columnheader "Cư dân" [ref=e591]
+              - columnheader "Loại" [ref=e592]
+              - columnheader "Nội dung" [ref=e593]
+              - columnheader "Tác giả" [ref=e594]
+              - columnheader "Thời gian" [ref=e595]
+              - columnheader "Thao tác" [ref=e596]
+          - rowgroup [ref=e597]:
+            - row "Cụ Nguyễn Thị Dung RES001 Sinh hoạt hằng ngày Cụ tắm rửa buổi sáng, cần hỗ trợ đứng dậy và di chuyển trong nhà tắm ĐD. Trần Thị Bích nurse 07:53 17/06/2026" [ref=e598]:
+              - cell "Cụ Nguyễn Thị Dung RES001" [ref=e599]:
+                - generic [ref=e600]: Cụ Nguyễn Thị Dung
+                - generic [ref=e601]: RES001
+              - cell "Sinh hoạt hằng ngày" [ref=e602]:
+                - generic [ref=e603]: Sinh hoạt hằng ngày
+              - cell "Cụ tắm rửa buổi sáng, cần hỗ trợ đứng dậy và di chuyển trong nhà tắm" [ref=e604]:
+                - generic "Cụ tắm rửa buổi sáng, cần hỗ trợ đứng dậy và di chuyển trong nhà tắm" [ref=e605]
+              - cell "ĐD. Trần Thị Bích nurse" [ref=e606]:
+                - generic [ref=e607]: ĐD. Trần Thị Bích
+                - generic [ref=e608]: nurse
+              - cell "07:53 17/06/2026" [ref=e609]
+              - cell [ref=e610]:
+                - generic [ref=e611]:
+                  - button "Xem chi tiết" [ref=e612] [cursor=pointer]:
+                    - img [ref=e613]
+                  - button "Chỉnh sửa" [ref=e616] [cursor=pointer]:
+                    - img [ref=e617]
+                  - button "Xóa" [ref=e620] [cursor=pointer]:
+                    - img [ref=e621]
+                  - button "Xem lịch sử cư dân" [ref=e624] [cursor=pointer]:
+                    - img [ref=e625]
+            - row "Bà Lê Thị Phương RES003 Bữa ăn ăn kh dc nhiều BS. Nguyễn Văn An doctor 19:42 04/06/2026" [ref=e629]:
+              - cell "Bà Lê Thị Phương RES003" [ref=e630]:
+                - generic [ref=e631]: Bà Lê Thị Phương
+                - generic [ref=e632]: RES003
+              - cell "Bữa ăn" [ref=e633]:
+                - generic [ref=e634]: Bữa ăn
+              - cell "ăn kh dc nhiều" [ref=e635]:
+                - generic "ăn kh dc nhiều" [ref=e636]
+              - cell "BS. Nguyễn Văn An doctor" [ref=e637]:
+                - generic [ref=e638]: BS. Nguyễn Văn An
+                - generic [ref=e639]: doctor
+              - cell "19:42 04/06/2026" [ref=e640]
+              - cell [ref=e641]:
+                - generic [ref=e642]:
+                  - button "Xem chi tiết" [ref=e643] [cursor=pointer]:
+                    - img [ref=e644]
+                  - button "Xem lịch sử cư dân" [ref=e647] [cursor=pointer]:
+                    - img [ref=e648]
+            - row "Bà Lê Thị Phương RES003 Sức khỏe Thấy nôn nhiều lắm BS. Nguyễn Văn An doctor 19:15 03/06/2026" [ref=e652]:
+              - cell "Bà Lê Thị Phương RES003" [ref=e653]:
+                - generic [ref=e654]: Bà Lê Thị Phương
+                - generic [ref=e655]: RES003
+              - cell "Sức khỏe" [ref=e656]:
+                - generic [ref=e657]: Sức khỏe
+              - cell "Thấy nôn nhiều lắm" [ref=e658]:
+                - generic "Thấy nôn nhiều lắm" [ref=e659]
+              - cell "BS. Nguyễn Văn An doctor" [ref=e660]:
+                - generic [ref=e661]: BS. Nguyễn Văn An
+                - generic [ref=e662]: doctor
+              - cell "19:15 03/06/2026" [ref=e663]
+              - cell [ref=e664]:
+                - generic [ref=e665]:
+                  - button "Xem chi tiết" [ref=e666] [cursor=pointer]:
+                    - img [ref=e667]
+                  - button "Xem lịch sử cư dân" [ref=e670] [cursor=pointer]:
+                    - img [ref=e671]
+            - row "Cụ Võ Văn Khoa RES006 Sức khỏe SpO2 94% khi nghỉ, 91% khi hoạt động nhẹ — tăng lưu lượng oxy từ 2L lên 3L/phút. ĐD. Phạm Văn Cường nurse 00:00 31/05/2026" [ref=e675]:
+              - cell "Cụ Võ Văn Khoa RES006" [ref=e676]:
+                - generic [ref=e677]: Cụ Võ Văn Khoa
+                - generic [ref=e678]: RES006
+              - cell "Sức khỏe" [ref=e679]:
+                - generic [ref=e680]: Sức khỏe
+              - cell "SpO2 94% khi nghỉ, 91% khi hoạt động nhẹ — tăng lưu lượng oxy từ 2L lên 3L/phút." [ref=e681]:
+                - generic "SpO2 94% khi nghỉ, 91% khi hoạt động nhẹ — tăng lưu lượng oxy từ 2L lên 3L/phút." [ref=e682]
+              - cell "ĐD. Phạm Văn Cường nurse" [ref=e683]:
+                - generic [ref=e684]: ĐD. Phạm Văn Cường
+                - generic [ref=e685]: nurse
+              - cell "00:00 31/05/2026" [ref=e686]
+              - cell [ref=e687]:
+                - generic [ref=e688]:
+                  - button "Xem chi tiết" [ref=e689] [cursor=pointer]:
+                    - img [ref=e690]
+                  - button "Xem lịch sử cư dân" [ref=e693] [cursor=pointer]:
+                    - img [ref=e694]
+            - row "Cụ Võ Văn Khoa RES006 Bữa ăn Cụ ăn ít do khó thở khi ăn. Bữa trưa 40%, uống đủ nước. Ăn theo nhiều bữa nhỏ. ĐD. Phạm Văn Cường nurse 00:00 31/05/2026" [ref=e698]:
+              - cell "Cụ Võ Văn Khoa RES006" [ref=e699]:
+                - generic [ref=e700]: Cụ Võ Văn Khoa
+                - generic [ref=e701]: RES006
+              - cell "Bữa ăn" [ref=e702]:
+                - generic [ref=e703]: Bữa ăn
+              - cell "Cụ ăn ít do khó thở khi ăn. Bữa trưa 40%, uống đủ nước. Ăn theo nhiều bữa nhỏ." [ref=e704]:
+                - generic "Cụ ăn ít do khó thở khi ăn. Bữa trưa 40%, uống đủ nước. Ăn theo nhiều bữa nhỏ." [ref=e705]
+              - cell "ĐD. Phạm Văn Cường nurse" [ref=e706]:
+                - generic [ref=e707]: ĐD. Phạm Văn Cường
+                - generic [ref=e708]: nurse
+              - cell "00:00 31/05/2026" [ref=e709]
+              - cell [ref=e710]:
+                - generic [ref=e711]:
+                  - button "Xem chi tiết" [ref=e712] [cursor=pointer]:
+                    - img [ref=e713]
+                  - button "Xem lịch sử cư dân" [ref=e716] [cursor=pointer]:
+                    - img [ref=e717]
+            - row "Bà Hoàng Thị Hương RES005 Sức khỏe Khớp ngón tay sưng nhẹ, không nóng đỏ. Đường huyết sau ăn 7.4 mmol/L. Đang theo dõi. ĐD. Phạm Văn Cường nurse 00:00 31/05/2026" [ref=e721]:
+              - cell "Bà Hoàng Thị Hương RES005" [ref=e722]:
+                - generic [ref=e723]: Bà Hoàng Thị Hương
+                - generic [ref=e724]: RES005
+              - cell "Sức khỏe" [ref=e725]:
+                - generic [ref=e726]: Sức khỏe
+              - cell "Khớp ngón tay sưng nhẹ, không nóng đỏ. Đường huyết sau ăn 7.4 mmol/L. Đang theo dõi." [ref=e727]:
+                - generic "Khớp ngón tay sưng nhẹ, không nóng đỏ. Đường huyết sau ăn 7.4 mmol/L. Đang theo dõi." [ref=e728]
+              - cell "ĐD. Phạm Văn Cường nurse" [ref=e729]:
+                - generic [ref=e730]: ĐD. Phạm Văn Cường
+                - generic [ref=e731]: nurse
+              - cell "00:00 31/05/2026" [ref=e732]
+              - cell [ref=e733]:
+                - generic [ref=e734]:
+                  - button "Xem chi tiết" [ref=e735] [cursor=pointer]:
+                    - img [ref=e736]
+                  - button "Xem lịch sử cư dân" [ref=e739] [cursor=pointer]:
+                    - img [ref=e740]
+            - row "Bà Hoàng Thị Hương RES005 Bữa ăn Cụ ăn ngon miệng, bữa trưa hoàn thành, hỏi về thực đơn ít đường cho bữa tối. ĐD. Phạm Văn Cường nurse 00:00 31/05/2026" [ref=e744]:
+              - cell "Bà Hoàng Thị Hương RES005" [ref=e745]:
+                - generic [ref=e746]: Bà Hoàng Thị Hương
+                - generic [ref=e747]: RES005
+              - cell "Bữa ăn" [ref=e748]:
+                - generic [ref=e749]: Bữa ăn
+              - cell "Cụ ăn ngon miệng, bữa trưa hoàn thành, hỏi về thực đơn ít đường cho bữa tối." [ref=e750]:
+                - generic "Cụ ăn ngon miệng, bữa trưa hoàn thành, hỏi về thực đơn ít đường cho bữa tối." [ref=e751]
+              - cell "ĐD. Phạm Văn Cường nurse" [ref=e752]:
+                - generic [ref=e753]: ĐD. Phạm Văn Cường
+                - generic [ref=e754]: nurse
+              - cell "00:00 31/05/2026" [ref=e755]
+              - cell [ref=e756]:
+                - generic [ref=e757]:
+                  - button "Xem chi tiết" [ref=e758] [cursor=pointer]:
+                    - img [ref=e759]
+                  - button "Xem lịch sử cư dân" [ref=e762] [cursor=pointer]:
+                    - img [ref=e763]
+            - row "Cụ Phạm Văn Giang RES004 Sức khỏe Run tay mức độ trung bình, dáng đi chậm với khung tập đi. HA 132/84 mmHg. SpO2 97%. ĐD. Phạm Văn Cường nurse 00:00 31/05/2026" [ref=e767]:
+              - cell "Cụ Phạm Văn Giang RES004" [ref=e768]:
+                - generic [ref=e769]: Cụ Phạm Văn Giang
+                - generic [ref=e770]: RES004
+              - cell "Sức khỏe" [ref=e771]:
+                - generic [ref=e772]: Sức khỏe
+              - cell "Run tay mức độ trung bình, dáng đi chậm với khung tập đi. HA 132/84 mmHg. SpO2 97%." [ref=e773]:
+                - generic "Run tay mức độ trung bình, dáng đi chậm với khung tập đi. HA 132/84 mmHg. SpO2 97%." [ref=e774]
+              - cell "ĐD. Phạm Văn Cường nurse" [ref=e775]:
+                - generic [ref=e776]: ĐD. Phạm Văn Cường
+                - generic [ref=e777]: nurse
+              - cell "00:00 31/05/2026" [ref=e778]
+              - cell [ref=e779]:
+                - generic [ref=e780]:
+                  - button "Xem chi tiết" [ref=e781] [cursor=pointer]:
+                    - img [ref=e782]
+                  - button "Xem lịch sử cư dân" [ref=e785] [cursor=pointer]:
+                    - img [ref=e786]
+            - row "Cụ Phạm Văn Giang RES004 Bữa ăn Cụ cần hỗ trợ ăn do run tay. Ăn được khoảng 70% bữa sáng với thức ăn nghiền mềm. ĐD. Phạm Văn Cường nurse 00:00 31/05/2026" [ref=e790]:
+              - cell "Cụ Phạm Văn Giang RES004" [ref=e791]:
+                - generic [ref=e792]: Cụ Phạm Văn Giang
+                - generic [ref=e793]: RES004
+              - cell "Bữa ăn" [ref=e794]:
+                - generic [ref=e795]: Bữa ăn
+              - cell "Cụ cần hỗ trợ ăn do run tay. Ăn được khoảng 70% bữa sáng với thức ăn nghiền mềm." [ref=e796]:
+                - generic "Cụ cần hỗ trợ ăn do run tay. Ăn được khoảng 70% bữa sáng với thức ăn nghiền mềm." [ref=e797]
+              - cell "ĐD. Phạm Văn Cường nurse" [ref=e798]:
+                - generic [ref=e799]: ĐD. Phạm Văn Cường
+                - generic [ref=e800]: nurse
+              - cell "00:00 31/05/2026" [ref=e801]
+              - cell [ref=e802]:
+                - generic [ref=e803]:
+                  - button "Xem chi tiết" [ref=e804] [cursor=pointer]:
+                    - img [ref=e805]
+                  - button "Xem lịch sử cư dân" [ref=e808] [cursor=pointer]:
+                    - img [ref=e809]
+            - row "Bà Lê Thị Phương RES003 Sức khỏe HA 122/78 mmHg, nhịp tim 72/phút, SpO2 98%. Không có triệu chứng đặc biệt. ĐD. Trần Thị Bích nurse 00:00 31/05/2026" [ref=e813]:
+              - cell "Bà Lê Thị Phương RES003" [ref=e814]:
+                - generic [ref=e815]: Bà Lê Thị Phương
+                - generic [ref=e816]: RES003
+              - cell "Sức khỏe" [ref=e817]:
+                - generic [ref=e818]: Sức khỏe
+              - cell "HA 122/78 mmHg, nhịp tim 72/phút, SpO2 98%. Không có triệu chứng đặc biệt." [ref=e819]:
+                - generic "HA 122/78 mmHg, nhịp tim 72/phút, SpO2 98%. Không có triệu chứng đặc biệt." [ref=e820]
+              - cell "ĐD. Trần Thị Bích nurse" [ref=e821]:
+                - generic [ref=e822]: ĐD. Trần Thị Bích
+                - generic [ref=e823]: nurse
+              - cell "00:00 31/05/2026" [ref=e824]
+              - cell [ref=e825]:
+                - generic [ref=e826]:
+                  - button "Xem chi tiết" [ref=e827] [cursor=pointer]:
+                    - img [ref=e828]
+                  - button "Chỉnh sửa" [ref=e831] [cursor=pointer]:
+                    - img [ref=e832]
+                  - button "Xóa" [ref=e835] [cursor=pointer]:
+                    - img [ref=e836]
+                  - button "Xem lịch sử cư dân" [ref=e839] [cursor=pointer]:
+                    - img [ref=e840]
+            - row "Bà Lê Thị Phương RES003 Bữa ăn Cụ ăn tốt, hoàn thành bữa chiều, uống đủ nước theo chỉ định của bác sĩ. ĐD. Trần Thị Bích nurse 00:00 31/05/2026" [ref=e844]:
+              - cell "Bà Lê Thị Phương RES003" [ref=e845]:
+                - generic [ref=e846]: Bà Lê Thị Phương
+                - generic [ref=e847]: RES003
+              - cell "Bữa ăn" [ref=e848]:
+                - generic [ref=e849]: Bữa ăn
+              - cell "Cụ ăn tốt, hoàn thành bữa chiều, uống đủ nước theo chỉ định của bác sĩ." [ref=e850]:
+                - generic "Cụ ăn tốt, hoàn thành bữa chiều, uống đủ nước theo chỉ định của bác sĩ." [ref=e851]
+              - cell "ĐD. Trần Thị Bích nurse" [ref=e852]:
+                - generic [ref=e853]: ĐD. Trần Thị Bích
+                - generic [ref=e854]: nurse
+              - cell "00:00 31/05/2026" [ref=e855]
+              - cell [ref=e856]:
+                - generic [ref=e857]:
+                  - button "Xem chi tiết" [ref=e858] [cursor=pointer]:
+                    - img [ref=e859]
+                  - button "Chỉnh sửa" [ref=e862] [cursor=pointer]:
+                    - img [ref=e863]
+                  - button "Xóa" [ref=e866] [cursor=pointer]:
+                    - img [ref=e867]
+                  - button "Xem lịch sử cư dân" [ref=e870] [cursor=pointer]:
+                    - img [ref=e871]
+            - row "Ông Trần Văn Em RES002 Sức khỏe HA 145/92 mmHg, nhịp tim không đều 68–88/phút. Đã báo cáo bác sĩ trực. SpO2 96%. ĐD. Trần Thị Bích nurse 00:00 31/05/2026" [ref=e875]:
+              - cell "Ông Trần Văn Em RES002" [ref=e876]:
+                - generic [ref=e877]: Ông Trần Văn Em
+                - generic [ref=e878]: RES002
+              - cell "Sức khỏe" [ref=e879]:
+                - generic [ref=e880]: Sức khỏe
+              - cell "HA 145/92 mmHg, nhịp tim không đều 68–88/phút. Đã báo cáo bác sĩ trực. SpO2 96%." [ref=e881]:
+                - generic "HA 145/92 mmHg, nhịp tim không đều 68–88/phút. Đã báo cáo bác sĩ trực. SpO2 96%." [ref=e882]
+              - cell "ĐD. Trần Thị Bích nurse" [ref=e883]:
+                - generic [ref=e884]: ĐD. Trần Thị Bích
+                - generic [ref=e885]: nurse
+              - cell "00:00 31/05/2026" [ref=e886]
+              - cell [ref=e887]:
+                - generic [ref=e888]:
+                  - button "Xem chi tiết" [ref=e889] [cursor=pointer]:
+                    - img [ref=e890]
+                  - button "Chỉnh sửa" [ref=e893] [cursor=pointer]:
+                    - img [ref=e894]
+                  - button "Xóa" [ref=e897] [cursor=pointer]:
+                    - img [ref=e898]
+                  - button "Xem lịch sử cư dân" [ref=e901] [cursor=pointer]:
+                    - img [ref=e902]
+            - row "Ông Trần Văn Em RES002 Bữa ăn Cụ ăn ít hơn thường lệ, chỉ ăn khoảng 50% bữa trưa. Ghi nhận theo dõi cân bằng dịch. ĐD. Trần Thị Bích nurse 00:00 31/05/2026" [ref=e906]:
+              - cell "Ông Trần Văn Em RES002" [ref=e907]:
+                - generic [ref=e908]: Ông Trần Văn Em
+                - generic [ref=e909]: RES002
+              - cell "Bữa ăn" [ref=e910]:
+                - generic [ref=e911]: Bữa ăn
+              - cell "Cụ ăn ít hơn thường lệ, chỉ ăn khoảng 50% bữa trưa. Ghi nhận theo dõi cân bằng dịch." [ref=e912]:
+                - generic "Cụ ăn ít hơn thường lệ, chỉ ăn khoảng 50% bữa trưa. Ghi nhận theo dõi cân bằng dịch." [ref=e913]
+              - cell "ĐD. Trần Thị Bích nurse" [ref=e914]:
+                - generic [ref=e915]: ĐD. Trần Thị Bích
+                - generic [ref=e916]: nurse
+              - cell "00:00 31/05/2026" [ref=e917]
+              - cell [ref=e918]:
+                - generic [ref=e919]:
+                  - button "Xem chi tiết" [ref=e920] [cursor=pointer]:
+                    - img [ref=e921]
+                  - button "Chỉnh sửa" [ref=e924] [cursor=pointer]:
+                    - img [ref=e925]
+                  - button "Xóa" [ref=e928] [cursor=pointer]:
+                    - img [ref=e929]
+                  - button "Xem lịch sử cư dân" [ref=e932] [cursor=pointer]:
+                    - img [ref=e933]
+            - row "Cụ Nguyễn Thị Dung RES001 Sức khỏe HA 128/82 mmHg, nhịp tim 76/phút, đường huyết trước ăn 5.8 mmol/L. Tình trạng ổn định. ĐD. Trần Thị Bích nurse 00:00 31/05/2026" [ref=e937]:
+              - cell "Cụ Nguyễn Thị Dung RES001" [ref=e938]:
+                - generic [ref=e939]: Cụ Nguyễn Thị Dung
+                - generic [ref=e940]: RES001
+              - cell "Sức khỏe" [ref=e941]:
+                - generic [ref=e942]: Sức khỏe
+              - cell "HA 128/82 mmHg, nhịp tim 76/phút, đường huyết trước ăn 5.8 mmol/L. Tình trạng ổn định." [ref=e943]:
+                - generic "HA 128/82 mmHg, nhịp tim 76/phút, đường huyết trước ăn 5.8 mmol/L. Tình trạng ổn định." [ref=e944]
+              - cell "ĐD. Trần Thị Bích nurse" [ref=e945]:
+                - generic [ref=e946]: ĐD. Trần Thị Bích
+                - generic [ref=e947]: nurse
+              - cell "00:00 31/05/2026" [ref=e948]
+              - cell [ref=e949]:
+                - generic [ref=e950]:
+                  - button "Xem chi tiết" [ref=e951] [cursor=pointer]:
+                    - img [ref=e952]
+                  - button "Chỉnh sửa" [ref=e955] [cursor=pointer]:
+                    - img [ref=e956]
+                  - button "Xóa" [ref=e959] [cursor=pointer]:
+                    - img [ref=e960]
+                  - button "Xem lịch sử cư dân" [ref=e963] [cursor=pointer]:
+                    - img [ref=e964]
+            - row "Cụ Nguyễn Thị Dung RES001 Bữa ăn Cụ ăn bữa sáng đầy đủ, uống thuốc tiểu đường đúng giờ. Không có biểu hiện khó nuốt. ĐD. Trần Thị Bích nurse 00:00 31/05/2026" [ref=e968]:
+              - cell "Cụ Nguyễn Thị Dung RES001" [ref=e969]:
+                - generic [ref=e970]: Cụ Nguyễn Thị Dung
+                - generic [ref=e971]: RES001
+              - cell "Bữa ăn" [ref=e972]:
+                - generic [ref=e973]: Bữa ăn
+              - cell "Cụ ăn bữa sáng đầy đủ, uống thuốc tiểu đường đúng giờ. Không có biểu hiện khó nuốt." [ref=e974]:
+                - generic "Cụ ăn bữa sáng đầy đủ, uống thuốc tiểu đường đúng giờ. Không có biểu hiện khó nuốt." [ref=e975]
+              - cell "ĐD. Trần Thị Bích nurse" [ref=e976]:
+                - generic [ref=e977]: ĐD. Trần Thị Bích
+                - generic [ref=e978]: nurse
+              - cell "00:00 31/05/2026" [ref=e979]
+              - cell [ref=e980]:
+                - generic [ref=e981]:
+                  - button "Xem chi tiết" [ref=e982] [cursor=pointer]:
+                    - img [ref=e983]
+                  - button "Chỉnh sửa" [ref=e986] [cursor=pointer]:
+                    - img [ref=e987]
+                  - button "Xóa" [ref=e990] [cursor=pointer]:
+                    - img [ref=e991]
+                  - button "Xem lịch sử cư dân" [ref=e994] [cursor=pointer]:
+                    - img [ref=e995]
+        - generic [ref=e999]:
+          - button "Trước" [disabled] [ref=e1000]
+          - generic [ref=e1001]: Trang 1 / 2 · 27 ghi chú
+          - button "Tiếp" [ref=e1002] [cursor=pointer]
+  - button "Chat" [ref=e7]

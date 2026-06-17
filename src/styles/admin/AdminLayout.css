@@ -21,4 +21,10 @@
   border-radius: 16px;
   box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
   padding: 28px;
+  animation: panelFadeIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes panelFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
