@@ -25,7 +25,6 @@ const BUSINESS_MODULE_LABELS = {
   billingInvoice: 'Hóa đơn',
   pharmacyMedication: 'Thuốc',
   pharmacySupplier: 'Nhà cung ứng',
-  billing: 'Kế toán',
 };
 
 const ROLE_LABELS = {

@@ -13,6 +13,7 @@ import {
   MessageSquare,
   Settings,
   FileCheck,
+  DollarSign,
 } from 'lucide-react';
 
 export const sidebarData = [
@@ -26,7 +27,6 @@ export const sidebarData = [
     icon: Shield,
     children: [
       { title: 'sidebar.myProfile', path: '/admin/profile' },
-      { title: 'sidebar.accounts', path: '/admin/accounts' },
       { title: 'sidebar.auditLogs', path: '/admin/audit-logs' },
     ],
   },
@@ -74,9 +74,21 @@ export const sidebarData = [
     ],
   },
   {
-    title: 'sidebar.healthMonitoring',
+    title: 'sidebar.activities',
+    icon: Activity,
+    children: [
+      { title: 'Quản lý hoạt động', path: '/admin/activities' },
+      { title: 'Thống kê hoạt động', path: '/admin/activities/statistics' },
+      { title: 'Kết quả tham gia', path: '/admin/activities/participation-results' },
+    ],
+  },
+  {
+    title: 'sidebar.clinical',
     icon: HeartPulse,
-    path: '/admin/health',
+    children: [
+      { title: 'sidebar.clinicalServices', path: '/admin/services' },
+      { title: 'sidebar.medicalCharges', path: '/admin/medical-charges' },
+    ],
   },
   {
     title: 'sidebar.medication',
@@ -87,15 +99,6 @@ export const sidebarData = [
     title: 'sidebar.appointments',
     icon: Calendar,
     path: '/admin/appointments',
-  },
-  {
-    title: 'sidebar.activities',
-    icon: Activity,
-    children: [
-      { title: 'Quản lý hoạt động', path: '/admin/activities' },
-      { title: 'Thống kê hoạt động', path: '/admin/activities/statistics' },
-      { title: 'Kết quả tham gia', path: '/admin/activities/participation-results' },
-    ],
   },
   {
     title: 'sidebar.incidents',
@@ -111,6 +114,11 @@ export const sidebarData = [
     title: 'sidebar.contractManagement',
     icon: FileCheck,
     path: '/admin/contracts',
+  },
+  {
+    title: 'sidebar.billing',
+    icon: DollarSign,
+    path: '/admin/invoices',
   },
   {
     title: 'sidebar.notifications',

@@ -10,6 +10,12 @@ const resources = {
         logo: 'Nursing Home',
       },
       sidebar: {
+        clinical: 'Clinical',
+        clinicalServices: 'Clinical Services',
+        ecg: 'ECG / Electrocardiogram',
+        imaging: 'Imaging & Radiology',
+        assessments: 'Assessments',
+        medicalCharges: 'Medical Charges',
         dashboard: 'Dashboard',
         authentication: 'Authentication',
         myProfile: 'My Profile',
@@ -59,6 +65,7 @@ const resources = {
         pharmacyDispense: 'Dispense',
         pharmacyReports: 'Reports',
         contractManagement: 'Contract Management',
+        billing: 'Billing',
       },
       login: {
         email: 'Email',
@@ -1359,6 +1366,12 @@ const resources = {
         logo: 'Nursing Home',
       },
       sidebar: {
+        clinical: 'Lâm sàng',
+        clinicalServices: 'Danh mục dịch vụ lâm sàng',
+        ecg: 'ECG / Điện tâm đồ',
+        imaging: 'Hình ảnh & Chẩn đoán hình ảnh',
+        assessments: 'Đánh giá lâm sàng',
+        medicalCharges: 'Các khoản phí y tế',
         dashboard: 'Dashboard',
         authentication: 'Xác thực',
         myProfile: 'Hồ sơ của tôi',
@@ -1411,6 +1424,7 @@ const resources = {
         pharmacyDispense: 'Cấp phát thuốc',
         pharmacyReports: 'Báo cáo',
         contractManagement: 'Quản lý hợp đồng',
+        billing: 'Kế toán',
       },
       login: {
         email: 'Email',

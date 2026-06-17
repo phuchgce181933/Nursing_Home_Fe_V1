@@ -52,6 +52,9 @@ import ActivityStatisticsPage from '../pages/admin/ActivityStatisticsPage';
 import ActivityParticipationResultsPage from '../pages/admin/ActivityParticipationResultsPage';
 import CareAppointmentsPage from '../pages/admin/appointments';
 import AdminContractManagementPage from '../pages/admin/AdminContractManagementPage';
+import AdminInvoiceManagementPage from '../pages/admin/AdminInvoiceManagementPage';
+import AdminClinicalServicesPage from '../pages/admin/AdminClinicalServicesPage';
+import AdminMedicalChargesPage from '../pages/admin/AdminMedicalChargesPage';
 import DoctorDashboardPage from '../pages/doctor/DoctorDashboardPage';
 import NurseDashboardPage from '../pages/nurse/NurseDashboardPage';
 import MedicationPage from '../pages/nurse/MedicationPage';
@@ -142,6 +145,9 @@ function AppRoutes() {
         <Route path="reports" element={<AdminReportsPage />} />
         <Route path="audit-logs" element={<AuditLogsPage />} />
         <Route path="contracts" element={<AdminContractManagementPage />} />
+        <Route path="invoices" element={<AdminInvoiceManagementPage />} />
+        <Route path="services" element={<AdminClinicalServicesPage />} />
+        <Route path="medical-charges" element={<AdminMedicalChargesPage />} />
         <Route path="incidents" element={<IncidentManagementPage />} />
         <Route path="*" element={<PlaceholderPage title="Trang quản trị" />} />
       </Route>
