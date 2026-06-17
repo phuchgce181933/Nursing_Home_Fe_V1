@@ -211,7 +211,6 @@ function AppRoutes() {
         <Route path="admission-requests" element={<AdminAdmissionRequestsPage />} />
         <Route path="service-packages" element={<ServicePackagesPage />} />
 
-        <Route path="care-notes" element={<PlaceholderPage title="Ghi chú chăm sóc" />} />
         <Route path="meal-plans" element={<MealPlansPage />} />
         <Route path="nutrition-reports" element={<NutritionReportsPage />} />
 

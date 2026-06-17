@@ -10,6 +10,7 @@ import '../../styles/shared/CareNotesPage.css';
 const NOTE_TYPE_LABELS = {
   meal: 'Bữa ăn',
   activity: 'Hoạt động',
+  daily_living: 'Sinh hoạt hằng ngày',
   health: 'Sức khỏe',
   general: 'Chung',
 };
@@ -17,9 +18,41 @@ const NOTE_TYPE_LABELS = {
 const MEAL_TYPES     = [{ value: 'breakfast', label: 'Sáng' }, { value: 'lunch', label: 'Trưa' }, { value: 'dinner', label: 'Tối' }, { value: 'snack', label: 'Bữa phụ' }];
 const INTAKE_AMOUNTS = [{ value: 'none', label: 'Không ăn' }, { value: 'little', label: 'Ăn ít (< 25%)' }, { value: 'half', label: 'Nửa phần (~50%)' }, { value: 'most', label: 'Phần lớn (~75%)' }, { value: 'all', label: 'Ăn hết' }];
 const APPETITE_OPTS  = [{ value: 'poor', label: 'Kém' }, { value: 'fair', label: 'Bình thường' }, { value: 'good', label: 'Tốt' }, { value: 'excellent', label: 'Rất tốt' }];
-const ACTIVITY_TYPES = [{ value: 'walking', label: 'Đi bộ' }, { value: 'exercise', label: 'Tập thể dục' }, { value: 'physiotherapy', label: 'Vật lý trị liệu' }, { value: 'bathing', label: 'Tắm rửa' }, { value: 'grooming', label: 'Vệ sinh cá nhân' }, { value: 'reading', label: 'Đọc sách/báo' }, { value: 'socializing', label: 'Giao lưu xã hội' }, { value: 'other', label: 'Khác' }];
+
+const ACTIVITY_TYPES = [
+  { value: 'walking', label: 'Đi bộ' },
+  { value: 'exercise', label: 'Tập thể dục' },
+  { value: 'physiotherapy', label: 'Vật lý trị liệu' },
+  { value: 'reading', label: 'Đọc sách/báo' },
+  { value: 'socializing', label: 'Giao lưu xã hội' },
+  { value: 'entertainment', label: 'Giải trí' },
+  { value: 'other', label: 'Khác' },
+];
 const PARTICIPATION  = [{ value: 'refused', label: 'Từ chối' }, { value: 'assisted', label: 'Cần hỗ trợ' }, { value: 'supervised', label: 'Giám sát' }, { value: 'independent', label: 'Độc lập' }];
 const MOOD_OPTS      = [{ value: 'happy', label: 'Vui vẻ' }, { value: 'neutral', label: 'Bình thường' }, { value: 'sad', label: 'Buồn' }, { value: 'agitated', label: 'Kích động' }, { value: 'anxious', label: 'Lo âu' }];
+
+const DAILY_LIVING_TYPES = [
+  { value: 'bathing', label: 'Tắm rửa' },
+  { value: 'grooming', label: 'Vệ sinh cá nhân' },
+  { value: 'dressing', label: 'Mặc quần áo' },
+  { value: 'eating', label: 'Ăn uống' },
+  { value: 'mobility', label: 'Di chuyển' },
+  { value: 'toileting', label: 'Vệ sinh' },
+  { value: 'sleeping', label: 'Giấc ngủ' },
+  { value: 'other', label: 'Khác' },
+];
+const ASSISTANCE_LEVELS = [
+  { value: 'independent', label: 'Tự lập' },
+  { value: 'supervised', label: 'Cần giám sát' },
+  { value: 'assisted', label: 'Cần hỗ trợ' },
+  { value: 'total_care', label: 'Chăm sóc hoàn toàn' },
+];
+const COMPLETION_STATUSES = [
+  { value: 'completed', label: 'Hoàn thành' },
+  { value: 'partial', label: 'Một phần' },
+  { value: 'refused', label: 'Từ chối' },
+];
+
 const CONSCIOUSNESS  = [{ value: 'alert', label: 'Tỉnh táo' }, { value: 'confused', label: 'Lú lẫn' }, { value: 'drowsy', label: 'Buồn ngủ' }, { value: 'unresponsive', label: 'Không phản ứng' }];
 const FALL_RISKS     = [{ value: 'low', label: 'Thấp' }, { value: 'medium', label: 'Trung bình' }, { value: 'high', label: 'Cao' }];
 
@@ -79,7 +112,7 @@ function MetaFormSection({ noteType, meta, setMeta }) {
   if (noteType === 'meal') {
     return (
       <div className="cn-meta-section">
-        <div className="cn-meta-section__title">🍽️ Chi tiết bữa ăn</div>
+        <div className="cn-meta-section__title">Chi tiết bữa ăn</div>
         <div className="cn-meta-grid">
           <div className="cn-form-group">
             <label className="cn-form-label">Loại bữa</label>
@@ -110,7 +143,7 @@ function MetaFormSection({ noteType, meta, setMeta }) {
   if (noteType === 'activity') {
     return (
       <div className="cn-meta-section">
-        <div className="cn-meta-section__title">🏃 Chi tiết hoạt động</div>
+        <div className="cn-meta-section__title">Chi tiết hoạt động</div>
         <div className="cn-meta-grid">
           <div className="cn-form-group">
             <label className="cn-form-label">Loại hoạt động</label>
@@ -149,10 +182,59 @@ function MetaFormSection({ noteType, meta, setMeta }) {
     );
   }
 
+  if (noteType === 'daily_living') {
+    return (
+      <div className="cn-meta-section">
+        <div className="cn-meta-section__title">Chi tiết sinh hoạt hằng ngày</div>
+        <div className="cn-meta-grid">
+          <div className="cn-form-group">
+            <label className="cn-form-label">Loại hoạt động</label>
+            <select className="cn-form-input" value={meta.activityType} onChange={setM('activityType')}>
+              <option value="">— Chọn hoạt động —</option>
+              {DAILY_LIVING_TYPES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
+          <div className="cn-form-group">
+            <label className="cn-form-label">Mức độ hỗ trợ</label>
+            <select className="cn-form-input" value={meta.assistanceLevel} onChange={setM('assistanceLevel')}>
+              <option value="">— Chọn mức độ —</option>
+              {ASSISTANCE_LEVELS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
+          <div className="cn-form-group">
+            <label className="cn-form-label">Trạng thái hoàn thành</label>
+            <select className="cn-form-input" value={meta.completionStatus} onChange={setM('completionStatus')}>
+              <option value="">— Chọn trạng thái —</option>
+              {COMPLETION_STATUSES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
+          <div className="cn-form-group">
+            <label className="cn-form-label">Thời gian (phút)</label>
+            <input
+              type="number"
+              className="cn-form-input"
+              min="0"
+              placeholder="Nhập số phút..."
+              value={meta.duration}
+              onChange={setM('duration')}
+            />
+          </div>
+          <div className="cn-form-group">
+            <label className="cn-form-label">Tâm trạng</label>
+            <select className="cn-form-input" value={meta.mood} onChange={setM('mood')}>
+              <option value="">— Chọn tâm trạng —</option>
+              {MOOD_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (noteType === 'health') {
     return (
       <div className="cn-meta-section">
-        <div className="cn-meta-section__title">🩺 Chi tiết sức khỏe</div>
+        <div className="cn-meta-section__title">Chi tiết sức khỏe</div>
         <div className="cn-meta-grid">
           <div className="cn-form-group cn-form-group--full">
             <label className="cn-form-label">Triệu chứng (cách nhau bởi dấu phẩy)</label>
@@ -179,6 +261,43 @@ function MetaFormSection({ noteType, meta, setMeta }) {
             </select>
           </div>
           <div className="cn-form-group">
+            <label className="cn-form-label">Mức độ đau (0–10)</label>
+            <input
+              type="number"
+              className="cn-form-input"
+              min="0"
+              max="10"
+              placeholder="0 = không đau, 10 = đau dữ dội"
+              value={meta.painLevel}
+              onChange={setM('painLevel')}
+            />
+          </div>
+          <div className="cn-form-group">
+            <label className="cn-form-label">Nhiệt độ (°C)</label>
+            <input
+              type="number"
+              className="cn-form-input"
+              min="30"
+              max="45"
+              step="0.1"
+              placeholder="VD: 36.5"
+              value={meta.temperature}
+              onChange={setM('temperature')}
+            />
+          </div>
+          <div className="cn-form-group">
+            <label className="cn-form-label">Nhịp tim (bpm)</label>
+            <input
+              type="number"
+              className="cn-form-input"
+              min="20"
+              max="300"
+              placeholder="VD: 72"
+              value={meta.pulse}
+              onChange={setM('pulse')}
+            />
+          </div>
+          <div className="cn-form-group">
             <label className="cn-form-label">Tình trạng da</label>
             <input
               type="text"
@@ -189,11 +308,21 @@ function MetaFormSection({ noteType, meta, setMeta }) {
             />
           </div>
           <div className="cn-form-group cn-form-group--full">
+            <label className="cn-form-label">Thay đổi thể trạng</label>
+            <textarea
+              className="cn-form-input"
+              rows={2}
+              placeholder="VD: sụt cân, phù nề, thay đổi khẩu vị..."
+              value={meta.physicalChanges}
+              onChange={setM('physicalChanges')}
+            />
+          </div>
+          <div className="cn-form-group cn-form-group--full">
             <label className="cn-form-label">Ghi chú quan sát thêm</label>
             <textarea
               className="cn-form-input"
               rows={2}
-              placeholder="Các thay đổi thể trạng khác..."
+              placeholder="Các quan sát bổ sung khác..."
               value={meta.observations}
               onChange={setM('observations')}
             />
@@ -224,10 +353,16 @@ function NoteFormModal({ mode, note, residents, onSave, onClose }) {
     duration: note?.metadata?.duration ?? '',
     participationLevel: note?.metadata?.participationLevel || '',
     mood: note?.metadata?.mood || '',
+    assistanceLevel: note?.metadata?.assistanceLevel || '',
+    completionStatus: note?.metadata?.completionStatus || '',
     symptomsText: (note?.metadata?.symptoms || []).join(', '),
     consciousness: note?.metadata?.consciousness || '',
     fallRisk: note?.metadata?.fallRisk || '',
+    painLevel: note?.metadata?.painLevel ?? '',
+    temperature: note?.metadata?.temperature ?? '',
+    pulse: note?.metadata?.pulse ?? '',
     skinCondition: note?.metadata?.skinCondition || '',
+    physicalChanges: note?.metadata?.physicalChanges || '',
     observations: note?.metadata?.observations || '',
   });
 
@@ -253,13 +388,26 @@ function NoteFormModal({ mode, note, residents, onSave, onClose }) {
       if (meta.mood) m.mood = meta.mood;
       return m;
     }
+    if (t === 'daily_living') {
+      const m = {};
+      if (meta.activityType) m.activityType = meta.activityType;
+      if (meta.assistanceLevel) m.assistanceLevel = meta.assistanceLevel;
+      if (meta.completionStatus) m.completionStatus = meta.completionStatus;
+      if (meta.duration !== '') m.duration = Number(meta.duration);
+      if (meta.mood) m.mood = meta.mood;
+      return m;
+    }
     if (t === 'health') {
       const m = {};
       const symptoms = meta.symptomsText.split(',').map((s) => s.trim()).filter(Boolean);
       if (symptoms.length) m.symptoms = symptoms;
       if (meta.consciousness) m.consciousness = meta.consciousness;
       if (meta.fallRisk) m.fallRisk = meta.fallRisk;
+      if (meta.painLevel !== '') m.painLevel = Number(meta.painLevel);
+      if (meta.temperature !== '') m.temperature = Number(meta.temperature);
+      if (meta.pulse !== '') m.pulse = Number(meta.pulse);
       if (meta.skinCondition) m.skinCondition = meta.skinCondition.trim();
+      if (meta.physicalChanges) m.physicalChanges = meta.physicalChanges.trim();
       if (meta.observations) m.observations = meta.observations.trim();
       return m;
     }
@@ -307,7 +455,6 @@ function NoteFormModal({ mode, note, residents, onSave, onClose }) {
       }
     >
       <div className="cn-form-grid">
-        {/* Resident */}
         <div className="cn-form-group cn-form-group--full">
           <label className="cn-form-label">Cư dân <span className="cn-required">*</span></label>
           <select
@@ -326,7 +473,6 @@ function NoteFormModal({ mode, note, residents, onSave, onClose }) {
           {errors.residentId && <span className="cn-form-error">{errors.residentId}</span>}
         </div>
 
-        {/* Type + Datetime */}
         <div className="cn-form-group">
           <label className="cn-form-label">Loại ghi chú</label>
           <select className="cn-form-input" value={form.noteType} onChange={setF('noteType')}>
@@ -347,7 +493,6 @@ function NoteFormModal({ mode, note, residents, onSave, onClose }) {
           {errors.noteAt && <span className="cn-form-error">{errors.noteAt}</span>}
         </div>
 
-        {/* Content */}
         <div className="cn-form-group cn-form-group--full">
           <label className="cn-form-label">Nội dung ghi chú <span className="cn-required">*</span></label>
           <textarea
@@ -361,7 +506,6 @@ function NoteFormModal({ mode, note, residents, onSave, onClose }) {
         </div>
       </div>
 
-      {/* Conditional metadata section */}
       <MetaFormSection noteType={form.noteType} meta={meta} setMeta={setMeta} />
     </Modal>
   );
@@ -407,7 +551,7 @@ function NoteViewModal({ note, onClose }) {
         {t === 'meal' && (meta.mealType || meta.intakeAmount || meta.appetite) && (
           <>
             <hr className="cn-view-divider" />
-            <span className="cn-view-section-title">🍽️ Chi tiết bữa ăn</span>
+            <span className="cn-view-section-title">Chi tiết bữa ăn</span>
             <MetaRow label="Loại bữa"            value={labelOf(MEAL_TYPES, meta.mealType)} />
             <MetaRow label="Lượng ăn"            value={labelOf(INTAKE_AMOUNTS, meta.intakeAmount)} />
             <MetaRow label="Cảm giác ăn ngon"    value={labelOf(APPETITE_OPTS, meta.appetite)} />
@@ -418,7 +562,7 @@ function NoteViewModal({ note, onClose }) {
         {t === 'activity' && (meta.activityType || meta.participationLevel || meta.mood || meta.duration) && (
           <>
             <hr className="cn-view-divider" />
-            <span className="cn-view-section-title">🏃 Chi tiết hoạt động</span>
+            <span className="cn-view-section-title">Chi tiết hoạt động</span>
             <MetaRow label="Loại hoạt động"       value={labelOf(ACTIVITY_TYPES, meta.activityType)} />
             <MetaRow label="Thời gian"             value={meta.duration != null ? `${meta.duration} phút` : null} />
             <MetaRow label="Mức độ tham gia"       value={labelOf(PARTICIPATION, meta.participationLevel)} />
@@ -426,11 +570,24 @@ function NoteViewModal({ note, onClose }) {
           </>
         )}
 
-        {/* Health metadata */}
-        {t === 'health' && (meta.symptoms?.length || meta.consciousness || meta.fallRisk || meta.skinCondition || meta.observations) && (
+        {/* Daily living metadata */}
+        {t === 'daily_living' && (meta.activityType || meta.assistanceLevel || meta.completionStatus || meta.duration || meta.mood) && (
           <>
             <hr className="cn-view-divider" />
-            <span className="cn-view-section-title">🩺 Chi tiết sức khỏe</span>
+            <span className="cn-view-section-title">Chi tiết sinh hoạt hằng ngày</span>
+            <MetaRow label="Loại hoạt động"         value={labelOf(DAILY_LIVING_TYPES, meta.activityType)} />
+            <MetaRow label="Mức độ hỗ trợ"          value={labelOf(ASSISTANCE_LEVELS, meta.assistanceLevel)} />
+            <MetaRow label="Trạng thái hoàn thành"  value={labelOf(COMPLETION_STATUSES, meta.completionStatus)} />
+            <MetaRow label="Thời gian"               value={meta.duration != null ? `${meta.duration} phút` : null} />
+            <MetaRow label="Tâm trạng"               value={labelOf(MOOD_OPTS, meta.mood)} />
+          </>
+        )}
+
+        {/* Health metadata */}
+        {t === 'health' && (meta.symptoms?.length || meta.consciousness || meta.fallRisk || meta.painLevel != null || meta.temperature != null || meta.pulse != null || meta.skinCondition || meta.physicalChanges || meta.observations) && (
+          <>
+            <hr className="cn-view-divider" />
+            <span className="cn-view-section-title">Chi tiết sức khỏe</span>
             {Array.isArray(meta.symptoms) && meta.symptoms.length > 0 && (
               <div className="cn-view-item cn-view-item--full">
                 <span className="cn-view-label">Triệu chứng</span>
@@ -441,7 +598,11 @@ function NoteViewModal({ note, onClose }) {
             )}
             <MetaRow label="Mức độ tỉnh táo"     value={labelOf(CONSCIOUSNESS, meta.consciousness)} />
             <MetaRow label="Nguy cơ ngã"          value={labelOf(FALL_RISKS, meta.fallRisk)} />
+            <MetaRow label="Mức độ đau"           value={meta.painLevel != null && meta.painLevel !== '' ? `${meta.painLevel}/10` : null} />
+            <MetaRow label="Nhiệt độ"             value={meta.temperature != null && meta.temperature !== '' ? `${meta.temperature}°C` : null} />
+            <MetaRow label="Nhịp tim"             value={meta.pulse != null && meta.pulse !== '' ? `${meta.pulse} bpm` : null} />
             <MetaRow label="Tình trạng da"        value={meta.skinCondition} />
+            <MetaRow label="Thay đổi thể trạng"  value={meta.physicalChanges} />
             <MetaRow label="Ghi chú quan sát"     value={meta.observations} />
           </>
         )}
@@ -528,7 +689,7 @@ function HistoryModal({ resident, onClose }) {
         <span style={{ fontSize: 13, color: '#64748b', fontWeight: 600 }}>Lọc theo loại:</span>
         <select
           className="cn-form-input"
-          style={{ width: 160 }}
+          style={{ width: 180 }}
           value={typeFilter}
           onChange={(e) => setTypeFilter(e.target.value)}
         >
@@ -714,11 +875,11 @@ function CareNotesPage() {
 
   return (
     <div className="cn-page">
-      {/* ── Header ── */}
+      {/* Header */}
       <div className="cn-header">
         <div>
           <h1 className="cn-header__title">Ghi chú chăm sóc</h1>
-          <p className="cn-header__subtitle">Ghi nhận tình trạng bữa ăn, hoạt động sinh hoạt và sức khỏe của cư dân</p>
+          <p className="cn-header__subtitle">Quản lý ghi chú bữa ăn, hoạt động, sinh hoạt hằng ngày và sức khỏe của cư dân</p>
         </div>
         <button
           className="cn-btn cn-btn--primary"
@@ -729,12 +890,12 @@ function CareNotesPage() {
         </button>
       </div>
 
-      {/* ── Message ── */}
+      {/* Message */}
       {msg.text && (
         <div className={`cn-message cn-message--${msg.type}`}>{msg.text}</div>
       )}
 
-      {/* ── Toolbar ── */}
+      {/* Toolbar */}
       <div className="cn-toolbar">
         <div className="cn-toolbar__search">
           <Search size={15} />
@@ -773,7 +934,7 @@ function CareNotesPage() {
         )}
       </div>
 
-      {/* ── Tabs ── */}
+      {/* Tabs */}
       <div className="cn-tabs">
         <button
           className={`cn-tab${tab === 'all' ? ' cn-tab--active' : ''}`}
@@ -789,7 +950,7 @@ function CareNotesPage() {
         </button>
       </div>
 
-      {/* ── Table ── */}
+      {/* Table */}
       {loading ? (
         <LoadingSpinner label="Đang tải ghi chú..." />
       ) : (
@@ -876,7 +1037,7 @@ function CareNotesPage() {
         </div>
       )}
 
-      {/* ── Pagination ── */}
+      {/* Pagination */}
       {!loading && totalPages > 1 && (
         <div className="cn-pagination">
           <button
@@ -884,22 +1045,22 @@ function CareNotesPage() {
             disabled={page <= 1}
             onClick={() => setPage((p) => p - 1)}
           >
-            ← Trước
+            Trước
           </button>
           <span className="cn-pagination__info">
-            Trang {page} / {totalPages} &nbsp;·&nbsp; {total} ghi chú
+            Trang {page} / {totalPages} · {total} ghi chú
           </span>
           <button
             className="cn-pagination__btn"
             disabled={page >= totalPages}
             onClick={() => setPage((p) => p + 1)}
           >
-            Tiếp →
+            Tiếp
           </button>
         </div>
       )}
 
-      {/* ── Modals ── */}
+      {/* Modals */}
       {modal.type === 'create' && (
         <NoteFormModal
           mode="create"
