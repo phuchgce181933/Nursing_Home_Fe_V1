@@ -6,7 +6,7 @@ import useClientPagination from '../../../hooks/useClientPagination';
 import useDebouncedSearch from '../../../hooks/useDebouncedSearch';
 import caregiverRehabilitationScheduleService from '../../../services/caregiverRehabilitationSchedule.service';
 import { getLocalDateString } from '../../../utils/dateUtils';
-import { formatVNDate } from '../../../utils/nutritionLabels';
+import { formatLocaleDate } from '../../../utils/nutritionLabels';
 import '../../../styles/caregiver/RehabilitationSchedulePage.css';
 import RehabScheduleDetailModal from './components/RehabScheduleDetailModal';
 
@@ -21,7 +21,7 @@ function StatusCell({ ok }) {
 }
 
 function RehabilitationSchedulePage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { search, setSearch, debouncedSearch } = useDebouncedSearch();
   const [workDate, setWorkDate] = useState(today());
   const [residentId, setResidentId] = useState('');
@@ -139,7 +139,7 @@ function RehabilitationSchedulePage() {
 
       {dayMeta && (
         <p className="rehab-schedule-page__day-banner">
-          {t('caregiver.rehabSchedule.dayBanner', { date: formatVNDate(workDate) })}{' '}
+          {t('caregiver.rehabSchedule.dayBanner', { date: formatLocaleDate(workDate, i18n.language) })}{' '}
           {dayMeta.hasPublishedRehabDay
             ? t('caregiver.rehabSchedule.hasRehabPlan', {
                 title: dayMeta.planTitle ? ` (${dayMeta.planTitle})` : '',

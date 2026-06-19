@@ -4,10 +4,13 @@ import caregiverCareTaskService from '../../../../services/caregiverCareTask.ser
 import { careTaskTypeLabel } from '../../../../utils/blockingCareTasks';
 import { TASK_STATUS_NEXT } from '../constants';
 
-function shiftDetail(shift, shiftFallback) {
+function shiftDetail(shift, shiftFallback, t) {
   if (!shift) return '—';
   const name = shift.name || shiftFallback;
-  return `${name} · ${shift.startTime || '—'} – ${shift.endTime || '—'} (${shift.status || '—'})`;
+  const statusLabel = shift.status
+    ? t(`common.shiftStatus.${shift.status}`, { defaultValue: shift.status })
+    : '—';
+  return `${name} · ${shift.startTime || '—'} – ${shift.endTime || '—'} (${statusLabel})`;
 }
 
 function CareTaskDetailModal({ taskId, mode = 'view', ns, onClose, onUpdated }) {
@@ -94,7 +97,7 @@ function CareTaskDetailModal({ taskId, mode = 'view', ns, onClose, onUpdated }) 
                   )}
                 </p>
                 <p>
-                  <strong>{t(`${ns}.colTaskType`)}:</strong> {careTaskTypeLabel(task.taskType)}
+                  <strong>{t(`${ns}.colTaskType`)}:</strong> {careTaskTypeLabel(task.taskType, t)}
                 </p>
                 <p>
                   <strong>{t(`${ns}.colCareLevel`)}:</strong>{' '}
@@ -102,7 +105,7 @@ function CareTaskDetailModal({ taskId, mode = 'view', ns, onClose, onUpdated }) 
                 </p>
                 <p>
                   <strong>{t(`${ns}.colShift`)}:</strong>{' '}
-                  {shiftDetail(task.shiftId, t(`${ns}.colShift`))}
+                  {shiftDetail(task.shiftId, t(`${ns}.colShift`), t)}
                 </p>
                 <p>
                   <strong>{t('common.colStatus')}:</strong>{' '}
@@ -129,7 +132,7 @@ function CareTaskDetailModal({ taskId, mode = 'view', ns, onClose, onUpdated }) 
                   {resident?.fullName || resident?.residentCode || '—'}
                 </p>
                 <p>
-                  <strong>{t(`${ns}.colTaskType`)}:</strong> {careTaskTypeLabel(task.taskType)}
+                  <strong>{t(`${ns}.colTaskType`)}:</strong> {careTaskTypeLabel(task.taskType, t)}
                 </p>
                 <p>
                   <strong>{t('common.colStatus')}:</strong>{' '}

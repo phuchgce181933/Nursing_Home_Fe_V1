@@ -1,4 +1,5 @@
-import { RESIDENCY_LABELS } from '../pages/admin/residents/_shared/residentLabels';
+import i18n from '../i18n';
+import { getResidencyLabel } from '../pages/admin/residents/_shared/residentLabels';
 import { formatResidentAreaLine, pickDrugAllergiesList } from './residentArea';
 import {
   buildDualSignatureFooter,
@@ -10,22 +11,32 @@ import {
   openPrintReport,
 } from './clientReportShell';
 
-const CSV_HEADERS = ['Mã', 'Họ tên', 'Khu vực', 'Dị ứng thuốc', 'Trạng thái'];
+const t = (key, opts) => i18n.t(key, opts);
+
+const getLocale = () => (i18n.language?.startsWith('vi') ? 'vi-VN' : 'en-US');
+
+const getCsvHeaders = () => [
+  t('admin.residents.common.colCode'),
+  t('admin.residents.common.colFullName'),
+  t('admin.residents.common.colArea'),
+  t('admin.residents.common.colDrugAllergies'),
+  t('admin.residents.common.colStatus'),
+];
 
 const formatDrugAllergiesLabel = (resident) => {
   if (resident?.hasDrugAllergiesRecord) {
     const count = resident.drugAllergiesCount ?? pickDrugAllergiesList(resident).length ?? 0;
-    return `Đã ghi (${count})`;
+    return t('admin.residents.common.recordedWithCount', { count });
   }
-  return 'Chưa ghi';
+  return t('admin.residents.common.noRecord');
 };
 
 const rowToCells = (resident) => [
   resident.residentCode || '',
   resident.fullName || '',
-  formatResidentAreaLine(resident) || '',
+  formatResidentAreaLine(resident, t) || '',
   formatDrugAllergiesLabel(resident),
-  RESIDENCY_LABELS[resident.residencyStatus] || resident.residencyStatus || '',
+  getResidencyLabel(t, resident.residencyStatus) || resident.residencyStatus || '',
 ];
 
 const getStatusStyle = (status) => {
@@ -56,32 +67,33 @@ const buildFilenameSlug = (meta) => {
 export const exportResidentListToCSV = (residents, meta = {}) => {
   if (!residents?.length) return;
 
-  const exportedAt = new Date().toLocaleString('vi-VN');
-  const title = meta.title || 'DANH SÁCH CƯ DÂN THEO KHU VỰC';
-  const filterSummary = meta.filterSummary || 'Tất cả khu vực';
+  const exportedAt = new Date().toLocaleString(getLocale());
+  const title = meta.title || t('admin.residents.byArea.export.listTitle');
+  const filterSummary = meta.filterSummary || t('admin.residents.byArea.export.allAreas');
   const rows = residents.map((resident) => rowToCells(resident));
 
   const preambleRows = [
     [title],
-    [`Bộ lọc: ${filterSummary}`],
-    [`Ngày xuất: ${exportedAt}`],
-    [`Người xuất: ${meta.exportedBy || '—'}`],
-    [`Tổng số: ${residents.length} cư dân`],
+    [t('admin.residents.byArea.export.filterLine', { filter: filterSummary })],
+    [t('admin.residents.byArea.export.dateLine', { date: exportedAt })],
+    [t('admin.residents.byArea.export.byLine', { name: meta.exportedBy || '—' })],
+    [t('admin.residents.byArea.export.totalLine', { count: residents.length })],
     [''],
   ];
 
   const filename = `residents-by-area-${buildFilenameSlug(meta)}-${new Date().toISOString().slice(0, 10)}.csv`;
-  downloadCsv(filename, CSV_HEADERS, rows, preambleRows);
+  downloadCsv(filename, getCsvHeaders(), rows, preambleRows);
 };
 
 export const exportResidentListToPDF = (residents, meta = {}) => {
   if (!residents?.length) return;
 
-  const exportedAt = new Date().toLocaleString('vi-VN');
-  const title = meta.title || 'DANH SÁCH CƯ DÂN THEO KHU VỰC';
-  const filterSummary = meta.filterSummary || 'Tất cả khu vực';
+  const exportedAt = new Date().toLocaleString(getLocale());
+  const title = meta.title || t('admin.residents.byArea.export.listTitle');
+  const filterSummary = meta.filterSummary || t('admin.residents.byArea.export.allAreas');
   const documentCode = buildDocumentCode(meta);
   const stats = meta.summaryStats || {};
+  const csvHeaders = getCsvHeaders();
 
   const tableRows = residents
     .map(
@@ -89,9 +101,9 @@ export const exportResidentListToPDF = (residents, meta = {}) => {
     <tr>
       <td style="font-family: monospace; color: #334155;">${resident.residentCode || '—'}</td>
       <td style="font-weight: 600; color: #0f172a;">${resident.fullName || '—'}</td>
-      <td style="text-align: center; color: #475569;">${formatResidentAreaLine(resident) || '—'}</td>
+      <td style="text-align: center; color: #475569;">${formatResidentAreaLine(resident, t) || '—'}</td>
       <td style="text-align: center; color: #475569;">${formatDrugAllergiesLabel(resident)}</td>
-      <td style="text-align: center; ${getStatusStyle(resident.residencyStatus)}">${RESIDENCY_LABELS[resident.residencyStatus] || resident.residencyStatus || '—'}</td>
+      <td style="text-align: center; ${getStatusStyle(resident.residencyStatus)}">${getResidencyLabel(t, resident.residencyStatus) || resident.residencyStatus || '—'}</td>
     </tr>
   `
     )
@@ -99,34 +111,37 @@ export const exportResidentListToPDF = (residents, meta = {}) => {
 
   const content = `
     ${buildReportHeader({
-      reportTypeLabel: 'BÁO CÁO CƯ DÂN THEO KHU VỰC',
+      reportTypeLabel: t('admin.residents.byArea.export.pdfReportType'),
       documentCode,
       exportedAt,
     })}
 
     <div class="title-container">
       <h1>${title}</h1>
-      <p>Tài liệu lưu hành nội bộ — Quản lý cư dân theo khu vực</p>
+      <p>${t('admin.residents.byArea.export.pdfSubtitle')}</p>
     </div>
 
     ${buildInfoGrid([
-      { label: 'Khu vực lọc', value: meta.buildingLabel || filterSummary },
-      { label: 'Bộ lọc', value: filterSummary },
-      { label: 'Người xuất', value: meta.exportedBy || '—' },
-      { label: 'Tổng bản ghi', value: `${residents.length} cư dân` },
+      { label: t('admin.residents.byArea.export.pdfFilteredArea'), value: meta.buildingLabel || filterSummary },
+      { label: t('admin.residents.byArea.export.pdfFilter'), value: filterSummary },
+      { label: t('admin.residents.byArea.export.pdfExporter'), value: meta.exportedBy || '—' },
+      {
+        label: t('admin.residents.byArea.export.pdfTotalRecords'),
+        value: t('admin.residents.byArea.export.pdfResidentCount', { count: residents.length }),
+      },
     ])}
 
     ${buildSummaryGrid([
-      { title: 'Tổng trong tòa', value: String(stats.totalInBuilding ?? '—').padStart(2, '0') },
-      { title: 'Số tầng', value: String(stats.floorCount ?? '—').padStart(2, '0') },
-      { title: 'Đang lọc', value: String(stats.filteredCount ?? residents.length).padStart(2, '0') },
+      { title: t('admin.residents.byArea.statTotalInBuilding'), value: String(stats.totalInBuilding ?? '—').padStart(2, '0') },
+      { title: t('admin.residents.byArea.statFloorCount'), value: String(stats.floorCount ?? '—').padStart(2, '0') },
+      { title: t('admin.residents.byArea.statFiltered'), value: String(stats.filteredCount ?? residents.length).padStart(2, '0') },
     ])}
 
-    <div class="section-title">Danh sách chi tiết</div>
+    <div class="section-title">${t('admin.residents.byArea.export.pdfDetailList')}</div>
     <table class="table">
       <thead>
         <tr>
-          ${CSV_HEADERS.map((header) => `<th>${header}</th>`).join('')}
+          ${csvHeaders.map((header) => `<th>${header}</th>`).join('')}
         </tr>
       </thead>
       <tbody>
@@ -135,12 +150,12 @@ export const exportResidentListToPDF = (residents, meta = {}) => {
     </table>
 
     ${buildDualSignatureFooter({
-      leftTitle: 'Quản trị / Quản lý vận hành',
-      leftSubtitle: '(Ký và ghi rõ họ tên)',
-      leftLine: 'Xác nhận quản lý',
-      rightTitle: 'Người lập báo cáo',
-      rightSubtitle: '(Ký tên và ghi rõ họ tên)',
-      rightLine: 'Xác nhận',
+      leftTitle: t('admin.residents.byArea.export.pdfSigLeftTitle'),
+      leftSubtitle: t('admin.residents.byArea.export.pdfSigLeftSubtitle'),
+      leftLine: t('admin.residents.byArea.export.pdfSigLeftLine'),
+      rightTitle: t('admin.residents.byArea.export.pdfSigRightTitle'),
+      rightSubtitle: t('admin.residents.byArea.export.pdfSigRightSubtitle'),
+      rightLine: t('admin.residents.byArea.export.pdfSigRightLine'),
     })}
   `;
 

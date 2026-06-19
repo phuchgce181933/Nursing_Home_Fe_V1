@@ -8,8 +8,8 @@ import nutritionReportService from '../../services/nutritionReport.service';
 import { getLocalDateString } from '../../utils/dateUtils';
 import {
   dietTypeLabel,
-  formatVNDate,
-  formatVNDateTime,
+  formatLocaleDate,
+  formatLocaleDateTime,
   intakeStatusLabel,
   mealTypeLabel,
 } from '../../utils/nutritionLabels';
@@ -23,7 +23,7 @@ const addDays = (dateStr, delta) => {
 };
 
 function NutritionReportsPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { search, setSearch, debouncedSearch } = useDebouncedSearch();
   const [to, setTo] = useState(today());
   const [from, setFrom] = useState(addDays(today(), -6));
@@ -278,43 +278,48 @@ function NutritionReportsPage() {
               {!detailLoading && detail && (
                 <>
                   <p className="nutrition-reports__resident-meta">
-                    <strong>Mã:</strong> {detail.resident?.residentCode || '—'} ·{' '}
-                    <strong>Khoảng:</strong> {formatVNDate(detail.period?.from)} – {formatVNDate(detail.period?.to)}
+                    <strong>{t('nurse.nutritionReports.detailCode')}:</strong> {detail.resident?.residentCode || '—'} ·{' '}
+                    <strong>{t('nurse.nutritionReports.detailPeriod')}:</strong> {formatLocaleDate(detail.period?.from, i18n.language)} – {formatLocaleDate(detail.period?.to, i18n.language)}
                     {detail.resident?.allergies?.length > 0 && (
                       <>
                         {' '}
-                        · <strong>Dị ứng:</strong> {detail.resident.allergies.join(', ')}
+                        · <strong>{t('nurse.nutritionReports.detailAllergies')}:</strong> {detail.resident.allergies.join(', ')}
                       </>
                     )}
                     {detail.resident?.chronicConditions?.length > 0 && (
                       <>
                         {' '}
-                        · <strong>Bệnh nền:</strong> {detail.resident.chronicConditions.join(', ')}
+                        · <strong>{t('nurse.nutritionReports.detailChronic')}:</strong> {detail.resident.chronicConditions.join(', ')}
                       </>
                     )}
                   </p>
                   <p className="nutrition-reports__resident-meta">
-                    {detail.summary?.mealPlanMealCount ?? 0} bữa có thực đơn ·{' '}
-                    {detail.summary?.mealIntakeCount ?? 0} ghi nhận intake ·{' '}
-                    {detail.summary?.mealNotesCount ?? 0} ghi chú meal ·{' '}
-                    {detail.summary?.daysWithData ?? 0} ngày có dữ liệu
+                    {t('nurse.nutritionReports.detailSummary', {
+                      mealPlanMeals: detail.summary?.mealPlanMealCount ?? 0,
+                      intakeCount: detail.summary?.mealIntakeCount ?? 0,
+                      mealNotesCount: detail.summary?.mealNotesCount ?? 0,
+                      daysWithData: detail.summary?.daysWithData ?? 0,
+                    })}
                   </p>
 
                   {(!detail.days || detail.days.length === 0) && (
-                    <p className="empty-state">Chưa có dữ liệu dinh dưỡng publish trong khoảng này.</p>
+                    <p className="empty-state">{t('nurse.nutritionReports.emptyDetailDays')}</p>
                   )}
 
                   {Array.isArray(detail.days) &&
                     detail.days.map((day) => (
                       <div key={day.workDate} className="nutrition-reports__day-block">
-                        <h3 className="nutrition-reports__day-title">{formatVNDate(day.workDate)}</h3>
+                        <h3 className="nutrition-reports__day-title">{formatLocaleDate(day.workDate, i18n.language)}</h3>
 
                         {day.mealTimeSchedule && (
                           <div className="nutrition-reports__subsection">
-                            <h4>Giờ ăn</h4>
+                            <h4>{t('nurse.nutritionReports.sectionMealTimes')}</h4>
                             <p>
-                              Sáng {day.mealTimeSchedule.breakfastTime} · Trưa{' '}
-                              {day.mealTimeSchedule.lunchTime} · Tối {day.mealTimeSchedule.dinnerTime}
+                              {t('nurse.nutritionReports.mealTimesLine', {
+                                breakfast: day.mealTimeSchedule.breakfastTime,
+                                lunch: day.mealTimeSchedule.lunchTime,
+                                dinner: day.mealTimeSchedule.dinnerTime,
+                              })}
                               {day.mealTimeSchedule.notes ? ` — ${day.mealTimeSchedule.notes}` : ''}
                             </p>
                           </div>
@@ -322,21 +327,21 @@ function NutritionReportsPage() {
 
                         {day.mealPlanEntries?.length > 0 && (
                           <div className="nutrition-reports__subsection">
-                            <h4>Thực đơn</h4>
+                            <h4>{t('nurse.nutritionReports.sectionMealPlan')}</h4>
                             <table className="data-table">
                               <thead>
                                 <tr>
-                                  <th>Bữa</th>
-                                  <th>Món</th>
-                                  <th>Giờ</th>
-                                  <th>Kcal</th>
-                                  <th>Ghi chú</th>
+                                  <th>{t('nurse.nutritionReports.colMeal')}</th>
+                                  <th>{t('nurse.nutritionReports.colDish')}</th>
+                                  <th>{t('common.colTime')}</th>
+                                  <th>{t('nurse.nutritionReports.colKcal')}</th>
+                                  <th>{t('nurse.nutritionReports.colNotes')}</th>
                                 </tr>
                               </thead>
                               <tbody>
                                 {day.mealPlanEntries.map((m, idx) => (
                                   <tr key={`${day.workDate}-meal-${idx}`}>
-                                    <td>{mealTypeLabel(m.mealType)}</td>
+                                    <td>{mealTypeLabel(m.mealType, t)}</td>
                                     <td>{m.mealName}</td>
                                     <td>{m.mealTime || '—'}</td>
                                     <td>{m.calories ?? '—'}</td>
@@ -350,20 +355,20 @@ function NutritionReportsPage() {
 
                         {day.specialDietEntries?.length > 0 && (
                           <div className="nutrition-reports__subsection">
-                            <h4>Chế độ ăn đặc biệt</h4>
+                            <h4>{t('nurse.nutritionReports.sectionSpecialDiet')}</h4>
                             <table className="data-table">
                               <thead>
                                 <tr>
-                                  <th>Loại</th>
-                                  <th>Hạn chế</th>
-                                  <th>Mục tiêu</th>
-                                  <th>Giờ</th>
+                                  <th>{t('nurse.nutritionReports.colType')}</th>
+                                  <th>{t('nurse.nutritionReports.colRestrictions')}</th>
+                                  <th>{t('nurse.nutritionReports.colGoal')}</th>
+                                  <th>{t('common.colTime')}</th>
                                 </tr>
                               </thead>
                               <tbody>
                                 {day.specialDietEntries.map((d, idx) => (
                                   <tr key={`${day.workDate}-diet-${idx}`}>
-                                    <td>{dietTypeLabel(d.dietType)}</td>
+                                    <td>{dietTypeLabel(d.dietType, t)}</td>
                                     <td>
                                       {Array.isArray(d.restrictions) ? d.restrictions.join(', ') || '—' : '—'}
                                     </td>
@@ -378,31 +383,31 @@ function NutritionReportsPage() {
 
                         {day.mealIntakeNotes?.length > 0 && (
                           <div className="nutrition-reports__subsection">
-                            <h4>Ghi nhận intake (Caregiver)</h4>
+                            <h4>{t('nurse.nutritionReports.sectionIntake')}</h4>
                             <table className="data-table">
                               <thead>
                                 <tr>
-                                  <th>Bữa</th>
-                                  <th>Món dự kiến</th>
-                                  <th>Tình trạng</th>
-                                  <th>% ăn</th>
-                                  <th>Ghi chú</th>
-                                  <th>Thời gian</th>
+                                  <th>{t('nurse.nutritionReports.colMeal')}</th>
+                                  <th>{t('nurse.nutritionReports.colPlannedDish')}</th>
+                                  <th>{t('common.colStatus')}</th>
+                                  <th>{t('nurse.nutritionReports.colPortion')}</th>
+                                  <th>{t('nurse.nutritionReports.colNotes')}</th>
+                                  <th>{t('nurse.nutritionReports.colRecordedAt')}</th>
                                 </tr>
                               </thead>
                               <tbody>
                                 {day.mealIntakeNotes.map((row) => (
                                   <tr key={row._id}>
-                                    <td>{mealTypeLabel(row.mealType)}</td>
+                                    <td>{mealTypeLabel(row.mealType, t)}</td>
                                     <td>{row.plannedMealName || '—'}</td>
-                                    <td>{intakeStatusLabel(row.intakeStatus)}</td>
+                                    <td>{intakeStatusLabel(row.intakeStatus, t)}</td>
                                     <td>
                                       {row.intakeStatus === 'partial' && row.portionPercent != null
                                         ? `${row.portionPercent}%`
                                         : '—'}
                                     </td>
                                     <td>{row.notes || '—'}</td>
-                                    <td>{formatVNDateTime(row.recordedAt)}</td>
+                                    <td>{formatLocaleDateTime(row.recordedAt, i18n.language)}</td>
                                   </tr>
                                 ))}
                               </tbody>
@@ -412,10 +417,10 @@ function NutritionReportsPage() {
 
                         {day.mealNotes?.length > 0 && (
                           <div className="nutrition-reports__subsection">
-                            <h4>Ghi chú ăn uống (text)</h4>
+                            <h4>{t('nurse.nutritionReports.sectionMealNotes')}</h4>
                             {day.mealNotes.map((n) => (
                               <div key={n._id} className="nutrition-reports__note">
-                                <time>{formatVNDateTime(n.noteAt)}</time>
+                                <time>{formatLocaleDateTime(n.noteAt, i18n.language)}</time>
                                 {n.authorName && <span>{n.authorName}: </span>}
                                 {n.content}
                               </div>

@@ -10,7 +10,6 @@ import { ADMIN_LIST_PAGE_SIZE } from '../../../../constants/adminListPage';
 import useDebouncedSearch from '../../../../hooks/useDebouncedSearch';
 import '../../../../styles/admin/DrugAllergiesPage.css';
 import '../../../../styles/admin/residentActionIcons.css';
-import { GENDER_LABELS, RESIDENCY_LABELS } from '../_shared/residentLabels';
 
 const parseCommaList = (value) =>
   String(value || '')
@@ -66,12 +65,12 @@ export default function DrugAllergiesPage() {
       setTotalPages(res.totalPages ?? 1);
       if (res._fallback) setShowRouteHint(true);
     } catch (e) {
-      setListError(e.response?.data?.message || 'Không thể tải danh sách cư dân');
+      setListError(e.response?.data?.message || t('admin.residents.common.loadListFailed'));
       setResidents([]);
     } finally {
       if (!silent) setListLoading(false);
     }
-  }, [page, debouncedSearch, statusFilter, recordedFilter]);
+  }, [page, debouncedSearch, statusFilter, recordedFilter, t]);
 
   const loadDetail = useCallback(async (residentId) => {
     if (!residentId) {
@@ -90,14 +89,14 @@ export default function DrugAllergiesPage() {
       setDrugAllergiesInput(joinList(data.drugAllergies?.drugAllergies));
     } catch (e) {
       const status = e?.response?.status;
-      setDetailError(e.response?.data?.message || 'Không thể tải thông tin dị ứng thuốc');
+      setDetailError(e.response?.data?.message || t('admin.residents.drugAllergies.loadFailed'));
       if (status === 404 || status === 400 || status === 403) setShowRouteHint(true);
       setDetailData(null);
       setDrugAllergiesInput('');
     } finally {
       setDetailLoading(false);
     }
-  }, []);
+  }, [t]);
 
   const refreshAfterSave = useCallback(async () => {
     const tasks = [loadList({ silent: true })];
@@ -136,12 +135,12 @@ export default function DrugAllergiesPage() {
   const handleSave = async (e) => {
     e.preventDefault();
     if (!selectedId) {
-      setFormError('Chưa chọn cư dân');
+      setFormError(t('admin.residents.common.noResidentSelected'));
       return;
     }
     const drugAllergies = parseCommaList(drugAllergiesInput);
     if (!drugAllergies.length) {
-      setFormError('Vui lòng nhập ít nhất một dị ứng thuốc');
+      setFormError(t('admin.residents.drugAllergies.requireOneAllergy'));
       return;
     }
 
@@ -153,14 +152,14 @@ export default function DrugAllergiesPage() {
       if (res._fallback) setShowRouteHint(true);
       setPanelMsg(
         res._legacyAllergiesField
-          ? `${res.message || 'Đã lưu'} — nên bật API PUT /residents/:id/drug-allergies trên backend để lưu đúng cột drugAllergies.`
-          : res.message || 'Đã cập nhật dị ứng thuốc'
+          ? `${res.message || t('admin.residents.drugAllergies.saveSuccess')} — ${t('admin.residents.drugAllergies.routeHint')}`
+          : res.message || t('admin.residents.drugAllergies.saveSuccess')
       );
       await refreshAfterSave();
       setEditPopup(false);
     } catch (e) {
       const status = e?.response?.status;
-      setFormError(e.response?.data?.message || 'Cập nhật thất bại');
+      setFormError(e.response?.data?.message || t('admin.residents.preExistingConditions.updateFailed'));
       if (status === 404 || status === 400 || status === 403) setShowRouteHint(true);
     } finally {
       setSaving(false);
@@ -179,16 +178,16 @@ export default function DrugAllergiesPage() {
       <div className="resident-page__filters">
         <div className="resident-page__filter-row">
           <label className="resident-page__filter">
-            <span>Tìm kiếm</span>
+            <span>{t('admin.residents.common.search')}</span>
             <input
               type="search"
-              placeholder="Tên hoặc mã cư dân..."
+              placeholder={t('admin.residents.common.searchPlaceholder')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </label>
           <label className="resident-page__filter">
-            <span>Trạng thái</span>
+            <span>{t('admin.residents.common.status')}</span>
             <select
               value={statusFilter}
               onChange={(e) => {
@@ -196,14 +195,14 @@ export default function DrugAllergiesPage() {
                 setPage(1);
               }}
             >
-              <option value="admitted">Đang điều trị</option>
-              <option value="pending">Chờ nhập viện</option>
-              <option value="discharged">Đã xuất viện</option>
-              <option value="">Tất cả trạng thái</option>
+              <option value="admitted">{t('common.residency.admitted')}</option>
+              <option value="pending">{t('common.residency.pending')}</option>
+              <option value="discharged">{t('common.residency.discharged')}</option>
+              <option value="">{t('common.allStatuses')}</option>
             </select>
           </label>
           <label className="resident-page__filter">
-            <span>Hồ sơ</span>
+            <span>{t('admin.residents.drugAllergies.filterRecord')}</span>
             <select
               value={recordedFilter}
               onChange={(e) => {
@@ -211,9 +210,9 @@ export default function DrugAllergiesPage() {
                 setPage(1);
               }}
             >
-              <option value="">Tất cả hồ sơ</option>
-              <option value="false">Chưa ghi nhận</option>
-              <option value="true">Đã ghi nhận</option>
+              <option value="">{t('admin.residents.common.filterRecordAll')}</option>
+              <option value="false">{t('admin.residents.common.notRecordedYet')}</option>
+              <option value="true">{t('admin.residents.common.recorded')}</option>
             </select>
           </label>
         </div>
@@ -228,24 +227,24 @@ export default function DrugAllergiesPage() {
         <table className="resident-page__table-element">
           <thead>
             <tr className="resident-page__table-header">
-              <th>Mã</th>
-              <th>Họ tên</th>
-              <th>Dị ứng thuốc</th>
-              <th>Thao tác</th>
+              <th>{t('admin.residents.common.colCode')}</th>
+              <th>{t('admin.residents.common.colFullName')}</th>
+              <th>{t('admin.residents.drugAllergies.colRecordStatus')}</th>
+              <th>{t('admin.residents.common.colActions')}</th>
             </tr>
           </thead>
           <tbody>
             {listLoading && (
               <tr>
                 <td colSpan={4} className="empty-state">
-                  Đang tải...
+                  {t('common.loading')}
                 </td>
               </tr>
             )}
             {!listLoading && residents.length === 0 && (
               <tr>
                 <td colSpan={4} className="empty-state">
-                  Không có cư dân nào
+                  {t('admin.residents.common.noResidents')}
                 </td>
               </tr>
             )}
@@ -254,13 +253,17 @@ export default function DrugAllergiesPage() {
                 <tr key={r._id}>
                   <td style={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>{r.residentCode}</td>
                   <td style={{ fontWeight: 600 }}>{r.fullName}</td>
-                  <td>{r.hasDrugAllergiesRecord ? `Đã ghi (${r.drugAllergiesCount || 0})` : 'Chưa ghi'}</td>
+                  <td>
+                    {r.hasDrugAllergiesRecord
+                      ? t('admin.residents.drugAllergies.statusRecorded', { count: r.drugAllergiesCount || 0 })
+                      : t('admin.residents.drugAllergies.statusNotRecorded')}
+                  </td>
                   <td className="resident-action-cell">
                     <div className="resident-action-group">
                       <button
                         type="button"
                         className="resident-icon-btn resident-icon-btn--view"
-                        title="Xem chi tiết"
+                        title={t('admin.residents.common.viewResidentDetail')}
                         onClick={() => openViewPopup(r)}
                       >
                         <FaEye />
@@ -268,7 +271,7 @@ export default function DrugAllergiesPage() {
                       <button
                         type="button"
                         className="resident-icon-btn resident-icon-btn--edit"
-                        title="Sửa"
+                        title={t('admin.residents.common.edit')}
                         onClick={() => openEditPopup(r)}
                       >
                         <FaPen />
@@ -291,7 +294,7 @@ export default function DrugAllergiesPage() {
       {viewPopup && (
         <div className="modal-overlay" onClick={() => setViewPopup(false)}>
           <div className="modal modal--wide" onClick={(e) => e.stopPropagation()}>
-            <h2 className="modal__title">Chi tiết dị ứng thuốc</h2>
+            <h2 className="modal__title">{t('admin.residents.drugAllergies.detailTitle')}</h2>
             <ResidentContextBlock
               resident={resident}
               summary={selectedSummary}
@@ -299,7 +302,7 @@ export default function DrugAllergiesPage() {
               showStatus
             />
             {detailLoading ? (
-              <div className="empty-state">Đang tải thông tin...</div>
+              <div className="empty-state">{t('admin.residents.common.loadingDetail')}</div>
             ) : detailError && !detailData ? (
               <div className="empty-state">
                 <p>{detailError}</p>
@@ -309,13 +312,13 @@ export default function DrugAllergiesPage() {
                   style={{ marginTop: 12 }}
                   onClick={() => loadDetail(selectedId)}
                 >
-                  Thử tải lại
+                  {t('admin.residents.common.retryLoad')}
                 </button>
               </div>
             ) : (
               <>
                 <div className="drug-allergies-current">
-                  <h3>Dữ liệu hiện tại</h3>
+                  <h3>{t('admin.residents.drugAllergies.currentData')}</h3>
                   {savedDrugAllergies.length ? (
                     <ul>
                       {savedDrugAllergies.map((item) => (
@@ -323,19 +326,21 @@ export default function DrugAllergiesPage() {
                       ))}
                     </ul>
                   ) : (
-                    <p>Chưa có dữ liệu dị ứng thuốc.</p>
+                    <p>{t('admin.residents.drugAllergies.noAllergyData')}</p>
                   )}
                 </div>
                 {detailData?.drugAllergies?.updatedAt && (
                   <p className="drug-allergies-panel__updated">
-                    Cập nhật lần cuối: {formatLeaveDate(detailData.drugAllergies.updatedAt)}
+                    {t('admin.residents.common.lastUpdated', {
+                      date: formatLeaveDate(detailData.drugAllergies.updatedAt),
+                    })}
                   </p>
                 )}
               </>
             )}
             <div className="modal__actions">
               <button type="button" className="btn-cancel" onClick={() => setViewPopup(false)}>
-                Đóng
+                {t('admin.residents.common.close')}
               </button>
               {selectedSummary && (
                 <button
@@ -346,7 +351,7 @@ export default function DrugAllergiesPage() {
                     openEditPopup(selectedSummary);
                   }}
                 >
-                  Chỉnh sửa
+                  {t('admin.residents.initialHealth.updateAction')}
                 </button>
               )}
             </div>
@@ -356,7 +361,7 @@ export default function DrugAllergiesPage() {
       {editPopup && (
         <div className="modal-overlay" onClick={() => setEditPopup(false)}>
           <div className="modal modal--wide" onClick={(e) => e.stopPropagation()}>
-            <h2 className="modal__title">Cập nhật dị ứng thuốc</h2>
+            <h2 className="modal__title">{t('admin.residents.drugAllergies.editTitle')}</h2>
             <ResidentContextBlock
               resident={resident}
               summary={selectedSummary}
@@ -364,7 +369,7 @@ export default function DrugAllergiesPage() {
               showStatus
             />
             {detailLoading ? (
-              <div className="empty-state">Đang tải thông tin...</div>
+              <div className="empty-state">{t('admin.residents.common.loadingDetail')}</div>
             ) : detailError && !detailData ? (
               <div className="empty-state">
                 <p>{detailError}</p>
@@ -374,7 +379,7 @@ export default function DrugAllergiesPage() {
                   style={{ marginTop: 12 }}
                   onClick={() => loadDetail(selectedId)}
                 >
-                  Thử tải lại
+                  {t('admin.residents.common.retryLoad')}
                 </button>
               </div>
             ) : (
@@ -383,20 +388,20 @@ export default function DrugAllergiesPage() {
                 {formError && <p className="form-error">{formError}</p>}
                 <form onSubmit={handleSave}>
                   <div className="form-group">
-                    <label>Dị ứng thuốc (ngăn cách bằng dấu phẩy)</label>
+                    <label>{t('admin.residents.drugAllergies.allergiesLabel')}</label>
                     <textarea
                       value={drugAllergiesInput}
                       onChange={(e) => setDrugAllergiesInput(e.target.value)}
-                      placeholder="Ví dụ: Penicillin, Sulfonamide, Aspirin"
+                      placeholder={t('admin.residents.drugAllergies.allergiesPlaceholder')}
                       rows={5}
                     />
                   </div>
                   <div className="modal__actions">
                     <button type="button" className="btn-cancel" onClick={() => setEditPopup(false)}>
-                      Đóng
+                      {t('admin.residents.common.close')}
                     </button>
                     <button type="submit" className="btn-save" disabled={saving}>
-                      {saving ? 'Đang lưu...' : 'Cập nhật'}
+                      {saving ? t('common.saving') : t('admin.residents.initialHealth.updateAction')}
                     </button>
                   </div>
                 </form>

@@ -1,17 +1,25 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import hygieneActivityService from '../../../../services/hygieneActivity.service';
 import {
   hygieneActivityLabel,
   hygieneCategoryLabel,
 } from '../../../../utils/hygieneLabels';
 import {
-  ACTIVITY_TYPE_OPTIONS,
-  COMPLETION_STATUS_OPTIONS,
+  ACTIVITY_TYPES_BY_CATEGORY,
+  getActivityTypeOptions,
+  getCompletionStatusOptions,
 } from '../constants';
 import HygieneContextBanner from './HygieneContextBanner';
 
 function HygieneFormModal({ open, mode, recordId, residents, defaultWorkDate, maxDate, onClose, onSuccess }) {
+  const { t } = useTranslation();
   const isEdit = mode === 'edit';
+  const ns = 'caregiver';
+  const c = `${ns}.common`;
+
+  const activityTypeOptions = useMemo(() => getActivityTypeOptions(t), [t]);
+  const completionStatusOptions = useMemo(() => getCompletionStatusOptions(t), [t]);
 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -26,8 +34,8 @@ function HygieneFormModal({ open, mode, recordId, residents, defaultWorkDate, ma
   const [readOnlyMeta, setReadOnlyMeta] = useState(null);
 
   const selectedActivity = useMemo(
-    () => ACTIVITY_TYPE_OPTIONS.find((o) => o.value === activityType),
-    [activityType]
+    () => activityTypeOptions.find((o) => o.value === activityType),
+    [activityType, activityTypeOptions]
   );
 
   const loadContext = useCallback(async () => {
@@ -61,11 +69,11 @@ function HygieneFormModal({ open, mode, recordId, residents, defaultWorkDate, ma
         activityCategory: data.activityCategory,
       });
     } catch (e) {
-      setError(e?.response?.data?.message || 'Không tải được chi tiết ghi nhận');
+      setError(e?.response?.data?.message || t(`${c}.detailLoadFailed`));
     } finally {
       setLoading(false);
     }
-  }, [open, isEdit, recordId]);
+  }, [open, isEdit, recordId, t, c]);
 
   useEffect(() => {
     if (!open) return;
@@ -90,12 +98,12 @@ function HygieneFormModal({ open, mode, recordId, residents, defaultWorkDate, ma
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!isEdit && !residentId) return setError('Vui lòng chọn cư dân');
+    if (!isEdit && !residentId) return setError(t(`${c}.selectResidentRequired`));
     if (!isEdit && context?.hasExistingRecord) {
-      return setError('Đã có ghi nhận cho hoạt động này. Vui lòng sửa từ danh sách.');
+      return setError(t(`${c}.duplicateActivityRecord`));
     }
     if (!isEdit && !context) {
-      return setError('Vui lòng chờ kiểm tra hoặc chọn đủ ngày, cư dân và hoạt động.');
+      return setError(t(`${c}.waitForActivityContext`));
     }
 
     setSaving(true);
@@ -117,7 +125,7 @@ function HygieneFormModal({ open, mode, recordId, residents, defaultWorkDate, ma
       }
       onSuccess();
     } catch (err) {
-      setError(err?.response?.data?.message || 'Lưu thất bại');
+      setError(err?.response?.data?.message || t(`${c}.saveFailed`));
     } finally {
       setSaving(false);
     }
@@ -125,7 +133,9 @@ function HygieneFormModal({ open, mode, recordId, residents, defaultWorkDate, ma
 
   if (!open) return null;
 
-  const title = isEdit ? 'Sửa ghi nhận vệ sinh' : 'Ghi nhận hoạt động vệ sinh';
+  const title = isEdit
+    ? t(`${ns}.hygiene.formModal.titleEdit`)
+    : t(`${ns}.hygiene.formModal.titleCreate`);
   const saveDisabled = saving || loading || (!isEdit && (context?.hasExistingRecord || !context));
 
   return (
@@ -138,18 +148,19 @@ function HygieneFormModal({ open, mode, recordId, residents, defaultWorkDate, ma
           </button>
         </div>
         <div className="hygiene-page__modal-body">
-          {loading && <p>Đang tải...</p>}
+          {loading && <p>{t('common.loading')}</p>}
           {!loading && (
             <form onSubmit={handleSubmit}>
               {isEdit && readOnlyMeta && (
                 <div className="hygiene-page__readonly-meta">
                   <p>
-                    <strong>Cư dân:</strong> {readOnlyMeta.residentName || '—'} · <strong>Ngày:</strong>{' '}
-                    {readOnlyMeta.workDate}
+                    <strong>{t(`${c}.residentLabel`)}:</strong> {readOnlyMeta.residentName || '—'} ·{' '}
+                    <strong>{t(`${c}.dateLabel`)}:</strong> {readOnlyMeta.workDate}
                   </p>
                   <p>
-                    <strong>Hoạt động:</strong> {hygieneActivityLabel(readOnlyMeta.activityType)} (
-                    {hygieneCategoryLabel(readOnlyMeta.activityCategory)})
+                    <strong>{t(`${c}.activityLabel`)}:</strong>{' '}
+                    {hygieneActivityLabel(readOnlyMeta.activityType, t)} (
+                    {hygieneCategoryLabel(readOnlyMeta.activityCategory, t)})
                   </p>
                 </div>
               )}
@@ -160,7 +171,7 @@ function HygieneFormModal({ open, mode, recordId, residents, defaultWorkDate, ma
                 {!isEdit && (
                   <>
                     <label>
-                      Ngày *
+                      {t(`${c}.dateLabel`)} *
                       <input
                         type="date"
                         max={maxDate}
@@ -170,9 +181,9 @@ function HygieneFormModal({ open, mode, recordId, residents, defaultWorkDate, ma
                       />
                     </label>
                     <label>
-                      Cư dân *
+                      {t(`${c}.residentLabel`)} *
                       <select required value={residentId} onChange={(e) => setResidentId(e.target.value)}>
-                        <option value="">— Chọn —</option>
+                        <option value="">{t(`${c}.selectOption`)}</option>
                         {residents.map((r) => (
                           <option key={r._id} value={r._id}>
                             {r.fullName || r.residentCode}
@@ -181,19 +192,19 @@ function HygieneFormModal({ open, mode, recordId, residents, defaultWorkDate, ma
                       </select>
                     </label>
                     <label>
-                      Hoạt động *
+                      {t(`${c}.activityLabel`)} *
                       <select required value={activityType} onChange={(e) => setActivityType(e.target.value)}>
-                        <optgroup label="Vệ sinh cá nhân">
-                          {ACTIVITY_TYPE_OPTIONS.filter((o) => o.category === 'personal').map((o) => (
+                        <optgroup label={t(`${ns}.hygiene.formModal.optgroupPersonal`)}>
+                          {ACTIVITY_TYPES_BY_CATEGORY.personal.map((o) => (
                             <option key={o.value} value={o.value}>
-                              {o.label}
+                              {hygieneActivityLabel(o.value, t)}
                             </option>
                           ))}
                         </optgroup>
-                        <optgroup label="Dọn dẹp / môi trường">
-                          {ACTIVITY_TYPE_OPTIONS.filter((o) => o.category === 'environment').map((o) => (
+                        <optgroup label={t(`${ns}.hygiene.formModal.optgroupEnvironment`)}>
+                          {ACTIVITY_TYPES_BY_CATEGORY.environment.map((o) => (
                             <option key={o.value} value={o.value}>
-                              {o.label}
+                              {hygieneActivityLabel(o.value, t)}
                             </option>
                           ))}
                         </optgroup>
@@ -201,19 +212,21 @@ function HygieneFormModal({ open, mode, recordId, residents, defaultWorkDate, ma
                     </label>
                     {selectedActivity && (
                       <p className="hygiene-page__field-hint hygiene-page__field-full">
-                        Nhóm: {hygieneCategoryLabel(selectedActivity.category)}
+                        {t(`${ns}.hygiene.formModal.groupHint`, {
+                          category: hygieneCategoryLabel(selectedActivity.category, t),
+                        })}
                       </p>
                     )}
                   </>
                 )}
                 <label>
-                  Kết quả *
+                  {t(`${c}.resultLabel`)} *
                   <select
                     required
                     value={completionStatus}
                     onChange={(e) => setCompletionStatus(e.target.value)}
                   >
-                    {COMPLETION_STATUS_OPTIONS.map((o) => (
+                    {completionStatusOptions.map((o) => (
                       <option key={o.value} value={o.value}>
                         {o.label}
                       </option>
@@ -221,7 +234,7 @@ function HygieneFormModal({ open, mode, recordId, residents, defaultWorkDate, ma
                   </select>
                 </label>
                 <label className="hygiene-page__field-full">
-                  Ghi chú thêm
+                  {t(`${c}.notesLabel`)}
                   <textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
                 </label>
               </div>
@@ -230,10 +243,10 @@ function HygieneFormModal({ open, mode, recordId, residents, defaultWorkDate, ma
 
               <div className="hygiene-page__actions">
                 <button type="submit" className="btn-primary" disabled={saveDisabled}>
-                  {saving ? 'Đang lưu...' : isEdit ? 'Cập nhật' : 'Lưu ghi nhận'}
+                  {saving ? t(`${c}.savingRecord`) : isEdit ? t(`${c}.update`) : t(`${c}.saveRecord`)}
                 </button>
                 <button type="button" className="btn-secondary" disabled={saving} onClick={onClose}>
-                  Hủy
+                  {t('common.cancel')}
                 </button>
               </div>
             </form>

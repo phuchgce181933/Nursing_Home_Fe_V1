@@ -1,5 +1,6 @@
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CATEGORY_FILTER_OPTIONS, SEVERITY_FILTER_OPTIONS } from '../constants';
+import { getCategoryFilterOptions, getSeverityFilterOptions } from '../constants';
 
 function BehaviorListFilters({
   workDate,
@@ -17,6 +18,8 @@ function BehaviorListFilters({
   onReload,
 }) {
   const { t } = useTranslation();
+  const categoryFilterOptions = useMemo(() => getCategoryFilterOptions(t), [t]);
+  const severityFilterOptions = useMemo(() => getSeverityFilterOptions(t), [t]);
 
   return (
     <div className="resident-page__filters">
@@ -33,7 +36,7 @@ function BehaviorListFilters({
         <label className="resident-page__filter">
           <span>{t('caregiver.dailyBehaviors.colType')}</span>
           <select value={observationCategory} onChange={(e) => onObservationCategoryChange(e.target.value)}>
-            {CATEGORY_FILTER_OPTIONS.map((o) => (
+            {categoryFilterOptions.map((o) => (
               <option key={o.value || 'all'} value={o.value}>
                 {o.label}
               </option>
@@ -43,7 +46,7 @@ function BehaviorListFilters({
         <label className="resident-page__filter">
           <span>{t('caregiver.dailyBehaviors.colSeverity')}</span>
           <select value={severity} onChange={(e) => onSeverityChange(e.target.value)}>
-            {SEVERITY_FILTER_OPTIONS.map((o) => (
+            {severityFilterOptions.map((o) => (
               <option key={o.value || 'all'} value={o.value}>
                 {o.label}
               </option>

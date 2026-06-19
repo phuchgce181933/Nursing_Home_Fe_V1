@@ -1,53 +1,37 @@
-export const OBSERVATION_CATEGORY_LABELS = {
-  mood: 'Tâm trạng',
-  behavior: 'Hành vi',
-  abnormal: 'Biểu hiện bất thường',
-};
+import i18n from '../i18n';
 
-export const MOOD_LEVEL_LABELS = {
-  calm: 'Bình tĩnh',
-  happy: 'Vui vẻ',
-  neutral: 'Trung tính',
-  anxious: 'Lo âu',
-  sad: 'Buồn',
-  agitated: 'Kích động',
-  confused: 'Lú lẫn',
-  irritable: 'Cáu gắt',
-};
+const NS = 'caregiver.dailyBehaviors.labels';
 
-export const BEHAVIOR_TYPE_LABELS = {
-  cooperative: 'Hợp tác',
-  withdrawn: 'Thu mình',
-  restless: 'Bồn chồn',
-  wandering: 'Đi lang thang',
-  verbal_outburst: 'La hét / nói to',
-  physical_resistance: 'Chống đối thể chất',
-  sleep_disturbance: 'Rối loạn giấc ngủ',
-  appetite_change: 'Thay đổi ăn uống',
-  social_withdrawal: 'Tránh giao tiếp',
-  repetitive_behavior: 'Lặp lại hành vi',
-  other: 'Khác',
-};
-
-export const SEVERITY_LABELS = {
-  normal: 'Bình thường',
-  mild: 'Nhẹ',
-  moderate: 'Trung bình',
-  urgent: 'Cần xử lý gấp',
-};
-
-export function observationCategoryLabel(cat) {
-  return OBSERVATION_CATEGORY_LABELS[cat] || cat || '—';
+function resolveT(t) {
+  return t || ((key, opts) => i18n.t(key, opts));
 }
 
-export function moodLevelLabel(level) {
-  return MOOD_LEVEL_LABELS[level] || level || '—';
+export function observationCategoryLabel(cat, t) {
+  const tt = resolveT(t);
+  if (!cat) return '—';
+  return tt(`${NS}.category.${cat}`, { defaultValue: cat });
 }
 
-export function behaviorTypeLabel(type) {
-  return BEHAVIOR_TYPE_LABELS[type] || type || '—';
+export function moodLevelLabel(level, t) {
+  const tt = resolveT(t);
+  if (!level) return '—';
+  return tt(`${NS}.mood.${level}`, { defaultValue: level });
 }
 
-export function severityLabel(severity) {
-  return SEVERITY_LABELS[severity] || severity || '—';
+export function behaviorTypeLabel(type, t) {
+  const tt = resolveT(t);
+  if (!type) return '—';
+  return tt(`${NS}.behaviorType.${type}`, { defaultValue: type });
 }
+
+export function severityLabel(severity, t) {
+  const tt = resolveT(t);
+  if (!severity) return '—';
+  return tt(`${NS}.severity.${severity}`, { defaultValue: severity });
+}
+
+/** @deprecated */
+export const OBSERVATION_CATEGORY_LABELS = {};
+export const MOOD_LEVEL_LABELS = {};
+export const BEHAVIOR_TYPE_LABELS = {};
+export const SEVERITY_LABELS = {};

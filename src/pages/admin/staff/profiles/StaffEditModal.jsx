@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ALL_STAFF_ROLE_OPTIONS } from '../../../../constants/rolePolicy';
 
 const PASSWORD_REGEX_LETTER = /[a-zA-Z]/;
@@ -13,6 +14,7 @@ export default function StaffEditModal({
   error,
   roleOptions = ALL_STAFF_ROLE_OPTIONS,
 }) {
+  const { t } = useTranslation();
   const [showPassword, setShowPassword] = useState(false);
   const [pwError, setPwError] = useState('');
   const fileRef = useRef();
@@ -22,9 +24,9 @@ export default function StaffEditModal({
   const handlePasswordChange = (val) => {
     set('password', val);
     if (!val) { setPwError(''); return; }
-    if (val.length < 8) { setPwError('Ít nhất 8 ký tự'); return; }
-    if (!PASSWORD_REGEX_LETTER.test(val)) { setPwError('Phải có ít nhất 1 chữ cái'); return; }
-    if (!PASSWORD_REGEX_DIGIT.test(val)) { setPwError('Phải có ít nhất 1 chữ số'); return; }
+    if (val.length < 8) { setPwError(t('admin.staff.profiles.validation.passwordMinEdit')); return; }
+    if (!PASSWORD_REGEX_LETTER.test(val)) { setPwError(t('admin.staff.profiles.validation.passwordLetterEdit')); return; }
+    if (!PASSWORD_REGEX_DIGIT.test(val)) { setPwError(t('admin.staff.profiles.validation.passwordDigitEdit')); return; }
     setPwError('');
   };
 
@@ -41,46 +43,46 @@ export default function StaffEditModal({
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal modal--scroll staff-profile-modal" onClick={(e) => e.stopPropagation()}>
-        <h2 className="modal__title">Cập nhật hồ sơ nhân viên</h2>
+        <h2 className="modal__title">{t('admin.staff.profiles.editTitle')}</h2>
 
         {error && <p className="form-error">{error}</p>}
         {loading && (
-          <p className="edit-modal__loading">Đang tải thông tin...</p>
+          <p className="edit-modal__loading">{t('admin.staff.profiles.loadingProfile')}</p>
         )}
 
         <fieldset className="edit-form-fields" disabled={loading}>
-          <div className="form-section-title">Thông tin cá nhân</div>
+          <div className="form-section-title">{t('admin.staff.profiles.sectionPersonalInfo')}</div>
           <div className="form-grid">
             <div className="form-group form-grid--full">
-              <label>Họ và tên *</label>
+              <label>{t('admin.staff.profiles.labelFullNameRequired')}</label>
               <input
                 value={form.fullName}
                 onChange={(e) => set('fullName', e.target.value)}
-                placeholder="Nguyễn Văn A"
+                placeholder={t('admin.staff.profiles.placeholderFullName')}
               />
             </div>
 
             <div className="form-group">
-              <label>Số điện thoại</label>
+              <label>{t('admin.staff.profiles.labelPhone')}</label>
               <input
                 value={form.phone}
                 onChange={(e) => set('phone', e.target.value)}
-                placeholder="0912345678"
+                placeholder={t('admin.staff.profiles.placeholderPhone')}
               />
             </div>
 
             <div className="form-group">
-              <label>Giới tính</label>
+              <label>{t('admin.staff.profiles.labelGender')}</label>
               <select value={form.gender} onChange={(e) => set('gender', e.target.value)}>
                 <option value="">—</option>
-                <option value="male">Nam</option>
-                <option value="female">Nữ</option>
-                <option value="other">Khác</option>
+                <option value="male">{t('common.gender.male')}</option>
+                <option value="female">{t('common.gender.female')}</option>
+                <option value="other">{t('common.gender.other')}</option>
               </select>
             </div>
 
             <div className="form-group">
-              <label>Ngày sinh</label>
+              <label>{t('admin.staff.profiles.labelDateOfBirth')}</label>
               <input
                 type="date"
                 value={form.dateOfBirth || ''}
@@ -89,16 +91,16 @@ export default function StaffEditModal({
             </div>
 
             <div className="form-group form-grid--full">
-              <label>Địa chỉ</label>
+              <label>{t('admin.staff.profiles.labelAddress')}</label>
               <input
                 value={form.address}
                 onChange={(e) => set('address', e.target.value)}
-                placeholder="Số nhà, đường, phường..."
+                placeholder={t('admin.staff.profiles.placeholderAddress')}
               />
             </div>
 
             <div className="form-group form-grid--full">
-              <label>Ảnh đại diện</label>
+              <label>{t('admin.staff.profiles.labelAvatar')}</label>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 {(form.avatarFile || form.avatarUrl) && (
                   <img
@@ -108,46 +110,46 @@ export default function StaffEditModal({
                   />
                 )}
                 <button type="button" className="btn-outline-sm" onClick={() => fileRef.current?.click()}>
-                  {form.avatarFile ? 'Đổi ảnh' : 'Chọn ảnh'}
+                  {form.avatarFile ? t('admin.staff.profiles.changeAvatar') : t('admin.staff.profiles.chooseAvatar')}
                 </button>
                 <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarChange} />
               </div>
             </div>
           </div>
 
-          <div className="form-section-title">Thông tin chuyên môn</div>
+          <div className="form-section-title">{t('admin.staff.profiles.sectionProfessionalInfo')}</div>
           <div className="form-grid">
             <div className="form-group">
               <label>
-                Vai trò hệ thống *
+                {t('admin.staff.profiles.labelSystemRoleRequired')}
                 <span style={{ fontWeight: 400, color: '#94a3b8', fontSize: '0.7rem', marginLeft: 4 }}>
-                  (ảnh hưởng quyền truy cập)
+                  {t('admin.staff.profiles.systemRoleHint')}
                 </span>
               </label>
               <select value={form.role} onChange={(e) => set('role', e.target.value)}>
                 {roleOptions.map((r) => (
-                  <option key={r.value} value={r.value}>{r.label}</option>
+                  <option key={r.value} value={r.value}>{t(`common.roles.${r.value}`, { defaultValue: r.value })}</option>
                 ))}
               </select>
             </div>
 
             <div className="form-group form-grid--full">
-              <label>Chuyên môn</label>
+              <label>{t('admin.staff.profiles.labelSpecialty')}</label>
               <input
                 value={form.specialty}
                 onChange={(e) => set('specialty', e.target.value)}
-                placeholder="Nội khoa, Hồi sức cấp cứu..."
+                placeholder={t('admin.staff.profiles.placeholderSpecialtyEdit')}
               />
             </div>
           </div>
 
-          <div className="form-section-title">Bảo mật</div>
+          <div className="form-section-title">{t('admin.staff.profiles.sectionSecurity')}</div>
           <div className="form-grid">
             <div className="form-group form-grid--full">
               <label>
-                Đặt lại mật khẩu
+                {t('admin.staff.profiles.labelResetPassword')}
                 <span style={{ fontWeight: 400, color: '#94a3b8', fontSize: '0.7rem', marginLeft: 4 }}>
-                  (để trống nếu không đổi)
+                  {t('admin.staff.profiles.resetPasswordHint')}
                 </span>
               </label>
               <div style={{ position: 'relative' }}>
@@ -155,7 +157,7 @@ export default function StaffEditModal({
                   type={showPassword ? 'text' : 'password'}
                   value={form.password || ''}
                   onChange={(e) => handlePasswordChange(e.target.value)}
-                  placeholder="Tối thiểu 8 ký tự, có chữ và số"
+                  placeholder={t('admin.staff.profiles.placeholderPassword')}
                   style={{ paddingRight: 64, width: '100%', boxSizing: 'border-box' }}
                 />
                 <button
@@ -166,7 +168,7 @@ export default function StaffEditModal({
                     background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.75rem', color: '#64748b',
                   }}
                 >
-                  {showPassword ? 'Ẩn' : 'Hiện'}
+                  {showPassword ? t('admin.staff.profiles.hidePassword') : t('admin.staff.profiles.showPassword')}
                 </button>
               </div>
               {pwError && <span className="field-error">{pwError}</span>}
@@ -175,14 +177,14 @@ export default function StaffEditModal({
         </fieldset>
 
         <div className="modal__actions">
-          <button type="button" className="btn-cancel" onClick={onClose}>Hủy</button>
+          <button type="button" className="btn-cancel" onClick={onClose}>{t('common.cancel')}</button>
           <button
             type="button"
             className="btn-save"
             onClick={handleSave}
             disabled={!!pwError || loading}
           >
-            Lưu thay đổi
+            {t('admin.staff.profiles.saveChanges')}
           </button>
         </div>
       </div>

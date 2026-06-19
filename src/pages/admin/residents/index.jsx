@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Search,
   Plus,
@@ -129,6 +130,7 @@ const emptyPersonalForm = {
 };
 
 function ResidentPage({ defaultMode }) {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const isManager = user?.role === 'manager';
   const canManageResidents = !isManager;
@@ -453,6 +455,11 @@ function ResidentPage({ defaultMode }) {
   };
 
   const removeContact = (index, setter, current) => {
+    const contact = current[index];
+    if (contact?.isPrimary && contact?._id) {
+      alert(t('admin.residents.family.cannotDeletePrimary'));
+      return;
+    }
     const next = [...current];
     next.splice(index, 1);
     setter(next);
@@ -1252,13 +1259,15 @@ function ResidentPage({ defaultMode }) {
                         />
                         Liên hệ chính
                       </label>
-                      <button
-                        type="button"
-                        className="resident-contact-row__remove"
-                        onClick={() => removeContact(index, setFamilyContacts, familyContacts)}
-                      >
-                        Xóa
-                      </button>
+                      {!(contact._id && contact.isPrimary) && (
+                        <button
+                          type="button"
+                          className="resident-contact-row__remove"
+                          onClick={() => removeContact(index, setFamilyContacts, familyContacts)}
+                        >
+                          Xóa
+                        </button>
+                      )}
                     </div>
                   ))}
 

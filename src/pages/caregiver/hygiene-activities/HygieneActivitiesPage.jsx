@@ -5,7 +5,7 @@ import ListPagination from '../../../components/ui/ListPagination';
 import useClientPagination from '../../../hooks/useClientPagination';
 import hygieneActivityService from '../../../services/hygieneActivity.service';
 import { getLocalDateString } from '../../../utils/dateUtils';
-import { formatVNDate } from '../../../utils/nutritionLabels';
+import { formatLocaleDate } from '../../../utils/nutritionLabels';
 import { hygieneActivityLabel } from '../../../utils/hygieneLabels';
 import '../../../styles/caregiver/HygieneActivitiesPage.css';
 import HygieneDeleteModal from './components/HygieneDeleteModal';
@@ -16,7 +16,7 @@ import HygieneRecordsTable from './components/HygieneRecordsTable';
 const today = () => getLocalDateString();
 
 function HygieneActivitiesPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [workDate, setWorkDate] = useState(today());
   const [activityCategory, setActivityCategory] = useState('');
   const [residentId, setResidentId] = useState('');
@@ -77,7 +77,7 @@ function HygieneActivitiesPage() {
   const handleOpenDelete = (row) => {
     const name = row.residentId?.fullName || row.residentId?.residentCode || '—';
     const wd = (row.workDate || '').slice(0, 10);
-    const summary = `${name} · ${hygieneActivityLabel(row.activityType)} · ${formatVNDate(wd)}`;
+    const summary = `${name} · ${hygieneActivityLabel(row.activityType, t)} · ${formatLocaleDate(wd, i18n.language)}`;
     setDeleteError('');
     setDeleteModal({ id: row._id, summary });
   };

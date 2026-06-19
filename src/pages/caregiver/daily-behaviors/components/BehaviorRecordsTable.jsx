@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { formatVNDateTime } from '../../../../utils/nutritionLabels';
+import { formatLocaleDateTime } from '../../../../utils/nutritionLabels';
 import {
   behaviorTypeLabel,
   moodLevelLabel,
@@ -7,12 +7,12 @@ import {
   severityLabel,
 } from '../../../../utils/behaviorLabels';
 
-function detailText(row) {
+function detailText(row, t) {
   if (row.observationCategory === 'mood' && row.moodLevel) {
-    return moodLevelLabel(row.moodLevel);
+    return moodLevelLabel(row.moodLevel, t);
   }
   if (row.behaviorType) {
-    return behaviorTypeLabel(row.behaviorType);
+    return behaviorTypeLabel(row.behaviorType, t);
   }
   if (row.notes) {
     const short = row.notes.length > 48 ? `${row.notes.slice(0, 48)}…` : row.notes;
@@ -22,7 +22,7 @@ function detailText(row) {
 }
 
 function BehaviorRecordsTable({ records, loading, onEdit, onDelete }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   return (
     <>
@@ -60,18 +60,18 @@ function BehaviorRecordsTable({ records, loading, onEdit, onDelete }) {
                   <td>{row.residentId?.fullName || row.residentId?.residentCode || '—'}</td>
                   <td>
                     <span className={`behavior-page__category behavior-page__category--${row.observationCategory}`}>
-                      {observationCategoryLabel(row.observationCategory)}
+                      {observationCategoryLabel(row.observationCategory, t)}
                     </span>
                   </td>
                   <td>
-                    <span className="behavior-page__detail">{detailText(row)}</span>
+                    <span className="behavior-page__detail">{detailText(row, t)}</span>
                   </td>
                   <td>
                     <span className={`behavior-page__severity behavior-page__severity--${row.severity || 'normal'}`}>
-                      {severityLabel(row.severity)}
+                      {severityLabel(row.severity, t)}
                     </span>
                   </td>
-                  <td>{formatVNDateTime(row.observedAt)}</td>
+                  <td>{formatLocaleDateTime(row.observedAt, i18n.language)}</td>
                   <td className="behavior-page__row-actions">
                     <button
                       type="button"

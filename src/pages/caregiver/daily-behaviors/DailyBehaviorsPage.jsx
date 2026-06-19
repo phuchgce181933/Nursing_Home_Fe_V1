@@ -5,7 +5,7 @@ import ListPagination from '../../../components/ui/ListPagination';
 import useClientPagination from '../../../hooks/useClientPagination';
 import dailyBehaviorService from '../../../services/dailyBehavior.service';
 import { getLocalDateString } from '../../../utils/dateUtils';
-import { formatVNDate } from '../../../utils/nutritionLabels';
+import { formatLocaleDate } from '../../../utils/nutritionLabels';
 import {
   behaviorTypeLabel,
   moodLevelLabel,
@@ -19,16 +19,16 @@ import BehaviorRecordsTable from './components/BehaviorRecordsTable';
 
 const today = () => getLocalDateString();
 
-function detailSummary(row) {
+function detailSummary(row, t) {
   if (row.observationCategory === 'mood' && row.moodLevel) {
-    return moodLevelLabel(row.moodLevel);
+    return moodLevelLabel(row.moodLevel, t);
   }
-  if (row.behaviorType) return behaviorTypeLabel(row.behaviorType);
+  if (row.behaviorType) return behaviorTypeLabel(row.behaviorType, t);
   return row.notes?.slice(0, 40) || '—';
 }
 
 function DailyBehaviorsPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [workDate, setWorkDate] = useState(today());
   const [observationCategory, setObservationCategory] = useState('');
   const [severity, setSeverity] = useState('');
@@ -91,7 +91,7 @@ function DailyBehaviorsPage() {
   const handleOpenDelete = (row) => {
     const name = row.residentId?.fullName || row.residentId?.residentCode || '—';
     const wd = (row.workDate || '').slice(0, 10);
-    const summary = `${name} · ${observationCategoryLabel(row.observationCategory)} · ${detailSummary(row)} · ${formatVNDate(wd)}`;
+    const summary = `${name} · ${observationCategoryLabel(row.observationCategory, t)} · ${detailSummary(row, t)} · ${formatLocaleDate(wd, i18n.language)}`;
     setDeleteError('');
     setDeleteModal({ id: row._id, summary });
   };

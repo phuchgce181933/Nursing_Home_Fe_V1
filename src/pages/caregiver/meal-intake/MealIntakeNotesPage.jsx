@@ -5,7 +5,7 @@ import ListPagination from '../../../components/ui/ListPagination';
 import useClientPagination from '../../../hooks/useClientPagination';
 import mealIntakeNoteService from '../../../services/mealIntakeNote.service';
 import { getLocalDateString } from '../../../utils/dateUtils';
-import { formatVNDate, mealTypeLabel } from '../../../utils/nutritionLabels';
+import { formatLocaleDate, mealTypeLabel } from '../../../utils/nutritionLabels';
 import '../../../styles/caregiver/MealIntakeNotesPage.css';
 import MealIntakeDeleteModal from './components/MealIntakeDeleteModal';
 import MealIntakeFormModal from './components/MealIntakeFormModal';
@@ -15,7 +15,7 @@ import MealIntakeRecordsTable from './components/MealIntakeRecordsTable';
 const today = () => getLocalDateString();
 
 function MealIntakeNotesPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [workDate, setWorkDate] = useState(today());
   const [residentId, setResidentId] = useState('');
   const [residents, setResidents] = useState([]);
@@ -82,7 +82,7 @@ function MealIntakeNotesPage() {
   const handleOpenDelete = (row) => {
     const name = row.residentId?.fullName || row.residentId?.residentCode || '—';
     const wd = (row.workDate || '').slice(0, 10);
-    const summary = `${name} · ${mealTypeLabel(row.mealType)} · ${formatVNDate(wd)}`;
+    const summary = `${name} · ${mealTypeLabel(row.mealType, t)} · ${formatLocaleDate(wd, i18n.language)}`;
     setDeleteError('');
     setDeleteModal({ id: row._id, summary });
   };

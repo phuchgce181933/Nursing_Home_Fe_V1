@@ -88,11 +88,11 @@ export default function StaffManagementPage() {
         setTotalPages(res.totalPages ?? Math.max(1, Math.ceil((res.total ?? data.length) / ADMIN_LIST_PAGE_SIZE)));
       }
     } catch (e) {
-      setPageError(e.response?.data?.message || 'Không thể tải danh sách nhân viên');
+      setPageError(e.response?.data?.message || t('admin.staff.common.loadFailed'));
     } finally {
       setLoading(false);
     }
-  }, [page, debouncedSearch, filterRole, filterBanned]);
+  }, [page, debouncedSearch, filterRole, filterBanned, t]);
 
   const {
     paginatedItems: clientPaginatedStaff,
@@ -144,14 +144,14 @@ export default function StaffManagementPage() {
       setEditStaff(fresh);
       setEditForm(staffToEditForm(fresh));
     } catch (e) {
-      setEditError(e.response?.data?.message || 'Không tải đủ hồ sơ — đang dùng dữ liệu từ danh sách');
+      setEditError(e.response?.data?.message || t('admin.staff.profiles.loadProfilePartial'));
     } finally {
       setEditLoading(false);
     }
   };
 
   const handleSaveEdit = async () => {
-    if (!editForm.fullName.trim()) { setEditError('Họ tên không được để trống'); return; }
+    if (!editForm.fullName.trim()) { setEditError(t('admin.staff.profiles.fullNameRequired')); return; }
     try {
       const profileBody = {
         fullName: editForm.fullName,
@@ -174,7 +174,7 @@ export default function StaffManagementPage() {
       closeEditModal();
       loadStaff();
     } catch (e) {
-      setEditError(e.response?.data?.message || 'Lưu thất bại');
+      setEditError(e.response?.data?.message || t('common.saveFailed'));
     }
   };
 
@@ -193,7 +193,7 @@ export default function StaffManagementPage() {
       );
       setBanStaff(null);
     } catch (e) {
-      alert(e.response?.data?.message || 'Ban thất bại');
+      alert(e.response?.data?.message || t('admin.staff.profiles.banFailed'));
     } finally {
       setBanLoading(false);
     }
@@ -208,7 +208,7 @@ export default function StaffManagementPage() {
       );
       setBanStaff(null);
     } catch (e) {
-      alert(e.response?.data?.message || 'Gỡ ban thất bại');
+      alert(e.response?.data?.message || t('admin.staff.profiles.unbanFailed'));
     } finally {
       setBanLoading(false);
     }
@@ -222,7 +222,7 @@ export default function StaffManagementPage() {
       setShowCreate(false);
       loadStaff();
     } catch (e) {
-      setCreateError(e.response?.data?.message || 'Tạo tài khoản thất bại');
+      setCreateError(e.response?.data?.message || t('admin.staff.profiles.createFailed'));
     }
   };
 
@@ -296,7 +296,7 @@ export default function StaffManagementPage() {
             <select value={filterRole} onChange={(e) => setFilterRole(e.target.value)}>
               <option value="">{t('admin.staff.common.allRoles')}</option>
               {filterRoleOptions.map((r) => (
-                <option key={r.value} value={r.value}>{r.label}</option>
+                <option key={r.value} value={r.value}>{t(`common.roles.${r.value}`, { defaultValue: r.value })}</option>
               ))}
             </select>
           </label>

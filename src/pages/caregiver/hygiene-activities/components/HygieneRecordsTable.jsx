@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { formatVNDateTime } from '../../../../utils/nutritionLabels';
+import { formatLocaleDateTime } from '../../../../utils/nutritionLabels';
 import {
   completionStatusLabel,
   hygieneActivityLabel,
@@ -7,7 +7,7 @@ import {
 } from '../../../../utils/hygieneLabels';
 
 function HygieneRecordsTable({ records, loading, onEdit, onDelete }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   return (
     <>
@@ -43,14 +43,14 @@ function HygieneRecordsTable({ records, loading, onEdit, onDelete }) {
               records.map((row) => (
                 <tr key={row._id}>
                   <td>{row.residentId?.fullName || row.residentId?.residentCode || '—'}</td>
-                  <td>{hygieneCategoryLabel(row.activityCategory)}</td>
-                  <td>{hygieneActivityLabel(row.activityType)}</td>
+                  <td>{hygieneCategoryLabel(row.activityCategory, t)}</td>
+                  <td>{hygieneActivityLabel(row.activityType, t)}</td>
                   <td>
                     <span className={`hygiene-page__status hygiene-page__status--${row.completionStatus}`}>
-                      {completionStatusLabel(row.completionStatus)}
+                      {completionStatusLabel(row.completionStatus, t)}
                     </span>
                   </td>
-                  <td>{formatVNDateTime(row.recordedAt)}</td>
+                  <td>{formatLocaleDateTime(row.recordedAt, i18n.language)}</td>
                   <td className="hygiene-page__row-actions">
                     <button
                       type="button"
