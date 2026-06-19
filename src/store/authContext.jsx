@@ -1,6 +1,7 @@
 import { createContext, useEffect, useMemo, useState } from 'react';
 import authService from '../services/auth.service';
 import { getAuthToken, removeAuthToken } from '../utils/auth';
+import socketService from '../services/socket.service';
 
 export const AuthContext = createContext(null);
 
@@ -35,6 +36,28 @@ export function AuthProvider({ children }) {
       setLoading(false);
     }
   }, [token, user]);
+
+  // connect socket and join role room for admin users
+  useEffect(() => {
+    if (!user) return;
+    try {
+      socketService.connect();
+      if (user.role === 'admin') {
+        socketService.joinRoom('role:admin');
+      }
+    } catch (e) {
+      console.warn('Socket connect/join failed', e.message || e);
+    }
+
+    return () => {
+      try {
+        if (user && user.role === 'admin') {
+          socketService.leaveRoom('role:admin');
+        }
+        socketService.disconnect();
+      } catch (e) {}
+    };
+  }, [user]);
 
   const login = async (credentials) => {
     const data = await authService.login(credentials);

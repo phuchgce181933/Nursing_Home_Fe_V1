@@ -21,6 +21,7 @@ import {
   Wallet,
 } from 'lucide-react';
 import medicalRecordService from '../../services/medicalRecord.service';
+import clinicalServiceService from '../../services/clinicalService.service';
 import residentService from '../../services/resident.service';
 import { useAuth } from '../../hooks/useAuth';
 import '../../styles/shared/HealthMonitoringPage.css';
@@ -65,6 +66,76 @@ const formatAge = (dob) => {
   if (!dob) return null;
   const age = Math.floor((Date.now() - new Date(dob)) / (1000 * 60 * 60 * 24 * 365.25));
   return `${age} tuổi`;
+};
+
+// ─── Chuyển field name sang label tiếng Việt ───
+const getFieldLabel = (field) => {
+  const labels = {
+    // Physical Examination
+    general: 'Tổng quát',
+    cardiovascular: 'Tim mạch',
+    respiratory: 'Hô hấp',
+    abdominal: 'Bụng',
+    neurological: 'Thần kinh',
+    musculoskeletal: 'Cơ xương',
+    skin: 'Da',
+    other: 'Khác',
+    summary: 'Tóm tắt',
+    // Urinalysis Results
+    appearance: 'Hình thái',
+    color: 'Màu sắc',
+    pH: 'pH',
+    specificGravity: 'Trọng lượng riêng',
+    protein: 'Protein',
+    glucose: 'Glucose',
+    ketones: 'Ketone',
+    blood: 'Máu',
+    leukocyteEsterase: 'Bạch cầu esterase',
+    nitrites: 'Nitrit',
+    urobilinogen: 'Urobilinogen',
+    bilirubin: 'Bilirubin',
+    microscopy: 'Kính hiển vi',
+    notes: 'Ghi chú',
+    // ECG Results
+    heartRate: 'Nhịp tim',
+    rhythm: 'Nhịp điệu',
+    prInterval: 'Khoảng PR',
+    qrsDuration: 'Thời gian QRS',
+    qtInterval: 'Khoảng QT',
+    axis: 'Trục',
+    interpretation: 'Giải thích',
+    // Cognitive Function
+    assessmentTool: 'Công cụ đánh giá',
+    score: 'Điểm số',
+    orientation: 'Định hướng',
+    memory: 'Trí nhớ',
+    attention: 'Chú ý',
+    language: 'Ngôn ngữ',
+    executiveFunction: 'Chức năng thực hành',
+    // Functional Status
+    mobility: 'Độ linh hoạt',
+    transfers: 'Chuyển vị',
+    adls: 'Hoạt động hàng ngày',
+    iadls: 'Hoạt động có công cụ',
+    assistanceRequired: 'Sự hỗ trợ cần thiết',
+    // Fall Risk
+    level: 'Mức độ',
+    historyOfFalls: 'Lịch sử té ngã',
+    gait: 'Dáng đi',
+    balance: 'Cân bằng',
+    medications: 'Thuốc',
+    vision: 'Thị lực',
+    cognition: 'Nhận thức',
+    // Nutritional Status
+    bmi: 'BMI',
+    weightChange: 'Thay đổi cân nặng',
+    appetite: 'Cảm giác thèm ăn',
+    dietType: 'Loại chế độ ăn',
+    swallowing: 'Khả năng nuốt',
+    proteinIntake: 'Lượng protein',
+    hydration: 'Tình trạng nước',
+  };
+  return labels[field] || (field.charAt(0).toUpperCase() + field.slice(1));
 };
 
 // ─── Xuất CSV (client-side) ───
@@ -592,26 +663,104 @@ export default function HealthMonitoringPage() {
     heightCm: '',
     bloodType: '',
     summary: '',
-    physicalExamination: '',
-    laboratoryTestResults: '',
-    urinalysisResults: '',
-    ecgResults: '',
-    imagingResults: '',
-    cognitiveFunction: '',
-    functionalStatus: '',
-    fallRisk: '',
-    nutritionalStatus: '',
-    roomCost: '',
-    medicationCost: '',
-    careServiceCost: '',
-    otherCost: '',
-    paymentMethod: 'card',
+    // Physical Examination
+    physicalExamination: {
+      general: '',
+      cardiovascular: '',
+      respiratory: '',
+      abdominal: '',
+      neurological: '',
+      musculoskeletal: '',
+      skin: '',
+      other: '',
+      summary: '',
+    },
+    // Laboratory Test Results (array)
+    laboratoryTestResults: [],
+    // Urinalysis Results
+    urinalysisResults: {
+      appearance: '',
+      color: '',
+      pH: '',
+      specificGravity: '',
+      protein: '',
+      glucose: '',
+      ketones: '',
+      blood: '',
+      leukocyteEsterase: '',
+      nitrites: '',
+      urobilinogen: '',
+      bilirubin: '',
+      microscopy: '',
+      notes: '',
+    },
+    // ECG Results
+    ecgResults: {
+      heartRate: '',
+      rhythm: '',
+      prInterval: '',
+      qrsDuration: '',
+      qtInterval: '',
+      axis: '',
+      interpretation: '',
+      notes: '',
+    },
+    // Imaging Results (array)
+    imagingResults: [],
+    // Cognitive Function
+    cognitiveFunction: {
+      assessmentTool: '',
+      score: '',
+      orientation: '',
+      memory: '',
+      attention: '',
+      language: '',
+      executiveFunction: '',
+      notes: '',
+    },
+    // Functional Status
+    functionalStatus: {
+      mobility: '',
+      transfers: '',
+      adls: '',
+      iadls: '',
+      assistanceRequired: '',
+      notes: '',
+    },
+    // Fall Risk
+    fallRisk: {
+      level: 'low',
+      historyOfFalls: false,
+      gait: '',
+      balance: '',
+      medications: '',
+      vision: '',
+      cognition: '',
+      notes: '',
+    },
+    // Nutritional Status
+    nutritionalStatus: {
+      bmi: '',
+      weightChange: '',
+      appetite: '',
+      dietType: '',
+      swallowing: '',
+      proteinIntake: '',
+      hydration: '',
+      notes: '',
+    },
+    // Billing now handled via selected services only
     consentToPayment: false,
   };
   const [form, setForm] = useState(emptyForm);
   const [formSaving, setFormSaving] = useState(false);
   const [formError, setFormError] = useState(null);
   const [formSuccess, setFormSuccess] = useState(false);
+  const [expandedSections, setExpandedSections] = useState({});
+
+  // clinical services + selected services for billing
+  const [clinicalServices, setClinicalServices] = useState([]);
+  const [selectedServices, setSelectedServices] = useState({});
 
   // ── Biểu đồ ──
   const [chartMetric, setChartMetric] = useState('bloodPressureSystolic');
@@ -688,6 +837,23 @@ export default function HealthMonitoringPage() {
     }
   }, [recPage]); // eslint-disable-line
 
+  useEffect(() => {
+    // load available clinical services when a resident is selected
+    const loadServices = async () => {
+      try {
+        const svcRes = await clinicalServiceService.listServices({ active: true });
+        const services = Array.isArray(svcRes) ? svcRes : (svcRes?.data || []);
+        setClinicalServices(services);
+      } catch (err) {
+        console.error('Failed to load clinical services:', err.message || err);
+        setClinicalServices([]);
+      }
+    };
+    if (selectedResident) loadServices();
+  }, [selectedResident]);
+
+  const formatMoney = (v) => new Intl.NumberFormat('vi-VN').format(Number(v || 0)) + '₫';
+
   // ─── Chọn cư dân ───
   const handleSelectResident = (r) => {
     setSelectedResident(r);
@@ -734,22 +900,59 @@ export default function HealthMonitoringPage() {
       if (form.heightCm !== '')             body.heightCm              = parseFloat(form.heightCm);
       if (form.bloodType && form.bloodType !== 'unknown') body.bloodType = form.bloodType;
       if (form.summary.trim())               body.summary               = form.summary.trim();
-      if (form.physicalExamination.trim())   body.physicalExamination    = form.physicalExamination.trim();
-      if (form.laboratoryTestResults.trim()) body.laboratoryTestResults  = form.laboratoryTestResults.trim();
-      if (form.urinalysisResults.trim())     body.urinalysisResults      = form.urinalysisResults.trim();
-      if (form.ecgResults.trim())            body.ecgResults             = form.ecgResults.trim();
-      if (form.imagingResults.trim())        body.imagingResults         = form.imagingResults.trim();
-      if (form.cognitiveFunction.trim())     body.cognitiveFunction      = form.cognitiveFunction.trim();
-      if (form.functionalStatus.trim())      body.functionalStatus       = form.functionalStatus.trim();
-      if (form.fallRisk.trim())              body.fallRisk               = form.fallRisk.trim();
-      if (form.nutritionalStatus.trim())     body.nutritionalStatus      = form.nutritionalStatus.trim();
-      if (form.roomCost !== '')              body.roomCost               = parseFloat(form.roomCost);
-      if (form.medicationCost !== '')        body.medicationCost         = parseFloat(form.medicationCost);
-      if (form.careServiceCost !== '')       body.careServiceCost        = parseFloat(form.careServiceCost);
-      if (form.otherCost !== '')             body.otherCost              = parseFloat(form.otherCost);
-      if (form.paymentMethod)                body.paymentMethod          = form.paymentMethod;
-      if (form.consentToPayment)             body.consentToPayment       = true;
+      
+      // Physical Examination - object
+      const peHasData = Object.values(form.physicalExamination || {}).some(v => v && String(v).trim());
+      if (peHasData) body.physicalExamination = form.physicalExamination;
+      
+      // Laboratory Test Results - array
+      const labHasData = Array.isArray(form.laboratoryTestResults) && form.laboratoryTestResults.length > 0;
+      if (labHasData) body.laboratoryTestResults = form.laboratoryTestResults;
+      
+      // Urinalysis Results - object
+      const urHasData = Object.values(form.urinalysisResults || {}).some(v => v && String(v).trim());
+      if (urHasData) body.urinalysisResults = form.urinalysisResults;
+      
+      // ECG Results - object
+      const ecgHasData = Object.values(form.ecgResults || {}).some(v => v && String(v).trim());
+      if (ecgHasData) body.ecgResults = form.ecgResults;
+      
+      // Imaging Results - array
+      const imgHasData = Array.isArray(form.imagingResults) && form.imagingResults.length > 0;
+      if (imgHasData) body.imagingResults = form.imagingResults;
+      
+      // Cognitive Function - object
+      const cogHasData = Object.values(form.cognitiveFunction || {}).some(v => v && String(v).trim());
+      if (cogHasData) body.cognitiveFunction = form.cognitiveFunction;
+      
+      // Functional Status - object
+      const funcHasData = Object.values(form.functionalStatus || {}).some(v => v && String(v).trim());
+      if (funcHasData) body.functionalStatus = form.functionalStatus;
+      
+      // Fall Risk - object (always send if level is set)
+      if (form.fallRisk?.level) body.fallRisk = form.fallRisk;
+      
+      // Nutritional Status - object
+      const nutHasData = Object.values(form.nutritionalStatus || {}).some(v => v && String(v).trim());
+      if (nutHasData) body.nutritionalStatus = form.nutritionalStatus;
+      
+      // Billing: include only selected clinical services (doctor flow)
+      const services = Object.values(selectedServices || {}).map(s => ({
+        serviceId: s._id,
+        serviceCode: s.serviceCode,
+        serviceName: s.serviceName,
+        quantity: Number(s.quantity) || 1,
+        unitPrice: Number(s.unitPrice) || 0,
+      }));
+      if (services.length) {
+        console.log('[HealthMonitoring] Selected services to save:', services);
+        body.selectedServices = services;
+        body.consentToPayment = true;
+      } else {
+        console.log('[HealthMonitoring] No services selected');
+      }
 
+      console.log('[HealthMonitoring] Saving vital signs with body:', body);
       await medicalRecordService.recordVitals(selectedResident._id, body);
       setFormSuccess(true);
       setForm(emptyForm);
@@ -1161,72 +1364,268 @@ export default function HealthMonitoringPage() {
 
                     <div className="hm-form-section" style={{ marginTop: '18px' }}>
                       <div className="hm-form-section-title">
-                        <ClipboardList size={15} /> Khám lâm sàng & cận lâm sàng
+                        <ClipboardList size={15} /> Khám lâm sàng & cận lâm sàng chi tiết
                       </div>
-                      <div className="hm-form-grid">
-                        {[
-                          { key: 'physicalExamination', label: 'Khám thực thể' },
-                          { key: 'laboratoryTestResults', label: 'Kết quả xét nghiệm' },
-                          { key: 'urinalysisResults', label: 'Kết quả nước tiểu' },
-                          { key: 'ecgResults', label: 'Kết quả ECG' },
-                          { key: 'imagingResults', label: 'Kết quả hình ảnh' },
-                          { key: 'cognitiveFunction', label: 'Tình trạng nhận thức' },
-                          { key: 'functionalStatus', label: 'Tình trạng chức năng' },
-                          { key: 'fallRisk', label: 'Nguy cơ té ngã' },
-                          { key: 'nutritionalStatus', label: 'Tình trạng dinh dưỡng' },
-                        ].map(({ key, label }) => (
-                          <div key={key} className="hm-form-group full">
-                            <label className="hm-form-label" htmlFor={`hm-input-${key}`}>{label}</label>
-                            <textarea
-                              id={`hm-input-${key}`}
-                              className="hm-form-textarea"
-                              placeholder={`Nhập ${label.toLowerCase()}...`}
-                              value={form[key]}
-                              onChange={(e) => setForm(prev => ({ ...prev, [key]: e.target.value }))}
-                            />
+
+                      {/* Physical Examination */}
+                      <div style={{ marginTop: 12, padding: 10, border: '1px solid #e6eef6', borderRadius: 6 }}>
+                        <div style={{ fontWeight: 700, marginBottom: 10, cursor: 'pointer' }} onClick={() => setExpandedSections(prev => ({ ...prev, physicalExamination: !prev.physicalExamination }))}>
+                          ▼ Khám thực thể
+                        </div>
+                        {expandedSections.physicalExamination && (
+                          <div className="hm-form-grid">
+                            {['general', 'cardiovascular', 'respiratory', 'abdominal', 'neurological', 'musculoskeletal', 'skin', 'other', 'summary'].map(field => (
+                              <div key={field} className="hm-form-group">
+                                <label className="hm-form-label">{getFieldLabel(field)}</label>
+                                <input type="text" className="hm-form-input" placeholder={`Nhập ${field}...`} value={form.physicalExamination[field] || ''} onChange={(e) => setForm(prev => ({ ...prev, physicalExamination: { ...prev.physicalExamination, [field]: e.target.value } }))} />
+                              </div>
+                            ))}
                           </div>
-                        ))}
+                        )}
+                      </div>
+
+                      {/* Laboratory Test Results */}
+                      <div style={{ marginTop: 12, padding: 10, border: '1px solid #e6eef6', borderRadius: 6 }}>
+                        <div style={{ fontWeight: 700, marginBottom: 10, cursor: 'pointer' }} onClick={() => setExpandedSections(prev => ({ ...prev, laboratoryTestResults: !prev.laboratoryTestResults }))}>
+                          ▼ Kết quả xét nghiệm
+                        </div>
+                        {expandedSections.laboratoryTestResults && (
+                          <div>
+                            {(form.laboratoryTestResults || []).map((item, idx) => (
+                              <div key={idx} style={{ marginBottom: 10, padding: 8, background: '#f8fafc', borderRadius: 4 }}>
+                                <input type="text" placeholder="Tên xét nghiệm" className="hm-form-input" value={item.testName || ''} onChange={(e) => {
+                                  const updated = [...(form.laboratoryTestResults || [])];
+                                  updated[idx].testName = e.target.value;
+                                  setForm(prev => ({ ...prev, laboratoryTestResults: updated }));
+                                }} />
+                                <input type="text" placeholder="Kết quả" className="hm-form-input" value={item.result || ''} onChange={(e) => {
+                                  const updated = [...(form.laboratoryTestResults || [])];
+                                  updated[idx].result = e.target.value;
+                                  setForm(prev => ({ ...prev, laboratoryTestResults: updated }));
+                                }} />
+                                <button type="button" onClick={() => {
+                                  const updated = form.laboratoryTestResults.filter((_, i) => i !== idx);
+                                  setForm(prev => ({ ...prev, laboratoryTestResults: updated }));
+                                }} style={{ background: '#ef4444', color: '#fff', padding: '4px 8px', borderRadius: 4 }}>Xóa</button>
+                              </div>
+                            ))}
+                            <button type="button" onClick={() => setForm(prev => ({ ...prev, laboratoryTestResults: [...(prev.laboratoryTestResults || []), { testName: '', result: '', unit: '', referenceRange: '', notes: '' }] }))} style={{ background: '#3b82f6', color: '#fff', padding: '6px 12px', borderRadius: 4 }}>+ Thêm xét nghiệm</button>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Urinalysis Results */}
+                      <div style={{ marginTop: 12, padding: 10, border: '1px solid #e6eef6', borderRadius: 6 }}>
+                        <div style={{ fontWeight: 700, marginBottom: 10, cursor: 'pointer' }} onClick={() => setExpandedSections(prev => ({ ...prev, urinalysisResults: !prev.urinalysisResults }))}>
+                          ▼ Kết quả nước tiểu
+                        </div>
+                        {expandedSections.urinalysisResults && (
+                          <div className="hm-form-grid">
+                            {['appearance', 'color', 'pH', 'specificGravity', 'protein', 'glucose', 'ketones', 'blood', 'leukocyteEsterase', 'nitrites', 'urobilinogen', 'bilirubin', 'microscopy', 'notes'].map(field => (
+                              <div key={field} className="hm-form-group">
+                                <label className="hm-form-label">{getFieldLabel(field)}</label>
+                                <input type={field === 'pH' || field === 'specificGravity' ? 'number' : 'text'} className="hm-form-input" step="0.01" placeholder={`Nhập ${field}...`} value={form.urinalysisResults[field] || ''} onChange={(e) => setForm(prev => ({ ...prev, urinalysisResults: { ...prev.urinalysisResults, [field]: e.target.value } }))} />
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* ECG Results */}
+                      <div style={{ marginTop: 12, padding: 10, border: '1px solid #e6eef6', borderRadius: 6 }}>
+                        <div style={{ fontWeight: 700, marginBottom: 10, cursor: 'pointer' }} onClick={() => setExpandedSections(prev => ({ ...prev, ecgResults: !prev.ecgResults }))}>
+                          ▼ Kết quả ECG
+                        </div>
+                        {expandedSections.ecgResults && (
+                          <div className="hm-form-grid">
+                            {['heartRate', 'rhythm', 'prInterval', 'qrsDuration', 'qtInterval', 'axis', 'interpretation', 'notes'].map(field => (
+                              <div key={field} className="hm-form-group">
+                                <label className="hm-form-label">{getFieldLabel(field)}</label>
+                                <input type={field === 'heartRate' ? 'number' : 'text'} className="hm-form-input" placeholder={`Nhập ${field}...`} value={form.ecgResults[field] || ''} onChange={(e) => setForm(prev => ({ ...prev, ecgResults: { ...prev.ecgResults, [field]: e.target.value } }))} />
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Imaging Results */}
+                      <div style={{ marginTop: 12, padding: 10, border: '1px solid #e6eef6', borderRadius: 6 }}>
+                        <div style={{ fontWeight: 700, marginBottom: 10, cursor: 'pointer' }} onClick={() => setExpandedSections(prev => ({ ...prev, imagingResults: !prev.imagingResults }))}>
+                          ▼ Kết quả hình ảnh
+                        </div>
+                        {expandedSections.imagingResults && (
+                          <div>
+                            {(form.imagingResults || []).map((item, idx) => (
+                              <div key={idx} style={{ marginBottom: 10, padding: 8, background: '#f8fafc', borderRadius: 4 }}>
+                                <input type="text" placeholder="Phương thức" className="hm-form-input" value={item.modality || ''} onChange={(e) => {
+                                  const updated = [...(form.imagingResults || [])];
+                                  updated[idx].modality = e.target.value;
+                                  setForm(prev => ({ ...prev, imagingResults: updated }));
+                                }} />
+                                <input type="text" placeholder="Vị trí" className="hm-form-input" value={item.bodyPart || ''} onChange={(e) => {
+                                  const updated = [...(form.imagingResults || [])];
+                                  updated[idx].bodyPart = e.target.value;
+                                  setForm(prev => ({ ...prev, imagingResults: updated }));
+                                }} />
+                                <input type="text" placeholder="Tìm thấy" className="hm-form-input" value={item.finding || ''} onChange={(e) => {
+                                  const updated = [...(form.imagingResults || [])];
+                                  updated[idx].finding = e.target.value;
+                                  setForm(prev => ({ ...prev, imagingResults: updated }));
+                                }} />
+                                <textarea placeholder="Kết luận" className="hm-form-textarea" value={item.impression || ''} onChange={(e) => {
+                                  const updated = [...(form.imagingResults || [])];
+                                  updated[idx].impression = e.target.value;
+                                  setForm(prev => ({ ...prev, imagingResults: updated }));
+                                }} />
+                                <button type="button" onClick={() => {
+                                  const updated = form.imagingResults.filter((_, i) => i !== idx);
+                                  setForm(prev => ({ ...prev, imagingResults: updated }));
+                                }} style={{ background: '#ef4444', color: '#fff', padding: '4px 8px', borderRadius: 4 }}>Xóa</button>
+                              </div>
+                            ))}
+                            <button type="button" onClick={() => setForm(prev => ({ ...prev, imagingResults: [...(prev.imagingResults || []), { modality: '', bodyPart: '', finding: '', impression: '', imageUrls: [], cloudinaryPublicIds: [], notes: '' }] }))} style={{ background: '#3b82f6', color: '#fff', padding: '6px 12px', borderRadius: 4 }}>+ Thêm hình ảnh</button>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Cognitive Function */}
+                      <div style={{ marginTop: 12, padding: 10, border: '1px solid #e6eef6', borderRadius: 6 }}>
+                        <div style={{ fontWeight: 700, marginBottom: 10, cursor: 'pointer' }} onClick={() => setExpandedSections(prev => ({ ...prev, cognitiveFunction: !prev.cognitiveFunction }))}>
+                          ▼ Tình trạng nhận thức
+                        </div>
+                        {expandedSections.cognitiveFunction && (
+                          <div className="hm-form-grid">
+                            {['assessmentTool', 'score', 'orientation', 'memory', 'attention', 'language', 'executiveFunction', 'notes'].map(field => (
+                              <div key={field} className="hm-form-group">
+                                <label className="hm-form-label">{getFieldLabel(field)}</label>
+                                <input type="text" className="hm-form-input" placeholder={`Nhập ${field}...`} value={form.cognitiveFunction[field] || ''} onChange={(e) => setForm(prev => ({ ...prev, cognitiveFunction: { ...prev.cognitiveFunction, [field]: e.target.value } }))} />
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Functional Status */}
+                      <div style={{ marginTop: 12, padding: 10, border: '1px solid #e6eef6', borderRadius: 6 }}>
+                        <div style={{ fontWeight: 700, marginBottom: 10, cursor: 'pointer' }} onClick={() => setExpandedSections(prev => ({ ...prev, functionalStatus: !prev.functionalStatus }))}>
+                          ▼ Tình trạng chức năng
+                        </div>
+                        {expandedSections.functionalStatus && (
+                          <div className="hm-form-grid">
+                            {['mobility', 'transfers', 'adls', 'iadls', 'assistanceRequired', 'notes'].map(field => (
+                              <div key={field} className="hm-form-group">
+                                <label className="hm-form-label">{getFieldLabel(field)}</label>
+                                <input type="text" className="hm-form-input" placeholder={`Nhập ${field}...`} value={form.functionalStatus[field] || ''} onChange={(e) => setForm(prev => ({ ...prev, functionalStatus: { ...prev.functionalStatus, [field]: e.target.value } }))} />
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Fall Risk */}
+                      <div style={{ marginTop: 12, padding: 10, border: '1px solid #e6eef6', borderRadius: 6 }}>
+                        <div style={{ fontWeight: 700, marginBottom: 10, cursor: 'pointer' }} onClick={() => setExpandedSections(prev => ({ ...prev, fallRisk: !prev.fallRisk }))}>
+                          ▼ Nguy cơ té ngã
+                        </div>
+                        {expandedSections.fallRisk && (
+                          <div className="hm-form-grid">
+                            <div className="hm-form-group">
+                              <label className="hm-form-label">Mức độ nguy cơ</label>
+                              <select className="hm-form-select" value={form.fallRisk?.level || 'low'} onChange={(e) => setForm(prev => ({ ...prev, fallRisk: { ...prev.fallRisk, level: e.target.value } }))}>
+                                <option value="low">Thấp</option>
+                                <option value="medium">Vừa</option>
+                                <option value="high">Cao</option>
+                              </select>
+                            </div>
+                            <div className="hm-form-group">
+                              <label className="hm-form-label">
+                                <input type="checkbox" checked={form.fallRisk?.historyOfFalls || false} onChange={(e) => setForm(prev => ({ ...prev, fallRisk: { ...prev.fallRisk, historyOfFalls: e.target.checked } }))} />
+                                Tiền sử té ngã
+                              </label>
+                            </div>
+                            {['gait', 'balance', 'medications', 'vision', 'cognition', 'notes'].map(field => (
+                              <div key={field} className="hm-form-group">
+                                <label className="hm-form-label">{getFieldLabel(field)}</label>
+                                <input type="text" className="hm-form-input" placeholder={`Nhập ${field}...`} value={form.fallRisk[field] || ''} onChange={(e) => setForm(prev => ({ ...prev, fallRisk: { ...prev.fallRisk, [field]: e.target.value } }))} />
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Nutritional Status */}
+                      <div style={{ marginTop: 12, padding: 10, border: '1px solid #e6eef6', borderRadius: 6 }}>
+                        <div style={{ fontWeight: 700, marginBottom: 10, cursor: 'pointer' }} onClick={() => setExpandedSections(prev => ({ ...prev, nutritionalStatus: !prev.nutritionalStatus }))}>
+                          ▼ Tình trạng dinh dưỡng
+                        </div>
+                        {expandedSections.nutritionalStatus && (
+                          <div className="hm-form-grid">
+                            {['bmi', 'weightChange', 'appetite', 'dietType', 'swallowing', 'proteinIntake', 'hydration', 'notes'].map(field => (
+                              <div key={field} className="hm-form-group">
+                                <label className="hm-form-label">{getFieldLabel(field)}</label>
+                                <input type={field === 'bmi' ? 'number' : 'text'} className="hm-form-input" step="0.1" placeholder={`Nhập ${field}...`} value={form.nutritionalStatus[field] || ''} onChange={(e) => setForm(prev => ({ ...prev, nutritionalStatus: { ...prev.nutritionalStatus, [field]: e.target.value } }))} />
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
 
                     <div className="hm-form-section" style={{ marginTop: '18px' }}>
                       <div className="hm-form-section-title">
-                        <Wallet size={15} /> Chi phí & Thanh toán
+                        <ClipboardList size={15} /> Dịch vụ lâm sàng & Cận lâm sàng
                       </div>
                       <div className="hm-form-grid">
-                        <div className="hm-form-group">
-                          <label className="hm-form-label" htmlFor="hm-input-roomCost">Chi phí phòng</label>
-                          <input id="hm-input-roomCost" type="number" step="0.01" className="hm-form-input" placeholder="0" value={form.roomCost} onChange={(e) => setForm(prev => ({ ...prev, roomCost: e.target.value }))} />
+                        <div className="hm-form-group full">
+                          <div style={{ maxHeight: 220, overflowY: 'auto', border: '1px solid #e6eef6', padding: 8, borderRadius: 6 }}>
+                            {clinicalServices.length === 0 && <div style={{ color: '#64748b' }}>Không có dịch vụ nào.</div>}
+                            {clinicalServices.map((svc) => {
+                              const selected = !!selectedServices[svc._id];
+                              return (
+                                <div key={svc._id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 4px', borderBottom: '1px solid #f1f5f9' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <input type="checkbox" checked={selected} onChange={() => {
+                                      setSelectedServices(prev => {
+                                        const copy = { ...prev };
+                                        if (copy[svc._id]) delete copy[svc._id];
+                                        else copy[svc._id] = { ...svc, quantity: 1 };
+                                        return copy;
+                                      });
+                                    }} />
+                                    <div>
+                                      <div style={{ fontWeight: 700 }}>{svc.serviceName}</div>
+                                      <div style={{ fontSize: 12, color: '#64748b' }}>{svc.category} · {formatMoney(svc.unitPrice)}</div>
+                                    </div>
+                                  </div>
+                                  {selected && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                      <input type="number" min="1" value={selectedServices[svc._id]?.quantity || 1} onChange={(e) => {
+                                        const q = parseInt(e.target.value || '1', 10) || 1;
+                                        setSelectedServices(prev => ({ ...prev, [svc._id]: { ...prev[svc._id], quantity: q } }));
+                                      }} style={{ width: 80 }} />
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
-                        <div className="hm-form-group">
-                          <label className="hm-form-label" htmlFor="hm-input-medicationCost">Chi phí thuốc</label>
-                          <input id="hm-input-medicationCost" type="number" step="0.01" className="hm-form-input" placeholder="0" value={form.medicationCost} onChange={(e) => setForm(prev => ({ ...prev, medicationCost: e.target.value }))} />
-                        </div>
-                        <div className="hm-form-group">
-                          <label className="hm-form-label" htmlFor="hm-input-careServiceCost">Chi phí dịch vụ chăm sóc</label>
-                          <input id="hm-input-careServiceCost" type="number" step="0.01" className="hm-form-input" placeholder="0" value={form.careServiceCost} onChange={(e) => setForm(prev => ({ ...prev, careServiceCost: e.target.value }))} />
-                        </div>
-                        <div className="hm-form-group">
-                          <label className="hm-form-label" htmlFor="hm-input-otherCost">Chi phí khác</label>
-                          <input id="hm-input-otherCost" type="number" step="0.01" className="hm-form-input" placeholder="0" value={form.otherCost} onChange={(e) => setForm(prev => ({ ...prev, otherCost: e.target.value }))} />
-                        </div>
-                        <div className="hm-form-group">
-                          <label className="hm-form-label" htmlFor="hm-input-paymentMethod">Phương thức thanh toán</label>
-                          <select id="hm-input-paymentMethod" className="hm-form-select" value={form.paymentMethod} onChange={(e) => setForm(prev => ({ ...prev, paymentMethod: e.target.value }))}>
-                            <option value="card">Thẻ</option>
-                            <option value="bank_transfer">Chuyển khoản</option>
-                            <option value="wallet">Ví điện tử</option>
-                            <option value="cash">Tiền mặt</option>
-                          </select>
-                        </div>
-                        <div className="hm-form-group full" style={{ alignItems: 'center', marginTop: '4px' }}>
-                          <label className="hm-form-label" htmlFor="hm-input-consentToPayment">Đồng ý thanh toán</label>
-                          <input
-                            id="hm-input-consentToPayment"
-                            type="checkbox"
-                            checked={form.consentToPayment}
-                            onChange={(e) => setForm(prev => ({ ...prev, consentToPayment: e.target.checked }))}
-                          />
+
+                        <div className="hm-form-group full" style={{ marginTop: 8 }}>
+                          <div style={{ border: '1px solid #e6eef6', padding: 10, borderRadius: 6 }}>
+                            <div style={{ fontWeight: 800, marginBottom: 8 }}>Hóa đơn (chỉ tính dịch vụ đã chọn)</div>
+                            {Object.values(selectedServices).length === 0 && <div style={{ color: '#64748b' }}>Chưa chọn dịch vụ nào.</div>}
+                            {Object.values(selectedServices).map((s) => (
+                              <div key={s._id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px dashed #eef2f7' }}>
+                                <div>{s.serviceName} × {s.quantity}</div>
+                                <div>{formatMoney((s.unitPrice || 0) * (s.quantity || 1))}</div>
+                              </div>
+                            ))}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontWeight: 800 }}>
+                              <div>Tổng</div>
+                              <div>{formatMoney(Object.values(selectedServices).reduce((sum, it) => sum + ((Number(it.unitPrice) || 0) * (Number(it.quantity) || 1)), 0))}</div>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>

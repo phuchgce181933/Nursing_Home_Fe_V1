@@ -5,6 +5,12 @@ const createInvoice = async (residentId, body) => {
   return response.data;
 };
 
+const listInvoices = async (residentId) => {
+  const response = await axiosClient.get(`/residents/${residentId}/invoices`);
+  return response.data;
+};
+
 export default {
   createInvoice,
+  listInvoices,
 };

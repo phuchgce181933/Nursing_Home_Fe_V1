@@ -25,6 +25,7 @@ import ManagerLeaveRequestAdminPage from '../pages/manager/staff/leave-requests'
 import RoleLayout from '../layouts/RoleLayout';
 import DashboardPage from '../pages/admin/DashboardPage';
 import ResidentPage from '../pages/admin/residents';
+import FacilitiesPage from '../pages/admin/facilities/FacilitiesPage';
 import FamilyManagementPage from '../pages/admin/residents/family';
 import ResidentsByAreaPage from '../pages/admin/residents/by-area';
 import InitialHealthPage from '../pages/admin/residents/initial-health';
@@ -46,10 +47,14 @@ import ServicePackagesPage from '../pages/admin/ServicePackagesPage';
 import PharmacyPage from '../pages/pharmacist/PharmacyPage';
 import AdminActivitiesPage from '../pages/admin/AdminActivitiesPage';
 import AdminReportsPage from '../pages/admin/AdminReportsPage';
+import AuditLogsPage from '../pages/admin/AuditLogsPage';
 import ActivityStatisticsPage from '../pages/admin/ActivityStatisticsPage';
 import ActivityParticipationResultsPage from '../pages/admin/ActivityParticipationResultsPage';
 import CareAppointmentsPage from '../pages/admin/appointments';
 import AdminContractManagementPage from '../pages/admin/AdminContractManagementPage';
+import AdminInvoiceManagementPage from '../pages/admin/AdminInvoiceManagementPage';
+import AdminClinicalServicesPage from '../pages/admin/AdminClinicalServicesPage';
+import AdminMedicalChargesPage from '../pages/admin/AdminMedicalChargesPage';
 import DoctorDashboardPage from '../pages/doctor/DoctorDashboardPage';
 import NurseDashboardPage from '../pages/nurse/NurseDashboardPage';
 import MedicationPage from '../pages/nurse/MedicationPage';
@@ -79,6 +84,8 @@ import HealthMonitoringPage from '../pages/shared/HealthMonitoringPage';
 import CareNotesPage from '../pages/shared/CareNotesPage';
 import ManagerActivityDashboard from '../pages/manager/ActivityDashboard';
 import ProtectedRoute from '../components/ProtectedRoute';
+import MessagesPage from '../pages/shared/MessagesPage';
+import GuestContact from '../pages/shared/GuestContact';
 
 function AppRoutes() {
   return (
@@ -113,6 +120,11 @@ function AppRoutes() {
         <Route path="residents/pre-existing-conditions" element={<PreExistingConditionsPage />} />
         <Route path="residents/drug-allergies" element={<DrugAllergiesPage />} />
         <Route path="residents/transfer-room" element={<TransferResidentPage />} />
+        <Route path="buildings" element={<FacilitiesPage defaultTab="buildings" />} />
+        <Route path="floors" element={<FacilitiesPage defaultTab="floors" />} />
+        <Route path="rooms" element={<FacilitiesPage defaultTab="rooms" />} />
+        <Route path="beds" element={<FacilitiesPage defaultTab="beds" />} />
+        <Route path="equipment" element={<FacilitiesPage defaultTab="equipment" />} />
         <Route path="staff/profiles" element={<StaffProfilesPage />} />
         <Route path="staff/shifts" element={<ShiftManagementPage />} />
         <Route path="staff/assignments" element={<StaffAssignmentPage />} />
@@ -120,17 +132,21 @@ function AppRoutes() {
         <Route path="staff/leave-requests" element={<LeaveRequestAdminPage />} />
         <Route path="residents/create" element={<ResidentPage defaultMode="create" />} />
         <Route path="profile" element={<AdminProfile />} />
+        <Route path="messages" element={<MessagesPage />} />
         <Route path="accounts" element={<AdminAccountsPage />} />
         <Route path="admission-requests" element={<AdminAdmissionRequestsPage />} />
         <Route path="appointments" element={<CareAppointmentsPage />} />
         <Route path="tour-requests" element={<AdminTourRequestsPage />} />
         <Route path="service-packages" element={<ServicePackagesPage />} />
-        <Route path="medications" element={<PharmacyPage />} />
-        <Route path="activities" element={<AdminActivitiesPage />} />
+        <Route path="medications" element={<PharmacyPage />} />        <Route path="activities" element={<AdminActivitiesPage />} />
         <Route path="activities/statistics" element={<ActivityStatisticsPage />} />
         <Route path="activities/participation-results" element={<ActivityParticipationResultsPage />} />
         <Route path="reports" element={<AdminReportsPage />} />
+        <Route path="audit-logs" element={<AuditLogsPage />} />
         <Route path="contracts" element={<AdminContractManagementPage />} />
+        <Route path="invoices" element={<AdminInvoiceManagementPage />} />
+        <Route path="services" element={<AdminClinicalServicesPage />} />
+        <Route path="medical-charges" element={<AdminMedicalChargesPage />} />
         <Route path="incidents" element={<IncidentManagementPage />} />
         <Route path="*" element={<PlaceholderPage title="Trang quản trị" />} />
       </Route>
@@ -182,7 +198,7 @@ function AppRoutes() {
         <Route path="my-shifts" element={<MyShiftsPage />} />
         <Route path="care-tasks" element={<DailyCareSchedulePage />} />
         <Route path="leave" element={<LeaveRequestPage />} />
-        <Route path="messages" element={<PlaceholderPage title="Tin nhắn" />} />
+        <Route path="messages" element={<MessagesPage />} />
         <Route path="incidents" element={<IncidentManagementPage />} />
       </Route>
 
@@ -200,7 +216,6 @@ function AppRoutes() {
         <Route path="admission-requests" element={<AdminAdmissionRequestsPage />} />
         <Route path="service-packages" element={<ServicePackagesPage />} />
 
-        <Route path="care-notes" element={<PlaceholderPage title="Ghi chú chăm sóc" />} />
         <Route path="meal-plans" element={<MealPlansPage />} />
         <Route path="nutrition-reports" element={<NutritionReportsPage />} />
 
@@ -212,7 +227,7 @@ function AppRoutes() {
         <Route path="care-tasks" element={<DailyCareSchedulePage />} />
         <Route path="activity-schedule" element={<ActivitySchedulePage />} />
         <Route path="leave" element={<LeaveRequestPage />} />
-        <Route path="messages" element={<PlaceholderPage title="Tin nhắn" />} />
+        <Route path="messages" element={<MessagesPage />} />
         <Route path="incidents" element={<IncidentManagementPage />} />
       </Route>
 
@@ -289,10 +304,11 @@ function AppRoutes() {
         <Route path="activities" element={<FamilyActivityPage />} />
         <Route path="resident" element={<PlaceholderPage title="Hồ sơ người thân" />} />
         <Route path="notifications" element={<PlaceholderPage title="Thông báo" />} />
-        <Route path="messages" element={<PlaceholderPage title="Tin nhắn" />} />
+        <Route path="messages" element={<MessagesPage />} />
       </Route>
 
       <Route path="/services" element={<ServicesPage />} />
+      <Route path="/guest-contact" element={<GuestContact />} />
       <Route path="/" element={<HomePage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

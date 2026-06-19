@@ -134,6 +134,7 @@ export const roleSidebarData = {
     },
     {
       title: 'sidebar.hygieneActivities',
+
       icon: Droplets,
       path: '/caregiver/hygiene-activities',
     },

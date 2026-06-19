@@ -216,6 +216,8 @@ const adminAssignServicePackage = async (admissionId, body) => {
  * @param {string} body.contractNumber     - Số hợp đồng (BẮT BUỘC)
  * @param {string} [body.contractStartDate] - Ngày bắt đầu (YYYY-MM-DD)
  * @param {string} [body.contractEndDate]   - Ngày kết thúc (YYYY-MM-DD)
+ * @param {number} [body.contractDurationMonths]  - Thời hạn hợp đồng theo tháng
+ * @param {number} [body.contractDiscountPercent] - Phần trăm giảm giá hợp đồng (0-100)
  * @param {string} [body.contractTerms]     - Điều khoản hợp đồng
  * @param {string} [body.notes]             - Ghi chú thêm
  * @returns {object} { message, admission }
@@ -322,6 +324,23 @@ const getStaffList = async (params = {}) => {
   return response.data;
 };
 
+/**
+ * Admin | Update Contract Dates
+ * Gia hạn hợp đồng bằng cách cập nhật ngày hết hạn.
+ *
+ * @param {string} admissionId - ID của admission
+ * @param {object} body
+ * @param {string} body.contractEndDate - Ngày hết hạn mới (ISO 8601 format) (BẮT BUỘC)
+ * @returns {object} { message, admission }
+ */
+const updateAdmissionContractDates = async (admissionId, body) => {
+  const response = await axiosClient.patch(
+    `/admin/admission-requests/${admissionId}/extend-contract`,
+    body
+  );
+  return response.data;
+};
+
 export default {
   // Family
   submitAdmissionRequest,
@@ -338,6 +357,7 @@ export default {
   adminCreateContract,
   adminCheckInResident,
   getStaffList,
+  updateAdmissionContractDates,
   // Medical Staff (Doctor / Nurse)
   medicalRecordConsultation,
   medicalScheduleAssessment,

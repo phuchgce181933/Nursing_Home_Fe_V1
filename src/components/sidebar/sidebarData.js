@@ -13,6 +13,7 @@ import {
   MessageSquare,
   Settings,
   FileCheck,
+  DollarSign,
 } from 'lucide-react';
 
 export const sidebarData = [
@@ -26,7 +27,7 @@ export const sidebarData = [
     icon: Shield,
     children: [
       { title: 'sidebar.myProfile', path: '/admin/profile' },
-      { title: 'sidebar.accounts', path: '/admin/accounts' },
+      { title: 'sidebar.auditLogs', path: '/admin/audit-logs' },
     ],
   },
   {
@@ -55,6 +56,7 @@ export const sidebarData = [
     title: 'sidebar.buildingsFacilities',
     icon: Building2,
     children: [
+      { title: 'sidebar.buildings', path: '/admin/buildings' },
       { title: 'sidebar.floors', path: '/admin/floors' },
       { title: 'sidebar.rooms', path: '/admin/rooms' },
       { title: 'sidebar.beds', path: '/admin/beds' },
@@ -72,21 +74,6 @@ export const sidebarData = [
     ],
   },
   {
-    title: 'sidebar.healthMonitoring',
-    icon: HeartPulse,
-    path: '/admin/health',
-  },
-  {
-    title: 'sidebar.medication',
-    icon: Pill,
-    path: '/admin/medications',
-  },
-  {
-    title: 'sidebar.appointments',
-    icon: Calendar,
-    path: '/admin/appointments',
-  },
-  {
     title: 'sidebar.activities',
     icon: Activity,
     children: [
@@ -94,6 +81,23 @@ export const sidebarData = [
       { title: 'Thống kê hoạt động', path: '/admin/activities/statistics' },
       { title: 'Kết quả tham gia', path: '/admin/activities/participation-results' },
     ],
+  },
+  {
+    title: 'sidebar.clinical',
+    icon: HeartPulse,
+    children: [
+      { title: 'sidebar.clinicalServices', path: '/admin/services' },
+      { title: 'sidebar.medicalCharges', path: '/admin/medical-charges' },
+    ],
+  },
+  {
+    title: 'sidebar.medication',
+    icon: Pill,
+    path: '/admin/medications',
+  },  {
+    title: 'sidebar.appointments',
+    icon: Calendar,
+    path: '/admin/appointments',
   },
   {
     title: 'sidebar.incidents',
@@ -109,6 +113,11 @@ export const sidebarData = [
     title: 'sidebar.contractManagement',
     icon: FileCheck,
     path: '/admin/contracts',
+  },
+  {
+    title: 'sidebar.billing',
+    icon: DollarSign,
+    path: '/admin/invoices',
   },
   {
     title: 'sidebar.notifications',
