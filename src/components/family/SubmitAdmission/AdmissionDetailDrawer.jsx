@@ -226,6 +226,8 @@ export default function AdmissionDetailDrawer({
   const [contractNum, setContractNum] = useState('');
   const [contractStart, setContractStart] = useState('');
   const [contractEnd, setContractEnd] = useState('');
+  const [contractDurationMonths, setContractDurationMonths] = useState('');
+  const [contractDiscountPercent, setContractDiscountPercent] = useState('');
   const [contractTerms, setContractTerms] = useState('');
   const [contractGenNotes, setContractGenNotes] = useState('');
   const [creatingContract, setCreatingContract] = useState(false);
@@ -240,9 +242,14 @@ export default function AdmissionDetailDrawer({
 
   useEffect(() => {
     if (!showInvoiceModal) return;
-    const defaultPackagePrice = admission?.servicePackageId?.monthlyPrice || '';
-    setCareServiceCost(defaultPackagePrice ? String(defaultPackagePrice) : '');
-  }, [showInvoiceModal, admission?.servicePackageId?.monthlyPrice]);
+    // Compute service fee: monthlyPrice × contractDurationMonths with discount applied
+    const monthlyPrice = admission?.servicePackageId?.monthlyPrice || 0;
+    const durationMonths = admission?.contractDurationMonths || 1;
+    const discountPercent = admission?.contractDiscountPercent || 0;
+    const grossService = monthlyPrice * durationMonths;
+    const netService = Math.round(grossService * (1 - discountPercent / 100));
+    setCareServiceCost(String(netService));
+  }, [showInvoiceModal, admission?.servicePackageId?.monthlyPrice, admission?.contractDurationMonths, admission?.contractDiscountPercent]);
 
   const [showCheckInModal, setShowCheckInModal] = useState(false);
   const [assignedBedHex, setAssignedBedHex] = useState('');
@@ -290,6 +297,74 @@ export default function AdmissionDetailDrawer({
     showContractModal,
     showCheckInModal
   ]);
+
+  // Helper: add months to a date string (YYYY-MM-DD) and return YYYY-MM-DD
+  const addMonthsToDateStr = (dateStr, months) => {
+    try {
+      const d = new Date(dateStr);
+      const day = d.getDate();
+      d.setMonth(d.getMonth() + months);
+      // handle month overflow (e.g., Jan 31 + 1 month -> Feb 28/29)
+      if (d.getDate() < day) {
+        d.setDate(0); // last day of previous month
+      }
+      return d.toISOString().split('T')[0];
+    } catch (e) {
+      return dateStr;
+    }
+  };
+
+  // Helper: calculate full months difference between two date-strings (YYYY-MM-DD)
+  const monthsBetween = (startStr, endStr) => {
+    try {
+      const s = new Date(startStr);
+      const e = new Date(endStr);
+      if (isNaN(s.getTime()) || isNaN(e.getTime())) return null;
+      let months = (e.getFullYear() - s.getFullYear()) * 12 + (e.getMonth() - s.getMonth());
+      // adjust if end day is before start day
+      if (e.getDate() < s.getDate()) months -= 1;
+      return months >= 0 ? months : 0;
+    } catch (err) {
+      return null;
+    }
+  };
+
+  // Sync handlers for contract date/duration fields
+  const handleContractStartChange = (val) => {
+    setContractStart(val);
+    // if duration provided, compute end date
+    if (contractDurationMonths && contractDurationMonths !== '') {
+      const months = parseInt(contractDurationMonths, 10);
+      if (!isNaN(months) && months > 0) {
+        const end = addMonthsToDateStr(val || new Date().toISOString().split('T')[0], months);
+        setContractEnd(end);
+      }
+    } else if (contractEnd) {
+      // if end exists but duration empty, compute duration
+      const m = monthsBetween(val, contractEnd);
+      if (m != null) setContractDurationMonths(String(m));
+    }
+  };
+
+  const handleContractEndChange = (val) => {
+    setContractEnd(val);
+    if (contractStart) {
+      const m = monthsBetween(contractStart, val);
+      if (m != null) setContractDurationMonths(String(m));
+    }
+  };
+
+  const handleContractDurationChange = (val) => {
+    // allow empty or numeric
+    setContractDurationMonths(val);
+    const months = parseInt(val, 10);
+    if (!isNaN(months) && months > 0) {
+      const start = contractStart || new Date().toISOString().split('T')[0];
+      setContractStart(start);
+      const end = addMonthsToDateStr(start, months);
+      setContractEnd(end);
+    }
+  };
 
   useEffect(() => {
     if (!isOpen || !admissionId) return;
@@ -657,6 +732,8 @@ export default function AdmissionDetailDrawer({
         contractNumber: contractNum.trim() || undefined,
         contractStartDate: contractStart ? new Date(contractStart).toISOString() : undefined,
         contractEndDate: contractEnd ? new Date(contractEnd).toISOString() : undefined,
+        contractDurationMonths: contractDurationMonths !== '' ? parseInt(contractDurationMonths, 10) : undefined,
+        contractDiscountPercent: contractDiscountPercent !== '' ? Number(contractDiscountPercent) : undefined,
         contractTerms: contractTerms.trim() || undefined,
         notes: contractGenNotes.trim() || undefined,
       });
@@ -664,6 +741,8 @@ export default function AdmissionDetailDrawer({
       setContractNum('');
       setContractStart('');
       setContractEnd('');
+      setContractDurationMonths('');
+      setContractDiscountPercent('');
       setContractTerms('');
       setContractGenNotes('');
       if (onCancelSuccess) onCancelSuccess();
@@ -685,15 +764,15 @@ export default function AdmissionDetailDrawer({
 
     try {
       setCreatingInvoice(true);
+      // careServiceCost is already computed with discount applied; roomCost is always 0
       await paymentService.createInvoice(residentId, {
-        roomCost: roomCost || 0,
+        roomCost: 0,
         medicationCost: medicationCost || 0,
-        careServiceCost: careServiceCost || 0,
+        careServiceCost: careServiceCost ? parseInt(careServiceCost, 10) : 0,
         otherCost: otherCost || 0,
         dueDate: invoiceDueDate || undefined,
       });
       setShowInvoiceModal(false);
-      setRoomCost('');
       setMedicationCost('');
       setCareServiceCost('');
       setOtherCost('');
@@ -1342,6 +1421,22 @@ export default function AdmissionDetailDrawer({
                         </p>
                       </div>
                     )}
+                    {admission.contractDurationMonths != null && (
+                      <div className="arh-detail-item">
+                        <p className="arh-detail-item__label" style={{ color: '#4F46E5' }}>Thời hạn hợp đồng</p>
+                        <p className="arh-detail-item__value font-bold" style={{ color: '#1E1B4B' }}>
+                          {admission.contractDurationMonths} tháng
+                        </p>
+                      </div>
+                    )}
+                    {admission.contractDiscountPercent != null && (
+                      <div className="arh-detail-item">
+                        <p className="arh-detail-item__label" style={{ color: '#4F46E5' }}>Giảm giá hợp đồng</p>
+                        <p className="arh-detail-item__value font-bold" style={{ color: '#1E1B4B' }}>
+                          {admission.contractDiscountPercent}%
+                        </p>
+                      </div>
+                    )}
                     <div className="arh-detail-item">
                       <p className="arh-detail-item__label" style={{ color: '#4F46E5' }}>Phòng ở</p>
                       <p className="arh-detail-item__value font-bold" style={{ color: (admission.assignedRoom?.roomNumber || admission.assignedRoom || admission.assignedRoomId) ? '#1E1B4B' : '#94a3b8' }}>
@@ -1502,6 +1597,8 @@ export default function AdmissionDetailDrawer({
                           }
                           setContractStart(admission.contractStartDate ? admission.contractStartDate.split('T')[0] : '');
                           setContractEnd(admission.contractEndDate ? admission.contractEndDate.split('T')[0] : '');
+                          setContractDurationMonths(admission.contractDurationMonths != null ? String(admission.contractDurationMonths) : '');
+                          setContractDiscountPercent(admission.contractDiscountPercent != null ? String(admission.contractDiscountPercent) : '');
                           setContractTerms(admission.contractTerms || '');
                           setShowContractModal(true);
                         }}
@@ -1512,7 +1609,7 @@ export default function AdmissionDetailDrawer({
                       </button>
                     )}
 
-                    {isAdminRole && admission.status === 'contracting' && (admission.servicePackageId || admission.assignedServicePackage) && !admission.latestInvoice && (
+                    {isAdminRole && (admission.status === 'contracting' || admission.status === 'checked_in') && (admission.servicePackageId || admission.assignedServicePackage) && !admission.latestInvoice && (
                       <button
                         type="button"
                         onClick={() => setShowInvoiceModal(true)}
@@ -2209,7 +2306,7 @@ export default function AdmissionDetailDrawer({
                     className="adm-filter-input"
                     style={{ paddingLeft: '14px' }}
                     value={contractStart}
-                    onChange={(e) => setContractStart(e.target.value)}
+                    onChange={(e) => handleContractStartChange(e.target.value)}
                   />
                 </div>
                 <div>
@@ -2221,7 +2318,40 @@ export default function AdmissionDetailDrawer({
                     className="adm-filter-input"
                     style={{ paddingLeft: '14px' }}
                     value={contractEnd}
-                    onChange={(e) => setContractEnd(e.target.value)}
+                    onChange={(e) => handleContractEndChange(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
+                    Số tháng hợp đồng
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    className="adm-filter-input"
+                    style={{ paddingLeft: '14px' }}
+                    placeholder="Số tháng"
+                    value={contractDurationMonths}
+                    onChange={(e) => handleContractDurationChange(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
+                    Giảm giá hợp đồng (%)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.1"
+                    className="adm-filter-input"
+                    style={{ paddingLeft: '14px' }}
+                    placeholder="0 - 100"
+                    value={contractDiscountPercent}
+                    onChange={(e) => setContractDiscountPercent(e.target.value)}
                   />
                 </div>
               </div>
@@ -2262,6 +2392,8 @@ export default function AdmissionDetailDrawer({
                     setContractNum('');
                     setContractStart('');
                     setContractEnd('');
+                    setContractDurationMonths('');
+                    setContractDiscountPercent('');
                     setContractTerms('');
                     setContractGenNotes('');
                   }}
@@ -2302,17 +2434,21 @@ export default function AdmissionDetailDrawer({
               <div className="grid grid-cols-2 gap-3 mb-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
-                    Chi phí phòng
+                    Chi phí dịch vụ chăm sóc
                   </label>
-                  <input
-                    type="number"
-                    min="0"
-                    className="adm-filter-input"
-                    style={{ paddingLeft: '14px' }}
-                    value={roomCost}
-                    onChange={(e) => setRoomCost(e.target.value)}
-                    placeholder="0"
-                  />
+                  <div className="adm-filter-input readonly bg-slate-100 text-slate-700 p-2 rounded">
+                    {(() => {
+                      const monthlyPrice = admission?.servicePackageId?.monthlyPrice || 0;
+                      const durationMonths = admission?.contractDurationMonths || 1;
+                      const discountPercent = admission?.contractDiscountPercent || 0;
+                      const grossService = monthlyPrice * durationMonths;
+                      const netService = Math.round(grossService * (1 - discountPercent / 100));
+                      return `${netService.toLocaleString('vi-VN')} VND`;
+                    })()}
+                    {admission?.contractDiscountPercent ? (
+                      <div className="text-xs text-slate-500 mt-1">(Đã áp dụng giảm giá {admission.contractDiscountPercent}%)</div>
+                    ) : null}
+                  </div>
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
@@ -2330,35 +2466,19 @@ export default function AdmissionDetailDrawer({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 mb-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
-                    Chi phí dịch vụ chăm sóc
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    className="adm-filter-input"
-                    style={{ paddingLeft: '14px' }}
-                    value={careServiceCost}
-                    onChange={(e) => setCareServiceCost(e.target.value)}
-                    placeholder="0"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
-                    Chi phí khác
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    className="adm-filter-input"
-                    style={{ paddingLeft: '14px' }}
-                    value={otherCost}
-                    onChange={(e) => setOtherCost(e.target.value)}
-                    placeholder="0"
-                  />
-                </div>
+              <div className="mb-3">
+                <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
+                  Chi phí khác
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  className="adm-filter-input"
+                  style={{ paddingLeft: '14px' }}
+                  value={otherCost}
+                  onChange={(e) => setOtherCost(e.target.value)}
+                  placeholder="0"
+                />
               </div>
 
               <div className="mb-4">
@@ -2372,6 +2492,28 @@ export default function AdmissionDetailDrawer({
                   value={invoiceDueDate}
                   onChange={(e) => setInvoiceDueDate(e.target.value)}
                 />
+              </div>
+
+              {/* Total Amount Display */}
+              <div className="mb-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                <label className="block text-xs font-bold text-slate-600 mb-2 uppercase tracking-wider">
+                  Tổng tiền (VND)
+                </label>
+                <div className="text-2xl font-bold text-emerald-600">
+                  {(() => {
+                    const monthly = admission?.servicePackageId?.monthlyPrice || 0;
+                    const months = admission?.contractDurationMonths || 1;
+                    const discount = admission?.contractDiscountPercent || 0;
+                    const grossService = monthly * months;
+                    const netService = Math.round(grossService * (1 - discount / 100));
+                    const total = 
+                      0 +
+                      (parseInt(medicationCost, 10) || 0) +
+                      netService +
+                      (parseInt(otherCost, 10) || 0);
+                    return total.toLocaleString('vi-VN');
+                  })()}
+                </div>
               </div>
 
               <div className="flex gap-3 pt-2">
@@ -2638,6 +2780,42 @@ export default function AdmissionDetailDrawer({
                       {formatEnglishDate(admission.contractStartDate)} - {formatEnglishDate(admission.contractEndDate)}
                     </span>
                   </div>
+                  {admission.contractDurationMonths != null && (
+                    <div>
+                      <span className="block text-white/45 text-[9px] uppercase tracking-wider font-bold mb-1">Chu kỳ thanh toán</span>
+                      <span className="font-semibold text-[12.5px] text-white/90">
+                        {admission.contractDurationMonths} tháng
+                      </span>
+                    </div>
+                  )}
+                  {admission.contractDiscountPercent != null && (
+                    <div>
+                      <span className="block text-white/45 text-[9px] uppercase tracking-wider font-bold mb-1">Giảm giá hợp đồng</span>
+                      <span className="font-semibold text-[12.5px] text-white/90">
+                        {admission.contractDiscountPercent}%
+                      </span>
+                    </div>
+                  )}
+                  {/* Invoice status & action */}
+                  <div>
+                    <span className="block text-white/45 text-[9px] uppercase tracking-wider font-bold mb-1">Trạng thái hóa đơn</span>
+                    {admission.latestInvoice ? (
+                      <span className="font-semibold text-[12.5px] text-white/90">
+                        {admission.latestInvoice.status === 'paid' ? 'Đã thanh toán' : admission.latestInvoice.status === 'partially_paid' ? 'Thanh toán một phần' : admission.latestInvoice.status}
+                      </span>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-[12.5px] text-white/90">Chưa có hóa đơn</span>
+                        <button
+                          type="button"
+                          onClick={() => { setShowContractViewModal(false); setShowInvoiceModal(true); }}
+                          className="py-1 px-2 bg-amber-400 hover:bg-amber-500 text-white rounded text-[11px] font-semibold"
+                        >
+                          Tạo hóa đơn
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -2752,6 +2930,16 @@ export default function AdmissionDetailDrawer({
                       <div className="col-span-2">
                         <strong>Phí dịch vụ hàng tháng:</strong> {admission.servicePackageId?.monthlyPrice ? (admission.servicePackageId.monthlyPrice.toLocaleString() + ' VND/tháng') : 'Theo đơn giá gói'}
                       </div>
+                      {admission.contractDurationMonths != null && (
+                        <div className="col-span-2">
+                          <strong>Thời hạn hợp đồng:</strong> {admission.contractDurationMonths} tháng
+                        </div>
+                      )}
+                      {admission.contractDiscountPercent != null && (
+                        <div className="col-span-2">
+                          <strong>Giảm giá hợp đồng:</strong> {admission.contractDiscountPercent}%
+                        </div>
+                      )}
                       <div className="col-span-2">
                         <strong>Thời hạn hợp đồng:</strong> Từ ngày {formatEnglishDate(admission.contractStartDate)} đến ngày {formatEnglishDate(admission.contractEndDate)}
                       </div>

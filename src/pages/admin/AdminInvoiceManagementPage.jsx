@@ -96,6 +96,7 @@ export default function AdminInvoiceManagementPage() {
   };
 
   const translateStatus = (status) => {
+    const normalized = String(status || '').toLowerCase();
     const map = {
       issued: 'Đã phát hành',
       partially_paid: 'Đã thanh toán một phần',
@@ -103,11 +104,11 @@ export default function AdminInvoiceManagementPage() {
       overdue: 'Quá hạn',
       cancelled: 'Đã hủy',
     };
-    return status ? map[status] || status : '-';
+    return normalized ? map[normalized] || status : '-';
   };
 
   const getStatusBadgeClass = (status) => {
-    const normalized = String(status || 'default').replace(/_/g, '-');
+    const normalized = String(status || 'default').toLowerCase().replace(/_/g, '-');
     return `adm-status-badge adm-status-badge--${normalized}`;
   };
 

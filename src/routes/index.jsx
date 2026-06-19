@@ -138,8 +138,7 @@ function AppRoutes() {
         <Route path="appointments" element={<CareAppointmentsPage />} />
         <Route path="tour-requests" element={<AdminTourRequestsPage />} />
         <Route path="service-packages" element={<ServicePackagesPage />} />
-        <Route path="medications" element={<PharmacyPage />} />
-        <Route path="activities" element={<AdminActivitiesPage />} />
+        <Route path="medications" element={<PharmacyPage />} />        <Route path="activities" element={<AdminActivitiesPage />} />
         <Route path="activities/statistics" element={<ActivityStatisticsPage />} />
         <Route path="activities/participation-results" element={<ActivityParticipationResultsPage />} />
         <Route path="reports" element={<AdminReportsPage />} />

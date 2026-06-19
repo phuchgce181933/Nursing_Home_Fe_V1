@@ -94,8 +94,7 @@ export const sidebarData = [
     title: 'sidebar.medication',
     icon: Pill,
     path: '/admin/medications',
-  },
-  {
+  },  {
     title: 'sidebar.appointments',
     icon: Calendar,
     path: '/admin/appointments',

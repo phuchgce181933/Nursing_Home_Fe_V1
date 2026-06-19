@@ -35,6 +35,11 @@ const payInvoice = async (residentId, invoiceId, body) => {
   return response.data.data || response.data;
 };
 
+const batchPayment = async (residentId, body) => {
+  const response = await axiosClient.post(`/residents/${residentId}/invoices/batch-pay`, body);
+  return response.data.data || response.data;
+};
+
 export default {
   getFamilyResidents,
   getResidentBillingSummary,
@@ -43,4 +48,5 @@ export default {
   getResidentInvoices,
   createInvoice,
   payInvoice,
+  batchPayment,
 };
