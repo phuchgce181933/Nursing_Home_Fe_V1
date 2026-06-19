@@ -128,11 +128,6 @@ export const roleSidebarData = {
       path: '/caregiver/diet-plans',
     },
     {
-      title: 'Lịch phục hồi',
-      icon: Dumbbell,
-      path: '/caregiver/rehabilitation-schedule',
-    },
-    {
       title: 'Hoạt động vệ sinh',
       icon: Droplets,
       path: '/caregiver/hygiene-activities',

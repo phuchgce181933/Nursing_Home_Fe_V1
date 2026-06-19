@@ -93,6 +93,19 @@ export default function AdminContractManagementPage() {
     prescriptionId: null,
   });
   const [isCreatingInvoice, setIsCreatingInvoice] = useState(false);
+  const [showMedicationModal, setShowMedicationModal] = useState(false);
+  const [medPrescriptions, setMedPrescriptions] = useState([]);
+  const [medLoading, setMedLoading] = useState(false);
+  const [medSelectedId, setMedSelectedId] = useState(null);
+  const [medEstimatedCost, setMedEstimatedCost] = useState(null);
+  const [medCreatingInvoice, setMedCreatingInvoice] = useState(false);
+  const [medError, setMedError] = useState('');
+  const [showExtensionModal, setShowExtensionModal] = useState(false);
+  const [extensionData, setExtensionData] = useState({
+    newEndDate: '',
+    discountPercent: 0,
+  });
+  const [isExtendingContract, setIsExtendingContract] = useState(false);
 
   const formatDate = (dateStr) => {
     if (!dateStr) return 'N/A';
@@ -134,8 +147,13 @@ export default function AdminContractManagementPage() {
           status: getContractStatusLabel(admission.contractStartDate, admission.contractEndDate),
           servicePackageName: admission.servicePackageId?.name || admission.servicePackageId?.packageCode || 'N/A',
           servicePackagePrice: admission.servicePackageId?.monthlyPrice || 0,
+          contractDurationMonths: admission.contractDurationMonths || null,
+          contractDiscountPercent: admission.contractDiscountPercent || null,
+          latestInvoice: admission.latestInvoice || null,
+          latestInvoiceStatus: admission.latestInvoice?.status?.toString().toLowerCase?.() || null,
         }));
 
+      console.log('Contract data fetched:', contractData[0]); // Debug log to check latestInvoice field
       setContracts(contractData);
     } catch (err) {
       setError(err.message || 'Failed to fetch contracts');
@@ -216,6 +234,170 @@ export default function AdminContractManagementPage() {
     }
   };
 
+  const refreshMedicationPrescriptions = async (residentId) => {
+    try {
+      setMedLoading(true);
+      // load recent prescriptions for the resident (include expired so admin can pick older ones)
+      const resp = await medicationService.listPrescriptions({ residentId, limit: 20 });
+      const list = Array.isArray(resp) ? resp : resp?.data || [];
+      setMedPrescriptions(list);
+      setMedError('');
+    } catch (err) {
+      console.error('Failed to load prescriptions for medication invoice:', err);
+      setMedError(err.response?.data?.message || 'Không thể tải đơn thuốc.');
+    } finally {
+      setMedLoading(false);
+    }
+  };
+
+  const openMedicationInvoiceModal = async (contract) => {
+    setSelectedContract(contract);
+    setMedError('');
+    setMedPrescriptions([]);
+    setMedSelectedId(null);
+    setMedEstimatedCost(null);
+    setShowMedicationModal(true);
+    await refreshMedicationPrescriptions(contract.residentId);
+  };
+
+  const estimateMedCost = async (prescriptionId) => {
+    if (!prescriptionId || !selectedContract) return;
+    try {
+      setMedEstimatedCost(null);
+      const resp = await medicationService.estimatePrescriptionCost(prescriptionId, selectedContract.residentId);
+      const cost = resp.data?.medicationCost ?? resp?.medicationCost ?? null;
+      setMedEstimatedCost(cost);
+    } catch (err) {
+      console.warn('Estimate failed:', err);
+      setMedError(err.response?.data?.message || 'Không thể ước tính chi phí thuốc.');
+    }
+  };
+
+  const isPrescriptionExpired = (validUntil) => {
+    if (!validUntil) return false;
+    return new Date(validUntil) < new Date();
+  };
+
+  const getSelectedPrescriptionDetails = () => {
+    if (!medSelectedId || medPrescriptions.length === 0) return null;
+    return medPrescriptions.find(p => (p._id || p.id) === medSelectedId);
+  };
+
+  const handleCreateMedicationInvoice = async () => {
+    if (!selectedContract || !medSelectedId) return alert('Vui lòng chọn đơn thuốc.');
+    try {
+      setMedCreatingInvoice(true);
+      const body = { prescriptionId: medSelectedId };
+      if (medEstimatedCost != null) body.medicationCost = medEstimatedCost;
+      await paymentService.createInvoice(selectedContract.residentId, body);
+      alert(t('admin.contractManagement.invoiceCreatedSuccess'));
+      setShowMedicationModal(false);
+      setSelectedContract(null);
+      await fetchContracts();
+    } catch (err) {
+      console.error('Error creating medication invoice:', err);
+      alert(t('admin.contractManagement.invoiceCreatedError') + (err.message || ''));
+    } finally {
+      setMedCreatingInvoice(false);
+    }
+  };
+
+  const handleOpenExtensionModal = (contract) => {
+    setSelectedContract(contract);
+    // Pre-fill with 1 year extension from current end date
+    const currentEndDate = new Date(contract.endDate);
+    const newEndDate = new Date(currentEndDate);
+    newEndDate.setFullYear(newEndDate.getFullYear() + 1);
+    setExtensionData({
+      newEndDate: newEndDate.toISOString().split('T')[0],
+      discountPercent: contract.contractDiscountPercent || 0,
+    });
+    setShowExtensionModal(true);
+  };
+
+  const calculateExtensionCost = (newEndDateStr, currentEndDate, servicePackagePrice, discountPercent) => {
+    if (!newEndDateStr) return 0;
+    
+    const newEndDate = new Date(newEndDateStr);
+    if (newEndDate <= currentEndDate) return 0;
+    
+    // Calculate months
+    let monthsDiff = (newEndDate.getFullYear() - currentEndDate.getFullYear()) * 12;
+    monthsDiff += newEndDate.getMonth() - currentEndDate.getMonth();
+    
+    if (monthsDiff <= 0) return 0;
+    
+    // Calculate service cost with discount
+    const baseServiceCost = (servicePackagePrice || 0) * monthsDiff;
+    const finalServiceCost = baseServiceCost * (1 - (discountPercent || 0) / 100);
+    
+    return finalServiceCost;
+  };
+
+  const handleExtendContract = async () => {
+    if (!selectedContract || !extensionData.newEndDate) {
+      return alert('Vui lòng nhập ngày hết hạn mới.');
+    }
+
+    const newEndDate = new Date(extensionData.newEndDate);
+    const currentEndDate = new Date(selectedContract.endDate);
+    
+    if (newEndDate <= currentEndDate) {
+      return alert('Ngày hết hạn mới phải sau ngày hết hạn hiện tại.');
+    }
+
+    try {
+      setIsExtendingContract(true);
+
+      // Calculate extension period in months
+      let monthsDiff = (newEndDate.getFullYear() - currentEndDate.getFullYear()) * 12;
+      monthsDiff += newEndDate.getMonth() - currentEndDate.getMonth();
+      
+      if (monthsDiff <= 0) {
+        return alert('Khoảng thời gian gia hạn phải tối thiểu 1 tháng.');
+      }
+
+      // Calculate service cost for extension: price * months * (1 - discount%)
+      const baseServiceCost = (selectedContract.servicePackagePrice || 0) * monthsDiff;
+      const discountPercent = extensionData.discountPercent || 0;
+      const discountAmount = baseServiceCost * (discountPercent / 100);
+      const finalServiceCost = baseServiceCost - discountAmount;
+
+      // Update admission contract end date
+      await admissionService.updateAdmissionContractDates(selectedContract.id, {
+        contractEndDate: newEndDate.toISOString(),
+      });
+
+      // Create SERVICE invoice for extension period
+      const billingPeriodStart = new Date(currentEndDate);
+      billingPeriodStart.setDate(billingPeriodStart.getDate() + 1); // Start from day after old contract end
+      
+      const invoiceBody = {
+        careServiceCost: finalServiceCost,
+        billingPeriodStart: billingPeriodStart.toISOString().split('T')[0],
+        billingPeriodEnd: newEndDate.toISOString().split('T')[0],
+        roomCost: 0,
+        medicationCost: 0,
+        otherCost: 0,
+        totalAmount: finalServiceCost,
+      };
+
+      await paymentService.createInvoice(selectedContract.residentId, invoiceBody);
+      
+      const discountText = discountPercent > 0 ? ` (giảm ${discountPercent}%)` : '';
+      alert(`Gia hạn hợp đồng và tạo hóa đơn thành công!\nChi phí gia hạn: ${finalServiceCost.toLocaleString('vi-VN')} VND${discountText}`);
+      
+      setShowExtensionModal(false);
+      setSelectedContract(null);
+      await fetchContracts();
+    } catch (err) {
+      console.error('Error extending contract:', err);
+      alert('Lỗi khi gia hạn hợp đồng: ' + (err.message || 'Unknown error'));
+    } finally {
+      setIsExtendingContract(false);
+    }
+  };
+
   const handleCreateRenewalInvoice = async (contract) => {
     setSelectedContract(contract);
     setSelectedPrescription(null);
@@ -228,14 +410,43 @@ export default function AdminContractManagementPage() {
     const nextEndDate = new Date(nextStartDate);
     nextEndDate.setFullYear(nextEndDate.getFullYear() + 1); // 1 year renewal
 
+    // Fetch existing invoices to avoid double-charging for already-paid service periods
+    let careServiceCost = (contract.servicePackagePrice || 0) * (contract.contractDurationMonths || 1);
+    try {
+      const invoicesResp = await paymentService.listInvoices(contract.residentId);
+      const invoices = Array.isArray(invoicesResp) ? invoicesResp : invoicesResp?.data || [];
+      
+      // Filter for paid SERVICE invoices
+      const paidServiceInvoices = invoices.filter(
+        (inv) => inv.type === 'SERVICE' && 
+                 (inv.paymentStatus === 'paid' || inv.status === 'paid') &&
+                 inv.careServiceCost > 0
+      );
+      
+      if (paidServiceInvoices.length > 0) {
+        // Sum up all careServiceCost from paid invoices
+        const totalPaidServiceCost = paidServiceInvoices.reduce((sum, inv) => sum + (inv.careServiceCost || 0), 0);
+        // Only charge for periods not yet billed
+        careServiceCost = Math.max(0, careServiceCost - totalPaidServiceCost);
+      }
+    } catch (err) {
+      console.warn('Unable to fetch invoices for service cost calculation:', err);
+      // Default to full cost if we can't fetch invoices
+    }
+
     setRenewalData({
       billingPeriodStart: nextStartDate.toISOString().split('T')[0],
       billingPeriodEnd: nextEndDate.toISOString().split('T')[0],
       roomCost: 0,
       medicationCost: '',
-      careServiceCost: contract.servicePackagePrice || 0,
+      careServiceCost,
       otherCost: 0,
       prescriptionId: null,
+      computedServiceFeeBreakdown: {
+        monthlyPrice: contract.servicePackagePrice || 0,
+        durationMonths: contract.contractDurationMonths || 1,
+        discountPercent: contract.contractDiscountPercent || 0,
+      },
     });
     setShowRenewalModal(true);
     await fetchActivePrescription(contract.residentId);
@@ -246,18 +457,26 @@ export default function AdminContractManagementPage() {
 
     setIsCreatingInvoice(true);
     try {
+      // compute service fee with discount
+      const monthly = renewalData.computedServiceFeeBreakdown?.monthlyPrice || 0;
+      const months = renewalData.computedServiceFeeBreakdown?.durationMonths || 1;
+      const discount = renewalData.computedServiceFeeBreakdown?.discountPercent || 0;
+      const grossService = monthly * months;
+      const netService = Math.round(grossService * (1 - discount / 100));
+
       const totalAmount =
-        (renewalData.roomCost || 0) +
+        /* roomCost intentionally 0 for contract-based billing */
+        0 +
         (renewalData.medicationCost || 0) +
-        (renewalData.careServiceCost || 0) +
+        netService +
         (renewalData.otherCost || 0);
 
       const invoiceBody = {
         billingPeriodStart: renewalData.billingPeriodStart,
         billingPeriodEnd: renewalData.billingPeriodEnd,
-        roomCost: renewalData.roomCost || 0,
+        roomCost: 0,
         medicationCost: renewalData.medicationCost === '' ? undefined : renewalData.medicationCost,
-        careServiceCost: renewalData.careServiceCost || 0,
+        careServiceCost: netService,
         otherCost: renewalData.otherCost || 0,
         prescriptionId: renewalData.prescriptionId,
         totalAmount,
@@ -355,6 +574,7 @@ export default function AdminContractManagementPage() {
                   <th>{t('admin.contractManagement.colResidentName')}</th>
                   <th>{t('admin.contractManagement.colStartDate')}</th>
                   <th>{t('admin.contractManagement.colEndDate')}</th>
+                  <th>Trạng thái hóa đơn</th>
                   <th>{t('admin.contractManagement.colStatus')}</th>
                   <th>{t('admin.contractManagement.colSignedDate')}</th>
                   <th>{t('admin.contractManagement.colActions')}</th>
@@ -367,6 +587,23 @@ export default function AdminContractManagementPage() {
                     <td>{contract.residentName}</td>
                     <td>{formatDate(contract.startDate)}</td>
                     <td>{formatDate(contract.endDate)}</td>
+                    <td>
+                      {contract.latestInvoice ? (
+                        <div className="inline-block px-3 py-1 rounded-full text-xs font-semibold">
+                          {contract.latestInvoiceStatus === 'paid' ? (
+                            <span className="bg-emerald-100 text-emerald-700">✓ Đã thanh toán</span>
+                          ) : contract.latestInvoiceStatus === 'partially_paid' ? (
+                            <span className="bg-amber-100 text-amber-700">◐ Thanh toán một phần</span>
+                          ) : (
+                            <span className="bg-red-100 text-red-700">✗ Chưa thanh toán</span>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="inline-block px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600">
+                          − Chưa có hóa đơn
+                        </div>
+                      )}
+                    </td>
                     <td>
                       <div className={`status-badge ${getContractStatusClass(contract.startDate, contract.endDate)}`}>
                         <div className="flex items-center gap-2">
@@ -381,13 +618,31 @@ export default function AdminContractManagementPage() {
                         <button className="btn-icon-primary" title={t('admin.contractManagement.viewDetails')}>
                           <Eye className="w-4 h-4" />
                         </button>
-                        {getContractStatusLabel(contract.startDate, contract.endDate) === 'expired' && (
+                        {/* Show create-invoice action when there is no invoice or invoice not paid */}
+                        {(!contract.latestInvoice || contract.latestInvoiceStatus !== 'paid') && (
                           <button
                             className="btn-icon-primary btn-create-invoice"
                             title={t('admin.contractManagement.createRenewalInvoice')}
                             onClick={() => handleCreateRenewalInvoice(contract)}
                           >
                             <Plus className="w-4 h-4" />
+                          </button>
+                        )}
+                        <button
+                          className="btn-icon-secondary"
+                          title="Tạo hóa đơn thuốc"
+                          onClick={() => openMedicationInvoiceModal(contract)}
+                        >
+                          🩺
+                        </button>
+                        {getContractStatusLabel(contract.startDate, contract.endDate) === 'expired' && (
+                          <button
+                            className="btn-icon-primary"
+                            title="Gia hạn hợp đồng"
+                            onClick={() => handleOpenExtensionModal(contract)}
+                            style={{ background: '#3b82f6', color: 'white' }}
+                          >
+                            ↻
                           </button>
                         )}
                       </div>
@@ -528,22 +783,6 @@ export default function AdminContractManagementPage() {
                   </div>
 
                   <div className="form-group">
-                    <label>{t('admin.contractManagement.roomCost')}</label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={renewalData.roomCost}
-                      onChange={(e) =>
-                        setRenewalData({
-                          ...renewalData,
-                          roomCost: parseFloat(e.target.value) || 0,
-                        })
-                      }
-                      className="form-input"
-                    />
-                  </div>
-
-                  <div className="form-group">
                     <label>{t('admin.contractManagement.medicationCost')}</label>
                     <input
                       type="number"
@@ -561,20 +800,22 @@ export default function AdminContractManagementPage() {
                     <p className="form-note">{t('admin.contractManagement.medicationCostNote')}</p>
                   </div>
 
+                  {/* Computed service fee from package price × duration (read-only) */}
                   <div className="form-group">
                     <label>{t('admin.contractManagement.careServiceCost')}</label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={renewalData.careServiceCost}
-                      onChange={(e) =>
-                        setRenewalData({
-                          ...renewalData,
-                          careServiceCost: parseFloat(e.target.value) || 0,
-                        })
-                      }
-                      className="form-input"
-                    />
+                    <div className="form-input readonly">
+                      {(() => {
+                        const monthly = renewalData.computedServiceFeeBreakdown?.monthlyPrice || 0;
+                        const months = renewalData.computedServiceFeeBreakdown?.durationMonths || 1;
+                        const discount = renewalData.computedServiceFeeBreakdown?.discountPercent || 0;
+                        const gross = monthly * months;
+                        const net = Math.round(gross * (1 - (discount / 100)));
+                        return `${net.toLocaleString('vi-VN')} VND`;
+                      })()}
+                      {renewalData.computedServiceFeeBreakdown?.discountPercent ? (
+                        <div className="text-xs text-slate-500 mt-1">(Đã áp dụng giảm giá {renewalData.computedServiceFeeBreakdown.discountPercent}%)</div>
+                      ) : null}
+                    </div>
                   </div>
 
                   <div className="form-group">
@@ -614,12 +855,20 @@ export default function AdminContractManagementPage() {
                   <div className="form-group-total">
                     <label>{t('admin.contractManagement.totalAmount')}</label>
                     <div className="total-amount">
-                      {(
-                        (renewalData.roomCost || 0) +
-                        (renewalData.medicationCost || 0) +
-                        (renewalData.careServiceCost || 0) +
-                        (renewalData.otherCost || 0)
-                      ).toLocaleString('vi-VN')}
+                      {(() => {
+                        // Recalculate service fee to ensure discount is applied
+                        const monthly = renewalData.computedServiceFeeBreakdown?.monthlyPrice || 0;
+                        const months = renewalData.computedServiceFeeBreakdown?.durationMonths || 1;
+                        const discount = renewalData.computedServiceFeeBreakdown?.discountPercent || 0;
+                        const grossService = monthly * months;
+                        const netService = Math.round(grossService * (1 - discount / 100));
+                        const total = 
+                          0 +
+                          (renewalData.medicationCost || 0) +
+                          netService +
+                          (renewalData.otherCost || 0);
+                        return total.toLocaleString('vi-VN');
+                      })()}
                     </div>
                   </div>
                 </>
@@ -642,6 +891,301 @@ export default function AdminContractManagementPage() {
                 disabled={isCreatingInvoice}
               >
                 {isCreatingInvoice ? t('admin.contractManagement.creatingInvoice') : t('admin.contractManagement.createInvoiceButton')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showMedicationModal && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h2>Tạo hóa đơn thuốc</h2>
+              <div className="flex gap-2">
+                <button
+                  className="btn-icon-secondary"
+                  title="Làm mới danh sách đơn thuốc"
+                  onClick={() => selectedContract && refreshMedicationPrescriptions(selectedContract.residentId)}
+                  disabled={medLoading}
+                >
+                  <RefreshCw className={`w-4 h-4 ${medLoading ? 'animate-spin' : ''}`} />
+                </button>
+                <button
+                  className="modal-close"
+                  onClick={() => {
+                    setShowMedicationModal(false);
+                    setSelectedContract(null);
+                  }}
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="modal-body">
+              {medLoading ? (
+                <div>Đang tải đơn thuốc...</div>
+              ) : medError ? (
+                <div className="alert alert-error">{medError}</div>
+              ) : (
+                <>
+                  <div className="form-group">
+                    <label>Chọn đơn thuốc</label>
+                    <select
+                      value={medSelectedId || ''}
+                      onChange={(e) => {
+                        setMedSelectedId(e.target.value);
+                        estimateMedCost(e.target.value);
+                      }}
+                      className="form-select"
+                    >
+                      <option value="">-- Chọn --</option>
+                      {medPrescriptions.map((p) => (
+                        <option key={p._id || p.id} value={p._id || p.id}>{`${p.prescriptionDate ? formatDate(p.prescriptionDate) : '---'} — ${p.doctorId?.fullName || 'Bác sĩ'}`}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {medSelectedId && (() => {
+                    const selectedPrx = getSelectedPrescriptionDetails();
+                    if (!selectedPrx) return null;
+                    const isExpired = isPrescriptionExpired(selectedPrx.validUntil);
+                    const invoiceStatus = selectedPrx.invoiceStatus || 'no_invoice';
+                    const paymentStatus = selectedPrx.paymentStatus || null;
+                    
+                    return (
+                      <>
+                        {/* Expiration Warning */}
+                        {isExpired && (
+                          <div className="alert alert-warning" style={{ marginBottom: '16px' }}>
+                            <AlertCircle className="inline w-4 h-4 mr-2" />
+                            <strong>⚠️ Cảnh báo:</strong> Đơn thuốc này đã quá hạn (hết hiệu lực: {formatDate(selectedPrx.validUntil)})
+                          </div>
+                        )}
+
+                        {/* Prescription Status and Payment Info */}
+                        <div className="form-group">
+                          <label>Thông tin đơn thuốc</label>
+                          <div style={{ background: '#f3f4f6', padding: '12px', borderRadius: '6px', fontSize: '14px' }}>
+                            <div style={{ marginBottom: '8px' }}>
+                              <strong>Trạng thái:</strong> {' '}
+                              <span style={{
+                                display: 'inline-block',
+                                padding: '2px 8px',
+                                borderRadius: '4px',
+                                background: isExpired ? '#fee2e2' : '#dcfce7',
+                                color: isExpired ? '#991b1b' : '#166534',
+                                fontSize: '12px',
+                                fontWeight: 'bold'
+                              }}>
+                                {isExpired ? '❌ Đã quá hạn' : '✓ Còn hiệu lực'}
+                              </span>
+                            </div>
+                            <div style={{ marginBottom: '8px' }}>
+                              <strong>Hết hiệu lực:</strong> {selectedPrx.validUntil ? formatDate(selectedPrx.validUntil) : '—'}
+                            </div>
+                            <div>
+                              <strong>Thanh toán:</strong> {' '}
+                              <span style={{
+                                display: 'inline-block',
+                                padding: '2px 8px',
+                                borderRadius: '4px',
+                                background: paymentStatus === 'paid' ? '#dcfce7' : paymentStatus === 'partially_paid' ? '#fef3c7' : '#fecaca',
+                                color: paymentStatus === 'paid' ? '#166534' : paymentStatus === 'partially_paid' ? '#92400e' : '#991b1b',
+                                fontSize: '12px',
+                                fontWeight: 'bold'
+                              }}>
+                                {paymentStatus === 'paid' ? '✓ Đã thanh toán' : paymentStatus === 'partially_paid' ? '◐ Thanh toán một phần' : '✗ Chưa thanh toán'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    );
+                  })()}
+
+                  <div className="form-group">
+                    <label>Ước tính chi phí thuốc</label>
+                    <div className="form-input readonly">{medEstimatedCost != null ? `${medEstimatedCost.toLocaleString('vi-VN')} VND` : '—'}</div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="modal-footer">
+              <button
+                className="btn-cancel"
+                onClick={() => {
+                  setShowMedicationModal(false);
+                  setSelectedContract(null);
+                }}
+              >
+                {t('admin.contractManagement.cancelButton')}
+              </button>
+              <button
+                className="btn-submit"
+                onClick={handleCreateMedicationInvoice}
+                disabled={medCreatingInvoice || !medSelectedId}
+              >
+                {medCreatingInvoice ? 'Đang tạo...' : 'Tạo hóa đơn'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Contract Extension Modal */}
+      {showExtensionModal && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h2>Gia hạn hợp đồng</h2>
+              <button
+                className="modal-close"
+                onClick={() => {
+                  setShowExtensionModal(false);
+                  setSelectedContract(null);
+                }}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="modal-body">
+              {selectedContract && (
+                <>
+                  <div className="form-group">
+                    <label>Số hợp đồng</label>
+                    <input
+                      type="text"
+                      value={selectedContract.contractNumber}
+                      disabled
+                      className="form-input"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Tên cư dân</label>
+                    <input
+                      type="text"
+                      value={selectedContract.residentName}
+                      disabled
+                      className="form-input"
+                    />
+                  </div>
+
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>Ngày hết hạn hiện tại</label>
+                      <input
+                        type="date"
+                        value={new Date(selectedContract.endDate).toISOString().split('T')[0]}
+                        disabled
+                        className="form-input"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Ngày hết hạn mới *</label>
+                      <input
+                        type="date"
+                        value={extensionData.newEndDate}
+                        onChange={(e) =>
+                          setExtensionData({
+                            ...extensionData,
+                            newEndDate: e.target.value,
+                          })
+                        }
+                        className="form-input"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>Giá gói dịch vụ (tháng)</label>
+                      <input
+                        type="text"
+                        value={`${(selectedContract.servicePackagePrice || 0).toLocaleString('vi-VN')} VND`}
+                        disabled
+                        className="form-input"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>% Giảm giá *</label>
+                      <input
+                        type="number"
+                        value={extensionData.discountPercent}
+                        onChange={(e) =>
+                          setExtensionData({
+                            ...extensionData,
+                            discountPercent: Math.max(0, Math.min(100, parseFloat(e.target.value) || 0)),
+                          })
+                        }
+                        min="0"
+                        max="100"
+                        step="1"
+                        className="form-input"
+                      />
+                    </div>
+                  </div>
+
+                  {extensionData.newEndDate && selectedContract && (
+                    <div className="form-group">
+                      <label>Chi phí gia hạn (sau giảm giá)</label>
+                      <div className="form-input readonly">
+                        <div style={{ fontSize: '14px', color: '#666' }}>
+                          {(() => {
+                            const currentEndDate = new Date(selectedContract.endDate);
+                            const finalCost = calculateExtensionCost(
+                              extensionData.newEndDate,
+                              currentEndDate,
+                              selectedContract.servicePackagePrice,
+                              extensionData.discountPercent
+                            );
+                            
+                            let monthsDiff = (new Date(extensionData.newEndDate).getFullYear() - currentEndDate.getFullYear()) * 12;
+                            monthsDiff += new Date(extensionData.newEndDate).getMonth() - currentEndDate.getMonth();
+                            
+                            const baseServiceCost = (selectedContract.servicePackagePrice || 0) * monthsDiff;
+                            
+                            return `${monthsDiff} tháng × ${(selectedContract.servicePackagePrice || 0).toLocaleString('vi-VN')} = ${baseServiceCost.toLocaleString('vi-VN')} VND`;
+                          })()}
+                        </div>
+                        <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#1e40af', marginTop: '8px' }}>
+                          {(() => {
+                            const currentEndDate = new Date(selectedContract.endDate);
+                            const finalCost = calculateExtensionCost(
+                              extensionData.newEndDate,
+                              currentEndDate,
+                              selectedContract.servicePackagePrice,
+                              extensionData.discountPercent
+                            );
+                            return `${finalCost.toLocaleString('vi-VN')} VND`;
+                          })()}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            <div className="modal-footer">
+              <button
+                className="btn-cancel"
+                onClick={() => {
+                  setShowExtensionModal(false);
+                  setSelectedContract(null);
+                }}
+              >
+                {t('admin.contractManagement.cancelButton')}
+              </button>
+              <button
+                className="btn-submit"
+                onClick={handleExtendContract}
+                disabled={isExtendingContract}
+              >
+                {isExtendingContract ? 'Đang xử lý...' : 'Gia hạn'}
               </button>
             </div>
           </div>

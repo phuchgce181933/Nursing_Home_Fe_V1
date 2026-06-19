@@ -68,6 +68,76 @@ const formatAge = (dob) => {
   return `${age} tuổi`;
 };
 
+// ─── Chuyển field name sang label tiếng Việt ───
+const getFieldLabel = (field) => {
+  const labels = {
+    // Physical Examination
+    general: 'Tổng quát',
+    cardiovascular: 'Tim mạch',
+    respiratory: 'Hô hấp',
+    abdominal: 'Bụng',
+    neurological: 'Thần kinh',
+    musculoskeletal: 'Cơ xương',
+    skin: 'Da',
+    other: 'Khác',
+    summary: 'Tóm tắt',
+    // Urinalysis Results
+    appearance: 'Hình thái',
+    color: 'Màu sắc',
+    pH: 'pH',
+    specificGravity: 'Trọng lượng riêng',
+    protein: 'Protein',
+    glucose: 'Glucose',
+    ketones: 'Ketone',
+    blood: 'Máu',
+    leukocyteEsterase: 'Bạch cầu esterase',
+    nitrites: 'Nitrit',
+    urobilinogen: 'Urobilinogen',
+    bilirubin: 'Bilirubin',
+    microscopy: 'Kính hiển vi',
+    notes: 'Ghi chú',
+    // ECG Results
+    heartRate: 'Nhịp tim',
+    rhythm: 'Nhịp điệu',
+    prInterval: 'Khoảng PR',
+    qrsDuration: 'Thời gian QRS',
+    qtInterval: 'Khoảng QT',
+    axis: 'Trục',
+    interpretation: 'Giải thích',
+    // Cognitive Function
+    assessmentTool: 'Công cụ đánh giá',
+    score: 'Điểm số',
+    orientation: 'Định hướng',
+    memory: 'Trí nhớ',
+    attention: 'Chú ý',
+    language: 'Ngôn ngữ',
+    executiveFunction: 'Chức năng thực hành',
+    // Functional Status
+    mobility: 'Độ linh hoạt',
+    transfers: 'Chuyển vị',
+    adls: 'Hoạt động hàng ngày',
+    iadls: 'Hoạt động có công cụ',
+    assistanceRequired: 'Sự hỗ trợ cần thiết',
+    // Fall Risk
+    level: 'Mức độ',
+    historyOfFalls: 'Lịch sử té ngã',
+    gait: 'Dáng đi',
+    balance: 'Cân bằng',
+    medications: 'Thuốc',
+    vision: 'Thị lực',
+    cognition: 'Nhận thức',
+    // Nutritional Status
+    bmi: 'BMI',
+    weightChange: 'Thay đổi cân nặng',
+    appetite: 'Cảm giác thèm ăn',
+    dietType: 'Loại chế độ ăn',
+    swallowing: 'Khả năng nuốt',
+    proteinIntake: 'Lượng protein',
+    hydration: 'Tình trạng nước',
+  };
+  return labels[field] || (field.charAt(0).toUpperCase() + field.slice(1));
+};
+
 // ─── Xuất CSV (client-side) ───
 const exportToCSV = (records, resident) => {
   if (!records.length) return;
@@ -1306,7 +1376,7 @@ export default function HealthMonitoringPage() {
                           <div className="hm-form-grid">
                             {['general', 'cardiovascular', 'respiratory', 'abdominal', 'neurological', 'musculoskeletal', 'skin', 'other', 'summary'].map(field => (
                               <div key={field} className="hm-form-group">
-                                <label className="hm-form-label">{field === 'summary' ? 'Tóm tắt' : field.charAt(0).toUpperCase() + field.slice(1)}</label>
+                                <label className="hm-form-label">{getFieldLabel(field)}</label>
                                 <input type="text" className="hm-form-input" placeholder={`Nhập ${field}...`} value={form.physicalExamination[field] || ''} onChange={(e) => setForm(prev => ({ ...prev, physicalExamination: { ...prev.physicalExamination, [field]: e.target.value } }))} />
                               </div>
                             ))}
@@ -1353,7 +1423,7 @@ export default function HealthMonitoringPage() {
                           <div className="hm-form-grid">
                             {['appearance', 'color', 'pH', 'specificGravity', 'protein', 'glucose', 'ketones', 'blood', 'leukocyteEsterase', 'nitrites', 'urobilinogen', 'bilirubin', 'microscopy', 'notes'].map(field => (
                               <div key={field} className="hm-form-group">
-                                <label className="hm-form-label">{field.charAt(0).toUpperCase() + field.slice(1)}</label>
+                                <label className="hm-form-label">{getFieldLabel(field)}</label>
                                 <input type={field === 'pH' || field === 'specificGravity' ? 'number' : 'text'} className="hm-form-input" step="0.01" placeholder={`Nhập ${field}...`} value={form.urinalysisResults[field] || ''} onChange={(e) => setForm(prev => ({ ...prev, urinalysisResults: { ...prev.urinalysisResults, [field]: e.target.value } }))} />
                               </div>
                             ))}
@@ -1370,7 +1440,7 @@ export default function HealthMonitoringPage() {
                           <div className="hm-form-grid">
                             {['heartRate', 'rhythm', 'prInterval', 'qrsDuration', 'qtInterval', 'axis', 'interpretation', 'notes'].map(field => (
                               <div key={field} className="hm-form-group">
-                                <label className="hm-form-label">{field.charAt(0).toUpperCase() + field.slice(1)}</label>
+                                <label className="hm-form-label">{getFieldLabel(field)}</label>
                                 <input type={field === 'heartRate' ? 'number' : 'text'} className="hm-form-input" placeholder={`Nhập ${field}...`} value={form.ecgResults[field] || ''} onChange={(e) => setForm(prev => ({ ...prev, ecgResults: { ...prev.ecgResults, [field]: e.target.value } }))} />
                               </div>
                             ))}
@@ -1427,7 +1497,7 @@ export default function HealthMonitoringPage() {
                           <div className="hm-form-grid">
                             {['assessmentTool', 'score', 'orientation', 'memory', 'attention', 'language', 'executiveFunction', 'notes'].map(field => (
                               <div key={field} className="hm-form-group">
-                                <label className="hm-form-label">{field.charAt(0).toUpperCase() + field.slice(1)}</label>
+                                <label className="hm-form-label">{getFieldLabel(field)}</label>
                                 <input type="text" className="hm-form-input" placeholder={`Nhập ${field}...`} value={form.cognitiveFunction[field] || ''} onChange={(e) => setForm(prev => ({ ...prev, cognitiveFunction: { ...prev.cognitiveFunction, [field]: e.target.value } }))} />
                               </div>
                             ))}
@@ -1444,7 +1514,7 @@ export default function HealthMonitoringPage() {
                           <div className="hm-form-grid">
                             {['mobility', 'transfers', 'adls', 'iadls', 'assistanceRequired', 'notes'].map(field => (
                               <div key={field} className="hm-form-group">
-                                <label className="hm-form-label">{field.charAt(0).toUpperCase() + field.slice(1)}</label>
+                                <label className="hm-form-label">{getFieldLabel(field)}</label>
                                 <input type="text" className="hm-form-input" placeholder={`Nhập ${field}...`} value={form.functionalStatus[field] || ''} onChange={(e) => setForm(prev => ({ ...prev, functionalStatus: { ...prev.functionalStatus, [field]: e.target.value } }))} />
                               </div>
                             ))}
@@ -1475,7 +1545,7 @@ export default function HealthMonitoringPage() {
                             </div>
                             {['gait', 'balance', 'medications', 'vision', 'cognition', 'notes'].map(field => (
                               <div key={field} className="hm-form-group">
-                                <label className="hm-form-label">{field.charAt(0).toUpperCase() + field.slice(1)}</label>
+                                <label className="hm-form-label">{getFieldLabel(field)}</label>
                                 <input type="text" className="hm-form-input" placeholder={`Nhập ${field}...`} value={form.fallRisk[field] || ''} onChange={(e) => setForm(prev => ({ ...prev, fallRisk: { ...prev.fallRisk, [field]: e.target.value } }))} />
                               </div>
                             ))}
@@ -1492,7 +1562,7 @@ export default function HealthMonitoringPage() {
                           <div className="hm-form-grid">
                             {['bmi', 'weightChange', 'appetite', 'dietType', 'swallowing', 'proteinIntake', 'hydration', 'notes'].map(field => (
                               <div key={field} className="hm-form-group">
-                                <label className="hm-form-label">{field.charAt(0).toUpperCase() + field.slice(1)}</label>
+                                <label className="hm-form-label">{getFieldLabel(field)}</label>
                                 <input type={field === 'bmi' ? 'number' : 'text'} className="hm-form-input" step="0.1" placeholder={`Nhập ${field}...`} value={form.nutritionalStatus[field] || ''} onChange={(e) => setForm(prev => ({ ...prev, nutritionalStatus: { ...prev.nutritionalStatus, [field]: e.target.value } }))} />
                               </div>
                             ))}
