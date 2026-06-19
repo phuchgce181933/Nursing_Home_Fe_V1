@@ -8,21 +8,21 @@ function shiftLabel(shift, shiftFallback) {
   return `${name} · ${shift.startTime || '—'}–${shift.endTime || '—'}`;
 }
 
-function CareTasksTable({ tasks, loading, onView, onQuickStatus }) {
+function CareTasksTable({ tasks, loading, onView, onQuickStatus, ns = 'caregiver.dailyCareSchedule' }) {
   const { t } = useTranslation();
 
   return (
     <>
-      <h3 className="daily-care-page__section-title">{t('caregiver.dailyCareSchedule.tasksToday')}</h3>
+      <h3 className="daily-care-page__section-title">{t(`${ns}.tasksToday`)}</h3>
       <div className="resident-page__table">
         <table className="resident-page__table-element">
           <thead>
             <tr className="resident-page__table-header">
               <th>{t('common.colTime')}</th>
               <th>{t('common.colResident')}</th>
-              <th>{t('caregiver.dailyCareSchedule.colTaskType')}</th>
-              <th>{t('caregiver.dailyCareSchedule.colCareLevel')}</th>
-              <th>{t('caregiver.dailyCareSchedule.colShift')}</th>
+              <th>{t(`${ns}.colTaskType`)}</th>
+              <th>{t(`${ns}.colCareLevel`)}</th>
+              <th>{t(`${ns}.colShift`)}</th>
               <th>{t('common.colStatus')}</th>
               <th>{t('common.colActions')}</th>
             </tr>
@@ -38,7 +38,7 @@ function CareTasksTable({ tasks, loading, onView, onQuickStatus }) {
             {!loading && tasks.length === 0 && (
               <tr>
                 <td colSpan={7} className="empty-state">
-                  {t('caregiver.dailyCareSchedule.emptyTasks')}
+                  {t(`${ns}.emptyTasks`)}
                 </td>
               </tr>
             )}
@@ -49,10 +49,10 @@ function CareTasksTable({ tasks, loading, onView, onQuickStatus }) {
                     <strong>{task.scheduledTime || '—'}</strong>
                   </td>
                   <td>{task.residentId?.fullName || task.residentId?.residentCode || '—'}</td>
-                  <td>{careTaskTypeLabel(task.taskType)}</td>
+                  <td>{careTaskTypeLabel(task.taskType, t)}</td>
                   <td>{t(`common.careLevel.${task.careLevel}`, { defaultValue: task.careLevel || '—' })}</td>
                   <td>
-                    <small>{shiftLabel(task.shiftId, t('caregiver.dailyCareSchedule.colShift'))}</small>
+                    <small>{shiftLabel(task.shiftId, t(`${ns}.colShift`))}</small>
                   </td>
                   <td>
                     <span className={`daily-care-page__status daily-care-page__status--${task.status}`}>
@@ -73,7 +73,7 @@ function CareTasksTable({ tasks, loading, onView, onQuickStatus }) {
                         className="resident-page__button resident-page__button--primary"
                         onClick={() => onQuickStatus(task)}
                       >
-                        {t('caregiver.dailyCareSchedule.update')}
+                        {t(`${ns}.update`)}
                       </button>
                     )}
                   </td>

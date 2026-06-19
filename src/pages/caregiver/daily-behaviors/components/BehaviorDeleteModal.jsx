@@ -1,4 +1,9 @@
+import { useTranslation } from 'react-i18next';
+
 function BehaviorDeleteModal({ open, recordSummary, deleting, error, onClose, onConfirm }) {
+  const { t } = useTranslation();
+  const ns = 'caregiver';
+
   if (!open) return null;
 
   return (
@@ -10,21 +15,21 @@ function BehaviorDeleteModal({ open, recordSummary, deleting, error, onClose, on
         aria-modal="true"
       >
         <div className="behavior-page__modal-header">
-          <h3 className="behavior-page__modal-title">Xóa ghi nhận hành vi</h3>
+          <h3 className="behavior-page__modal-title">{t(`${ns}.dailyBehaviors.deleteModal.title`)}</h3>
           <button type="button" className="behavior-page__modal-close" onClick={onClose} disabled={deleting}>
             ×
           </button>
         </div>
         <div className="behavior-page__modal-body">
-          <p>Bạn có chắc muốn xóa bản ghi này?</p>
+          <p>{t(`${ns}.dailyBehaviors.deleteModal.confirm`)}</p>
           <p className="behavior-page__delete-summary">{recordSummary || '—'}</p>
           {error && <p className="form-error">{error}</p>}
           <div className="behavior-page__actions">
             <button type="button" className="btn btn--delete" disabled={deleting} onClick={onConfirm}>
-              {deleting ? 'Đang xóa...' : 'Xóa'}
+              {deleting ? t(`${ns}.common.deleting`) : t('common.delete')}
             </button>
             <button type="button" className="btn-secondary" disabled={deleting} onClick={onClose}>
-              Hủy
+              {t('common.cancel')}
             </button>
           </div>
         </div>

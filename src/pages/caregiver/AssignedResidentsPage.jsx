@@ -242,7 +242,7 @@ function AssignedResidentsPage() {
                     <td>{row.residentCode || '—'}</td>
                     <td>{row.fullName || '—'}</td>
                     <td>{t(`common.gender.${row.gender}`, { defaultValue: row.gender || '—' })}</td>
-                    <td>{formatResidentAreaLine(row) || '—'}</td>
+                    <td>{formatResidentAreaLine(row, t) || '—'}</td>
                     <td className={hasAllergy ? 'assigned-residents-page__allergy-tags' : undefined}>
                       {allergies}
                     </td>

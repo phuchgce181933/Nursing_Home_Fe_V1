@@ -17,8 +17,11 @@ const today = () => getLocalDateString();
 function DailyCareSchedulePage() {
   const { t } = useTranslation();
   const { pathname } = useLocation();
-  const isNurseRoute = pathname.includes('/nurse/') || pathname.includes('/doctor/');
-  const ns = isNurseRoute ? 'nurse.careTasks' : 'caregiver.dailyCareSchedule';
+  const ns = pathname.includes('/doctor/')
+    ? 'doctor.careTasks'
+    : pathname.includes('/nurse/')
+      ? 'nurse.careTasks'
+      : 'caregiver.dailyCareSchedule';
 
   const [workDate, setWorkDate] = useState(today());
   const [status, setStatus] = useState('');
@@ -100,6 +103,7 @@ function DailyCareSchedulePage() {
       <CareTasksTable
         tasks={tasks}
         loading={loading}
+        ns={ns}
         onView={(row) => setTaskModal({ taskId: row._id, mode: 'view' })}
         onQuickStatus={(row) => setTaskModal({ taskId: row._id, mode: 'update' })}
       />

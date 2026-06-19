@@ -1,3 +1,6 @@
+import i18n from '../i18n';
+import { floorLabel } from './residentArea';
+
 /**
  * @param {import('../types/staffAvailability').StaffAvailabilityRow} person
  */
@@ -21,15 +24,20 @@ export const formatExpertiseLabel = (person) => {
   return specialty || certPart || '—';
 };
 
+function resolveT(t) {
+  return t || ((key, opts) => i18n.t(key, opts));
+}
+
 /** Human-readable floor names from staffProfile.responsibleAreaIds */
-export const formatResponsibleFloorLabels = (person) => {
+export const formatResponsibleFloorLabels = (person, t) => {
+  const tt = resolveT(t);
   const areas = person?.staffProfile?.responsibleAreaIds ?? person?.responsibleAreaIds;
   if (!Array.isArray(areas) || !areas.length) return '—';
 
   const labels = areas
     .map((a) => {
       if (typeof a === 'object' && a !== null) {
-        return a.name || (a.floorNumber != null ? `Tầng ${a.floorNumber}` : null);
+        return floorLabel(a, tt) || a.name || null;
       }
       return null;
     })
@@ -38,5 +46,7 @@ export const formatResponsibleFloorLabels = (person) => {
   return labels.length ? labels.join(', ') : '—';
 };
 
-export const formatTaskSummary = (person) =>
-  person?.hasTasks ? 'Có nhiệm vụ' : '—';
+export const formatTaskSummary = (person, t) => {
+  const tt = resolveT(t);
+  return person?.hasTasks ? tt('admin.staff.emergency.hasTasks') : '—';
+};

@@ -1,9 +1,9 @@
 import { useTranslation } from 'react-i18next';
-import { formatVNDateTime, intakeStatusLabel, mealTypeLabel } from '../../../../utils/nutritionLabels';
+import { formatLocaleDateTime, intakeStatusLabel, mealTypeLabel } from '../../../../utils/nutritionLabels';
 import '../../../../styles/caregiver/MealIntakeNotesPage.css';
 
 function MealIntakeRecordsTable({ records, loading, onEdit, onDelete }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   return (
     <>
@@ -40,11 +40,11 @@ function MealIntakeRecordsTable({ records, loading, onEdit, onDelete }) {
               records.map((row) => (
                 <tr key={row._id}>
                   <td>{row.residentId?.fullName || row.residentId?.residentCode || '—'}</td>
-                  <td>{mealTypeLabel(row.mealType)}</td>
+                  <td>{mealTypeLabel(row.mealType, t)}</td>
                   <td>{row.plannedMealName || '—'}</td>
-                  <td>{intakeStatusLabel(row.intakeStatus)}</td>
+                  <td>{intakeStatusLabel(row.intakeStatus, t)}</td>
                   <td>{row.intakeStatus === 'partial' ? `${row.portionPercent ?? '—'}%` : '—'}</td>
-                  <td>{formatVNDateTime(row.recordedAt)}</td>
+                  <td>{formatLocaleDateTime(row.recordedAt, i18n.language)}</td>
                   <td className="meal-intake-page__row-actions">
                     <button
                       type="button"

@@ -10,7 +10,6 @@ import { ADMIN_LIST_PAGE_SIZE } from '../../../../constants/adminListPage';
 import useDebouncedSearch from '../../../../hooks/useDebouncedSearch';
 import '../../../../styles/admin/PreExistingConditionsPage.css';
 import '../../../../styles/admin/residentActionIcons.css';
-import { GENDER_LABELS, RESIDENCY_LABELS } from '../_shared/residentLabels';
 
 const emptyForm = () => ({
   chronicConditions: '',
@@ -25,18 +24,20 @@ const parseCommaList = (value) =>
     .map((s) => s.trim())
     .filter(Boolean);
 
-/** Số mục từng nhóm — không phải "hoàn thành X/Y phần". */
-function formatPreExistingListStatus(row) {
-  if (!row?.hasPreExistingRecord) return 'Chưa ghi';
+function formatPreExistingListStatus(row, t) {
+  if (!row?.hasPreExistingRecord) return t('admin.residents.common.noRecord');
   const chronic = row.chronicConditionsCount || 0;
   const history = row.medicalHistoryCount || 0;
   const parts = [];
-  if (chronic > 0) parts.push(`Bệnh nền: ${chronic} mục`);
-  if (history > 0) parts.push(`Tiền sử: ${history} mục`);
-  if (!parts.length) return 'Đã ghi nhận';
+  if (chronic > 0) parts.push(t('admin.residents.common.chronicCount', { count: chronic }));
+  if (history > 0) parts.push(t('admin.residents.common.historyCount', { count: history }));
+  if (!parts.length) return t('admin.residents.common.recorded');
   const filledSections = (chronic > 0 ? 1 : 0) + (history > 0 ? 1 : 0);
-  const sectionNote = filledSections < 2 ? ` (${filledSections}/2 phần)` : '';
-  return `Đã ghi${sectionNote} · ${parts.join(' · ')}`;
+  const base =
+    filledSections < 2
+      ? t('admin.residents.common.recordedPartial', { sections: filledSections })
+      : t('admin.residents.common.recorded');
+  return `${base} · ${parts.join(' · ')}`;
 }
 
 export default function PreExistingConditionsPage() {
@@ -85,12 +86,12 @@ export default function PreExistingConditionsPage() {
       setTotalPages(res.totalPages ?? 1);
       if (res._fallback) setShowRouteHint(true);
     } catch (e) {
-      setListError(e.response?.data?.message || 'Không thể tải danh sách cư dân');
+      setListError(e.response?.data?.message || t('admin.residents.common.loadListFailed'));
       setResidents([]);
     } finally {
       if (!silent) setListLoading(false);
     }
-  }, [page, debouncedSearch, statusFilter, recordedFilter]);
+  }, [page, debouncedSearch, statusFilter, recordedFilter, t]);
 
   const loadDetail = useCallback(async (residentId) => {
     if (!residentId) {
@@ -112,7 +113,7 @@ export default function PreExistingConditionsPage() {
       });
     } catch (e) {
       const status = e?.response?.status;
-      const message = e.response?.data?.message || 'Không thể tải bệnh lý nền và tiền sử bệnh';
+      const message = e.response?.data?.message || t('admin.residents.preExistingConditions.loadFailed');
       setDetailError(message);
       if (status === 404 || status === 400 || status === 403) setShowRouteHint(true);
       setDetailData(null);
@@ -120,7 +121,7 @@ export default function PreExistingConditionsPage() {
     } finally {
       setDetailLoading(false);
     }
-  }, []);
+  }, [t]);
 
   const refreshAfterSave = useCallback(async () => {
     const tasks = [loadList({ silent: true })];
@@ -162,7 +163,7 @@ export default function PreExistingConditionsPage() {
     const chronicList = parseCommaList(form.chronicConditions);
     const historyList = parseCommaList(form.medicalHistory);
     if (!chronicList.length && !historyList.length) {
-      return 'Cần nhập ít nhất một mục bệnh lý nền hoặc tiền sử bệnh';
+      return t('admin.residents.preExistingConditions.requireOneField');
     }
     return '';
   };
@@ -170,7 +171,7 @@ export default function PreExistingConditionsPage() {
   const handleSave = async (e) => {
     e.preventDefault();
     if (!selectedId) {
-      setFormError('Chưa chọn cư dân');
+      setFormError(t('admin.residents.common.noResidentSelected'));
       return;
     }
     const error = validateForm();
@@ -193,14 +194,14 @@ export default function PreExistingConditionsPage() {
       if (res._fallback) setShowRouteHint(true);
       setPanelMsg(
         res._partialMedicalHistory
-          ? `${res.message || 'Đã lưu một phần'} — vui lòng bật API PUT /residents/:id/pre-existing-conditions trên backend để lưu tiền sử bệnh.`
-          : res.message || 'Đã cập nhật bệnh lý nền và tiền sử bệnh'
+          ? `${res.message || t('admin.residents.preExistingConditions.saveSuccess')} — ${t('admin.residents.preExistingConditions.routeHintPartial')}`
+          : res.message || t('admin.residents.preExistingConditions.saveSuccess')
       );
       await refreshAfterSave();
       setEditPopup(false);
     } catch (e) {
       const status = e?.response?.status;
-      setFormError(e.response?.data?.message || 'Cập nhật thất bại');
+      setFormError(e.response?.data?.message || t('admin.residents.preExistingConditions.updateFailed'));
       if (status === 404 || status === 400 || status === 403) setShowRouteHint(true);
     } finally {
       setSaving(false);
@@ -218,16 +219,16 @@ export default function PreExistingConditionsPage() {
       <div className="resident-page__filters">
         <div className="resident-page__filter-row">
           <label className="resident-page__filter">
-            <span>Tìm kiếm</span>
+            <span>{t('admin.residents.common.search')}</span>
             <input
               type="search"
-              placeholder="Tên hoặc mã cư dân..."
+              placeholder={t('admin.residents.common.searchPlaceholder')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </label>
           <label className="resident-page__filter">
-            <span>Trạng thái</span>
+            <span>{t('admin.residents.common.status')}</span>
             <select
               value={statusFilter}
               onChange={(e) => {
@@ -235,14 +236,14 @@ export default function PreExistingConditionsPage() {
                 setPage(1);
               }}
             >
-              <option value="admitted">Đang điều trị</option>
-              <option value="pending">Chờ nhập viện</option>
-              <option value="discharged">Đã xuất viện</option>
-              <option value="">Tất cả trạng thái</option>
+              <option value="admitted">{t('common.residency.admitted')}</option>
+              <option value="pending">{t('common.residency.pending')}</option>
+              <option value="discharged">{t('common.residency.discharged')}</option>
+              <option value="">{t('common.allStatuses')}</option>
             </select>
           </label>
           <label className="resident-page__filter">
-            <span>Hồ sơ</span>
+            <span>{t('admin.residents.common.filterRecord')}</span>
             <select
               value={recordedFilter}
               onChange={(e) => {
@@ -250,9 +251,9 @@ export default function PreExistingConditionsPage() {
                 setPage(1);
               }}
             >
-              <option value="">Tất cả hồ sơ</option>
-              <option value="false">Chưa ghi nhận</option>
-              <option value="true">Đã ghi nhận</option>
+              <option value="">{t('admin.residents.common.filterRecordAll')}</option>
+              <option value="false">{t('admin.residents.common.notRecordedYet')}</option>
+              <option value="true">{t('admin.residents.common.recorded')}</option>
             </select>
           </label>
         </div>
@@ -265,24 +266,24 @@ export default function PreExistingConditionsPage() {
         <table className="resident-page__table-element">
           <thead>
             <tr className="resident-page__table-header">
-              <th>Mã</th>
-              <th>Họ tên</th>
-              <th>Trạng thái hồ sơ</th>
-              <th>Thao tác</th>
+              <th>{t('admin.residents.common.colCode')}</th>
+              <th>{t('admin.residents.common.colFullName')}</th>
+              <th>{t('admin.residents.preExistingConditions.colRecordStatus')}</th>
+              <th>{t('admin.residents.common.colActions')}</th>
             </tr>
           </thead>
           <tbody>
             {listLoading && (
               <tr>
                 <td colSpan={4} className="empty-state">
-                  Đang tải...
+                  {t('common.loading')}
                 </td>
               </tr>
             )}
             {!listLoading && residents.length === 0 && (
               <tr>
                 <td colSpan={4} className="empty-state">
-                  Không có cư dân nào
+                  {t('admin.residents.common.noResidents')}
                 </td>
               </tr>
             )}
@@ -291,13 +292,13 @@ export default function PreExistingConditionsPage() {
                 <tr key={r._id}>
                   <td style={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>{r.residentCode}</td>
                   <td style={{ fontWeight: 600 }}>{r.fullName}</td>
-                  <td className="pre-existing-status-cell">{formatPreExistingListStatus(r)}</td>
+                  <td className="pre-existing-status-cell">{formatPreExistingListStatus(r, t)}</td>
                   <td className="resident-action-cell">
                     <div className="resident-action-group">
                       <button
                         type="button"
                         className="resident-icon-btn resident-icon-btn--view"
-                        title="Xem chi tiết"
+                        title={t('admin.residents.common.viewResidentDetail')}
                         onClick={() => openViewPopup(r)}
                       >
                         <FaEye />
@@ -305,7 +306,7 @@ export default function PreExistingConditionsPage() {
                       <button
                         type="button"
                         className="resident-icon-btn resident-icon-btn--edit"
-                        title="Sửa"
+                        title={t('admin.residents.common.edit')}
                         onClick={() => openEditPopup(r)}
                       >
                         <FaPen />
@@ -328,7 +329,7 @@ export default function PreExistingConditionsPage() {
       {viewPopup && (
         <div className="modal-overlay" onClick={() => setViewPopup(false)}>
           <div className="modal modal--wide" onClick={(e) => e.stopPropagation()}>
-            <h2 className="modal__title">Chi tiết bệnh lý nền và tiền sử bệnh</h2>
+            <h2 className="modal__title">{t('admin.residents.preExistingConditions.viewModalTitle')}</h2>
             <ResidentContextBlock
               resident={resident}
               summary={selectedSummary}
@@ -336,7 +337,7 @@ export default function PreExistingConditionsPage() {
               showStatus
             />
             {detailLoading ? (
-              <div className="empty-state">Đang tải thông tin...</div>
+              <div className="empty-state">{t('admin.residents.common.loadingDetail')}</div>
             ) : detailError && !detailData ? (
               <div className="empty-state">
                 <p>{detailError}</p>
@@ -346,33 +347,35 @@ export default function PreExistingConditionsPage() {
                   style={{ marginTop: 12 }}
                   onClick={() => loadDetail(selectedId)}
                 >
-                  Thử tải lại
+                  {t('admin.residents.common.retryLoad')}
                 </button>
               </div>
             ) : (
               <>
                 <div className="detail-row">
-                  <strong>Bệnh lý nền / mạn tính:</strong>{' '}
+                  <strong>{t('admin.residents.common.chronicConditions')}:</strong>{' '}
                   {detailData?.preExistingConditions?.chronicConditions?.length
                     ? detailData.preExistingConditions.chronicConditions.join(', ')
-                    : 'Không có'}
+                    : t('admin.residents.common.none')}
                 </div>
                 <div className="detail-row">
-                  <strong>Tiền sử bệnh (trước vào viện):</strong>{' '}
+                  <strong>{t('admin.residents.preExistingConditions.historyBeforeAdmission')}:</strong>{' '}
                   {detailData?.preExistingConditions?.medicalHistory?.length
                     ? detailData.preExistingConditions.medicalHistory.join(', ')
-                    : 'Không có'}
+                    : t('admin.residents.common.none')}
                 </div>
                 {detailData?.preExistingConditions?.updatedAt && (
                   <p className="pre-existing-panel__updated">
-                    Cập nhật lần cuối: {formatLeaveDate(detailData.preExistingConditions.updatedAt)}
+                    {t('admin.residents.common.lastUpdated', {
+                      date: formatLeaveDate(detailData.preExistingConditions.updatedAt),
+                    })}
                   </p>
                 )}
               </>
             )}
             <div className="modal__actions">
               <button type="button" className="btn-cancel" onClick={() => setViewPopup(false)}>
-                Đóng
+                {t('admin.residents.common.close')}
               </button>
               {selectedSummary && (
                 <button
@@ -383,7 +386,7 @@ export default function PreExistingConditionsPage() {
                     openEditPopup(selectedSummary);
                   }}
                 >
-                  Chỉnh sửa
+                  {t('admin.residents.initialHealth.updateAction')}
                 </button>
               )}
             </div>
@@ -393,7 +396,7 @@ export default function PreExistingConditionsPage() {
       {editPopup && (
         <div className="modal-overlay" onClick={() => setEditPopup(false)}>
           <div className="modal modal--wide" onClick={(e) => e.stopPropagation()}>
-            <h2 className="modal__title">Cập nhật bệnh lý nền và tiền sử bệnh</h2>
+            <h2 className="modal__title">{t('admin.residents.preExistingConditions.editModalTitle')}</h2>
             <ResidentContextBlock
               resident={resident}
               summary={selectedSummary}
@@ -401,7 +404,7 @@ export default function PreExistingConditionsPage() {
               showStatus
             />
             {detailLoading ? (
-              <div className="empty-state">Đang tải thông tin...</div>
+              <div className="empty-state">{t('admin.residents.common.loadingDetail')}</div>
             ) : detailError && !detailData ? (
               <div className="empty-state">
                 <p>{detailError}</p>
@@ -411,7 +414,7 @@ export default function PreExistingConditionsPage() {
                   style={{ marginTop: 12 }}
                   onClick={() => loadDetail(selectedId)}
                 >
-                  Thử tải lại
+                  {t('admin.residents.common.retryLoad')}
                 </button>
               </div>
             ) : (
@@ -421,30 +424,30 @@ export default function PreExistingConditionsPage() {
                 <form onSubmit={handleSave}>
                   <div className="form-grid">
                     <div className="form-group form-grid--full">
-                      <label>Bệnh lý nền / mạn tính (ngăn cách bằng dấu phẩy)</label>
+                      <label>{t('admin.residents.preExistingConditions.chronicLabel')}</label>
                       <textarea
                         value={form.chronicConditions}
                         onChange={(e) => setField('chronicConditions', e.target.value)}
-                        placeholder="Ví dụ: Hen suyễn, Tiểu đường type 2"
+                        placeholder={t('admin.residents.preExistingConditions.chronicPlaceholder')}
                         rows={4}
                       />
                     </div>
                     <div className="form-group form-grid--full">
-                      <label>Tiền sử bệnh (ngăn cách bằng dấu phẩy)</label>
+                      <label>{t('admin.residents.preExistingConditions.historyLabel')}</label>
                       <textarea
                         value={form.medicalHistory}
                         onChange={(e) => setField('medicalHistory', e.target.value)}
-                        placeholder="Ví dụ: Sốt xuất huyết năm 2020"
+                        placeholder={t('admin.residents.preExistingConditions.historyPlaceholder')}
                         rows={4}
                       />
                     </div>
                   </div>
                   <div className="modal__actions">
                     <button type="button" className="btn-cancel" onClick={() => setEditPopup(false)}>
-                      Đóng
+                      {t('admin.residents.common.close')}
                     </button>
                     <button type="submit" className="btn-save" disabled={saving}>
-                      {saving ? 'Đang lưu...' : 'Cập nhật'}
+                      {saving ? t('common.saving') : t('admin.residents.initialHealth.updateAction')}
                     </button>
                   </div>
                 </form>

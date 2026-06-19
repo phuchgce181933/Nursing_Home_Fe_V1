@@ -6,7 +6,7 @@ import useClientPagination from '../../../hooks/useClientPagination';
 import useDebouncedSearch from '../../../hooks/useDebouncedSearch';
 import caregiverDietPlanService from '../../../services/caregiverDietPlan.service';
 import { getLocalDateString } from '../../../utils/dateUtils';
-import { formatVNDate } from '../../../utils/nutritionLabels';
+import { formatLocaleDate } from '../../../utils/nutritionLabels';
 import '../../../styles/caregiver/DietPlansPage.css';
 import DietPlanDetailModal from './components/DietPlanDetailModal';
 
@@ -17,7 +17,7 @@ function StatusCell({ ok }) {
 }
 
 function DietPlansPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { search, setSearch, debouncedSearch } = useDebouncedSearch();
   const [workDate, setWorkDate] = useState(today());
   const [residentId, setResidentId] = useState('');
@@ -136,7 +136,7 @@ function DietPlansPage() {
 
       {dayMeta && (
         <p className="diet-plans-page__day-banner">
-          {t('caregiver.dietPlans.dayBanner', { date: formatVNDate(workDate) })}{' '}
+          {t('caregiver.dietPlans.dayBanner', { date: formatLocaleDate(workDate, i18n.language) })}{' '}
           {dayMeta.hasPublishedMealPlanDay
             ? t('caregiver.dietPlans.hasMealPlan', {
                 title: dayMeta.mealPlanDayTitle ? ` (${dayMeta.mealPlanDayTitle})` : '',
@@ -189,7 +189,10 @@ function DietPlansPage() {
                   <td>
                     <StatusCell ok={row.hasMealPlan} />
                     {row.hasMealPlan && (
-                      <span className="diet-plans-page__meal-meta"> ({row.mealPlanMealCount} bữa)</span>
+                      <span className="diet-plans-page__meal-meta">
+                        {' '}
+                        ({t('caregiver.common.mealCount', { count: row.mealPlanMealCount })})
+                      </span>
                     )}
                   </td>
                   <td>

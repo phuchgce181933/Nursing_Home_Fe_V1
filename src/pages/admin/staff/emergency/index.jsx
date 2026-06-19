@@ -10,7 +10,6 @@ import {
 import { getLocalDateString } from '../../../../utils/dateUtils';
 import {
   formatResponsibleFloorLabels,
-  formatTaskSummary,
 } from '../../../../utils/staffAvailabilityDisplay';
 import facilityService from '../../../../services/facility.service';
 import { floorLabel } from '../../../../components/facility/FloorRoomSelect';
@@ -18,38 +17,47 @@ import EmergencyStaffDetailModal from './EmergencyStaffDetailModal';
 import AdminPageShell from '../../../../components/admin/AdminPageShell';
 import '../../../../styles/admin/EmergencyAvailabilityPage.css';
 
-const ROLE_LABELS = { doctor: 'Bác sĩ', nurse: 'Y tá' };
+const READINESS_CONFIG = (t) => ({
+  ready: { label: t('admin.staff.emergency.readiness.ready'), dot: 'available', badge: 'available', legacy: 'Available' },
+  caring: { label: t('admin.staff.emergency.readiness.caring'), dot: 'on-duty', badge: 'on-duty', legacy: 'On Duty' },
+  off_duty: { label: t('admin.staff.emergency.readiness.off_duty'), dot: 'off-shift', badge: 'off-shift', legacy: 'Off Shift' },
+  on_leave: { label: t('admin.staff.emergency.readiness.on_leave'), dot: 'on-leave', badge: 'on-leave', legacy: 'On Leave' },
+});
 
-const READINESS_CONFIG = {
-  ready: { label: 'Sẵn sàng', dot: 'available', badge: 'available', legacy: 'Available' },
-  caring: { label: 'Đang chăm sóc', dot: 'on-duty', badge: 'on-duty', legacy: 'On Duty' },
-  off_duty: { label: 'Không trực', dot: 'off-shift', badge: 'off-shift', legacy: 'Off Shift' },
-  on_leave: { label: 'Nghỉ phép', dot: 'on-leave', badge: 'on-leave', legacy: 'On Leave' },
-};
-
-const LEGACY_AVAIL_CONFIG = {
-  Available: READINESS_CONFIG.ready,
-  'On Duty': READINESS_CONFIG.caring,
-  'Off Shift': READINESS_CONFIG.off_duty,
-  'On Leave': READINESS_CONFIG.on_leave,
+const LEGACY_AVAIL_CONFIG = (t) => {
+  const cfg = READINESS_CONFIG(t);
+  return {
+    Available: cfg.ready,
+    'On Duty': cfg.caring,
+    'Off Shift': cfg.off_duty,
+    'On Leave': cfg.on_leave,
+  };
 };
 
 const AUTO_REFRESH_SECONDS = 30;
 
-const formatCheckDateVi = (iso) => {
+const dateLocale = (language) => (language === 'vi' ? 'vi-VN' : 'en-US');
+
+const formatCheckDate = (iso, language) => {
   if (!iso) return '';
   const d = new Date(`${iso}T12:00:00`);
-  return d.toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' });
+  return d.toLocaleDateString(dateLocale(language), {
+    weekday: 'long',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
 };
 
-const resolveReadiness = (person) => {
-  if (person.readinessLevel && READINESS_CONFIG[person.readinessLevel]) {
+const resolveReadiness = (person, t) => {
+  const readinessConfig = READINESS_CONFIG(t);
+  if (person.readinessLevel && readinessConfig[person.readinessLevel]) {
     return {
-      ...READINESS_CONFIG[person.readinessLevel],
-      label: person.readinessLabelVi || READINESS_CONFIG[person.readinessLevel].label,
+      ...readinessConfig[person.readinessLevel],
+      label: person.readinessLabelVi || readinessConfig[person.readinessLevel].label,
     };
   }
-  const legacy = LEGACY_AVAIL_CONFIG[person.availabilityStatus];
+  const legacy = LEGACY_AVAIL_CONFIG(t)[person.availabilityStatus];
   return legacy || { label: person.availabilityStatus || '—', dot: 'off-shift', badge: 'off-shift' };
 };
 
@@ -100,11 +108,11 @@ export default function EmergencyAvailabilityPage() {
       const res = await staffService.getAvailability(params);
       applyPayload(res);
     } catch (e) {
-      setError(e.response?.data?.message || 'Không thể tải dữ liệu sẵn sàng');
+      setError(e.response?.data?.message || t('admin.staff.emergency.loadFailed'));
     } finally {
       setLoading(false);
     }
-  }, [checkDate, filterRole, filterFloor, applyPayload]);
+  }, [checkDate, filterRole, filterFloor, applyPayload, t]);
 
   useEffect(() => {
     loadFromApi();
@@ -183,7 +191,7 @@ export default function EmergencyAvailabilityPage() {
   }, [checkDate, filterRole, filterFloor, isToday, applyPayload]);
 
   const filtered = data.filter((person) => {
-    const cfg = resolveReadiness(person);
+    const cfg = resolveReadiness(person, t);
     const matchAvail = filterAvail
       ? person.readinessLevel === filterAvail
         || person.availabilityStatus === filterAvail
@@ -226,23 +234,25 @@ export default function EmergencyAvailabilityPage() {
 
       {!isToday && (
         <p className="emergency-date-hint">
-          Đang xem ngày <strong>{formatCheckDateVi(checkDate)}</strong>. Đổi ngày để so sánh — nhiệm vụ ngày khác không hiển thị ở đây.
+          {t('admin.staff.emergency.dateHint', { date: formatCheckDate(checkDate, i18n.language) })}
         </p>
       )}
 
       <div className="emergency-banner">
         <span style={{ fontSize: '1.2rem' }}>🚨</span>
-        Trong trường hợp khẩn cấp, liên hệ nhân viên trạng thái <strong>Sẵn sàng</strong> trước tiên.
+        {t('admin.staff.emergency.banner')}
         <span className="emergency-banner__meta">
           {liveConnected && (
             <span className="live-badge">
-              <span className="live-badge__dot" /> Realtime
+              <span className="live-badge__dot" /> {t('admin.staff.emergency.realtime')}
             </span>
           )}
           {lastUpdated && (
             <span>
-              Cập nhật lúc {lastUpdated.toLocaleTimeString('vi-VN')}
-              {!liveConnected && isToday && ` · làm mới sau ${countdown}s`}
+              {t('admin.staff.emergency.updatedAt', {
+                time: lastUpdated.toLocaleTimeString(dateLocale(i18n.language)),
+              })}
+              {!liveConnected && isToday && ` · ${t('admin.staff.emergency.refreshIn', { seconds: countdown })}`}
             </span>
           )}
         </span>
@@ -323,9 +333,11 @@ export default function EmergencyAvailabilityPage() {
               </tr>
             )}
             {paginatedStaff.map((person) => {
-              const cfg = resolveReadiness(person);
-              const floorLabel = formatResponsibleFloorLabels(person);
-              const taskLabel = formatTaskSummary(person);
+              const cfg = resolveReadiness(person, t);
+              const floorLabelText = formatResponsibleFloorLabels(person, t);
+              const taskLabel = person.hasTasks
+                ? t('admin.staff.emergency.hasTasks')
+                : '—';
 
               return (
                 <tr key={person._id}>
@@ -340,8 +352,8 @@ export default function EmergencyAvailabilityPage() {
                       {t(`common.roles.${person.role}`, { defaultValue: person.role })}
                     </span>
                   </td>
-                  <td className="emergency-table-cell--wrap" title={floorLabel}>
-                    {floorLabel}
+                  <td className="emergency-table-cell--wrap" title={floorLabelText}>
+                    {floorLabelText}
                   </td>
                   <td>
                     <span className={person.hasTasks ? 'task-active' : 'task-inactive'}>
@@ -382,8 +394,8 @@ export default function EmergencyAvailabilityPage() {
       {detailPerson && (
         <EmergencyStaffDetailModal
           person={detailPerson}
-          readinessConfig={resolveReadiness(detailPerson)}
-          checkDateLabel={formatCheckDateVi(checkDate)}
+          readinessConfig={resolveReadiness(detailPerson, t)}
+          checkDateLabel={formatCheckDate(checkDate, i18n.language)}
           onClose={() => setDetailPerson(null)}
         />
       )}

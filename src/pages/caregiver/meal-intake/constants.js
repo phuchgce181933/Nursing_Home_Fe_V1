@@ -1,12 +1,15 @@
-export const INTAKE_STATUS_OPTIONS = [
-  { value: 'full', label: 'Ăn hết' },
-  { value: 'partial', label: 'Ăn một phần' },
-  { value: 'refused', label: 'Từ chối ăn' },
-  { value: 'assisted', label: 'Hỗ trợ ăn' },
-];
+export const MEAL_TYPE_VALUES = ['breakfast', 'lunch', 'dinner'];
 
-export const MEAL_TYPE_OPTIONS = [
-  { value: 'breakfast', label: 'Sáng' },
-  { value: 'lunch', label: 'Trưa' },
-  { value: 'dinner', label: 'Tối' },
-];
+export const INTAKE_STATUS_VALUES = ['full', 'partial', 'refused', 'assisted'];
+
+export const getMealTypeOptions = (t) =>
+  MEAL_TYPE_VALUES.map((value) => ({
+    value,
+    label: t(`common.mealType.${value}`),
+  }));
+
+export const getIntakeStatusOptions = (t) =>
+  INTAKE_STATUS_VALUES.map((value) => ({
+    value,
+    label: t(`common.intakeStatus.${value}`),
+  }));

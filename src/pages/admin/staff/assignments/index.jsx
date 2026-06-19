@@ -20,24 +20,33 @@ import AdminPageShell from '../../../../components/admin/AdminPageShell';
 import { filterShiftsNotEnded, getLocalDateString, todayVN } from '../../../../utils/dateUtils';
 import '../../../../styles/admin/StaffAssignmentPage.css';
 
-const CARE_TASK_TAB_HINT =
-  'Vào tab «Nhiệm vụ chăm sóc» để hoàn thành, bỏ qua hoặc xóa các nhiệm vụ trước khi thử lại.';
-
-const ROLE_LABELS = { doctor: 'Bác sĩ', nurse: 'Y tá', staff: 'Chăm sóc viên', manager: 'Quản lý', admin: 'Admin' };
-
-const TASK_TYPES = [
-  { value: 'morning_care',      label: 'Chăm sóc buổi sáng' },
-  { value: 'medication',        label: 'Dùng thuốc' },
-  { value: 'physical_therapy',  label: 'Vật lý trị liệu' },
-  { value: 'meal_assistance',   label: 'Hỗ trợ bữa ăn' },
-  { value: 'evening_check',     label: 'Kiểm tra buổi tối' },
-  { value: 'emergency_response', label: 'Phản ứng khẩn cấp' },
+const TASK_TYPE_VALUES = [
+  'morning_care',
+  'medication',
+  'physical_therapy',
+  'meal_assistance',
+  'evening_check',
+  'emergency_response',
 ];
-const CARE_LEVELS = [
-  { value: 'low',    label: '🟢 Thấp' },
-  { value: 'medium', label: '🟠 Trung bình' },
-  { value: 'high',   label: '🔴 Cao' },
-];
+const CARE_LEVEL_VALUES = ['low', 'medium', 'high'];
+const CARE_LEVEL_EMOJI = { low: '🟢', medium: '🟠', high: '🔴' };
+
+const dateLocale = (language) => (language === 'vi' ? 'vi-VN' : 'en-US');
+
+const taskTypeLabel = (t, value) =>
+  t(`admin.staff.assignments.taskTypes.${value}`, { defaultValue: value });
+
+const careLevelLabel = (t, value) => {
+  const emoji = CARE_LEVEL_EMOJI[value] || '';
+  const label = t(`common.careLevel.${value}`, { defaultValue: value });
+  return emoji ? `${emoji} ${label}` : label;
+};
+
+const roleLabel = (t, role) => t(`common.roles.${role}`, { defaultValue: role });
+
+const shiftStatusLabel = (t, status) =>
+  t(`common.shiftStatus.${status}`, { defaultValue: status });
+
 const today = () => getLocalDateString();
 
 const filterAssignableStaff = (list) =>
@@ -45,8 +54,6 @@ const filterAssignableStaff = (list) =>
     (s) => !NON_ASSIGNABLE_ROLES.includes(String(s.role || '').toLowerCase())
   );
 
-const SHIFT_STATUS_VI = { published: 'Đã đăng', confirmed: 'Đã xác nhận' };
-/** Ca đủ điều kiện gán nhiệm vụ — khớp backend findShiftsByStaffIdsOnDate / findActiveShiftsForStaffOnDate */
 const ELIGIBLE_SHIFT_STATUSES = ['published', 'confirmed'];
 
 const filterEligibleShifts = (shifts) =>
@@ -86,22 +93,29 @@ function useMinuteNow(enabled) {
   return now;
 }
 
-function formatDateVi(iso) {
+function formatAssignmentDate(iso, language) {
   if (!iso) return '';
   const d = new Date(`${iso}T00:00:00`);
-  return d.toLocaleDateString('vi-VN', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
+  return d.toLocaleDateString(dateLocale(language), {
+    weekday: 'short',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
 }
 
 function NonAssignableBadge() {
-  return <span className="shift-badge shift-badge--muted">Không phân công</span>;
+  const { t } = useTranslation();
+  return <span className="shift-badge shift-badge--muted">{t('admin.staff.assignments.badges.nonAssignable')}</span>;
 }
 
 /** Badge ca trong ngày (từ shiftSummary trên GET /api/staff?assignmentDate=) */
 function ShiftSummaryBadge({ summary, assignmentDate, displayNow, assignable = true }) {
+  const { t } = useTranslation();
   if (!assignable) return <NonAssignableBadge />;
   if (!summary) return <span className="shift-badge shift-badge--muted">—</span>;
   const resolved = resolveShiftSummaryForDisplay(summary, assignmentDate, displayNow);
-  if (resolved.onLeave) return <span className="shift-badge shift-badge--leave">Nghỉ phép</span>;
+  if (resolved.onLeave) return <span className="shift-badge shift-badge--leave">{t('admin.staff.assignments.badges.onLeave')}</span>;
   if (resolved.hasShiftOnDate) {
     const shifts = resolved.shiftsOnDate || [];
     return (
@@ -118,20 +132,25 @@ function ShiftSummaryBadge({ summary, assignmentDate, displayNow, assignable = t
       </div>
     );
   }
-  return <span className="shift-badge shift-badge--off">Không có ca</span>;
+  return <span className="shift-badge shift-badge--off">{t('admin.staff.assignments.badges.noShift')}</span>;
 }
 
 /** Chi tiết ca trong panel phải — dùng shiftSummary.shiftsOnDate */
 function ShiftDetailPanel({ summary, assignmentDate, displayNow }) {
+  const { t, i18n } = useTranslation();
   if (!summary) return null;
   const resolved = resolveShiftSummaryForDisplay(summary, assignmentDate, displayNow);
   const dateLabel = assignmentDate || resolved.assignmentDate;
   return (
     <div className="shift-detail-panel">
-      <div className="shift-detail-panel__title">Ca làm việc — {formatDateVi(dateLabel)}</div>
+      <div className="shift-detail-panel__title">
+        {t('admin.staff.assignments.shiftDetail.title', {
+          date: formatAssignmentDate(dateLabel, i18n.language),
+        })}
+      </div>
       {resolved.onLeave && (
         <p className="shift-detail-panel__hint shift-detail-panel__hint--warn">
-          Nhân viên có đơn nghỉ phép đã duyệt trong ngày này.
+          {t('admin.staff.assignments.shiftDetail.onLeaveHint')}
         </p>
       )}
       {!resolved.onLeave && resolved.shiftsOnDate?.length > 0 ? (
@@ -141,14 +160,14 @@ function ShiftDetailPanel({ summary, assignmentDate, displayNow }) {
               <span className="shift-detail-panel__name">{sh.name}</span>
               <span className="shift-detail-panel__time">{sh.startTime} – {sh.endTime}</span>
               <span className={`shift-status-tag shift-status-tag--${sh.status}`}>
-                {SHIFT_STATUS_VI[sh.status] || sh.status}
+                {shiftStatusLabel(t, sh.status)}
               </span>
             </li>
           ))}
         </ul>
       ) : (
         !resolved.onLeave && (
-          <p className="shift-detail-panel__hint">Chưa có ca đã đăng hoặc đã xác nhận trong ngày này.</p>
+          <p className="shift-detail-panel__hint">{t('admin.staff.assignments.shiftDetail.noShiftsHint')}</p>
         )
       )}
     </div>
@@ -172,6 +191,7 @@ function Alert({ type, msg }) {
 
 // ── Tab 1: Area Assignment ────────────────────────────────────────────────────
 function AreaTab({ staff, staffPool, loading, assignmentDate, displayNow, onStaffUpdated, staffPagination }) {
+  const { t } = useTranslation();
   const [selected, setSelected]         = useState(null);
   const [selectedFloorIds, setSelectedFloorIds] = useState([]);
   const [selectedRoomIds, setSelectedRoomIds]   = useState([]);
@@ -298,7 +318,7 @@ function AreaTab({ staff, staffPool, loading, assignmentDate, displayNow, onStaf
         floorIds: selectedFloorIds,
         roomIds: selectedRoomIds,
       });
-      setSuccess('Đã cập nhật khu vực phụ trách (master data)!');
+      setSuccess(t('admin.staff.assignments.area.areaUpdated'));
       const hints = res.info || res.warnings || [];
       if (hints.length) setInfos(hints);
 
@@ -315,7 +335,7 @@ function AreaTab({ staff, staffPool, loading, assignmentDate, displayNow, onStaf
       if (pruned?.count > 0) {
         const names = (pruned.removed || [])
           .map((r) => {
-            const room = r.roomNumber ? `P.${r.roomNumber}` : '';
+            const room = r.roomNumber ? `${t('admin.staff.assignments.residents.roomPrefix')}${r.roomNumber}` : '';
             const label = r.fullName || r.residentCode || '';
             return [label, room].filter(Boolean).join(' · ');
           })
@@ -323,13 +343,16 @@ function AreaTab({ staff, staffPool, loading, assignmentDate, displayNow, onStaf
           .join(', ');
         setInfos((prev) => [
           ...prev,
-          `Đã tự động gỡ ${pruned.count} cư dân không còn thuộc khu vực phụ trách${names ? `: ${names}` : ''}.`,
+          t('admin.staff.assignments.area.residentsPruned', {
+            count: pruned.count,
+            names: names ? t('admin.staff.assignments.area.residentsPrunedNames', { names }) : '',
+          }),
         ]);
       }
 
       await onStaffUpdated?.();
     } catch (e) {
-      const { message, blockingTasks: blocked } = getApiErrorPayload(e, 'Lưu thất bại');
+      const { message, blockingTasks: blocked } = getApiErrorPayload(e, t('common.saveFailed'));
       setBlockingTasks(blocked);
       setError(blocked.length ? blockingCareTasksMessage(message) : message);
     } finally {
@@ -351,24 +374,24 @@ function AreaTab({ staff, staffPool, loading, assignmentDate, displayNow, onStaf
           </colgroup>
           <thead>
             <tr>
-              <th>Nhân viên</th>
-              <th title="Vai trò">Vai trò</th>
-              <th title="Ca trong ngày">Ca</th>
-              <th title="Khu vực phụ trách">Khu vực</th>
-              <th aria-label="Thao tác" />
+              <th>{t('admin.staff.assignments.area.colStaff')}</th>
+              <th title={t('admin.staff.assignments.area.colRole')}>{t('admin.staff.assignments.area.colRole')}</th>
+              <th title={t('admin.staff.assignments.area.colShift')}>{t('admin.staff.assignments.area.colShift')}</th>
+              <th title={t('admin.staff.assignments.area.colArea')}>{t('admin.staff.assignments.area.colArea')}</th>
+              <th aria-label={t('common.colActions')} />
             </tr>
           </thead>
           <tbody>
-            {loading && <tr><td colSpan={5} className="empty-state">Đang tải...</td></tr>}
+            {loading && <tr><td colSpan={5} className="empty-state">{t('admin.staff.assignments.area.loading')}</td></tr>}
             {!loading && staff.length === 0 && (
-              <tr><td colSpan={5} className="empty-state">Không có nhân viên có ca trong ngày này</td></tr>
+              <tr><td colSpan={5} className="empty-state">{t('admin.staff.assignments.area.emptyStaff')}</td></tr>
             )}
             {!loading && staff.map((s) => {
               const areas = s.staffProfile?.responsibleAreaIds || [];
               return (
                 <tr key={s._id} style={{ background: selected?._id === s._id ? '#eff6ff' : undefined }}>
                   <td className="assignment-table__cell--name">{s.fullName}</td>
-                  <td>{ROLE_LABELS[s.role] || s.role}</td>
+                  <td>{roleLabel(t, s.role)}</td>
                   <td className="assignment-table__cell--badges">
                     <ShiftSummaryBadge
                       summary={s.shiftSummary}
@@ -387,21 +410,21 @@ function AreaTab({ staff, staffPool, loading, assignmentDate, displayNow, onStaf
                         ))}
                       </div>
                     ) : (
-                      <span className="assignment-table__empty">Chưa phân công</span>
+                      <span className="assignment-table__empty">{t('admin.staff.assignments.badges.notAssigned')}</span>
                     )}
                   </td>
                   <td className="assignment-table__cell--actions">
                     {canAssignAreas(s) ? (
                       isStaffOnLeaveForAssignment(s) ? (
-                        <span className="shift-badge shift-badge--leave">Nghỉ phép</span>
+                        <span className="shift-badge shift-badge--leave">{t('admin.staff.assignments.badges.onLeave')}</span>
                       ) : (
                         <button
                           className="btn btn--sm btn--edit"
                           onClick={() => handleSelect(s)}
                           disabled={!s.staffProfile}
-                          title={!s.staffProfile ? 'Chưa có hồ sơ nhân viên' : undefined}
+                          title={!s.staffProfile ? t('admin.staff.assignments.area.noProfile') : undefined}
                         >
-                          Chọn
+                          {t('admin.staff.assignments.area.selectStaff')}
                         </button>
                       )
                     ) : (
@@ -426,28 +449,28 @@ function AreaTab({ staff, staffPool, loading, assignmentDate, displayNow, onStaf
       {/* Edit panel */}
       <div className="assignment-panel">
         {!selected ? (
-          <div className="empty-state">Chọn nhân viên để phân công khu vực</div>
+          <div className="empty-state">{t('admin.staff.assignments.area.emptyPanel')}</div>
         ) : !canAssignAreas(selected) ? (
           <div className="empty-state empty-state--warn">
-            Tài khoản Admin hoặc Quản lý không được phân công khu vực, ca làm hoặc nhiệm vụ chăm sóc.
+            {t('admin.staff.assignments.area.adminManagerWarn')}
           </div>
         ) : !selected.staffProfile ? (
-          <div className="empty-state empty-state--warn">Nhân viên chưa có hồ sơ — không thể phân công khu vực.</div>
+          <div className="empty-state empty-state--warn">{t('admin.staff.assignments.area.noProfileWarn')}</div>
         ) : isStaffOnLeaveForAssignment(selected) ? (
           <div className="empty-state empty-state--warn">
-            Nhân viên có đơn nghỉ phép đã duyệt trong ngày phân công — không thể phân công khu vực.
+            {t('admin.staff.assignments.area.onLeaveWarn')}
           </div>
         ) : (
           <>
             <div style={{ fontWeight: 600, fontSize: '1rem', marginBottom: 14 }}>
-              Phân công khu vực — <span style={{ color: '#3b82f6' }}>{selected.fullName}</span>
+              {t('admin.staff.assignments.area.panelTitle', { name: selected.fullName })}
             </div>
             <Alert type="success" msg={success} />
             {blockingTasks.length > 0 ? (
               <BlockingCareTasksAlert
                 message={error}
                 tasks={blockingTasks}
-                hint={CARE_TASK_TAB_HINT}
+                hint={t('admin.staff.assignments.careTaskTabHint')}
               />
             ) : (
               <Alert type="error" msg={error} />
@@ -461,16 +484,16 @@ function AreaTab({ staff, staffPool, loading, assignmentDate, displayNow, onStaf
             />
 
             <p style={{ fontSize: '0.78rem', color: '#64748b', marginBottom: 12, lineHeight: 1.45 }}>
-              Tầng/phòng lưu cố định trên hồ sơ nhân viên (master data). Ca làm việc theo ngày xem ở trên — phân công ca tại mục Quản lý ca làm việc.
+              {t('admin.staff.assignments.area.masterDataHint')}
             </p>
 
             <div className="form-group" style={{ marginBottom: 14 }}>
-              <label>Tầng / Khu vực phụ trách</label>
+              <label>{t('admin.staff.assignments.area.floorsLabel')}</label>
               {loadingFloors ? (
-                <p className="field-hint">Đang tải danh sách tầng...</p>
+                <p className="field-hint">{t('admin.staff.assignments.area.loadingFloors')}</p>
               ) : (
                 <div className="area-multi-select">
-                  {floors.length === 0 && <p className="field-hint">Chưa có tầng trong hệ thống</p>}
+                  {floors.length === 0 && <p className="field-hint">{t('admin.staff.assignments.area.noFloors')}</p>}
                   {floors.map((f) => (
                     <label key={f._id} className="area-multi-select__item">
                       <input
@@ -486,14 +509,14 @@ function AreaTab({ staff, staffPool, loading, assignmentDate, displayNow, onStaf
             </div>
 
             <div className="form-group" style={{ marginBottom: 20 }}>
-              <label>Phòng phụ trách (tùy chọn)</label>
+              <label>{t('admin.staff.assignments.area.roomsLabel')}</label>
               {!selectedFloorIds.length ? (
-                <p className="field-hint">Chọn ít nhất một tầng để xem phòng</p>
+                <p className="field-hint">{t('admin.staff.assignments.area.selectFloorFirst')}</p>
               ) : loadingRooms ? (
-                <p className="field-hint">Đang tải phòng...</p>
+                <p className="field-hint">{t('admin.staff.assignments.area.loadingRooms')}</p>
               ) : (
                 <div className="area-multi-select">
-                  {rooms.length === 0 && <p className="field-hint">Không có phòng trên các tầng đã chọn</p>}
+                  {rooms.length === 0 && <p className="field-hint">{t('admin.staff.assignments.area.noRooms')}</p>}
                   {rooms.map((r) => (
                     <label key={r._id} className="area-multi-select__item">
                       <input
@@ -508,7 +531,7 @@ function AreaTab({ staff, staffPool, loading, assignmentDate, displayNow, onStaf
               )}
             </div>
             <button className="btn btn--primary" onClick={handleSave} disabled={saving}>
-              {saving ? 'Đang lưu...' : 'Lưu phân công khu vực'}
+              {saving ? t('common.saving') : t('admin.staff.assignments.area.saveArea')}
             </button>
           </>
         )}
@@ -533,15 +556,17 @@ function areaIdsFromProfile(profile) {
   return { floorIds, roomIds };
 }
 
-function residentPickerLabel(r) {
+function residentPickerLabel(r, t) {
   const room = r.roomId;
   const roomNum = typeof room === 'object' ? room?.roomNumber : '';
   const code = r.residentCode ? ` (${r.residentCode})` : '';
-  return `${r.fullName || 'Cư dân'}${code}${roomNum ? ` · P.${roomNum}` : ''}`;
+  const roomPrefix = t('admin.staff.assignments.residents.roomPrefix');
+  return `${r.fullName || t('admin.staff.assignments.residents.defaultResidentLabel')}${code}${roomNum ? ` · ${roomPrefix}${roomNum}` : ''}`;
 }
 
 // ── Tab 2: Resident Assignment ────────────────────────────────────────────────
 function ResidentTab({ staff, staffPool, loading, assignmentDate, displayNow, onStaffUpdated, staffPagination }) {
+  const { t, i18n } = useTranslation();
   const [selected, setSelected]           = useState(null);
   const [selectedResidentIds, setSelectedResidentIds] = useState([]);
   const [residentOptions, setResidentOptions] = useState([]);
@@ -595,7 +620,7 @@ function ResidentTab({ staff, staffPool, loading, assignmentDate, displayNow, on
     if (!member.staffProfile) {
       setResidentOptions([]);
       setResidentFilterMode(null);
-      setResidentHint('Nhân viên chưa có hồ sơ — không thể phân công cư dân.');
+      setResidentHint(t('admin.staff.assignments.residents.noProfileHint'));
       return;
     }
 
@@ -609,21 +634,23 @@ function ResidentTab({ staff, staffPool, loading, assignmentDate, displayNow, on
       const list = Array.isArray(res.data) ? res.data : [];
       setResidentFilterMode(res.filterMode || null);
       setResidentOptions(
-        [...list].sort((a, b) => (a.fullName || '').localeCompare(b.fullName || '', 'vi'))
+        [...list].sort((a, b) =>
+          (a.fullName || '').localeCompare(b.fullName || '', i18n.language === 'vi' ? 'vi' : 'en')
+        )
       );
       if (res.message) {
         setResidentHint(res.message);
       } else if (!list.length) {
         setResidentHint(
           res.filterMode === 'rooms'
-            ? 'Không có cư dân trong các phòng phụ trách đã chọn.'
-            : 'Không có cư dân trên tầng phụ trách.'
+            ? t('admin.staff.assignments.residents.noResidentsRooms')
+            : t('admin.staff.assignments.residents.noResidentsFloors')
         );
       }
     } catch (e) {
       setResidentOptions([]);
       setResidentFilterMode(null);
-      setResidentHint(e.response?.data?.message || 'Không tải được danh sách cư dân');
+      setResidentHint(e.response?.data?.message || t('admin.staff.assignments.residents.loadResidentsFailed'));
     } finally {
       setLoadingResidents(false);
     }
@@ -701,7 +728,7 @@ function ResidentTab({ staff, staffPool, loading, assignmentDate, displayNow, on
   const handleSave = async () => {
     if (!selected) return;
     if (!selected.staffProfile) {
-      setError('Nhân viên chưa có hồ sơ — không thể phân công cư dân.');
+      setError(t('admin.staff.assignments.residents.noProfileWarn'));
       return;
     }
     setSaving(true);
@@ -712,7 +739,7 @@ function ResidentTab({ staff, staffPool, loading, assignmentDate, displayNow, on
       const res = await staffService.assignResidents(selected._id, {
         residentIds: selectedResidentIds,
       });
-      setSuccess('Đã cập nhật danh sách cư dân phụ trách!');
+      setSuccess(t('admin.staff.assignments.residents.residentsUpdated'));
       if (res.staffProfile) {
         setSelected((prev) =>
           prev ? { ...prev, staffProfile: res.staffProfile } : prev
@@ -721,7 +748,7 @@ function ResidentTab({ staff, staffPool, loading, assignmentDate, displayNow, on
       }
       await onStaffUpdated?.();
     } catch (e) {
-      const { message, blockingTasks: blocked } = getApiErrorPayload(e, 'Lưu thất bại');
+      const { message, blockingTasks: blocked } = getApiErrorPayload(e, t('common.saveFailed'));
       setBlockingTasks(blocked);
       setError(blocked.length ? blockingCareTasksMessage(message) : message);
     } finally {
@@ -742,24 +769,24 @@ function ResidentTab({ staff, staffPool, loading, assignmentDate, displayNow, on
           </colgroup>
           <thead>
             <tr>
-              <th>Nhân viên</th>
-              <th title="Vai trò">Vai trò</th>
-              <th title="Ca trong ngày">Ca</th>
-              <th title="Cư dân đang chăm sóc">Cư dân</th>
-              <th aria-label="Thao tác" />
+              <th>{t('admin.staff.assignments.area.colStaff')}</th>
+              <th title={t('admin.staff.assignments.area.colRole')}>{t('admin.staff.assignments.area.colRole')}</th>
+              <th title={t('admin.staff.assignments.area.colShift')}>{t('admin.staff.assignments.area.colShift')}</th>
+              <th title={t('admin.staff.assignments.residents.colResidents')}>{t('admin.staff.assignments.residents.colResidents')}</th>
+              <th aria-label={t('common.colActions')} />
             </tr>
           </thead>
           <tbody>
-            {loading && <tr><td colSpan={5} className="empty-state">Đang tải...</td></tr>}
+            {loading && <tr><td colSpan={5} className="empty-state">{t('admin.staff.assignments.area.loading')}</td></tr>}
             {!loading && staff.length === 0 && (
-              <tr><td colSpan={5} className="empty-state">Không có nhân viên có ca trong ngày này</td></tr>
+              <tr><td colSpan={5} className="empty-state">{t('admin.staff.assignments.area.emptyStaff')}</td></tr>
             )}
             {!loading && staff.map((s) => {
               const residents = s.staffProfile?.assignedResidentIds || [];
               return (
                 <tr key={s._id} style={{ background: selected?._id === s._id ? '#eff6ff' : undefined }}>
                   <td className="assignment-table__cell--name">{s.fullName}</td>
-                  <td>{ROLE_LABELS[s.role] || s.role}</td>
+                  <td>{roleLabel(t, s.role)}</td>
                   <td className="assignment-table__cell--badges">
                     <ShiftSummaryBadge
                       summary={s.shiftSummary}
@@ -770,21 +797,21 @@ function ResidentTab({ staff, staffPool, loading, assignmentDate, displayNow, on
                   </td>
                   <td>
                     {residents.length
-                      ? <span className="assignment-table__count">{residents.length} cư dân</span>
-                      : <span className="assignment-table__empty">Chưa giao</span>}
+                      ? <span className="assignment-table__count">{t('admin.staff.assignments.residents.residentCount', { count: residents.length })}</span>
+                      : <span className="assignment-table__empty">{t('admin.staff.assignments.residents.notAssigned')}</span>}
                   </td>
                   <td className="assignment-table__cell--actions">
                     {canAssignResidents(s) ? (
                       isStaffOnLeaveForAssignment(s) ? (
-                        <span className="shift-badge shift-badge--leave">Nghỉ phép</span>
+                        <span className="shift-badge shift-badge--leave">{t('admin.staff.assignments.badges.onLeave')}</span>
                       ) : (
                         <button
                           className="btn btn--sm btn--edit"
                           onClick={() => handleSelect(s)}
                           disabled={!s.staffProfile}
-                          title={!s.staffProfile ? 'Chưa có hồ sơ nhân viên' : undefined}
+                          title={!s.staffProfile ? t('admin.staff.assignments.area.noProfile') : undefined}
                         >
-                          Chọn
+                          {t('admin.staff.assignments.area.selectStaff')}
                         </button>
                       )
                     ) : (
@@ -808,28 +835,28 @@ function ResidentTab({ staff, staffPool, loading, assignmentDate, displayNow, on
 
       <div className="assignment-panel">
         {!selected ? (
-          <div className="empty-state">Chọn nhân viên để phân công cư dân phụ trách</div>
+          <div className="empty-state">{t('admin.staff.assignments.residents.emptyPanel')}</div>
         ) : !canAssignResidents(selected) ? (
           <div className="empty-state empty-state--warn">
-            Tài khoản Admin hoặc Quản lý không được phân công cư dân.
+            {t('admin.staff.assignments.residents.adminManagerWarn')}
           </div>
         ) : !selected.staffProfile ? (
-          <div className="empty-state empty-state--warn">Nhân viên chưa có hồ sơ — không thể phân công cư dân.</div>
+          <div className="empty-state empty-state--warn">{t('admin.staff.assignments.residents.noProfileWarn')}</div>
         ) : isStaffOnLeaveForAssignment(selected) ? (
           <div className="empty-state empty-state--warn">
-            Nhân viên có đơn nghỉ phép đã duyệt trong ngày phân công — không thể phân công cư dân.
+            {t('admin.staff.assignments.residents.onLeaveWarn')}
           </div>
         ) : (
           <>
             <div style={{ fontWeight: 600, fontSize: '1rem', marginBottom: 14 }}>
-              Cư dân phụ trách — <span style={{ color: '#3b82f6' }}>{selected.fullName}</span>
+              {t('admin.staff.assignments.residents.panelTitle', { name: selected.fullName })}
             </div>
             <Alert type="success" msg={success} />
             {blockingTasks.length > 0 ? (
               <BlockingCareTasksAlert
                 message={error}
                 tasks={blockingTasks}
-                hint={CARE_TASK_TAB_HINT}
+                hint={t('admin.staff.assignments.careTaskTabHint')}
               />
             ) : (
               <Alert type="error" msg={error} />
@@ -842,11 +869,11 @@ function ResidentTab({ staff, staffPool, loading, assignmentDate, displayNow, on
 
             <p style={{ fontSize: '0.78rem', color: '#64748b', marginBottom: 12, lineHeight: 1.45 }}>
               {residentFilterMode === 'rooms'
-                ? 'Chỉ hiển thị cư dân trong các phòng phụ trách đã chọn (không lấy cả tầng).'
+                ? t('admin.staff.assignments.residents.filterRoomsHint')
                 : residentFilterMode === 'floors'
-                  ? 'Hiển thị cư dân trên tầng phụ trách (chưa chọn phòng cụ thể).'
-                  : 'Phân công khu vực/phòng trước khi giao cư dân.'}
-              {' '}Bỏ chọn tất cả và lưu để xóa phân công.
+                  ? t('admin.staff.assignments.residents.filterFloorsHint')
+                  : t('admin.staff.assignments.residents.filterDefaultHint')}
+              {' '}{t('admin.staff.assignments.residents.clearAllHint')}
             </p>
 
             {residentHint && (
@@ -854,26 +881,26 @@ function ResidentTab({ staff, staffPool, loading, assignmentDate, displayNow, on
             )}
 
             <div className="form-group" style={{ marginBottom: 12 }}>
-              <label>Tìm cư dân</label>
+              <label>{t('admin.staff.assignments.residents.searchLabel')}</label>
               <input
                 type="search"
                 value={residentSearch}
                 onChange={(e) => setResidentSearch(e.target.value)}
-                placeholder="Tên, mã hoặc số phòng..."
+                placeholder={t('admin.staff.assignments.residents.searchPlaceholder')}
                 disabled={loadingResidents || !residentOptions.length}
               />
             </div>
 
             <div className="form-group" style={{ marginBottom: 16 }}>
               <label>
-                Chọn cư dân ({selectedResidentIds.length} đã chọn)
+                {t('admin.staff.assignments.residents.selectResidents', { count: selectedResidentIds.length })}
               </label>
               {loadingResidents ? (
-                <p className="field-hint">Đang tải danh sách cư dân...</p>
+                <p className="field-hint">{t('admin.staff.assignments.residents.loadingResidents')}</p>
               ) : (
                 <div className="area-multi-select resident-picker">
                   {filteredResidents.length === 0 && !residentHint && (
-                    <p className="field-hint">Không có cư dân phù hợp</p>
+                    <p className="field-hint">{t('admin.staff.assignments.residents.noMatchingResidents')}</p>
                   )}
                   {filteredResidents.map((r) => (
                     <label key={r._id} className="area-multi-select__item">
@@ -882,7 +909,7 @@ function ResidentTab({ staff, staffPool, loading, assignmentDate, displayNow, on
                         checked={selectedResidentIds.includes(String(r._id))}
                         onChange={() => toggleResident(r._id)}
                       />
-                      <span>{residentPickerLabel(r)}</span>
+                      <span>{residentPickerLabel(r, t)}</span>
                     </label>
                   ))}
                 </div>
@@ -894,7 +921,7 @@ function ResidentTab({ staff, staffPool, loading, assignmentDate, displayNow, on
               onClick={handleSave}
               disabled={saving || loadingResidents}
             >
-              {saving ? 'Đang lưu...' : 'Lưu danh sách cư dân'}
+              {saving ? t('common.saving') : t('admin.staff.assignments.residents.saveResidents')}
             </button>
           </>
         )}
@@ -903,19 +930,15 @@ function ResidentTab({ staff, staffPool, loading, assignmentDate, displayNow, on
   );
 }
 
-// ── Tab 3: Care Tasks (bước 3 — sau khu vực + cư dân) ───────────────────────
-const TASK_STATUS_LABELS = {
-  pending: 'Chờ',
-  in_progress: 'Đang làm',
-  completed: 'Hoàn thành',
-  skipped: 'Bỏ qua',
-  missed: 'Bỏ lỡ',
-};
+// ── Tab 3: Care Tasks ───────────────────────────────────────────────────────
 /** Admin/manager may only skip (not in_progress/completed) */
 const TASK_STATUS_ADMIN_NEXT = {
   pending: ['skipped'],
   in_progress: ['skipped'],
 };
+
+const taskStatusLabel = (t, status) =>
+  t(`common.careTaskStatus.${status}`, { defaultValue: status });
 
 const toMinutes = (hhmm) => {
   if (!hhmm || typeof hhmm !== 'string') return null;
@@ -944,11 +967,11 @@ const emptyTaskForm = (workDate) => ({
   notes: '',
 });
 
-const buildAssignmentContextFallback = (staffList) => ({
-  taskTypes: TASK_TYPES.map((t) => ({ value: t.value, labelVi: t.label })),
-  careLevels: CARE_LEVELS.map((l) => ({
-    value: l.value,
-    labelVi: l.label.replace(/^[^\s]+\s/, ''),
+const buildAssignmentContextFallback = (staffList, t) => ({
+  taskTypes: TASK_TYPE_VALUES.map((value) => ({ value, labelVi: taskTypeLabel(t, value) })),
+  careLevels: CARE_LEVEL_VALUES.map((value) => ({
+    value,
+    labelVi: t(`common.careLevel.${value}`, { defaultValue: value }),
   })),
   staffWithShifts: (staffList || [])
     .map((s) => {
@@ -967,11 +990,12 @@ const buildAssignmentContextFallback = (staffList) => ({
     .filter(Boolean),
 });
 
-function careResidentOptionLabel(r) {
-  return residentPickerLabel(r);
+function careResidentOptionLabel(r, t) {
+  return residentPickerLabel(r, t);
 }
 
 function CareTaskTab({ assignmentDate, staff }) {
+  const { t } = useTranslation();
   const [tasks, setTasks]               = useState([]);
   const [loading, setLoading]           = useState(false);
   const [error, setError]               = useState('');
@@ -979,9 +1003,9 @@ function CareTaskTab({ assignmentDate, staff }) {
   const filteredTasks = useMemo(() => {
     const q = debouncedTaskSearch.trim().toLowerCase();
     if (!q) return tasks;
-    return tasks.filter((t) => {
-      const staffName = t.staffProfileId?.userId?.fullName || t.staffProfileId?.staffCode || '';
-      const resident = t.residentId?.fullName || t.residentId?.residentCode || '';
+    return tasks.filter((task) => {
+      const staffName = task.staffProfileId?.userId?.fullName || task.staffProfileId?.staffCode || '';
+      const resident = task.residentId?.fullName || task.residentId?.residentCode || '';
       return staffName.toLowerCase().includes(q) || resident.toLowerCase().includes(q);
     });
   }, [tasks, debouncedTaskSearch]);
@@ -1010,12 +1034,12 @@ function CareTaskTab({ assignmentDate, staff }) {
 
   const taskTypeOptions = ctx?.taskTypes?.length
     ? ctx.taskTypes
-    : TASK_TYPES.map((t) => ({ value: t.value, labelVi: t.label }));
+    : TASK_TYPE_VALUES.map((value) => ({ value, labelVi: taskTypeLabel(t, value) }));
   const careLevelOptions = ctx?.careLevels?.length
     ? ctx.careLevels
-    : CARE_LEVELS.map((l) => ({
-        value: l.value,
-        labelVi: l.label.replace(/^[^\s]+\s/, ''),
+    : CARE_LEVEL_VALUES.map((value) => ({
+        value,
+        labelVi: t(`common.careLevel.${value}`, { defaultValue: value }),
       }));
 
   const staffWithShifts = ctx?.staffWithShifts ?? [];
@@ -1052,15 +1076,11 @@ function CareTaskTab({ assignmentDate, staff }) {
     || shiftOptions[0]
     || null;
 
-  const taskTypeLabel = (value) =>
-    taskTypeOptions.find((t) => t.value === value)?.labelVi
-    || TASK_TYPES.find((t) => t.value === value)?.label
-    || value;
+  const resolveTaskTypeLabel = (value) =>
+    taskTypeOptions.find((opt) => opt.value === value)?.labelVi
+    || taskTypeLabel(t, value);
 
-  const careLevelLabel = (value) =>
-    careLevelOptions.find((l) => l.value === value)?.labelVi
-    || CARE_LEVELS.find((l) => l.value === value)?.label
-    || value;
+  const resolveCareLevelLabel = (value) => careLevelLabel(t, value);
 
   const loadContext = async (workDate) => {
     setCtxLoading(true);
@@ -1071,12 +1091,12 @@ function CareTaskTab({ assignmentDate, staff }) {
       return data;
     } catch (e) {
       if (e.response?.status === 404) {
-        const fallback = buildAssignmentContextFallback(staff);
+        const fallback = buildAssignmentContextFallback(staff, t);
         setCtx(fallback);
         return fallback;
       }
-      setCtx(buildAssignmentContextFallback(staff));
-      setSaveErr(e.response?.data?.message || 'Không tải được dữ liệu form');
+      setCtx(buildAssignmentContextFallback(staff, t));
+      setSaveErr(e.response?.data?.message || t('admin.staff.assignments.tasks.loadFormFailed'));
       return null;
     } finally {
       setCtxLoading(false);
@@ -1098,11 +1118,11 @@ function CareTaskTab({ assignmentDate, staff }) {
       if (res.message) {
         setResidentHint(res.message);
       } else if (!list.length) {
-        setResidentHint('Chưa có cư dân phụ trách — hoàn thành bước 2 trước.');
+        setResidentHint(t('admin.staff.assignments.tasks.noAssignedResidents'));
       }
     } catch (e) {
       setAssignedResidents([]);
-      setResidentHint(e.response?.data?.message || 'Không tải được danh sách cư dân');
+      setResidentHint(e.response?.data?.message || t('admin.staff.assignments.tasks.loadAssignedFailed'));
     } finally {
       setResidentsLoading(false);
     }
@@ -1119,7 +1139,7 @@ function CareTaskTab({ assignmentDate, staff }) {
         setTasks([]);
         setError('');
       } else {
-        setError(e.response?.data?.message || 'Tải thất bại');
+        setError(e.response?.data?.message || t('common.loadFailed'));
       }
     } finally {
       setLoading(false);
@@ -1162,25 +1182,28 @@ function CareTaskTab({ assignmentDate, staff }) {
   const handleCreate = async () => {
     setSaveErr('');
     if (selectedStaffEntry && onLeaveByUserId[String(selectedStaffEntry.userId)]) {
-      setSaveErr('Nhân viên đang nghỉ phép trong ngày này — không thể giao nhiệm vụ.');
+      setSaveErr(t('admin.staff.assignments.tasks.onLeaveError'));
       return;
     }
     if (!form.shiftId || !selectedShift) {
-      setSaveErr('Vui lòng chọn ca làm việc.');
+      setSaveErr(t('admin.staff.assignments.tasks.selectShiftError'));
       return;
     }
     const scheduledTimeTrimmed = form.scheduledTime?.trim();
     if (!scheduledTimeTrimmed) {
-      setSaveErr('Vui lòng chọn giờ dự kiến.');
+      setSaveErr(t('admin.staff.assignments.tasks.selectTimeError'));
       return;
     }
     if (minScheduledTime && scheduledTimeTrimmed < minScheduledTime) {
-      setSaveErr(`Giờ dự kiến phải từ ${minScheduledTime} trở đi (theo giờ hiện tại).`);
+      setSaveErr(t('admin.staff.assignments.tasks.minTimeError', { time: minScheduledTime }));
       return;
     }
     if (selectedShift && !isTimeWithinShift(scheduledTimeTrimmed, selectedShift)) {
       setSaveErr(
-        `Giờ dự kiến phải nằm trong khung ca ${selectedShift.startTime} - ${selectedShift.endTime}.`
+        t('admin.staff.assignments.tasks.withinShiftError', {
+          start: selectedShift.startTime,
+          end: selectedShift.endTime,
+        })
       );
       return;
     }
@@ -1200,7 +1223,7 @@ function CareTaskTab({ assignmentDate, staff }) {
       setShowForm(false);
       loadTasks();
     } catch (e) {
-      setSaveErr(e.response?.data?.message || 'Lưu thất bại');
+      setSaveErr(e.response?.data?.message || t('common.saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -1211,42 +1234,42 @@ function CareTaskTab({ assignmentDate, staff }) {
       await careTaskService.updateCareTaskStatus(id, status);
       loadTasks();
     } catch (e) {
-      alert(e.response?.data?.message || 'Thất bại');
+      alert(e.response?.data?.message || t('admin.staff.assignments.tasks.actionFailed'));
     }
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Xóa nhiệm vụ này?')) return;
+    if (!confirm(t('admin.staff.assignments.tasks.confirmDelete'))) return;
     try {
       await careTaskService.deleteCareTask(id);
       loadTasks();
     } catch (e) {
-      alert(e.response?.data?.message || 'Thất bại');
+      alert(e.response?.data?.message || t('admin.staff.assignments.tasks.actionFailed'));
     }
   };
 
   const staffOnShiftHint =
     form.workDate !== assignmentDate
-      ? 'Đổi ngày phân công ở thanh trên để giao nhiệm vụ.'
+      ? t('admin.staff.assignments.tasks.changeDateHint')
       : ctxLoading
         ? ''
         : !showForm
           ? ''
           : staffWithShiftsAvailable.length === 0
             ? staffWithShifts.length > 0
-              ? 'Tất cả nhân viên có ca trong ngày đều đang nghỉ phép — không thể giao nhiệm vụ.'
-              : 'Không có nhân viên có ca đã đăng/xác nhận trong ngày này. Phân công ca trước.'
+              ? t('admin.staff.assignments.tasks.allOnLeave')
+              : t('admin.staff.assignments.tasks.noStaffWithShift')
             : '';
 
   return (
     <div>
-      <p className="assignment-steps-hint">
-        Quy trình 3 bước: <strong>1. Khu vực phụ trách</strong> →{' '}
-        <strong>2. Cư dân phụ trách</strong> → <strong>3. Nhiệm vụ chăm sóc</strong> (tab này).
-      </p>
+      <p
+        className="assignment-steps-hint"
+        dangerouslySetInnerHTML={{ __html: t('admin.staff.assignments.tasks.stepsHint') }}
+      />
 
       <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
-        <label style={{ fontSize: '0.8rem', color: '#64748b' }}>Xem ngày:</label>
+        <label style={{ fontSize: '0.8rem', color: '#64748b' }}>{t('admin.staff.assignments.tasks.viewDate')}</label>
         <input
           type="date"
           value={filterDate}
@@ -1255,46 +1278,44 @@ function CareTaskTab({ assignmentDate, staff }) {
         />
         <input
           type="search"
-          placeholder="Tìm nhân viên hoặc cư dân..."
+          placeholder={t('admin.staff.assignments.tasks.searchPlaceholder')}
           value={taskSearch}
           onChange={(e) => setTaskSearch(e.target.value)}
           style={{ padding: '7px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: '0.875rem', outline: 'none', minWidth: 220 }}
         />
-        <button className="btn btn--primary" onClick={handleOpenForm}>+ Giao nhiệm vụ</button>
+        <button className="btn btn--primary" onClick={handleOpenForm}>{t('admin.staff.assignments.tasks.assignTask')}</button>
       </div>
 
       {error && <Alert type="error" msg={error} />}
 
       {showForm && (
         <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: 20, marginBottom: 16 }}>
-          <div style={{ fontWeight: 600, marginBottom: 4 }}>Giao nhiệm vụ chăm sóc mới</div>
+          <div style={{ fontWeight: 600, marginBottom: 4 }}>{t('admin.staff.assignments.tasks.formTitle')}</div>
           <p style={{ fontSize: '0.78rem', color: '#64748b', marginBottom: 12 }}>
-            Nhân viên phải có ca đã đăng/xác nhận (chưa kết thúc), cư dân đã giao ở bước 2, và giờ dự kiến
-            từ thời điểm hiện tại trở đi. Nhiệm vụ chưa hoàn thành sẽ tự chuyển «Bỏ lỡ» khi hết ca
-            (khác «Bỏ qua» do quản lý chủ động chọn).
+            {t('admin.staff.assignments.tasks.formHint')}
           </p>
           {saveError && <Alert type="error" msg={saveError} />}
           <div className="form-grid">
             <div className="form-group">
-              <label>Ngày thực hiện *</label>
+              <label>{t('admin.staff.assignments.tasks.workDate')}</label>
               <input type="date" value={form.workDate} readOnly />
-              <small className="field-hint">Theo ngày phân công ở thanh trên.</small>
+              <small className="field-hint">{t('admin.staff.assignments.tasks.workDateHint')}</small>
             </div>
 
             <div className="form-group">
-              <label>Nhân viên có ca *</label>
+              <label>{t('admin.staff.assignments.tasks.staffOnShift')}</label>
               {ctxLoading ? (
-                <p className="field-hint">Đang tải danh sách nhân viên...</p>
+                <p className="field-hint">{t('admin.staff.assignments.tasks.loadingStaff')}</p>
               ) : (
                 <select
                   value={form.staffProfileId}
                   onChange={(e) => handleStaffChange(e.target.value)}
                   disabled={staffWithShiftsAvailable.length === 0}
                 >
-                  <option value="">— Chọn nhân viên —</option>
+                  <option value="">{t('admin.staff.assignments.tasks.selectStaff')}</option>
                   {staffWithShiftsAvailable.map((s) => (
                     <option key={s.staffProfileId} value={s.staffProfileId}>
-                      {s.fullName} ({ROLE_LABELS[s.role] || s.role}) · {s.shiftTimeLabel}
+                      {s.fullName} ({roleLabel(t, s.role)}) · {s.shiftTimeLabel}
                     </option>
                   ))}
                 </select>
@@ -1306,7 +1327,7 @@ function CareTaskTab({ assignmentDate, staff }) {
 
             {shiftOptions.length > 0 && (
               <div className="form-group">
-                <label>Ca làm việc *</label>
+                <label>{t('admin.staff.assignments.tasks.selectShift')}</label>
                 <select
                   value={form.shiftId}
                   onChange={(e) => setForm((p) => ({ ...p, shiftId: e.target.value }))}
@@ -1314,7 +1335,7 @@ function CareTaskTab({ assignmentDate, staff }) {
                 >
                   {shiftOptions.map((sh) => (
                     <option key={sh._id} value={sh._id}>
-                      {sh.name} · {sh.startTime} – {sh.endTime} ({SHIFT_STATUS_VI[sh.status] || sh.status})
+                      {sh.name} · {sh.startTime} – {sh.endTime} ({shiftStatusLabel(t, sh.status)})
                     </option>
                   ))}
                 </select>
@@ -1322,19 +1343,19 @@ function CareTaskTab({ assignmentDate, staff }) {
             )}
 
             <div className="form-group">
-              <label>Cư dân phụ trách *</label>
+              <label>{t('admin.staff.assignments.tasks.assignedResident')}</label>
               {residentsLoading ? (
-                <p className="field-hint">Đang tải cư dân đã giao...</p>
+                <p className="field-hint">{t('admin.staff.assignments.tasks.loadingAssignedResidents')}</p>
               ) : (
                 <select
                   value={form.residentId}
                   onChange={(e) => setForm((p) => ({ ...p, residentId: e.target.value }))}
                   disabled={!form.staffProfileId || assignedResidents.length === 0}
                 >
-                  <option value="">— Chọn cư dân —</option>
+                  <option value="">{t('admin.staff.assignments.tasks.selectResident')}</option>
                   {assignedResidents.map((r) => (
                     <option key={r._id} value={r._id}>
-                      {careResidentOptionLabel(r)}
+                      {careResidentOptionLabel(r, t)}
                     </option>
                   ))}
                 </select>
@@ -1345,31 +1366,31 @@ function CareTaskTab({ assignmentDate, staff }) {
             </div>
 
             <div className="form-group">
-              <label>Loại nhiệm vụ *</label>
+              <label>{t('admin.staff.assignments.tasks.taskType')}</label>
               <select
                 value={form.taskType}
                 onChange={(e) => setForm((p) => ({ ...p, taskType: e.target.value }))}
               >
-                {taskTypeOptions.map((t) => (
-                  <option key={t.value} value={t.value}>{t.labelVi}</option>
+                {taskTypeOptions.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.labelVi}</option>
                 ))}
               </select>
             </div>
 
             <div className="form-group">
-              <label>Mức độ chăm sóc *</label>
+              <label>{t('admin.staff.assignments.tasks.careLevel')}</label>
               <select
                 value={form.careLevel}
                 onChange={(e) => setForm((p) => ({ ...p, careLevel: e.target.value }))}
               >
                 {careLevelOptions.map((l) => (
-                  <option key={l.value} value={l.value}>{l.labelVi}</option>
+                  <option key={l.value} value={l.value}>{careLevelLabel(t, l.value)}</option>
                 ))}
               </select>
             </div>
 
             <div className="form-group">
-              <label>Giờ dự kiến *</label>
+              <label>{t('admin.staff.assignments.tasks.scheduledTime')}</label>
               <input
                 type="time"
                 required
@@ -1379,14 +1400,17 @@ function CareTaskTab({ assignmentDate, staff }) {
               />
               {selectedShift && (
                 <small className="field-hint">
-                  Khung hợp lệ: {selectedShift.startTime} - {selectedShift.endTime}
-                  {minScheduledTime ? ` · Từ ${minScheduledTime} trở đi` : ''}
+                  {t('admin.staff.assignments.tasks.validTimeRange', {
+                    start: selectedShift.startTime,
+                    end: selectedShift.endTime,
+                  })}
+                  {minScheduledTime ? ` ${t('admin.staff.assignments.tasks.fromTime', { time: minScheduledTime })}` : ''}
                 </small>
               )}
             </div>
 
             <div className="form-group form-grid--full">
-              <label>Ghi chú</label>
+              <label>{t('admin.staff.assignments.tasks.notes')}</label>
               <input value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} />
             </div>
           </div>
@@ -1402,56 +1426,62 @@ function CareTaskTab({ assignmentDate, staff }) {
                 || !form.scheduledTime?.trim()
               }
             >
-              {saving ? 'Đang lưu...' : 'Lưu nhiệm vụ'}
+              {saving ? t('common.saving') : t('admin.staff.assignments.tasks.saveTask')}
             </button>
             <button
               className="btn"
               style={{ background: '#f1f5f9', color: '#475569', padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer' }}
               onClick={() => setShowForm(false)}
             >
-              Hủy
+              {t('common.cancel')}
             </button>
           </div>
         </div>
       )}
 
       {loading ? (
-        <p style={{ color: '#94a3b8', textAlign: 'center', padding: 32 }}>Đang tải...</p>
+        <p style={{ color: '#94a3b8', textAlign: 'center', padding: 32 }}>{t('common.loading')}</p>
       ) : (
         <div className="data-table-wrap assignment-table-wrap">
         <table className="data-table assignment-table assignment-table--tasks">
           <thead>
             <tr>
-              <th>Nhân viên</th><th>Cư dân</th><th>Ca</th><th>Loại nhiệm vụ</th><th>Mức độ</th>
-              <th>Giờ</th><th>Trạng thái</th><th>Thao tác</th>
+              <th>{t('admin.staff.assignments.tasks.colStaff')}</th>
+              <th>{t('admin.staff.assignments.tasks.colResident')}</th>
+              <th>{t('admin.staff.assignments.tasks.colShift')}</th>
+              <th>{t('admin.staff.assignments.tasks.colTaskType')}</th>
+              <th>{t('admin.staff.assignments.tasks.colCareLevel')}</th>
+              <th>{t('admin.staff.assignments.tasks.colTime')}</th>
+              <th>{t('admin.staff.assignments.tasks.colStatus')}</th>
+              <th>{t('admin.staff.assignments.tasks.colActions')}</th>
             </tr>
           </thead>
           <tbody>
             {paginatedTasks.length === 0 && (
-              <tr><td colSpan={8} className="empty-state">Không có nhiệm vụ nào ngày này</td></tr>
+              <tr><td colSpan={8} className="empty-state">{t('admin.staff.assignments.tasks.emptyList')}</td></tr>
             )}
-            {paginatedTasks.map((t) => {
-              const staffName = t.staffProfileId?.userId?.fullName || t.staffProfileId?.staffCode || '—';
-              const resident = t.residentId?.fullName || t.residentId?.residentCode || '—';
-              const shift = t.shiftId;
+            {paginatedTasks.map((task) => {
+              const staffName = task.staffProfileId?.userId?.fullName || task.staffProfileId?.staffCode || '—';
+              const resident = task.residentId?.fullName || task.residentId?.residentCode || '—';
+              const shift = task.shiftId;
               const shiftLabel = shift
-                ? `${shift.name || 'Ca'} · ${shift.startTime}–${shift.endTime}`
+                ? `${shift.name || t('admin.staff.assignments.tasks.shiftFallback')} · ${shift.startTime}–${shift.endTime}`
                 : '—';
-              const next = TASK_STATUS_ADMIN_NEXT[t.status] || [];
+              const next = TASK_STATUS_ADMIN_NEXT[task.status] || [];
               return (
-                <tr key={t._id}>
+                <tr key={task._id}>
                   <td>{staffName}</td>
                   <td>{resident}</td>
                   <td><small>{shiftLabel}</small></td>
-                  <td>{taskTypeLabel(t.taskType)}</td>
-                  <td>{careLevelLabel(t.careLevel)}</td>
-                  <td>{t.scheduledTime || '—'}</td>
+                  <td>{resolveTaskTypeLabel(task.taskType)}</td>
+                  <td>{resolveCareLevelLabel(task.careLevel)}</td>
+                  <td>{task.scheduledTime || '—'}</td>
                   <td>
-                    <span className={`task-status task-status--${t.status}`}>
-                      {TASK_STATUS_LABELS[t.status] || t.status}
+                    <span className={`task-status task-status--${task.status}`}>
+                      {taskStatusLabel(t, task.status)}
                     </span>
-                    {t.status === 'missed' && (
-                      <small className="field-hint" style={{ display: 'block' }}>Hết ca</small>
+                    {task.status === 'missed' && (
+                      <small className="field-hint" style={{ display: 'block' }}>{t('admin.staff.assignments.tasks.shiftMissed')}</small>
                     )}
                   </td>
                   <td className="assignment-table__cell--actions">
@@ -1460,13 +1490,13 @@ function CareTaskTab({ assignmentDate, staff }) {
                       <button
                         key={s}
                         className="btn btn--sm btn--edit"
-                        onClick={() => handleStatus(t._id, s)}
+                        onClick={() => handleStatus(task._id, s)}
                       >
-                        {TASK_STATUS_LABELS[s]}
+                        {taskStatusLabel(t, s)}
                       </button>
                     ))}
-                    {t.status === 'pending' && (
-                      <button className="btn btn--sm btn--delete" onClick={() => handleDelete(t._id)}>Xóa</button>
+                    {task.status === 'pending' && (
+                      <button className="btn btn--sm btn--delete" onClick={() => handleDelete(task._id)}>{t('common.delete')}</button>
                     )}
                     </div>
                   </td>
@@ -1497,7 +1527,7 @@ const TABS = (t) => [
 ];
 
 export default function StaffAssignmentPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const tabs = TABS(t);
   const [activeTab, setActiveTab] = useState('area');
   const [assignmentDate, setAssignmentDate] = useState(today());
@@ -1572,14 +1602,14 @@ export default function StaffAssignmentPage() {
           value={assignmentDate}
           onChange={(e) => setAssignmentDate(e.target.value)}
         />
-        <span className="assignment-toolbar__hint">{formatDateVi(assignmentDate)}</span>
+        <span className="assignment-toolbar__hint">{formatAssignmentDate(assignmentDate, i18n.language)}</span>
         <span className="assignment-toolbar__note">
-          Chỉ hiển thị nhân viên có ca trong ngày đã chọn · Ca: đã đăng / đã xác nhận, chưa kết thúc (giờ VN) · Tầng/phòng lưu cố định trên hồ sơ
+          {t('admin.staff.assignments.shiftHint')}
         </span>
         <input
           type="search"
           className="assignment-toolbar__search"
-          placeholder="Tìm tên nhân viên..."
+          placeholder={t('admin.staff.assignments.searchStaff')}
           value={staffSearch}
           onChange={(e) => setStaffSearch(e.target.value)}
           style={{ marginLeft: 'auto', padding: '7px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: '0.875rem' }}

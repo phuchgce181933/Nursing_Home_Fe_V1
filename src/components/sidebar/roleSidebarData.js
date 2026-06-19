@@ -36,12 +36,12 @@ export const roleSidebarData = {
       path: '/doctor/profile',
     },
     {
-      title: 'Ca của tôi',
+      title: 'sidebar.myShifts',
       icon: Calendar,
       path: '/doctor/my-shifts',
     },
     {
-      title: 'Nhiệm vụ chăm sóc',
+      title: 'sidebar.careTasks',
       icon: ClipboardList,
       path: '/doctor/care-tasks',
     },
@@ -81,7 +81,7 @@ export const roleSidebarData = {
       path: '/doctor/incidents',
     },
     {
-      title: 'Nghỉ phép',
+      title: 'sidebar.staffLeave',
       icon: CalendarOff,
       path: '/doctor/leave',
     },
@@ -103,37 +103,43 @@ export const roleSidebarData = {
       path: '/caregiver/profile',
     },
     {
-      title: 'Cư dân phụ trách',
+      title: 'sidebar.assignedResidents',
       icon: Users,
       path: '/caregiver/assigned-residents',
     },
     {
-      title: 'Ca của tôi',
+      title: 'sidebar.myShifts',
       icon: Calendar,
       path: '/caregiver/my-shifts',
     },
     {
-      title: 'Lịch chăm sóc',
+      title: 'sidebar.dailyCareSchedule',
       icon: ClipboardList,
       path: '/caregiver/daily-care-schedule',
     },
     {
-      title: 'Ghi nhận bữa ăn',
+      title: 'sidebar.mealIntakeNotes',
       icon: Soup,
       path: '/caregiver/meal-intake-notes',
     },
     {
-      title: 'Chế độ ăn uống',
+      title: 'sidebar.dietPlans',
       icon: Apple,
       path: '/caregiver/diet-plans',
     },
     {
-      title: 'Hoạt động vệ sinh',
+      title: 'sidebar.rehabSchedule',
+      icon: Dumbbell,
+      path: '/caregiver/rehabilitation-schedule',
+    },
+    {
+      title: 'sidebar.hygieneActivities',
+
       icon: Droplets,
       path: '/caregiver/hygiene-activities',
     },
     {
-      title: 'Hành vi hằng ngày',
+      title: 'sidebar.dailyBehaviors',
       icon: Brain,
       path: '/caregiver/daily-behaviors',
     },
@@ -150,12 +156,12 @@ export const roleSidebarData = {
       path: '/nurse/profile',
     },
     {
-      title: 'Ca của tôi',
+      title: 'sidebar.myShifts',
       icon: Calendar,
       path: '/nurse/my-shifts',
     },
     {
-      title: 'Nhiệm vụ chăm sóc',
+      title: 'sidebar.careTasks',
       icon: ClipboardList,
       path: '/nurse/care-tasks',
     },
@@ -175,12 +181,12 @@ export const roleSidebarData = {
       path: '/nurse/health-monitoring',
     },
     {
-      title: 'Kế hoạch bữa ăn',
+      title: 'sidebar.mealPlans',
       icon: Soup,
       path: '/nurse/meal-plans',
     },
     {
-      title: 'Báo cáo dinh dưỡng',
+      title: 'sidebar.nutritionReports',
       icon: BarChart3,
       path: '/nurse/nutrition-reports',
     },
@@ -205,7 +211,7 @@ export const roleSidebarData = {
       path: '/nurse/incidents',
     },
     {
-      title: 'Nghỉ phép',
+      title: 'sidebar.staffLeave',
       icon: CalendarOff,
       path: '/nurse/leave',
     },

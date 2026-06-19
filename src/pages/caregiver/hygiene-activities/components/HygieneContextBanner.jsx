@@ -1,20 +1,25 @@
+import { useTranslation } from 'react-i18next';
 import { hygieneActivityLabel } from '../../../../utils/hygieneLabels';
 
 function HygieneContextBanner({ context }) {
+  const { t } = useTranslation();
+  const ns = 'caregiver.hygiene.contextBanner';
+
   if (!context) return null;
+
+  const activity = hygieneActivityLabel(context.activityType, t);
 
   if (context.hasExistingRecord) {
     return (
       <p className="hygiene-page__context hygiene-page__context--warn">
-        Đã có ghi nhận cho <strong>{hygieneActivityLabel(context.activityType)}</strong> trong ngày
-        này. Vui lòng đóng và chọn <strong>Sửa</strong> từ danh sách.
+        {t(`${ns}.duplicate`, { activity })}
       </p>
     );
   }
 
   return (
     <p className="hygiene-page__context">
-      Ghi nhận hoạt động: <strong>{hygieneActivityLabel(context.activityType)}</strong>
+      {t(`${ns}.recording`, { activity })}
     </p>
   );
 }

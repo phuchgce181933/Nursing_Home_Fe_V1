@@ -7,7 +7,16 @@ import mealPlanService from '../../services/mealPlan.service';
 import mealTimeScheduleService from '../../services/mealTimeSchedule.service';
 import specialDietService from '../../services/specialDiet.service';
 import { getLocalDateString } from '../../utils/dateUtils';
+import {
+  dietTypeLabel,
+  formatLocaleDate,
+  mealTypeLabel,
+  planStatusLabel,
+  sourceLabel,
+} from '../../utils/nutritionLabels';
 import '../../styles/nurse/MealPlansPage.css';
+
+const MP = 'nurse.mealPlans';
 
 const today = () => getLocalDateString();
 const addDays = (dateStr, delta) => {
@@ -15,41 +24,15 @@ const addDays = (dateStr, delta) => {
   d.setDate(d.getDate() + delta);
   return getLocalDateString(d);
 };
-const formatVNDate = (dateStr) => {
-  if (!dateStr) return '—';
-  return new Date(`${dateStr}T00:00:00`).toLocaleDateString('vi-VN');
-};
 const defaultMealTimeByType = (mealType) => {
   if (mealType === 'breakfast') return '07:30';
   if (mealType === 'lunch') return '11:30';
   return '17:30';
 };
 
-const mealTypeLabel = (v) => {
-  if (v === 'breakfast') return 'Sáng';
-  if (v === 'lunch') return 'Trưa';
-  if (v === 'dinner') return 'Tối';
-  return v;
-};
-
-const statusLabel = (v) => {
-  if (v === 'draft') return 'Nháp';
-  if (v === 'published') return 'Đã đăng';
-  return v;
-};
-
-const dietTypeLabel = (v) => {
-  if (v === 'diabetic') return 'Tiểu đường';
-  if (v === 'low_sodium') return 'Ít muối';
-  if (v === 'renal') return 'Hỗ trợ thận';
-  if (v === 'high_protein') return 'Giàu đạm';
-  if (v === 'soft_texture') return 'Mềm dễ nuốt';
-  if (v === 'liquid_only') return 'Lỏng hoàn toàn';
-  if (v === 'custom') return 'Tùy chỉnh';
-  return v;
-};
-
 function MealPlanTab() {
+  const { t, i18n } = useTranslation();
+  const TAB = `${MP}.mealTab`;
   const [formWorkDate, setFormWorkDate] = useState(today());
   const [listDate, setListDate] = useState(today());
   const [careStages, setCareStages] = useState([]);
@@ -132,7 +115,7 @@ function MealPlanTab() {
       setTemplates(Array.isArray(tplRes.templates) ? tplRes.templates : []);
       setResidents(Array.isArray(residentRes?.data) ? residentRes.data : []);
     } catch (e) {
-      setError(e?.response?.data?.message || 'Không tải được dữ liệu khởi tạo');
+      setError(e?.response?.data?.message || t(`${MP}.loadBootFailed`));
     } finally {
       setLoading(false);
     }
@@ -233,9 +216,9 @@ function MealPlanTab() {
   const addFromTemplate = () => {
     setError('');
     const tpl = templates.find((t) => t.key === selectedTemplate);
-    if (!tpl) return setError('Vui lòng chọn template');
-    if (!selectedScheduleId) return setError('Vui lòng chọn lịch giờ ăn đã đăng');
-    if (selectedResidents.length < 1) return setError('Lịch giờ ăn đã chọn không có cư dân');
+    if (!tpl) return setError(t(`${MP}.selectTemplate`));
+    if (!selectedScheduleId) return setError(t(`${MP}.selectSchedule`));
+    if (selectedResidents.length < 1) return setError(t(`${MP}.scheduleNoResidents`));
     const generated = [];
     selectedResidents.forEach((residentId) => {
       tpl.entries.forEach((it) => {
@@ -304,13 +287,13 @@ function MealPlanTab() {
   };
 
   const validate = () => {
-    if (!selectedScheduleId) return 'Vui lòng chọn lịch giờ ăn đã đăng';
-    if (!careStage) return 'Vui lòng chọn giai đoạn chăm sóc';
-    if (formWorkDate < today()) return 'Không thể tạo meal plan cho ngày quá khứ';
-    if (selectedResidents.length < 1) return 'Lịch giờ ăn đã chọn không có cư dân';
-    if (!entries.length) return 'Vui lòng thêm ít nhất 1 dòng thực đơn';
+    if (!selectedScheduleId) return t(`${MP}.selectSchedule`);
+    if (!careStage) return t(`${MP}.selectCareStage`);
+    if (formWorkDate < today()) return t(`${MP}.pastDateMealPlan`);
+    if (selectedResidents.length < 1) return t(`${MP}.scheduleNoResidents`);
+    if (!entries.length) return t(`${MP}.addAtLeastOneMealEntry`);
     const hasInvalid = entries.some((e) => !e.residentId || !e.mealType || !e.mealName?.trim() || !e.mealTime);
-    if (hasInvalid) return 'Mỗi dòng phải có cư dân, loại bữa, tên món và giờ';
+    if (hasInvalid) return t(`${MP}.invalidMealRow`);
     return '';
   };
 
@@ -353,7 +336,7 @@ function MealPlanTab() {
       resetForm();
       loadPlans(listDate);
     } catch (e) {
-      setError(e?.response?.data?.message || 'Lưu draft thất bại');
+      setError(e?.response?.data?.message || t(`${MP}.saveDraftFailed`));
     } finally {
       setSaving(false);
     }
@@ -386,7 +369,7 @@ function MealPlanTab() {
         }))
       );
     } catch (e) {
-      setError(e?.response?.data?.message || 'Không mở được draft');
+      setError(e?.response?.data?.message || t(`${MP}.openDraftFailed`));
     } finally {
       setSaving(false);
     }
@@ -400,14 +383,14 @@ function MealPlanTab() {
       if (editingId === id) resetForm();
       loadPlans(listDate);
     } catch (e) {
-      setError(e?.response?.data?.message || 'Publish thất bại');
+      setError(e?.response?.data?.message || t(`${MP}.publishFailed`));
     } finally {
       setSaving(false);
     }
   };
 
   const deleteDraft = async (id) => {
-    if (!window.confirm('Bạn có chắc muốn xóa bản nháp meal plan này?')) return;
+    if (!window.confirm(t(`${MP}.confirmDeleteMealPlan`))) return;
     setSaving(true);
     setError('');
     try {
@@ -415,7 +398,7 @@ function MealPlanTab() {
       if (editingId === id) resetForm();
       loadPlans(listDate);
     } catch (e) {
-      setError(e?.response?.data?.message || 'Xóa draft thất bại');
+      setError(e?.response?.data?.message || t(`${MP}.deleteDraftFailed`));
     } finally {
       setSaving(false);
     }
@@ -428,7 +411,7 @@ function MealPlanTab() {
       const data = await mealPlanService.getPlan(id);
       setDetailPlan(data || null);
     } catch (e) {
-      setError(e?.response?.data?.message || 'Không tải được chi tiết lịch');
+      setError(e?.response?.data?.message || t(`${MP}.detailLoadFailed`));
     } finally {
       setDetailLoading(false);
     }
@@ -438,57 +421,58 @@ function MealPlanTab() {
 
   return (
     <div className="page card meal-page">
-      <h1 className="meal-page__title">Create Meal Plans</h1>
-      <p className="meal-page__intro">
-        Điều dưỡng tạo thực đơn theo ngày cho nhiều cư dân theo từng giai đoạn chăm sóc (Draft → Publish).
-      </p>
+      <h1 className="meal-page__title">{t(`${TAB}.title`)}</h1>
+      <p className="meal-page__intro">{t(`${TAB}.intro`)}</p>
       {error && <p className="form-error">{error}</p>}
-      {loading && <p>Đang tải...</p>}
+      {loading && <p>{t('common.loading')}</p>}
 
       {!loading && (
         <>
           <div className="form-grid">
             <div className="form-group">
-              <label>Ngày áp dụng *</label>
+              <label>{t(`${TAB}.workDate`)}</label>
               <input type="date" min={today()} value={formWorkDate} onChange={(e) => setFormWorkDate(e.target.value)} />
             </div>
             <div className="form-group">
-              <label>Lịch giờ ăn *</label>
+              <label>{t(`${TAB}.mealTimeSchedule`)}</label>
               <select
                 value={selectedScheduleId}
                 onChange={(e) => setSelectedScheduleId(e.target.value)}
                 disabled={!publishedSchedules.length}
               >
-                <option value="">— Chọn lịch đã đăng —</option>
+                <option value="">{t(`${TAB}.selectPublishedSchedule`)}</option>
                 {publishedSchedules.map((s) => (
                   <option key={s._id} value={s._id}>
-                    {s.title || 'Lịch giờ ăn'} ({Array.isArray(s.entries) ? s.entries.length : '…'} cư dân)
+                    {t(`${TAB}.scheduleOption`, {
+                      title: s.title || t(`${TAB}.defaultScheduleTitle`),
+                      count: Array.isArray(s.entries) ? s.entries.length : '…',
+                    })}
                   </option>
                 ))}
               </select>
             </div>
             <div className="form-group">
-              <label>Giai đoạn chăm sóc *</label>
+              <label>{t(`${TAB}.careStage`)}</label>
               <select value={careStage} onChange={(e) => setCareStage(e.target.value)}>
-                <option value="">— Chọn —</option>
+                <option value="">{t(`${TAB}.selectOption`)}</option>
                 {careStages.map((s) => (
                   <option key={s} value={s}>{s}</option>
                 ))}
               </select>
             </div>
             <div className="form-group">
-              <label>Tiêu đề</label>
-              <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="VD: Tuần phục hồi đầu tháng 6" />
+              <label>{t(`${TAB}.titleLabel`)}</label>
+              <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t(`${TAB}.titlePlaceholder`)} />
             </div>
           </div>
 
           {selectedScheduleId ? (
             <div className="meal-page__resident-section">
               <label className="meal-page__resident-label">
-                Cư dân từ lịch giờ ăn ({selectedResidents.length})
+                {t(`${TAB}.residentsFromSchedule`, { count: selectedResidents.length })}
               </label>
               {selectedResidents.length === 0 ? (
-                <p className="field-hint field-hint--warn">Lịch đã chọn không có cư dân.</p>
+                <p className="field-hint field-hint--warn">{t(`${TAB}.scheduleNoResidentsWarn`)}</p>
               ) : (
                 <ul className="meal-page__resident-readonly">
                   {selectedResidents.map((id) => (
@@ -498,34 +482,34 @@ function MealPlanTab() {
               )}
             </div>
           ) : (
-            <p className="meal-page__hint">Chọn lịch giờ ăn để tự động lấy danh sách cư dân.</p>
+            <p className="meal-page__hint">{t(`${TAB}.selectScheduleHint`)}</p>
           )}
 
           <p className="meal-page__hint">
             {selectedScheduleId && publishedTimes.source === 'published_schedule'
-              ? 'Giờ ăn và danh sách cư dân lấy từ lịch giờ ăn đã chọn.'
+              ? t(`${TAB}.timesFromScheduleHint`)
               : publishedSchedules.length
                 ? ''
-                : 'Chưa có lịch giờ ăn đã đăng cho ngày này — hãy tạo và đăng ở tab Lịch giờ ăn trước.'}
+                : t(`${TAB}.noPublishedScheduleHint`)}
           </p>
 
           <div className="tab-toolbar">
             <select value={selectedTemplate} onChange={(e) => setSelectedTemplate(e.target.value)}>
-              <option value="">— Chọn template 3 bữa —</option>
-              {templates.map((t) => <option key={t.key} value={t.key}>{t.name}</option>)}
+              <option value="">{t(`${TAB}.selectThreeMealTemplate`)}</option>
+              {templates.map((tpl) => <option key={tpl.key} value={tpl.key}>{tpl.name}</option>)}
             </select>
-            <button type="button" className="btn-primary" onClick={addFromTemplate}>+ Thêm từ template</button>
-            <button type="button" className="btn-secondary" onClick={addManual} disabled={!selectedScheduleId}>+ Thêm thủ công</button>
+            <button type="button" className="btn-primary" onClick={addFromTemplate}>{t(`${MP}.addFromTemplate`)}</button>
+            <button type="button" className="btn-secondary" onClick={addManual} disabled={!selectedScheduleId}>{t(`${MP}.addManual`)}</button>
           </div>
 
           <table className="data-table">
             <thead>
               <tr>
-                <th>Cư dân</th><th>Bữa</th><th>Tên món</th><th>Kcal</th><th>Giờ</th><th>Thành phần</th><th>Nguồn</th><th>Ghi chú</th><th />
+                <th>{t(`${TAB}.colResident`)}</th><th>{t(`${TAB}.colMeal`)}</th><th>{t(`${TAB}.colDish`)}</th><th>{t(`${TAB}.colKcal`)}</th><th>{t(`${TAB}.colTime`)}</th><th>{t(`${TAB}.colIngredients`)}</th><th>{t(`${TAB}.colSource`)}</th><th>{t(`${TAB}.colNotes`)}</th><th />
               </tr>
             </thead>
             <tbody>
-              {entries.length === 0 && <tr><td colSpan={9} className="empty-state">Chưa có dòng thực đơn</td></tr>}
+              {entries.length === 0 && <tr><td colSpan={9} className="empty-state">{t(`${MP}.emptyEntries`)}</td></tr>}
               {entries.map((row, idx) => (
                 <tr key={`${idx}-${row.residentId}-${row.mealType}`}>
                   <td>
@@ -547,18 +531,18 @@ function MealPlanTab() {
                   </td>
                   <td>
                     <select value={row.mealType} onChange={(e) => patchEntry(idx, { mealType: e.target.value })}>
-                      <option value="breakfast">Sáng</option>
-                      <option value="lunch">Trưa</option>
-                      <option value="dinner">Tối</option>
+                      <option value="breakfast">{mealTypeLabel('breakfast', t)}</option>
+                      <option value="lunch">{mealTypeLabel('lunch', t)}</option>
+                      <option value="dinner">{mealTypeLabel('dinner', t)}</option>
                     </select>
                   </td>
                   <td><input value={row.mealName} onChange={(e) => patchEntry(idx, { mealName: e.target.value })} /></td>
                   <td><input type="number" min="0" value={row.calories} onChange={(e) => patchEntry(idx, { calories: e.target.value })} /></td>
                   <td><input type="time" value={row.mealTime || defaultMealTimeByType(row.mealType)} onChange={(e) => patchEntry(idx, { mealTime: e.target.value })} /></td>
                   <td><input value={Array.isArray(row.ingredients) ? row.ingredients.join(', ') : row.ingredients || ''} onChange={(e) => patchEntry(idx, { ingredients: e.target.value })} /></td>
-                  <td>{row.source === 'template' ? 'Template' : 'Thủ công'}</td>
+                  <td>{sourceLabel(row.source, t)}</td>
                   <td><input value={row.nutritionNote || ''} onChange={(e) => patchEntry(idx, { nutritionNote: e.target.value })} /></td>
-                  <td><button type="button" className="btn btn--sm btn--delete" onClick={() => removeEntry(idx)}>Xóa</button></td>
+                  <td><button type="button" className="btn btn--sm btn--delete" onClick={() => removeEntry(idx)}>{t('common.delete')}</button></td>
                 </tr>
               ))}
             </tbody>
@@ -566,40 +550,40 @@ function MealPlanTab() {
 
           <div className="tab-toolbar">
             <button type="button" className="btn-primary" disabled={saving} onClick={saveDraft}>
-              {saving ? 'Đang lưu...' : editingId ? 'Cập nhật Draft' : 'Lưu Draft'}
+              {saving ? t('common.saving') : editingId ? t(`${MP}.updateDraft`) : t(`${MP}.saveDraft`)}
             </button>
-            <button type="button" className="btn-secondary" onClick={resetForm}>Làm mới</button>
+            <button type="button" className="btn-secondary" onClick={resetForm}>{t(`${MP}.reset`)}</button>
           </div>
 
           <div className="meal-page__list-header">
-            <h3 className="meal-page__draft-title">Lịch meal plans ngày {formatVNDate(listDate)}</h3>
+            <h3 className="meal-page__draft-title">{t(`${MP}.listTitleMealPlans`, { date: formatLocaleDate(listDate, i18n.language) })}</h3>
             <div className="meal-page__date-switch">
-              <button type="button" className="btn-secondary" onClick={() => setListDate(addDays(listDate, -1))}>← Hôm qua</button>
-              <button type="button" className="btn-secondary" onClick={() => setListDate(today())}>Hôm nay</button>
+              <button type="button" className="btn-secondary" onClick={() => setListDate(addDays(listDate, -1))}>{t(`${MP}.yesterday`)}</button>
+              <button type="button" className="btn-secondary" onClick={() => setListDate(today())}>{t('common.today')}</button>
               <input type="date" value={listDate} onChange={(e) => setListDate(e.target.value)} />
-              <button type="button" className="btn-secondary" onClick={() => setListDate(addDays(listDate, 1))}>Ngày mai →</button>
+              <button type="button" className="btn-secondary" onClick={() => setListDate(addDays(listDate, 1))}>{t(`${MP}.tomorrow`)}</button>
             </div>
           </div>
           <table className="data-table">
-            <thead><tr><th>Tiêu đề</th><th>Giai đoạn</th><th>Ngày</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
+            <thead><tr><th>{t(`${TAB}.titleLabel`)}</th><th>{t(`${TAB}.detailStage`)}</th><th>{t('common.date')}</th><th>{t('common.colStatus')}</th><th>{t('common.colActions')}</th></tr></thead>
             <tbody>
-              {plans.length === 0 && <tr><td colSpan={5} className="empty-state">Không có lịch</td></tr>}
+              {plans.length === 0 && <tr><td colSpan={5} className="empty-state">{t(`${MP}.emptyPlans`)}</td></tr>}
               {paginatedPlans.map((d) => (
                 <tr key={d._id}>
                   <td>{d.title || '—'}</td>
                   <td>{d.careStage || '—'}</td>
-                  <td>{formatVNDate((d.workDate || '').slice(0, 10))}</td>
-                  <td>{statusLabel(d.status)}</td>
+                  <td>{formatLocaleDate((d.workDate || '').slice(0, 10), i18n.language)}</td>
+                  <td>{planStatusLabel(d.status, t)}</td>
                   <td>
                     {d.status === 'draft' ? (
                       <>
-                        <button type="button" className="btn btn--sm btn--edit" onClick={() => openDraft(d._id)}>Mở</button>{' '}
-                        <button type="button" className="btn btn--sm btn--primary" onClick={() => publishDraft(d._id)}>Publish</button>{' '}
-                        <button type="button" className="btn btn--sm btn--delete" onClick={() => deleteDraft(d._id)}>Xóa</button>
+                        <button type="button" className="btn btn--sm btn--edit" onClick={() => openDraft(d._id)}>{t(`${MP}.open`)}</button>{' '}
+                        <button type="button" className="btn btn--sm btn--primary" onClick={() => publishDraft(d._id)}>{t(`${MP}.publish`)}</button>{' '}
+                        <button type="button" className="btn btn--sm btn--delete" onClick={() => deleteDraft(d._id)}>{t('common.delete')}</button>
                       </>
                     ) : (
                       <button type="button" className="btn btn--sm meal-page__btn-view" onClick={() => openPlanDetail(d._id)}>
-                        Chi tiết
+                        {t('common.viewDetails')}
                       </button>
                     )}
                   </td>
@@ -618,12 +602,12 @@ function MealPlanTab() {
 
           {!!editingId && (
             <p className="meal-page__editing-meta">
-              Đang chỉnh draft: <code>{editingId}</code>
+              {t(`${MP}.updateDraft`)}: <code>{editingId}</code>
               {entries.length > 0 && (
-                <> · Cư dân: {[...new Set(entries.map((e) => residentMap[e.residentId]).filter(Boolean))].join(', ')}</>
+                <> · {t('common.residents')}: {[...new Set(entries.map((e) => residentMap[e.residentId]).filter(Boolean))].join(', ')}</>
               )}
               {entries.length > 0 && (
-                <> · Bữa: {[...new Set(entries.map((e) => mealTypeLabel(e.mealType)))].join(', ')}</>
+                <> · {t(`${TAB}.colMeal`)}: {[...new Set(entries.map((e) => mealTypeLabel(e.mealType, t)))].join(', ')}</>
               )}
             </p>
           )}
@@ -634,21 +618,21 @@ function MealPlanTab() {
         <div className="meal-page__modal-overlay" onClick={!detailLoading ? closePlanDetail : undefined}>
           <div className="meal-page__modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
             <div className="meal-page__modal-header">
-              <h3 className="meal-page__modal-title">Chi tiết lịch đã publish</h3>
+              <h3 className="meal-page__modal-title">{t(`${TAB}.detailPublishedTitle`)}</h3>
               {!detailLoading && (
                 <button type="button" className="meal-page__modal-close" onClick={closePlanDetail}>×</button>
               )}
             </div>
-            {detailLoading && <p className="meal-page__modal-loading">Đang tải chi tiết...</p>}
+            {detailLoading && <p className="meal-page__modal-loading">{t('common.loading')}</p>}
             {!detailLoading && detailPlan && (
               <div className="meal-page__modal-body">
                 <p className="meal-page__modal-meta">
-                  <strong>Tiêu đề:</strong> {detailPlan.title || '—'} · <strong>Ngày:</strong> {formatVNDate((detailPlan.workDate || '').slice(0, 10))} · <strong>Giai đoạn:</strong> {detailPlan.careStage || '—'}
+                  <strong>{t(`${TAB}.detailTitle`)}:</strong> {detailPlan.title || '—'} · <strong>{t(`${TAB}.detailDate`)}:</strong> {formatLocaleDate((detailPlan.workDate || '').slice(0, 10), i18n.language)} · <strong>{t(`${TAB}.detailStage`)}:</strong> {detailPlan.careStage || '—'}
                 </p>
                 <table className="data-table meal-page__detail-table">
                   <thead>
                     <tr>
-                      <th>Cư dân</th><th>Bữa</th><th>Món</th><th>Kcal</th><th>Giờ</th><th>Thành phần</th><th>Nguồn</th><th>Ghi chú</th>
+                      <th>{t(`${TAB}.colResident`)}</th><th>{t(`${TAB}.colMeal`)}</th><th>{t(`${TAB}.colDish`)}</th><th>{t(`${TAB}.colKcal`)}</th><th>{t(`${TAB}.colTime`)}</th><th>{t(`${TAB}.colIngredients`)}</th><th>{t(`${TAB}.colSource`)}</th><th>{t(`${TAB}.colNotes`)}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -658,17 +642,17 @@ function MealPlanTab() {
                       return (
                         <tr key={`${rid}-${row.mealType}-${idx}`}>
                           <td>{name}</td>
-                          <td>{mealTypeLabel(row.mealType)}</td>
+                          <td>{mealTypeLabel(row.mealType, t)}</td>
                           <td>{row.mealName || '—'}</td>
                           <td>{row.calories ?? '—'}</td>
                           <td>{row.mealTime || '—'}</td>
                           <td>{Array.isArray(row.ingredients) ? row.ingredients.join(', ') || '—' : row.ingredients || '—'}</td>
-                          <td>{row.source === 'template' ? 'Template' : 'Thủ công'}</td>
+                          <td>{sourceLabel(row.source, t)}</td>
                           <td>{row.nutritionNote || row.stageNote || '—'}</td>
                         </tr>
                       );
                     }) : (
-                      <tr><td colSpan={8} className="empty-state">Lịch chưa có chi tiết món ăn</td></tr>
+                      <tr><td colSpan={8} className="empty-state">{t(`${TAB}.emptyDetailMeals`)}</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -682,6 +666,8 @@ function MealPlanTab() {
 }
 
 function SpecialDietTab() {
+  const { t, i18n } = useTranslation();
+  const TAB = `${MP}.specialTab`;
   const [workDate, setWorkDate] = useState(today());
   const [listDate, setListDate] = useState(today());
   const [title, setTitle] = useState('');
@@ -711,7 +697,7 @@ function SpecialDietTab() {
       setDietTypes(Array.isArray(tplRes.dietTypes) ? tplRes.dietTypes : []);
       setResidents(Array.isArray(residentRes?.data) ? residentRes.data : []);
     } catch (e) {
-      setError(e?.response?.data?.message || 'Không tải được dữ liệu special diets');
+      setError(e?.response?.data?.message || t(`${MP}.loadSpecialBootFailed`));
     } finally {
       setLoading(false);
     }
@@ -753,8 +739,8 @@ function SpecialDietTab() {
   const addFromTemplate = () => {
     setError('');
     const tpl = templates.find((t) => t.key === selectedTemplate);
-    if (!tpl) return setError('Vui lòng chọn template');
-    if (selectedResidents.length < 1) return setError('Vui lòng chọn ít nhất 1 cư dân');
+    if (!tpl) return setError(t(`${MP}.selectTemplate`));
+    if (selectedResidents.length < 1) return setError(t(`${MP}.selectResidents`));
     const generated = selectedResidents.map((residentId) => ({
       residentId,
       dietType: tpl.dietType,
@@ -799,11 +785,11 @@ function SpecialDietTab() {
   };
 
   const validate = () => {
-    if (workDate < today()) return 'Không thể tạo special diet plan cho ngày quá khứ';
-    if (selectedResidents.length < 1) return 'Vui lòng chọn tối thiểu 1 cư dân';
-    if (!entries.length) return 'Vui lòng thêm ít nhất 1 dòng chế độ ăn đặc biệt';
+    if (workDate < today()) return t(`${MP}.pastDateSpecialDiet`);
+    if (selectedResidents.length < 1) return t(`${MP}.selectResidents`);
+    if (!entries.length) return t(`${MP}.addAtLeastOneSpecialEntry`);
     const hasInvalid = entries.some((e) => !e.residentId || !e.dietType || !e.effectiveTime);
-    if (hasInvalid) return 'Mỗi dòng phải có cư dân, loại chế độ ăn và giờ hiệu lực';
+    if (hasInvalid) return t(`${MP}.invalidSpecialRow`);
     return '';
   };
 
@@ -842,7 +828,7 @@ function SpecialDietTab() {
       resetForm();
       loadPlans(listDate);
     } catch (e) {
-      setError(e?.response?.data?.message || 'Lưu draft thất bại');
+      setError(e?.response?.data?.message || t(`${MP}.saveDraftFailed`));
     } finally {
       setSaving(false);
     }
@@ -872,7 +858,7 @@ function SpecialDietTab() {
       const picked = [...new Set(rows.map((r) => String(r.residentId?._id || r.residentId || '')).filter(Boolean))];
       setSelectedResidents(picked);
     } catch (e) {
-      setError(e?.response?.data?.message || 'Không mở được draft');
+      setError(e?.response?.data?.message || t(`${MP}.openDraftFailed`));
     } finally {
       setSaving(false);
     }
@@ -886,14 +872,14 @@ function SpecialDietTab() {
       if (editingId === id) resetForm();
       loadPlans(listDate);
     } catch (e) {
-      setError(e?.response?.data?.message || 'Publish thất bại');
+      setError(e?.response?.data?.message || t(`${MP}.publishFailed`));
     } finally {
       setSaving(false);
     }
   };
 
   const deleteDraft = async (id) => {
-    if (!window.confirm('Bạn có chắc muốn xóa bản nháp special diet này?')) return;
+    if (!window.confirm(t(`${MP}.confirmDeleteSpecialDiet`))) return;
     setSaving(true);
     setError('');
     try {
@@ -901,7 +887,7 @@ function SpecialDietTab() {
       if (editingId === id) resetForm();
       loadPlans(listDate);
     } catch (e) {
-      setError(e?.response?.data?.message || 'Xóa draft thất bại');
+      setError(e?.response?.data?.message || t(`${MP}.deleteDraftFailed`));
     } finally {
       setSaving(false);
     }
@@ -914,7 +900,7 @@ function SpecialDietTab() {
       const data = await specialDietService.getPlan(id);
       setDetailPlan(data || null);
     } catch (e) {
-      setError(e?.response?.data?.message || 'Không tải được chi tiết lịch');
+      setError(e?.response?.data?.message || t(`${MP}.detailLoadFailed`));
     } finally {
       setDetailLoading(false);
     }
@@ -924,27 +910,25 @@ function SpecialDietTab() {
 
   return (
     <div className="meal-page">
-      <p className="meal-page__intro">
-        Điều dưỡng chỉ định chế độ ăn đặc biệt theo ngày cho nhiều cư dân (Draft → Publish).
-      </p>
+      <p className="meal-page__intro">{t(`${TAB}.intro`)}</p>
       {error && <p className="form-error">{error}</p>}
-      {loading && <p>Đang tải...</p>}
+      {loading && <p>{t('common.loading')}</p>}
 
       {!loading && (
         <>
           <div className="form-grid">
             <div className="form-group">
-              <label>Ngày áp dụng *</label>
+              <label>{t(`${TAB}.workDate`)}</label>
               <input type="date" min={today()} value={workDate} onChange={(e) => setWorkDate(e.target.value)} />
             </div>
             <div className="form-group">
-              <label>Tiêu đề</label>
-              <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="VD: Chế độ ăn đặc biệt tuần 1" />
+              <label>{t(`${TAB}.titleLabel`)}</label>
+              <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t(`${TAB}.titlePlaceholder`)} />
             </div>
           </div>
 
           <div className="meal-page__resident-section">
-            <label className="meal-page__resident-label">Cư dân áp dụng (nhiều người) *</label>
+            <label className="meal-page__resident-label">{t(`${TAB}.residentsLabel`)}</label>
             <div className="meal-page__resident-grid">
               {residents.map((r) => {
                 const id = String(r._id);
@@ -967,21 +951,21 @@ function SpecialDietTab() {
 
           <div className="tab-toolbar">
             <select value={selectedTemplate} onChange={(e) => setSelectedTemplate(e.target.value)}>
-              <option value="">— Chọn template special diet —</option>
-              {templates.map((t) => <option key={t.key} value={t.key}>{t.name}</option>)}
+              <option value="">{t(`${TAB}.selectSpecialTemplate`)}</option>
+              {templates.map((tpl) => <option key={tpl.key} value={tpl.key}>{tpl.name}</option>)}
             </select>
-            <button type="button" className="btn-primary" onClick={addFromTemplate}>+ Thêm từ template</button>
-            <button type="button" className="btn-secondary" onClick={addManual}>+ Thêm thủ công</button>
+            <button type="button" className="btn-primary" onClick={addFromTemplate}>{t(`${MP}.addFromTemplate`)}</button>
+            <button type="button" className="btn-secondary" onClick={addManual}>{t(`${MP}.addManual`)}</button>
           </div>
 
           <table className="data-table">
             <thead>
               <tr>
-                <th>Cư dân</th><th>Chế độ ăn</th><th>Hạn chế</th><th>Mục tiêu</th><th>Giờ hiệu lực</th><th>Nguồn</th><th>Ghi chú</th><th />
+                <th>{t(`${TAB}.colResident`)}</th><th>{t(`${TAB}.colDietType`)}</th><th>{t(`${TAB}.colRestrictions`)}</th><th>{t(`${TAB}.colGoal`)}</th><th>{t(`${TAB}.colEffectiveTime`)}</th><th>{t(`${TAB}.colSource`)}</th><th>{t(`${TAB}.colNotes`)}</th><th />
               </tr>
             </thead>
             <tbody>
-              {entries.length === 0 && <tr><td colSpan={8} className="empty-state">Chưa có chỉ định special diet</td></tr>}
+              {entries.length === 0 && <tr><td colSpan={8} className="empty-state">{t(`${TAB}.emptyEntries`)}</td></tr>}
               {entries.map((row, idx) => (
                 <tr key={`${idx}-${row.residentId}-${row.dietType}`}>
                   <td>
@@ -992,7 +976,7 @@ function SpecialDietTab() {
                   </td>
                   <td>
                     <select value={row.dietType} onChange={(e) => patchEntry(idx, { dietType: e.target.value })}>
-                      {dietTypes.map((t) => <option key={t} value={t}>{dietTypeLabel(t)}</option>)}
+                      {dietTypes.map((dt) => <option key={dt} value={dt}>{dietTypeLabel(dt, t)}</option>)}
                     </select>
                   </td>
                   <td>
@@ -1003,9 +987,9 @@ function SpecialDietTab() {
                   </td>
                   <td><input value={row.nutritionGoal || ''} onChange={(e) => patchEntry(idx, { nutritionGoal: e.target.value })} /></td>
                   <td><input type="time" value={row.effectiveTime || '07:00'} onChange={(e) => patchEntry(idx, { effectiveTime: e.target.value })} /></td>
-                  <td>{row.source === 'template' ? 'Template' : 'Thủ công'}</td>
+                  <td>{sourceLabel(row.source, t)}</td>
                   <td><input value={row.notes || ''} onChange={(e) => patchEntry(idx, { notes: e.target.value })} /></td>
-                  <td><button type="button" className="btn btn--sm btn--delete" onClick={() => removeEntry(idx)}>Xóa</button></td>
+                  <td><button type="button" className="btn btn--sm btn--delete" onClick={() => removeEntry(idx)}>{t('common.delete')}</button></td>
                 </tr>
               ))}
             </tbody>
@@ -1013,39 +997,39 @@ function SpecialDietTab() {
 
           <div className="tab-toolbar">
             <button type="button" className="btn-primary" disabled={saving} onClick={saveDraft}>
-              {saving ? 'Đang lưu...' : editingId ? 'Cập nhật Draft' : 'Lưu Draft'}
+              {saving ? t('common.saving') : editingId ? t(`${MP}.updateDraft`) : t(`${MP}.saveDraft`)}
             </button>
-            <button type="button" className="btn-secondary" onClick={resetForm}>Làm mới</button>
+            <button type="button" className="btn-secondary" onClick={resetForm}>{t(`${MP}.reset`)}</button>
           </div>
 
           <div className="meal-page__list-header">
-            <h3 className="meal-page__draft-title">Lịch special diets ngày {formatVNDate(listDate)}</h3>
+            <h3 className="meal-page__draft-title">{t(`${MP}.listTitleSpecialDiets`, { date: formatLocaleDate(listDate, i18n.language) })}</h3>
             <div className="meal-page__date-switch">
-              <button type="button" className="btn-secondary" onClick={() => setListDate(addDays(listDate, -1))}>← Hôm qua</button>
-              <button type="button" className="btn-secondary" onClick={() => setListDate(today())}>Hôm nay</button>
+              <button type="button" className="btn-secondary" onClick={() => setListDate(addDays(listDate, -1))}>{t(`${MP}.yesterday`)}</button>
+              <button type="button" className="btn-secondary" onClick={() => setListDate(today())}>{t('common.today')}</button>
               <input type="date" value={listDate} onChange={(e) => setListDate(e.target.value)} />
-              <button type="button" className="btn-secondary" onClick={() => setListDate(addDays(listDate, 1))}>Ngày mai →</button>
+              <button type="button" className="btn-secondary" onClick={() => setListDate(addDays(listDate, 1))}>{t(`${MP}.tomorrow`)}</button>
             </div>
           </div>
           <table className="data-table">
-            <thead><tr><th>Tiêu đề</th><th>Ngày</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
+            <thead><tr><th>{t(`${TAB}.titleLabel`)}</th><th>{t('common.date')}</th><th>{t('common.colStatus')}</th><th>{t('common.colActions')}</th></tr></thead>
             <tbody>
-              {plans.length === 0 && <tr><td colSpan={4} className="empty-state">Không có lịch</td></tr>}
+              {plans.length === 0 && <tr><td colSpan={4} className="empty-state">{t(`${MP}.emptyPlans`)}</td></tr>}
               {paginatedPlans.map((d) => (
                 <tr key={d._id}>
                   <td>{d.title || '—'}</td>
-                  <td>{formatVNDate((d.workDate || '').slice(0, 10))}</td>
-                  <td>{statusLabel(d.status)}</td>
+                  <td>{formatLocaleDate((d.workDate || '').slice(0, 10), i18n.language)}</td>
+                  <td>{planStatusLabel(d.status, t)}</td>
                   <td>
                     {d.status === 'draft' ? (
                       <>
-                        <button type="button" className="btn btn--sm btn--edit" onClick={() => openDraft(d._id)}>Mở</button>{' '}
-                        <button type="button" className="btn btn--sm btn--primary" onClick={() => publishDraft(d._id)}>Publish</button>{' '}
-                        <button type="button" className="btn btn--sm btn--delete" onClick={() => deleteDraft(d._id)}>Xóa</button>
+                        <button type="button" className="btn btn--sm btn--edit" onClick={() => openDraft(d._id)}>{t(`${MP}.open`)}</button>{' '}
+                        <button type="button" className="btn btn--sm btn--primary" onClick={() => publishDraft(d._id)}>{t(`${MP}.publish`)}</button>{' '}
+                        <button type="button" className="btn btn--sm btn--delete" onClick={() => deleteDraft(d._id)}>{t('common.delete')}</button>
                       </>
                     ) : (
                       <button type="button" className="btn btn--sm meal-page__btn-view" onClick={() => openPlanDetail(d._id)}>
-                        Chi tiết
+                        {t('common.viewDetails')}
                       </button>
                     )}
                   </td>
@@ -1068,21 +1052,21 @@ function SpecialDietTab() {
         <div className="meal-page__modal-overlay" onClick={!detailLoading ? closePlanDetail : undefined}>
           <div className="meal-page__modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
             <div className="meal-page__modal-header">
-              <h3 className="meal-page__modal-title">Chi tiết special diet đã publish</h3>
+              <h3 className="meal-page__modal-title">{t(`${TAB}.detailPublishedTitle`)}</h3>
               {!detailLoading && (
                 <button type="button" className="meal-page__modal-close" onClick={closePlanDetail}>×</button>
               )}
             </div>
-            {detailLoading && <p className="meal-page__modal-loading">Đang tải chi tiết...</p>}
+            {detailLoading && <p className="meal-page__modal-loading">{t('common.loading')}</p>}
             {!detailLoading && detailPlan && (
               <div className="meal-page__modal-body">
                 <p className="meal-page__modal-meta">
-                  <strong>Tiêu đề:</strong> {detailPlan.title || '—'} · <strong>Ngày:</strong> {formatVNDate((detailPlan.workDate || '').slice(0, 10))}
+                  <strong>{t(`${TAB}.titleLabel`)}:</strong> {detailPlan.title || '—'} · <strong>{t('common.date')}:</strong> {formatLocaleDate((detailPlan.workDate || '').slice(0, 10), i18n.language)}
                 </p>
                 <table className="data-table meal-page__detail-table">
                   <thead>
                     <tr>
-                      <th>Cư dân</th><th>Chế độ ăn</th><th>Hạn chế</th><th>Mục tiêu</th><th>Giờ hiệu lực</th><th>Nguồn</th><th>Ghi chú</th>
+                      <th>{t(`${TAB}.colResident`)}</th><th>{t(`${TAB}.colDietType`)}</th><th>{t(`${TAB}.colRestrictions`)}</th><th>{t(`${TAB}.colGoal`)}</th><th>{t(`${TAB}.colEffectiveTime`)}</th><th>{t(`${TAB}.colSource`)}</th><th>{t(`${TAB}.colNotes`)}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1091,16 +1075,16 @@ function SpecialDietTab() {
                       return (
                         <tr key={`${detailPlan._id || 'detail-special'}-${idx}`}>
                           <td>{name}</td>
-                          <td>{dietTypeLabel(row.dietType) || '—'}</td>
+                          <td>{dietTypeLabel(row.dietType, t) || '—'}</td>
                           <td>{Array.isArray(row.restrictions) ? row.restrictions.join(', ') || '—' : row.restrictions || '—'}</td>
                           <td>{row.nutritionGoal || '—'}</td>
                           <td>{row.effectiveTime || '—'}</td>
-                          <td>{row.source === 'template' ? 'Template' : 'Thủ công'}</td>
+                          <td>{sourceLabel(row.source, t)}</td>
                           <td>{row.notes || '—'}</td>
                         </tr>
                       );
                     }) : (
-                      <tr><td colSpan={7} className="empty-state">Lịch chưa có chi tiết special diet</td></tr>
+                      <tr><td colSpan={7} className="empty-state">{t(`${TAB}.emptyDetail`)}</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -1114,6 +1098,8 @@ function SpecialDietTab() {
 }
 
 function MealTimeScheduleTab() {
+  const { t, i18n } = useTranslation();
+  const TAB = `${MP}.scheduleTab`;
   const [formWorkDate, setFormWorkDate] = useState(today());
   const [listDate, setListDate] = useState(today());
   const [title, setTitle] = useState('');
@@ -1154,7 +1140,7 @@ function MealTimeScheduleTab() {
       }
       setResidents(Array.isArray(residentRes?.data) ? residentRes.data : []);
     } catch (e) {
-      setError(e?.response?.data?.message || 'Không tải được dữ liệu lịch giờ ăn');
+      setError(e?.response?.data?.message || t(`${MP}.loadScheduleBootFailed`));
     } finally {
       setLoading(false);
     }
@@ -1196,8 +1182,8 @@ function MealTimeScheduleTab() {
   const addFromTemplate = () => {
     setError('');
     const tpl = templates.find((t) => t.key === selectedTemplate);
-    if (!tpl) return setError('Vui lòng chọn template');
-    if (selectedResidents.length < 1) return setError('Vui lòng chọn ít nhất 1 cư dân');
+    if (!tpl) return setError(t(`${MP}.selectTemplate`));
+    if (selectedResidents.length < 1) return setError(t(`${MP}.selectResidents`));
     const existing = new Set(entries.map((e) => String(e.residentId)));
     const generated = selectedResidents
       .filter((id) => !existing.has(String(id)))
@@ -1210,15 +1196,15 @@ function MealTimeScheduleTab() {
         source: 'template',
         templateKey: tpl.key,
       }));
-    if (!generated.length) return setError('Các cư dân đã chọn đều có trong bảng');
+    if (!generated.length) return setError(t(`${MP}.residentsAlreadyInTable`));
     setEntries((prev) => [...prev, ...generated]);
   };
 
   const addManual = () => {
     const rid = selectedResidents[0] || '';
-    if (!rid) return setError('Vui lòng chọn ít nhất 1 cư dân trước khi thêm thủ công');
+    if (!rid) return setError(t(`${MP}.selectResidentsBeforeManual`));
     if (entries.some((e) => String(e.residentId) === String(rid))) {
-      return setError('Cư dân này đã có trong bảng');
+      return setError(t(`${MP}.residentAlreadyInTable`));
     }
     setEntries((prev) => [
       ...prev,
@@ -1249,15 +1235,15 @@ function MealTimeScheduleTab() {
   };
 
   const validate = () => {
-    if (formWorkDate < today()) return 'Không thể tạo lịch giờ ăn cho ngày quá khứ';
-    if (selectedResidents.length < 1) return 'Vui lòng chọn tối thiểu 1 cư dân';
-    if (!entries.length) return 'Vui lòng thêm ít nhất 1 dòng lịch giờ ăn';
+    if (formWorkDate < today()) return t(`${MP}.pastDateMealTime`);
+    if (selectedResidents.length < 1) return t(`${MP}.selectResidents`);
+    if (!entries.length) return t(`${MP}.addAtLeastOneTimeEntry`);
     const hasInvalid = entries.some(
       (e) => !e.residentId || !e.breakfastTime || !e.lunchTime || !e.dinnerTime
     );
-    if (hasInvalid) return 'Mỗi dòng phải có cư dân và đủ 3 giờ (sáng/trưa/tối)';
+    if (hasInvalid) return t(`${MP}.invalidTimeRow`);
     const uniqueResidents = new Set(entries.map((e) => String(e.residentId)));
-    if (uniqueResidents.size !== entries.length) return 'Mỗi cư dân chỉ được 1 dòng trong lịch';
+    if (uniqueResidents.size !== entries.length) return t(`${MP}.oneRowPerResident`);
     return '';
   };
 
@@ -1290,7 +1276,7 @@ function MealTimeScheduleTab() {
       resetForm();
       loadSchedules(listDate);
     } catch (e) {
-      setError(e?.response?.data?.message || 'Lưu draft thất bại');
+      setError(e?.response?.data?.message || t(`${MP}.saveDraftFailed`));
     } finally {
       setSaving(false);
     }
@@ -1319,7 +1305,7 @@ function MealTimeScheduleTab() {
       const picked = [...new Set(rows.map((r) => String(r.residentId?._id || r.residentId || '')).filter(Boolean))];
       setSelectedResidents(picked);
     } catch (e) {
-      setError(e?.response?.data?.message || 'Không mở được draft');
+      setError(e?.response?.data?.message || t(`${MP}.openDraftFailed`));
     } finally {
       setSaving(false);
     }
@@ -1333,14 +1319,14 @@ function MealTimeScheduleTab() {
       if (editingId === id) resetForm();
       loadSchedules(listDate);
     } catch (e) {
-      setError(e?.response?.data?.message || 'Publish thất bại');
+      setError(e?.response?.data?.message || t(`${MP}.publishFailed`));
     } finally {
       setSaving(false);
     }
   };
 
   const removeDraft = async (id) => {
-    if (!window.confirm('Xóa lịch giờ ăn nháp này?')) return;
+    if (!window.confirm(t(`${MP}.confirmDeleteMealTime`))) return;
     setSaving(true);
     setError('');
     try {
@@ -1348,7 +1334,7 @@ function MealTimeScheduleTab() {
       if (editingId === id) resetForm();
       loadSchedules(listDate);
     } catch (e) {
-      setError(e?.response?.data?.message || 'Xóa draft thất bại');
+      setError(e?.response?.data?.message || t(`${MP}.deleteDraftFailed`));
     } finally {
       setSaving(false);
     }
@@ -1361,7 +1347,7 @@ function MealTimeScheduleTab() {
       const data = await mealTimeScheduleService.getSchedule(id);
       setDetailSchedule(data || null);
     } catch (e) {
-      setError(e?.response?.data?.message || 'Không tải được chi tiết lịch');
+      setError(e?.response?.data?.message || t(`${MP}.detailLoadFailed`));
     } finally {
       setDetailLoading(false);
     }
@@ -1371,28 +1357,26 @@ function MealTimeScheduleTab() {
 
   return (
     <div className="page card meal-page">
-      <h1 className="meal-page__title">Schedule Meal Times</h1>
-      <p className="meal-page__intro">
-        Thiết lập giờ ăn Sáng/Trưa/Tối theo ngày cho nhiều cư dân (Draft → Publish). Create Meal Plans sẽ tự lấy giờ từ lịch đã publish.
-      </p>
+      <h1 className="meal-page__title">{t(`${TAB}.title`)}</h1>
+      <p className="meal-page__intro">{t(`${TAB}.intro`)}</p>
       {error && <p className="form-error">{error}</p>}
-      {loading && <p>Đang tải...</p>}
+      {loading && <p>{t('common.loading')}</p>}
 
       {!loading && (
         <>
           <div className="form-grid">
             <div className="form-group">
-              <label>Ngày áp dụng *</label>
+              <label>{t(`${TAB}.workDate`)}</label>
               <input type="date" min={today()} value={formWorkDate} onChange={(e) => setFormWorkDate(e.target.value)} />
             </div>
             <div className="form-group">
-              <label>Tiêu đề</label>
-              <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="VD: Lịch giờ ăn đầu tháng 6" />
+              <label>{t(`${TAB}.titleLabel`)}</label>
+              <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t(`${TAB}.titlePlaceholder`)} />
             </div>
           </div>
 
           <div className="meal-page__resident-section">
-            <label className="meal-page__resident-label">Cư dân áp dụng (nhiều người) *</label>
+            <label className="meal-page__resident-label">{t(`${TAB}.residentsLabel`)}</label>
             <div className="meal-page__resident-grid">
               {residents.map((r) => {
                 const id = String(r._id);
@@ -1415,23 +1399,23 @@ function MealTimeScheduleTab() {
 
           <div className="tab-toolbar">
             <select value={selectedTemplate} onChange={(e) => setSelectedTemplate(e.target.value)}>
-              <option value="">— Chọn mẫu giờ ăn —</option>
-              {templates.map((t) => (
-                <option key={t.key} value={t.key}>{t.name}</option>
+              <option value="">{t(`${TAB}.selectPattern`)}</option>
+              {templates.map((tpl) => (
+                <option key={tpl.key} value={tpl.key}>{tpl.name}</option>
               ))}
             </select>
-            <button type="button" className="btn-primary" onClick={addFromTemplate}>+ Thêm từ mẫu</button>
-            <button type="button" className="btn-secondary" onClick={addManual}>+ Thêm thủ công</button>
+            <button type="button" className="btn-primary" onClick={addFromTemplate}>{t(`${MP}.addFromPattern`)}</button>
+            <button type="button" className="btn-secondary" onClick={addManual}>{t(`${MP}.addManual`)}</button>
           </div>
 
           <table className="data-table">
             <thead>
               <tr>
-                <th>Cư dân</th><th>Giờ sáng</th><th>Giờ trưa</th><th>Giờ tối</th><th>Ghi chú</th><th>Nguồn</th><th />
+                <th>{t(`${TAB}.colResident`)}</th><th>{t(`${TAB}.colBreakfast`)}</th><th>{t(`${TAB}.colLunch`)}</th><th>{t(`${TAB}.colDinner`)}</th><th>{t(`${TAB}.colNotes`)}</th><th>{t(`${TAB}.colSource`)}</th><th />
               </tr>
             </thead>
             <tbody>
-              {entries.length === 0 && <tr><td colSpan={7} className="empty-state">Chưa có dòng lịch giờ ăn</td></tr>}
+              {entries.length === 0 && <tr><td colSpan={7} className="empty-state">{t(`${TAB}.emptyEntries`)}</td></tr>}
               {entries.map((row, idx) => (
                 <tr key={`${idx}-${row.residentId}`}>
                   <td>
@@ -1446,8 +1430,8 @@ function MealTimeScheduleTab() {
                   <td><input type="time" value={row.lunchTime} onChange={(e) => patchEntry(idx, { lunchTime: e.target.value })} /></td>
                   <td><input type="time" value={row.dinnerTime} onChange={(e) => patchEntry(idx, { dinnerTime: e.target.value })} /></td>
                   <td><input value={row.notes || ''} onChange={(e) => patchEntry(idx, { notes: e.target.value })} /></td>
-                  <td>{row.source === 'template' ? 'Mẫu' : 'Thủ công'}</td>
-                  <td><button type="button" className="btn btn--sm btn--delete" onClick={() => removeEntry(idx)}>Xóa</button></td>
+                  <td>{row.source === 'template' ? t(`${MP}.sourcePattern`) : sourceLabel(row.source, t)}</td>
+                  <td><button type="button" className="btn btn--sm btn--delete" onClick={() => removeEntry(idx)}>{t('common.delete')}</button></td>
                 </tr>
               ))}
             </tbody>
@@ -1455,39 +1439,39 @@ function MealTimeScheduleTab() {
 
           <div className="tab-toolbar">
             <button type="button" className="btn-primary" disabled={saving} onClick={saveDraft}>
-              {saving ? 'Đang lưu...' : editingId ? 'Cập nhật Draft' : 'Lưu Draft'}
+              {saving ? t('common.saving') : editingId ? t(`${MP}.updateDraft`) : t(`${MP}.saveDraft`)}
             </button>
-            <button type="button" className="btn-secondary" onClick={resetForm}>Làm mới</button>
+            <button type="button" className="btn-secondary" onClick={resetForm}>{t(`${MP}.reset`)}</button>
           </div>
 
           <div className="meal-page__list-header">
-            <h3 className="meal-page__draft-title">Lịch giờ ăn ngày {formatVNDate(listDate)}</h3>
+            <h3 className="meal-page__draft-title">{t(`${MP}.listTitleMealTimes`, { date: formatLocaleDate(listDate, i18n.language) })}</h3>
             <div className="meal-page__date-switch">
-              <button type="button" className="btn-secondary" onClick={() => setListDate(addDays(listDate, -1))}>← Hôm qua</button>
-              <button type="button" className="btn-secondary" onClick={() => setListDate(today())}>Hôm nay</button>
+              <button type="button" className="btn-secondary" onClick={() => setListDate(addDays(listDate, -1))}>{t(`${MP}.yesterday`)}</button>
+              <button type="button" className="btn-secondary" onClick={() => setListDate(today())}>{t('common.today')}</button>
               <input type="date" value={listDate} onChange={(e) => setListDate(e.target.value)} />
-              <button type="button" className="btn-secondary" onClick={() => setListDate(addDays(listDate, 1))}>Ngày mai →</button>
+              <button type="button" className="btn-secondary" onClick={() => setListDate(addDays(listDate, 1))}>{t(`${MP}.tomorrow`)}</button>
             </div>
           </div>
           <table className="data-table">
-            <thead><tr><th>Tiêu đề</th><th>Ngày</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
+            <thead><tr><th>{t(`${TAB}.titleLabel`)}</th><th>{t('common.date')}</th><th>{t('common.colStatus')}</th><th>{t('common.colActions')}</th></tr></thead>
             <tbody>
-              {schedules.length === 0 && <tr><td colSpan={4} className="empty-state">Không có lịch</td></tr>}
+              {schedules.length === 0 && <tr><td colSpan={4} className="empty-state">{t(`${MP}.emptyPlans`)}</td></tr>}
               {paginatedSchedules.map((d) => (
                 <tr key={d._id}>
                   <td>{d.title || '—'}</td>
-                  <td>{formatVNDate((d.workDate || '').slice(0, 10))}</td>
-                  <td>{statusLabel(d.status)}</td>
+                  <td>{formatLocaleDate((d.workDate || '').slice(0, 10), i18n.language)}</td>
+                  <td>{planStatusLabel(d.status, t)}</td>
                   <td>
                     {d.status === 'draft' ? (
                       <>
-                        <button type="button" className="btn btn--sm btn--edit" onClick={() => openDraft(d._id)}>Mở</button>{' '}
-                        <button type="button" className="btn btn--sm btn--primary" onClick={() => publishDraft(d._id)}>Publish</button>{' '}
-                        <button type="button" className="btn btn--sm btn--delete" onClick={() => removeDraft(d._id)}>Xóa</button>
+                        <button type="button" className="btn btn--sm btn--edit" onClick={() => openDraft(d._id)}>{t(`${MP}.open`)}</button>{' '}
+                        <button type="button" className="btn btn--sm btn--primary" onClick={() => publishDraft(d._id)}>{t(`${MP}.publish`)}</button>{' '}
+                        <button type="button" className="btn btn--sm btn--delete" onClick={() => removeDraft(d._id)}>{t('common.delete')}</button>
                       </>
                     ) : (
                       <button type="button" className="btn btn--sm meal-page__btn-view" onClick={() => openScheduleDetail(d._id)}>
-                        Chi tiết
+                        {t('common.viewDetails')}
                       </button>
                     )}
                   </td>
@@ -1507,9 +1491,9 @@ function MealTimeScheduleTab() {
 
           {!!editingId && (
             <p className="meal-page__editing-meta">
-              Đang chỉnh draft: <code>{editingId}</code>
+              {t(`${MP}.updateDraft`)}: <code>{editingId}</code>
               {entries.length > 0 && (
-                <> · Cư dân: {[...new Set(entries.map((e) => residentMap[e.residentId]).filter(Boolean))].join(', ')}</>
+                <> · {t('common.residents')}: {[...new Set(entries.map((e) => residentMap[e.residentId]).filter(Boolean))].join(', ')}</>
               )}
             </p>
           )}
@@ -1520,22 +1504,22 @@ function MealTimeScheduleTab() {
         <div className="meal-page__modal-overlay" onClick={!detailLoading ? closeScheduleDetail : undefined}>
           <div className="meal-page__modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
             <div className="meal-page__modal-header">
-              <h3 className="meal-page__modal-title">Chi tiết lịch giờ ăn đã publish</h3>
+              <h3 className="meal-page__modal-title">{t(`${TAB}.detailPublishedTitle`)}</h3>
               {!detailLoading && (
                 <button type="button" className="meal-page__modal-close" onClick={closeScheduleDetail}>×</button>
               )}
             </div>
-            {detailLoading && <p className="meal-page__modal-loading">Đang tải chi tiết...</p>}
+            {detailLoading && <p className="meal-page__modal-loading">{t('common.loading')}</p>}
             {!detailLoading && detailSchedule && (
               <div className="meal-page__modal-body">
                 <p className="meal-page__modal-meta">
-                  <strong>Tiêu đề:</strong> {detailSchedule.title || '—'} · <strong>Ngày:</strong>{' '}
-                  {formatVNDate((detailSchedule.workDate || '').slice(0, 10))}
+                  <strong>{t(`${TAB}.titleLabel`)}:</strong> {detailSchedule.title || '—'} · <strong>{t('common.date')}:</strong>{' '}
+                  {formatLocaleDate((detailSchedule.workDate || '').slice(0, 10), i18n.language)}
                 </p>
                 <table className="data-table meal-page__detail-table">
                   <thead>
                     <tr>
-                      <th>Cư dân</th><th>Sáng</th><th>Trưa</th><th>Tối</th><th>Ghi chú</th><th>Nguồn</th>
+                      <th>{t(`${TAB}.colResident`)}</th><th>{t(`${TAB}.colBreakfast`)}</th><th>{t(`${TAB}.colLunch`)}</th><th>{t(`${TAB}.colDinner`)}</th><th>{t(`${TAB}.colNotes`)}</th><th>{t(`${TAB}.colSource`)}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1550,12 +1534,12 @@ function MealTimeScheduleTab() {
                             <td>{row.lunchTime || '—'}</td>
                             <td>{row.dinnerTime || '—'}</td>
                             <td>{row.notes || '—'}</td>
-                            <td>{row.source === 'template' ? 'Mẫu' : 'Thủ công'}</td>
+                            <td>{row.source === 'template' ? t(`${MP}.sourcePattern`) : sourceLabel(row.source, t)}</td>
                           </tr>
                         );
                       })
                     ) : (
-                      <tr><td colSpan={6} className="empty-state">Lịch chưa có chi tiết</td></tr>
+                      <tr><td colSpan={6} className="empty-state">{t(`${TAB}.emptyDetail`)}</td></tr>
                     )}
                   </tbody>
                 </table>

@@ -1,12 +1,13 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import dailyBehaviorService from '../../../../services/dailyBehavior.service';
 import { observationCategoryLabel } from '../../../../utils/behaviorLabels';
 import {
-  ABNORMAL_SEVERITY_OPTIONS,
-  BEHAVIOR_TYPE_OPTIONS,
-  MOOD_LEVEL_OPTIONS,
-  OBSERVATION_CATEGORY_OPTIONS,
-  SEVERITY_OPTIONS,
+  getAbnormalSeverityOptions,
+  getBehaviorTypeOptions,
+  getMoodLevelOptions,
+  getObservationCategoryOptions,
+  getSeverityOptions,
 } from '../constants';
 
 const toDatetimeLocalValue = (iso) => {
@@ -17,7 +18,16 @@ const toDatetimeLocalValue = (iso) => {
 };
 
 function BehaviorFormModal({ open, mode, recordId, residents, defaultWorkDate, maxDate, onClose, onSuccess }) {
+  const { t } = useTranslation();
   const isEdit = mode === 'edit';
+  const ns = 'caregiver';
+  const c = `${ns}.common`;
+
+  const observationCategoryOptions = useMemo(() => getObservationCategoryOptions(t), [t]);
+  const moodLevelOptions = useMemo(() => getMoodLevelOptions(t), [t]);
+  const behaviorTypeOptions = useMemo(() => getBehaviorTypeOptions(t), [t]);
+  const severityOptions = useMemo(() => getSeverityOptions(t), [t]);
+  const abnormalSeverityOptions = useMemo(() => getAbnormalSeverityOptions(t), [t]);
 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -64,11 +74,11 @@ function BehaviorFormModal({ open, mode, recordId, residents, defaultWorkDate, m
         workDate: wd,
       });
     } catch (e) {
-      setError(e?.response?.data?.message || 'Không tải được chi tiết ghi nhận');
+      setError(e?.response?.data?.message || t(`${c}.detailLoadFailed`));
     } finally {
       setLoading(false);
     }
-  }, [open, isEdit, recordId]);
+  }, [open, isEdit, recordId, t, c]);
 
   useEffect(() => {
     if (!open) return;
@@ -115,12 +125,12 @@ function BehaviorFormModal({ open, mode, recordId, residents, defaultWorkDate, m
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!isEdit && !residentId) return setError('Vui lòng chọn cư dân');
+    if (!isEdit && !residentId) return setError(t(`${c}.selectResidentRequired`));
     if (observationCategory === 'mood' && !moodLevel) {
-      return setError('Vui lòng chọn mức tâm trạng');
+      return setError(t(`${c}.selectMoodRequired`));
     }
     if (notes.trim().length < 5) {
-      return setError('Mô tả phải có ít nhất 5 ký tự');
+      return setError(t(`${c}.descriptionMinLength`));
     }
 
     setSaving(true);
@@ -137,7 +147,7 @@ function BehaviorFormModal({ open, mode, recordId, residents, defaultWorkDate, m
       }
       onSuccess();
     } catch (err) {
-      setError(err?.response?.data?.message || 'Lưu thất bại');
+      setError(err?.response?.data?.message || t(`${c}.saveFailed`));
     } finally {
       setSaving(false);
     }
@@ -145,9 +155,11 @@ function BehaviorFormModal({ open, mode, recordId, residents, defaultWorkDate, m
 
   if (!open) return null;
 
-  const title = isEdit ? 'Sửa ghi nhận hành vi' : 'Ghi nhận hành vi / tâm trạng';
-  const severityOptions =
-    observationCategory === 'abnormal' ? ABNORMAL_SEVERITY_OPTIONS : SEVERITY_OPTIONS;
+  const title = isEdit
+    ? t(`${ns}.dailyBehaviors.formModal.titleEdit`)
+    : t(`${ns}.dailyBehaviors.formModal.titleCreate`);
+  const activeSeverityOptions =
+    observationCategory === 'abnormal' ? abnormalSeverityOptions : severityOptions;
 
   return (
     <div className="behavior-page__modal-overlay" onClick={saving ? undefined : onClose}>
@@ -159,14 +171,14 @@ function BehaviorFormModal({ open, mode, recordId, residents, defaultWorkDate, m
           </button>
         </div>
         <div className="behavior-page__modal-body">
-          {loading && <p>Đang tải...</p>}
+          {loading && <p>{t('common.loading')}</p>}
           {!loading && (
             <form onSubmit={handleSubmit}>
               {isEdit && readOnlyMeta && (
                 <div className="behavior-page__readonly-meta">
                   <p>
-                    <strong>Cư dân:</strong> {readOnlyMeta.residentName || '—'} · <strong>Ngày:</strong>{' '}
-                    {readOnlyMeta.workDate}
+                    <strong>{t(`${c}.residentLabel`)}:</strong> {readOnlyMeta.residentName || '—'} ·{' '}
+                    <strong>{t(`${c}.dateLabel`)}:</strong> {readOnlyMeta.workDate}
                   </p>
                 </div>
               )}
@@ -175,7 +187,7 @@ function BehaviorFormModal({ open, mode, recordId, residents, defaultWorkDate, m
                 {!isEdit && (
                   <>
                     <label>
-                      Ngày *
+                      {t(`${c}.dateLabel`)} *
                       <input
                         type="date"
                         max={maxDate}
@@ -185,9 +197,9 @@ function BehaviorFormModal({ open, mode, recordId, residents, defaultWorkDate, m
                       />
                     </label>
                     <label>
-                      Cư dân *
+                      {t(`${c}.residentLabel`)} *
                       <select required value={residentId} onChange={(e) => setResidentId(e.target.value)}>
-                        <option value="">— Chọn —</option>
+                        <option value="">{t(`${c}.selectOption`)}</option>
                         {residents.map((r) => (
                           <option key={r._id} value={r._id}>
                             {r.fullName || r.residentCode}
@@ -198,13 +210,13 @@ function BehaviorFormModal({ open, mode, recordId, residents, defaultWorkDate, m
                   </>
                 )}
                 <label>
-                  Loại quan sát *
+                  {t(`${c}.observationTypeLabel`)} *
                   <select
                     required
                     value={observationCategory}
                     onChange={(e) => handleCategoryChange(e.target.value)}
                   >
-                    {OBSERVATION_CATEGORY_OPTIONS.map((o) => (
+                    {observationCategoryOptions.map((o) => (
                       <option key={o.value} value={o.value}>
                         {o.label}
                       </option>
@@ -212,7 +224,7 @@ function BehaviorFormModal({ open, mode, recordId, residents, defaultWorkDate, m
                   </select>
                 </label>
                 <label>
-                  Thời điểm quan sát
+                  {t(`${c}.observedAtLabel`)}
                   <input
                     type="datetime-local"
                     value={observedAtLocal}
@@ -221,9 +233,9 @@ function BehaviorFormModal({ open, mode, recordId, residents, defaultWorkDate, m
                 </label>
                 {observationCategory === 'mood' && (
                   <label>
-                    Tâm trạng *
+                    {t(`${c}.moodLabel`)} *
                     <select required value={moodLevel} onChange={(e) => setMoodLevel(e.target.value)}>
-                      {MOOD_LEVEL_OPTIONS.map((o) => (
+                      {moodLevelOptions.map((o) => (
                         <option key={o.value} value={o.value}>
                           {o.label}
                         </option>
@@ -233,10 +245,10 @@ function BehaviorFormModal({ open, mode, recordId, residents, defaultWorkDate, m
                 )}
                 {(observationCategory === 'behavior' || observationCategory === 'abnormal') && (
                   <label>
-                    Kiểu hành vi
+                    {t(`${c}.behaviorTypeLabel`)}
                     <select value={behaviorType} onChange={(e) => setBehaviorType(e.target.value)}>
-                      <option value="">— Không chọn —</option>
-                      {BEHAVIOR_TYPE_OPTIONS.map((o) => (
+                      <option value="">{t(`${c}.selectNone`)}</option>
+                      {behaviorTypeOptions.map((o) => (
                         <option key={o.value} value={o.value}>
                           {o.label}
                         </option>
@@ -245,13 +257,13 @@ function BehaviorFormModal({ open, mode, recordId, residents, defaultWorkDate, m
                   </label>
                 )}
                 <label>
-                  Mức độ {observationCategory === 'abnormal' ? '*' : ''}
+                  {t(`${c}.severityLabel`)} {observationCategory === 'abnormal' ? '*' : ''}
                   <select
                     required={observationCategory === 'abnormal'}
                     value={severity}
                     onChange={(e) => setSeverity(e.target.value)}
                   >
-                    {severityOptions.map((o) => (
+                    {activeSeverityOptions.map((o) => (
                       <option key={o.value} value={o.value}>
                         {o.label}
                       </option>
@@ -260,18 +272,20 @@ function BehaviorFormModal({ open, mode, recordId, residents, defaultWorkDate, m
                 </label>
                 {!isEdit && observationCategory && (
                   <p className="behavior-page__field-hint behavior-page__field-full">
-                    Đang ghi: {observationCategoryLabel(observationCategory)}. Có thể ghi nhiều lần trong ngày.
+                    {t(`${ns}.dailyBehaviors.formModal.recordingHint`, {
+                      category: observationCategoryLabel(observationCategory, t),
+                    })}
                   </p>
                 )}
                 <label className="behavior-page__field-full">
-                  Mô tả chi tiết * (tối thiểu 5 ký tự)
+                  {t(`${c}.descriptionLabel`)}
                   <textarea
                     rows={3}
                     required
                     minLength={5}
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Mô tả hành vi, tâm trạng hoặc biểu hiện bất thường..."
+                    placeholder={t(`${c}.descriptionPlaceholder`)}
                   />
                 </label>
               </div>
@@ -280,10 +294,10 @@ function BehaviorFormModal({ open, mode, recordId, residents, defaultWorkDate, m
 
               <div className="behavior-page__actions">
                 <button type="submit" className="btn-primary" disabled={saving}>
-                  {saving ? 'Đang lưu...' : isEdit ? 'Cập nhật' : 'Lưu ghi nhận'}
+                  {saving ? t(`${c}.savingRecord`) : isEdit ? t(`${c}.update`) : t(`${c}.saveRecord`)}
                 </button>
                 <button type="button" className="btn-secondary" disabled={saving} onClick={onClose}>
-                  Hủy
+                  {t('common.cancel')}
                 </button>
               </div>
             </form>

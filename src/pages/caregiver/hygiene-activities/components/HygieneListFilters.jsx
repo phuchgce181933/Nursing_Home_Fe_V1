@@ -1,5 +1,6 @@
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CATEGORY_FILTER_OPTIONS } from '../constants';
+import { getCategoryFilterOptions } from '../constants';
 
 function HygieneListFilters({
   workDate,
@@ -15,6 +16,7 @@ function HygieneListFilters({
   onReload,
 }) {
   const { t } = useTranslation();
+  const categoryFilterOptions = useMemo(() => getCategoryFilterOptions(t), [t]);
 
   return (
     <div className="resident-page__filters">
@@ -31,7 +33,7 @@ function HygieneListFilters({
         <label className="resident-page__filter">
           <span>{t('caregiver.hygiene.colCategory')}</span>
           <select value={activityCategory} onChange={(e) => onActivityCategoryChange(e.target.value)}>
-            {CATEGORY_FILTER_OPTIONS.map((o) => (
+            {categoryFilterOptions.map((o) => (
               <option key={o.value || 'all'} value={o.value}>
                 {o.label}
               </option>

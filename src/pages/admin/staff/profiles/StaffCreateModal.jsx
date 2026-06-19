@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ALL_STAFF_ROLE_OPTIONS } from '../../../../constants/rolePolicy';
 
 // Mirror backend validators
@@ -6,29 +7,30 @@ const PHONE_REGEX = /^(\+84|0)[0-9]{8,10}$/;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,30}$/;
 
-const validate = (form) => {
+const validate = (form, t) => {
   const errs = {};
+  const v = (key) => t(`admin.staff.profiles.validation.${key}`);
 
-  if (!form.fullName.trim()) errs.fullName = 'Họ tên không được để trống';
-  else if (form.fullName.trim().length < 2) errs.fullName = 'Họ tên ít nhất 2 ký tự';
-  else if (form.fullName.trim().length > 100) errs.fullName = 'Họ tên tối đa 100 ký tự';
+  if (!form.fullName.trim()) errs.fullName = v('fullNameRequired');
+  else if (form.fullName.trim().length < 2) errs.fullName = v('fullNameMin');
+  else if (form.fullName.trim().length > 100) errs.fullName = v('fullNameMax');
 
-  if (!form.email.trim()) errs.email = 'Email không được để trống';
-  else if (!EMAIL_REGEX.test(form.email.trim())) errs.email = 'Email không hợp lệ';
+  if (!form.email.trim()) errs.email = v('emailRequired');
+  else if (!EMAIL_REGEX.test(form.email.trim())) errs.email = v('emailInvalid');
 
-  if (!form.password) errs.password = 'Mật khẩu không được để trống';
-  else if (form.password.length < 8) errs.password = 'Mật khẩu ít nhất 8 ký tự';
-  else if (!/[a-zA-Z]/.test(form.password)) errs.password = 'Mật khẩu phải chứa ít nhất 1 chữ cái';
-  else if (!/[0-9]/.test(form.password)) errs.password = 'Mật khẩu phải chứa ít nhất 1 chữ số';
+  if (!form.password) errs.password = v('passwordRequired');
+  else if (form.password.length < 8) errs.password = v('passwordMin');
+  else if (!/[a-zA-Z]/.test(form.password)) errs.password = v('passwordLetter');
+  else if (!/[0-9]/.test(form.password)) errs.password = v('passwordDigit');
 
-  if (!form.role) errs.role = 'Vui lòng chọn vai trò';
+  if (!form.role) errs.role = v('roleRequired');
 
   if (form.phone && !PHONE_REGEX.test(form.phone.trim())) {
-    errs.phone = 'Số điện thoại không hợp lệ (VD: 0912345678 hoặc +84912345678)';
+    errs.phone = v('phoneInvalid');
   }
 
   if (form.username && !USERNAME_REGEX.test(form.username.trim())) {
-    errs.username = 'Username 3–30 ký tự, chỉ chữ cái, số và dấu gạch dưới';
+    errs.username = v('usernameInvalid');
   }
 
   return errs;
@@ -46,6 +48,7 @@ export default function StaffCreateModal({
   serverError,
   roleOptions = ALL_STAFF_ROLE_OPTIONS,
 }) {
+  const { t } = useTranslation();
   const [form, setForm] = useState(emptyForm);
   const [errors, setErrors] = useState({});
   const [avatarFile, setAvatarFile] = useState(null);
@@ -72,7 +75,7 @@ export default function StaffCreateModal({
   };
 
   const handleSubmit = () => {
-    const errs = validate(form);
+    const errs = validate(form, t);
     if (Object.keys(errs).length) { setErrors(errs); return; }
 
     onSave({
@@ -97,16 +100,15 @@ export default function StaffCreateModal({
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal modal--wide modal--scroll staff-profile-modal" onClick={(e) => e.stopPropagation()}>
-        <h2 className="modal__title">Thêm nhân viên mới</h2>
+        <h2 className="modal__title">{t('admin.staff.profiles.createTitle')}</h2>
 
         {serverError && <p className="form-error">{serverError}</p>}
 
-        {/* Avatar upload */}
         <div className="avatar-upload">
           <div
             className="avatar-upload__preview"
             onClick={() => fileRef.current?.click()}
-            title="Chọn ảnh đại diện"
+            title={t('admin.staff.profiles.avatarChoose')}
           >
             {avatarPreview
               ? <img src={avatarPreview} alt="preview" className="avatar-upload__img" />
@@ -114,58 +116,60 @@ export default function StaffCreateModal({
           </div>
           <div>
             <button type="button" className="btn-outline-sm" onClick={() => fileRef.current?.click()}>
-              Chọn ảnh đại diện
+              {t('admin.staff.profiles.avatarChoose')}
             </button>
             <p style={{ fontSize: '0.75rem', color: '#94a3b8', margin: '4px 0 0' }}>
-              JPG, PNG, WebP — tối đa 5MB
+              {t('admin.staff.profiles.avatarHint')}
             </p>
           </div>
           <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarChange} />
         </div>
 
-        <div className="form-section-title">Thông tin đăng nhập</div>
+        <div className="form-section-title">{t('admin.staff.profiles.sectionLogin')}</div>
         <div className="form-grid">
-          {field('Email *', 'email', { placeholder: 'nhanvien@example.com', type: 'email' })}
-          {field('Mật khẩu *', 'password', { placeholder: 'Tối thiểu 8 ký tự, có chữ và số', type: 'password' })}
-          {field('Username', 'username', { placeholder: 'Tùy chọn, 3–30 ký tự' })}
+          {field(t('admin.staff.profiles.labelEmailRequired'), 'email', { placeholder: t('admin.staff.profiles.placeholderEmail'), type: 'email' })}
+          {field(t('admin.staff.profiles.labelPasswordRequired'), 'password', { placeholder: t('admin.staff.profiles.placeholderPassword'), type: 'password' })}
+          {field(t('admin.staff.profiles.labelUsername'), 'username', { placeholder: t('admin.staff.profiles.placeholderUsername') })}
         </div>
 
-        <div className="form-section-title">Thông tin cá nhân</div>
+        <div className="form-section-title">{t('admin.staff.profiles.sectionPersonalInfo')}</div>
         <div className="form-grid">
-          {field('Họ và tên *', 'fullName', { placeholder: 'Nguyễn Văn A', full: true })}
-          {field('Số điện thoại', 'phone', { placeholder: '0912345678' })}
+          {field(t('admin.staff.profiles.labelFullNameRequired'), 'fullName', { placeholder: t('admin.staff.profiles.placeholderFullName'), full: true })}
+          {field(t('admin.staff.profiles.labelPhone'), 'phone', { placeholder: t('admin.staff.profiles.placeholderPhone') })}
           <div className="form-group">
-            <label>Giới tính</label>
+            <label>{t('admin.staff.profiles.labelGender')}</label>
             <select value={form.gender} onChange={(e) => set('gender', e.target.value)}>
               <option value="">—</option>
-              <option value="male">Nam</option>
-              <option value="female">Nữ</option>
-              <option value="other">Khác</option>
+              <option value="male">{t('common.gender.male')}</option>
+              <option value="female">{t('common.gender.female')}</option>
+              <option value="other">{t('common.gender.other')}</option>
             </select>
           </div>
-          {field('Địa chỉ', 'address', { placeholder: 'Số nhà, đường, phường...', full: true })}
+          {field(t('admin.staff.profiles.labelAddress'), 'address', { placeholder: t('admin.staff.profiles.placeholderAddress'), full: true })}
         </div>
 
-        <div className="form-section-title">Thông tin chuyên môn</div>
+        <div className="form-section-title">{t('admin.staff.profiles.sectionProfessionalInfo')}</div>
         <div className="form-grid">
           <div className="form-group">
-            <label>Vai trò *</label>
+            <label>{t('admin.staff.profiles.labelRoleRequired')}</label>
             <select value={form.role} onChange={(e) => set('role', e.target.value)}>
               {roleOptions.map((r) => (
-                <option key={r.value} value={r.value}>{r.label}</option>
+                <option key={r.value} value={r.value}>{t(`common.roles.${r.value}`, { defaultValue: r.value })}</option>
               ))}
             </select>
             {errors.role && <span className="field-error">{errors.role}</span>}
           </div>
-          {field('Chuyên môn', 'specialty', { placeholder: 'Nội khoa, Hồi sức...' })}
+          {field(t('admin.staff.profiles.labelSpecialty'), 'specialty', { placeholder: t('admin.staff.profiles.placeholderSpecialty') })}
           <div className="form-group form-grid--full">
-            <label>Chứng chỉ (DOC/PDF)</label>
+            <label>{t('admin.staff.profiles.labelCertificationsUpload')}</label>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
               <button type="button" className="btn-outline-sm" onClick={() => certFileRef.current?.click()}>
-                Chọn file chứng chỉ
+                {t('admin.staff.profiles.chooseCertFiles')}
               </button>
               <span style={{ color: '#64748b', fontSize: '0.9rem' }}>
-                {certificationFiles.length ? `${certificationFiles.length} file đã chọn` : 'Hỗ trợ PDF, DOC, DOCX'}
+                {certificationFiles.length
+                  ? t('admin.staff.profiles.certFilesSelected', { count: certificationFiles.length })
+                  : t('admin.staff.profiles.certFilesHint')}
               </span>
             </div>
             <input
@@ -187,8 +191,8 @@ export default function StaffCreateModal({
         </div>
 
         <div className="modal__actions">
-          <button className="btn-cancel" onClick={onClose}>Hủy</button>
-          <button className="btn-save" onClick={handleSubmit}>Tạo tài khoản</button>
+          <button className="btn-cancel" onClick={onClose}>{t('common.cancel')}</button>
+          <button className="btn-save" onClick={handleSubmit}>{t('admin.staff.profiles.createAccount')}</button>
         </div>
       </div>
     </div>

@@ -1,8 +1,4 @@
-const ROLE_LABELS = {
-  doctor: 'Bác sĩ', nurse: 'Y tá', staff: 'Chăm sóc viên',
-  manager: 'Quản lý', admin: 'Admin',
-};
-const GENDER_LABELS = { male: 'Nam', female: 'Nữ', other: 'Khác', unknown: 'Không rõ' };
+import { useTranslation } from 'react-i18next';
 
 function DetailRow({ label, value }) {
   return (
@@ -22,23 +18,37 @@ function DetailSection({ title, children }) {
   );
 }
 
-function fmt(date) {
+function fmt(date, locale) {
   if (!date) return null;
-  return new Date(date).toLocaleDateString('vi-VN');
+  return new Date(date).toLocaleDateString(locale);
 }
 
-function fmtDatetime(date) {
+function fmtDatetime(date, locale) {
   if (!date) return null;
-  return new Date(date).toLocaleString('vi-VN');
+  return new Date(date).toLocaleString(locale);
 }
 
 export default function StaffDetailModal({ staff, onClose, onEdit, canEdit = true }) {
+  const { t, i18n } = useTranslation();
+  const locale = i18n.language?.startsWith('vi') ? 'vi-VN' : 'en-US';
+
   if (!staff) return null;
 
   const profile = staff.staffProfile || {};
   const areas = profile.responsibleAreaIds || [];
   const rooms = profile.responsibleRoomIds || [];
   const residents = profile.assignedResidentIds || [];
+
+  const roleLabel = t(`common.roles.${staff.role}`, { defaultValue: staff.role });
+  const genderLabel = staff.gender
+    ? t(`common.gender.${staff.gender}`, { defaultValue: staff.gender })
+    : null;
+
+  const statusLabel = staff.isBanned
+    ? t('admin.staff.profiles.statusBannedLong')
+    : staff.isActive
+      ? t('admin.staff.profiles.statusActiveLong')
+      : t('admin.staff.profiles.statusInactiveLong');
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -59,49 +69,49 @@ export default function StaffDetailModal({ staff, onClose, onEdit, canEdit = tru
               <h2 id="staff-detail-title" className="modal__title">{staff.fullName}</h2>
               <div className="detail-header__meta">
                 <span className={`role-badge role-badge--${staff.role}`}>
-                  {ROLE_LABELS[staff.role] || staff.role}
+                  {roleLabel}
                 </span>
                 <span className={`status-badge status-badge--${staff.isBanned ? 'banned' : staff.isActive ? 'active' : 'inactive'}`}>
-                  {staff.isBanned ? 'Đang bị ban' : staff.isActive ? 'Đang làm việc' : 'Vô hiệu hóa'}
+                  {statusLabel}
                 </span>
               </div>
               {staff.isBanned && staff.banReason && (
-                <p className="detail-header__ban">Lý do ban: {staff.banReason}</p>
+                <p className="detail-header__ban">{t('admin.staff.profiles.banReason', { reason: staff.banReason })}</p>
               )}
             </div>
           </div>
 
           <div className="detail-grid">
             <div>
-              <DetailSection title="Thông tin cá nhân">
-                <DetailRow label="Email" value={staff.email} />
-                <DetailRow label="Username" value={staff.username} />
-                <DetailRow label="Số điện thoại" value={staff.phone} />
-                <DetailRow label="Giới tính" value={GENDER_LABELS[staff.gender]} />
-                <DetailRow label="Ngày sinh" value={fmt(staff.dateOfBirth)} />
-                <DetailRow label="Địa chỉ" value={staff.address} />
+              <DetailSection title={t('admin.staff.profiles.sectionPersonalInfo')}>
+                <DetailRow label={t('admin.staff.profiles.colEmail')} value={staff.email} />
+                <DetailRow label={t('admin.staff.profiles.labelUsername')} value={staff.username} />
+                <DetailRow label={t('admin.staff.profiles.labelPhone')} value={staff.phone} />
+                <DetailRow label={t('admin.staff.profiles.labelGender')} value={genderLabel} />
+                <DetailRow label={t('admin.staff.profiles.labelDateOfBirth')} value={fmt(staff.dateOfBirth, locale)} />
+                <DetailRow label={t('admin.staff.profiles.labelAddress')} value={staff.address} />
               </DetailSection>
 
-              <DetailSection title="Thông tin tài khoản">
-                <DetailRow label="Ngày tạo" value={fmtDatetime(staff.createdAt)} />
-                <DetailRow label="Đăng nhập lần cuối" value={fmtDatetime(staff.lastLoginAt)} />
+              <DetailSection title={t('admin.staff.profiles.sectionAccountInfo')}>
+                <DetailRow label={t('admin.staff.profiles.labelCreatedAt')} value={fmtDatetime(staff.createdAt, locale)} />
+                <DetailRow label={t('admin.staff.profiles.labelLastLogin')} value={fmtDatetime(staff.lastLoginAt, locale)} />
               </DetailSection>
             </div>
 
             <div>
-              <DetailSection title="Thông tin chuyên môn">
-                <DetailRow label="Mã nhân viên" value={profile.staffCode} />
-                <DetailRow label="Vai trò hệ thống" value={ROLE_LABELS[staff.role] || staff.role} />
-                <DetailRow label="Chuyên môn" value={profile.specialty} />
+              <DetailSection title={t('admin.staff.profiles.sectionProfessionalInfo')}>
+                <DetailRow label={t('admin.staff.profiles.labelStaffCode')} value={profile.staffCode} />
+                <DetailRow label={t('admin.staff.profiles.labelSystemRole')} value={roleLabel} />
+                <DetailRow label={t('admin.staff.profiles.labelSpecialty')} value={profile.specialty} />
                 <DetailRow
-                  label="Chứng chỉ"
+                  label={t('admin.staff.profiles.labelCertifications')}
                   value={profile.certifications?.length ? profile.certifications.join(', ') : null}
                 />
               </DetailSection>
 
-              <DetailSection title="Phân công">
+              <DetailSection title={t('admin.staff.profiles.sectionAssignments')}>
                 <DetailRow
-                  label="Tầng phụ trách"
+                  label={t('admin.staff.profiles.labelResponsibleFloors')}
                   value={
                     areas.length
                       ? areas.map((a) => (typeof a === 'object' ? a.name || a.floorNumber || a._id : a)).join(', ')
@@ -109,7 +119,7 @@ export default function StaffDetailModal({ staff, onClose, onEdit, canEdit = tru
                   }
                 />
                 <DetailRow
-                  label="Phòng phụ trách"
+                  label={t('admin.staff.profiles.labelResponsibleRooms')}
                   value={
                     rooms.length
                       ? rooms.map((r) => (typeof r === 'object' ? r.name || r.roomNumber || r._id : r)).join(', ')
@@ -117,8 +127,8 @@ export default function StaffDetailModal({ staff, onClose, onEdit, canEdit = tru
                   }
                 />
                 <DetailRow
-                  label="Cư dân phụ trách"
-                  value={residents.length ? `${residents.length} cư dân` : null}
+                  label={t('admin.staff.profiles.labelAssignedResidents')}
+                  value={residents.length ? t('admin.staff.profiles.assignedResidentsCount', { count: residents.length }) : null}
                 />
               </DetailSection>
             </div>
@@ -126,14 +136,14 @@ export default function StaffDetailModal({ staff, onClose, onEdit, canEdit = tru
         </div>
 
         <div className="modal__actions">
-          <button type="button" className="btn-cancel" onClick={onClose}>Đóng</button>
+          <button type="button" className="btn-cancel" onClick={onClose}>{t('common.close')}</button>
           {canEdit && (
             <button
               type="button"
               className="btn-save"
               onClick={() => { onClose(); onEdit(staff); }}
             >
-              Chỉnh sửa
+              {t('common.edit')}
             </button>
           )}
         </div>

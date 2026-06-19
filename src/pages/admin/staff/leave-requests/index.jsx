@@ -9,27 +9,21 @@ import {
   conflictsFromError,
   sortConflicts,
   CONFLICT_ICON,
-  CONFLICT_LABEL,
+  getConflictLabel,
 } from '../../../../constants/shiftConflicts';
 import AdminPageShell from '../../../../components/admin/AdminPageShell';
 import '../../../../styles/admin/LeaveRequestAdminPage.css';
 
-const STATUS_LABELS = {
-  draft: 'Nháp',
-  pending: 'Chờ duyệt',
-  approved: 'Đã duyệt',
-  rejected: 'Từ chối',
-  cancelled: 'Đã hủy',
+const STATUS_LABELS = (t, status) => {
+  if (status === 'draft') return t('common.planStatus.draft');
+  return t(`common.leaveStatus.${status}`, { defaultValue: status });
 };
-const TYPE_LABELS = {
-  annual: 'Phép năm',
-  sick: 'Ốm',
-  emergency: 'Khẩn cấp',
-  unpaid: 'Không lương',
-  other: 'Khác',
+const TYPE_LABEL = (t, type) => t(`admin.staff.leaveRequests.types.${type}`, { defaultValue: type });
+const ROLE_LABEL = (t, role) => t(`common.roles.${role}`, { defaultValue: role });
+const SHIFT_STATUS_LABEL = (t, status) => {
+  if (status === 'draft') return t('common.planStatus.draft');
+  return t(`common.shiftStatus.${status}`, { defaultValue: status });
 };
-const ROLE_LABELS = { doctor: 'Bác sĩ', nurse: 'Y tá', staff: 'Nhân viên', manager: 'Quản lý' };
-const SHIFT_STATUS_VI = { draft: 'Nháp', published: 'Đã đăng', confirmed: 'Đã xác nhận' };
 
 function replacementDisplay(replacement) {
   if (!replacement) return '—';
@@ -40,6 +34,7 @@ function replacementDisplay(replacement) {
 }
 
 function ApproveLeaveModal({ requestRow, onClose, onSuccess }) {
+  const { t } = useTranslation();
   const requestId = requestRow._id;
   const [loading, setLoading] = useState(true);
   const [candidatesData, setCandidatesData] = useState(null);
@@ -62,7 +57,7 @@ function ApproveLeaveModal({ requestRow, onClose, onSuccess }) {
       })
       .catch((e) => {
         if (!cancelled) {
-          setLoadError(e.response?.data?.message || 'Không tải được danh sách người thế ca');
+          setLoadError(e.response?.data?.message || t('admin.staff.leaveRequests.approveModal.loadCandidatesFailed'));
         }
       })
       .finally(() => {
@@ -84,7 +79,7 @@ function ApproveLeaveModal({ requestRow, onClose, onSuccess }) {
     setBlockingTasks([]);
 
     if (needsReplacement && !replacementId) {
-      setSubmitError('Vui lòng chọn nhân viên thế ca (cùng vai trò, không trùng ca).');
+      setSubmitError(t('admin.staff.leaveRequests.approveModal.selectReplacementError'));
       return;
     }
 
@@ -98,7 +93,7 @@ function ApproveLeaveModal({ requestRow, onClose, onSuccess }) {
       onClose();
     } catch (e) {
       const data = e.response?.data || {};
-      setSubmitError(data.message || 'Duyệt đơn thất bại');
+      setSubmitError(data.message || t('admin.staff.leaveRequests.approveModal.approveFailed'));
       setConflicts(conflictsFromError(e));
       setBlockingTasks(Array.isArray(data.blockingTasks) ? data.blockingTasks : []);
     } finally {
@@ -115,17 +110,17 @@ function ApproveLeaveModal({ requestRow, onClose, onSuccess }) {
         onClick={(e) => e.stopPropagation()}
       >
         <h2 id="approve-leave-title" className="leave-modal__title">
-          Duyệt đơn nghỉ phép
+          {t('admin.staff.leaveRequests.approveModal.title')}
         </h2>
         <p className="leave-modal__subtitle">
           <strong>{requestRow.staffId?.fullName}</strong>
           {' · '}
-          {TYPE_LABELS[requestRow.type] || requestRow.type}
+          {TYPE_LABEL(t, requestRow.type)}
           {' · '}
           {formatLeaveDate(requestRow.startDate)} → {formatLeaveDate(requestRow.endDate)}
         </p>
 
-        {loading && <p className="leave-modal__hint">Đang tải ca cần chuyển và danh sách người thế...</p>}
+        {loading && <p className="leave-modal__hint">{t('admin.staff.leaveRequests.approveModal.loading')}</p>}
         {loadError && <p className="leave-modal__error">{loadError}</p>}
 
         {!loading && !loadError && (
@@ -133,7 +128,7 @@ function ApproveLeaveModal({ requestRow, onClose, onSuccess }) {
             {needsReplacement ? (
               <div className="leave-modal__section">
                 <h3 className="leave-modal__section-title">
-                  Ca cần chuyển ({shiftsToCover.length})
+                  {t('admin.staff.leaveRequests.approveModal.shiftsToCover', { count: shiftsToCover.length })}
                 </h3>
                 <ul className="leave-modal__shift-list">
                   {shiftsToCover.map((sh) => (
@@ -142,17 +137,18 @@ function ApproveLeaveModal({ requestRow, onClose, onSuccess }) {
                       {' · '}
                       {sh.name} ({sh.startTime}–{sh.endTime})
                       {' · '}
-                      {SHIFT_STATUS_VI[sh.status] || sh.status}
+                      {SHIFT_STATUS_LABEL(t, sh.status)}
                     </li>
                   ))}
                 </ul>
                 <p className="leave-modal__hint leave-modal__hint--warn">
-                  Bắt buộc chọn người thế ca cùng vai trò ({ROLE_LABELS[requestRow.staffId?.role] || requestRow.staffId?.role}).
-                  Ca được chuyển sang người thế, không hủy.
+                  {t('admin.staff.leaveRequests.approveModal.replacementRequired', {
+                    role: ROLE_LABEL(t, requestRow.staffId?.role),
+                  })}
                 </p>
 
                 <label className="leave-modal__label" htmlFor="replacement-select">
-                  Người thế ca *
+                  {t('admin.staff.leaveRequests.approveModal.replacementLabel')}
                 </label>
                 <select
                   id="replacement-select"
@@ -163,14 +159,14 @@ function ApproveLeaveModal({ requestRow, onClose, onSuccess }) {
                 >
                   <option value="">
                     {eligibleCandidates.length
-                      ? '— Chọn nhân viên —'
-                      : 'Không có ứng viên đủ điều kiện'}
+                      ? t('admin.staff.leaveRequests.approveModal.selectStaff')
+                      : t('admin.staff.leaveRequests.approveModal.noEligibleCandidates')}
                   </option>
                   {eligibleCandidates.map((c) => (
                     <option key={c.staffProfileId} value={c.staffProfileId}>
                       {c.fullName || '—'}
                       {c.staffCode ? ` (${c.staffCode})` : ''}
-                      {c.role ? ` · ${ROLE_LABELS[c.role] || c.role}` : ''}
+                      {c.role ? ` · ${ROLE_LABEL(t, c.role)}` : ''}
                     </option>
                   ))}
                 </select>
@@ -178,7 +174,7 @@ function ApproveLeaveModal({ requestRow, onClose, onSuccess }) {
                 {ineligibleCandidates.length > 0 && (
                   <details className="leave-modal__ineligible">
                     <summary>
-                      Không đủ điều kiện ({ineligibleCandidates.length})
+                      {t('admin.staff.leaveRequests.approveModal.ineligible', { count: ineligibleCandidates.length })}
                     </summary>
                     <ul>
                       {ineligibleCandidates.map((c) => (
@@ -195,18 +191,18 @@ function ApproveLeaveModal({ requestRow, onClose, onSuccess }) {
               </div>
             ) : (
               <p className="leave-modal__hint">
-                Nhân viên không có ca draft/đăng/xác nhận trong kỳ nghỉ — không cần chọn người thế.
+                {t('admin.staff.leaveRequests.approveModal.noShiftsHint')}
               </p>
             )}
 
             <label className="leave-modal__label" htmlFor="approve-review-note">
-              Ghi chú duyệt (tùy chọn)
+              {t('admin.staff.leaveRequests.approveModal.reviewNote')}
             </label>
             <textarea
               id="approve-review-note"
               className="leave-modal__textarea"
               rows={2}
-              placeholder="Ghi chú cho nhân viên..."
+              placeholder={t('admin.staff.leaveRequests.approveModal.reviewNotePlaceholder')}
               value={reviewNote}
               onChange={(e) => setReviewNote(e.target.value)}
             />
@@ -217,7 +213,7 @@ function ApproveLeaveModal({ requestRow, onClose, onSuccess }) {
           <BlockingCareTasksAlert
             message={submitError}
             tasks={blockingTasks}
-            hint="Cập nhật phân công khu vực/cư dân cho người thế ca hoặc hoàn thành nhiệm vụ trước khi duyệt."
+            hint={t('admin.staff.leaveRequests.approveModal.blockingHint')}
           />
         )}
         {submitError && !blockingTasks.length && (
@@ -225,10 +221,10 @@ function ApproveLeaveModal({ requestRow, onClose, onSuccess }) {
         )}
         {conflicts.length > 0 && (
           <div className="leave-modal__conflicts">
-            <p className="leave-modal__conflicts-title">Xung đột ca (không thể duyệt)</p>
+            <p className="leave-modal__conflicts-title">{t('admin.staff.leaveRequests.approveModal.conflictsTitle')}</p>
             {sortConflicts(conflicts).map((c, i) => (
               <div key={`${c.type}-${i}`} className={`leave-modal__conflict leave-modal__conflict--${c.severity?.toLowerCase()}`}>
-                {CONFLICT_ICON[c.severity]} <strong>{CONFLICT_LABEL[c.type] || c.type}</strong>
+                {CONFLICT_ICON[c.severity]} <strong>{getConflictLabel(c.type, t)}</strong>
                 {c.message ? ` — ${c.message}` : ''}
               </div>
             ))}
@@ -237,7 +233,7 @@ function ApproveLeaveModal({ requestRow, onClose, onSuccess }) {
 
         <div className="leave-modal__actions">
           <button type="button" className="leave-modal__btn leave-modal__btn--ghost" onClick={onClose} disabled={saving}>
-            Hủy
+            {t('common.cancel')}
           </button>
           <button
             type="button"
@@ -245,7 +241,7 @@ function ApproveLeaveModal({ requestRow, onClose, onSuccess }) {
             onClick={handleSubmit}
             disabled={saving || loading || !!loadError || (needsReplacement && eligibleCandidates.length === 0)}
           >
-            {saving ? 'Đang duyệt...' : 'Xác nhận duyệt'}
+            {saving ? t('common.confirming') : t('admin.staff.leaveRequests.approveModal.confirmApprove')}
           </button>
         </div>
       </div>
@@ -274,7 +270,7 @@ export default function LeaveRequestAdminPage() {
       const res = await leaveRequestService.getAll(params);
       setRequests(Array.isArray(res.data) ? res.data : []);
     } catch (e) {
-      setError(e.response?.data?.message || 'Không thể tải danh sách');
+      setError(e.response?.data?.message || t('admin.staff.leaveRequests.loadFailed'));
     } finally {
       setLoading(false);
     }
@@ -304,16 +300,16 @@ export default function LeaveRequestAdminPage() {
   const count = (s) => requests.filter((r) => r.status === s).length;
 
   const handleApproveSuccess = (res) => {
-    const parts = ['Đã duyệt đơn nghỉ phép.'];
+    const parts = [t('admin.staff.leaveRequests.toast.approved')];
     const replacement = res.request?.replacementStaffProfileId;
     if (replacement) {
-      parts.push(`Người thế ca: ${replacementDisplay(replacement)}.`);
+      parts.push(t('admin.staff.leaveRequests.toast.replacement', { name: replacementDisplay(replacement) }));
     }
     if (res.reassignedShifts?.count) {
-      parts.push(`Đã chuyển ${res.reassignedShifts.count} ca làm việc.`);
+      parts.push(t('admin.staff.leaveRequests.toast.shiftsReassigned', { count: res.reassignedShifts.count }));
     }
     if (res.reassignedCareTasks?.count) {
-      parts.push(`Đã chuyển ${res.reassignedCareTasks.count} nhiệm vụ chăm sóc.`);
+      parts.push(t('admin.staff.leaveRequests.toast.tasksReassigned', { count: res.reassignedCareTasks.count }));
     }
     setResult({
       type: 'success',
@@ -326,7 +322,7 @@ export default function LeaveRequestAdminPage() {
   const handleReject = async (id) => {
     const note = reviewNotes[id]?.trim();
     if (!note) {
-      alert('Vui lòng nhập lý do từ chối (bắt buộc)');
+      alert(t('admin.staff.leaveRequests.rejectReasonRequired'));
       return;
     }
     setActLoad(id + '_reject');
@@ -336,7 +332,7 @@ export default function LeaveRequestAdminPage() {
         prev.map((r) => (r._id === id ? { ...r, status: 'rejected', reviewNote: note } : r))
       );
     } catch (e) {
-      alert(e.response?.data?.message || 'Thao tác thất bại');
+      alert(e.response?.data?.message || t('admin.staff.leaveRequests.actionFailed'));
     } finally {
       setActLoad(null);
     }
@@ -378,13 +374,13 @@ export default function LeaveRequestAdminPage() {
             <ul>
               {approveResult.shifts.map((sh) => (
                 <li key={sh.shiftId}>
-                  {sh.name || 'Ca'} — {formatLeaveDate(sh.workDate)}
+                  {sh.name || t('admin.staff.leaveRequests.toast.shiftFallback')} — {formatLeaveDate(sh.workDate)}
                 </li>
               ))}
             </ul>
           )}
           <button type="button" className="leave-approve-toast__close" onClick={() => setResult(null)}>
-            Đóng
+            {t('common.close')}
           </button>
         </div>
       )}
@@ -446,10 +442,10 @@ export default function LeaveRequestAdminPage() {
                   <td style={{ fontWeight: 600 }}>{r.staffId?.fullName || '—'}</td>
                   <td>
                     <span className={`role-badge role-badge--${r.staffId?.role}`}>
-                      {ROLE_LABELS[r.staffId?.role] || r.staffId?.role || '—'}
+                      {ROLE_LABEL(t, r.staffId?.role) || '—'}
                     </span>
                   </td>
-                  <td>{TYPE_LABELS[r.type] || r.type}</td>
+                  <td>{TYPE_LABEL(t, r.type)}</td>
                   <td>{formatLeaveDate(r.startDate)}</td>
                   <td>{formatLeaveDate(r.endDate)}</td>
                   <td style={{ textAlign: 'center' }}>
@@ -468,14 +464,14 @@ export default function LeaveRequestAdminPage() {
                   <td>{formatLeaveDate(r.createdAt)}</td>
                   <td>
                     <span className={`leave-status leave-status--${r.status}`}>
-                      {STATUS_LABELS[r.status] || r.status}
+                      {STATUS_LABELS(t, r.status)}
                     </span>
                   </td>
                   <td>
                     {r.status === 'pending' ? (
                       <input
                         className="leave-review-input"
-                        placeholder="Lý do từ chối (bắt buộc)"
+                        placeholder={t('admin.staff.leaveRequests.rejectReasonPlaceholder')}
                         value={reviewNotes[r._id] || ''}
                         onChange={(e) =>
                           setNotes((prev) => ({ ...prev, [r._id]: e.target.value }))
@@ -492,16 +488,16 @@ export default function LeaveRequestAdminPage() {
                       disabled={r.status !== 'pending' || !!actionLoading}
                       onClick={() => setApproveTarget(r)}
                     >
-                      ✓ Duyệt
+                      ✓ {t('admin.staff.leaveRequests.approve')}
                     </button>
                     <button
                       type="button"
                       className="action-btn action-btn--reject"
                       disabled={r.status !== 'pending' || !!actionLoading}
-                      title="Cần nhập lý do từ chối"
+                      title={t('admin.staff.leaveRequests.rejectReasonTitle')}
                       onClick={() => handleReject(r._id)}
                     >
-                      {actionLoading === r._id + '_reject' ? '...' : '✗ Từ chối'}
+                      {actionLoading === r._id + '_reject' ? '...' : `✗ ${t('admin.staff.leaveRequests.reject')}`}
                     </button>
                   </td>
                 </tr>

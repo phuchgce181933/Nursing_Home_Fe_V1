@@ -8,8 +8,8 @@ import useDebouncedSearch from '../../../../hooks/useDebouncedSearch';
 import useClientPagination from '../../../../hooks/useClientPagination';
 import {
   CONFLICT_ICON,
-  CONFLICT_LABEL,
   conflictsFromError,
+  getConflictLabel,
   hasBlockingConflicts,
   sortConflicts,
 } from '../../../../constants/shiftConflicts';
@@ -28,36 +28,58 @@ import { useTranslation } from 'react-i18next';
 import AdminPageShell from '../../../../components/admin/AdminPageShell';
 import '../../../../styles/admin/ShiftManagementPage.css';
 
-// ── Constants ─────────────────────────────────────────────────────────────────
+// ── Constants & label helpers ─────────────────────────────────────────────────
 
-const SHIFT_TYPES = [
-  { value: 'morning',   label: 'Ca ngày' },
-  { value: 'afternoon', label: 'Ca chiều/tối' },
-  { value: 'night',     label: 'Ca đêm/sáng sớm' },
-  { value: 'custom',    label: 'Ca gãy' },
+const NS = 'admin.staff.shifts';
+
+const getShiftTypeOptions = (t) => [
+  { value: 'morning', label: t(`${NS}.shiftTypes.morning`) },
+  { value: 'afternoon', label: t(`${NS}.shiftTypes.afternoon`) },
+  { value: 'night', label: t(`${NS}.shiftTypes.night`) },
+  { value: 'custom', label: t(`${NS}.shiftTypes.custom`) },
 ];
 
-const isFlexibleTemplate = (t) => Boolean(t?.isFlexibleTime || t?.shiftCode === 'SPLIT');
+const getShiftStatusLabels = (t) => ({
+  draft: t(`${NS}.shiftStatus.draft`),
+  published: t(`${NS}.shiftStatus.published`),
+  confirmed: t(`${NS}.shiftStatus.confirmed`),
+  completed: t(`${NS}.shiftStatus.completed`),
+  cancelled: t(`${NS}.shiftStatus.cancelled`),
+});
 
-const templateOptionLabel = (t) =>
-  isFlexibleTemplate(t)
-    ? `${t.shiftCode} — ${t.name} (nhập giờ tùy chỉnh)`
-    : `${t.shiftCode} — ${t.name} (${t.startTime}–${t.endTime})`;
+const getCareTaskTypeOptions = (t) => [
+  { value: 'morning_care', label: t(`${NS}.taskTypes.morning_care`) },
+  { value: 'medication', label: t(`${NS}.taskTypes.medication`) },
+  { value: 'physical_therapy', label: t(`${NS}.taskTypes.physical_therapy`) },
+  { value: 'meal_assistance', label: t(`${NS}.taskTypes.meal_assistance`) },
+  { value: 'evening_check', label: t(`${NS}.taskTypes.evening_check`) },
+  { value: 'emergency_response', label: t(`${NS}.taskTypes.emergency_response`) },
+];
 
-const SHIFT_STATUS_LABELS = { draft: 'Nháp', published: 'Đã đăng', confirmed: 'Đã xác nhận', completed: 'Hoàn thành', cancelled: 'Đã hủy' };
-const CARE_TASK_TYPES = [
-  { value: 'morning_care', label: 'Chăm sóc buổi sáng' },
-  { value: 'medication', label: 'Cho thuốc' },
-  { value: 'physical_therapy', label: 'Vật lý trị liệu' },
-  { value: 'meal_assistance', label: 'Hỗ trợ bữa ăn' },
-  { value: 'evening_check', label: 'Kiểm tra buổi tối' },
-  { value: 'emergency_response', label: 'Ứng phó khẩn cấp' },
+const getCareLevelOptions = (t) => [
+  { value: 'low', label: t(`${NS}.priorityLevels.low`) },
+  { value: 'medium', label: t(`${NS}.priorityLevels.medium`) },
+  { value: 'high', label: t(`${NS}.priorityLevels.high`) },
 ];
-const CARE_LEVELS = [
-  { value: 'low', label: 'Thấp' },
-  { value: 'medium', label: 'Trung bình' },
-  { value: 'high', label: 'Cao' },
-];
+
+const getCareScheduleStatusLabels = (t) => ({
+  draft: t(`${NS}.shiftStatus.draft`),
+  published: t(`${NS}.shiftStatus.published`),
+});
+
+const getStaffRoleLabel = (t, role) => t(`common.roles.${role}`, { defaultValue: role });
+
+const isFlexibleTemplate = (tpl) => Boolean(tpl?.isFlexibleTime || tpl?.shiftCode === 'SPLIT');
+
+const templateOptionLabel = (t, tpl) =>
+  isFlexibleTemplate(tpl)
+    ? t(`${NS}.templateOptionFlexible`, { code: tpl.shiftCode, name: tpl.name })
+    : t(`${NS}.templateOptionFixed`, {
+        code: tpl.shiftCode,
+        name: tpl.name,
+        start: tpl.startTime,
+        end: tpl.endTime,
+      });
 
 /** Backend wraps payloads as { success, data }; list endpoints nest arrays under data.data */
 const unwrapApiData = (res) => res?.data ?? res;
@@ -93,13 +115,13 @@ const parseShiftList = (res) => {
 
 const templateHours = (t) => t?.totalHours ?? t?.durationHours;
 
-const formatTemplateTimeDisplay = (t) =>
-  isFlexibleTemplate(t) ? 'Nhập giờ khi phân công' : `${t.startTime} – ${t.endTime}`;
+const formatTemplateTimeDisplay = (t, tpl) =>
+  isFlexibleTemplate(tpl) ? t(`${NS}.flexibleTimeOnAssign`) : `${tpl.startTime} – ${tpl.endTime}`;
 
-const formatTemplateDurationDisplay = (t) => {
-  if (isFlexibleTemplate(t)) return 'Theo phân công';
-  const hours = templateHours(t);
-  return hours != null ? `${hours}h` : '—';
+const formatTemplateDurationDisplay = (t, tpl) => {
+  if (isFlexibleTemplate(tpl)) return t(`${NS}.durationByAssignment`);
+  const hours = templateHours(tpl);
+  return hours != null ? t(`${NS}.durationHours`, { hours }) : '—';
 };
 
 const addDays = (dateStr, delta) => {
@@ -108,9 +130,9 @@ const addDays = (dateStr, delta) => {
   return getLocalDateString(d);
 };
 
-const formatScheduleDayHeader = (dateStr) => {
+const formatScheduleDayHeader = (dateStr, locale) => {
   const d = new Date(`${dateStr}T12:00:00`);
-  const weekday = d.toLocaleDateString('vi-VN', { weekday: 'long' }).toUpperCase();
+  const weekday = d.toLocaleDateString(locale?.startsWith('vi') ? 'vi-VN' : 'en-US', { weekday: 'long' }).toUpperCase();
   const day = String(d.getDate()).padStart(2, '0');
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const year = d.getFullYear();
@@ -216,6 +238,7 @@ function useAssignableStaffForDate(workDate) {
 // ── Small shared components ───────────────────────────────────────────────────
 
 function ConflictList({ conflicts, title }) {
+  const { t } = useTranslation();
   const sorted = sortConflicts(conflicts);
   if (!sorted.length) return null;
   return (
@@ -224,7 +247,7 @@ function ConflictList({ conflicts, title }) {
       <div className="conflict-list">
         {sorted.map((c, i) => (
           <div key={`${c.type}-${i}`} className={`conflict-item conflict-item--${c.severity.toLowerCase()}`}>
-            {CONFLICT_ICON[c.severity]} <strong>{CONFLICT_LABEL[c.type] || c.type}</strong>
+            {CONFLICT_ICON[c.severity]} <strong>{getConflictLabel(c.type, t)}</strong>
             {c.message && <> — {c.message}</>}
           </div>
         ))}
@@ -289,6 +312,8 @@ function StatusBadge({ value, map, prefix }) {
 // ── Tab 1: Mẫu ca làm việc (read-only system shifts) ─────────────────────────
 
 function TemplatesTab() {
+  const { t } = useTranslation();
+  const shiftTypeOptions = useMemo(() => getShiftTypeOptions(t), [t]);
   const [templates, setTemplates] = useState([]);
   const [totalHoursPerDay, setTotalHoursPerDay] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -322,7 +347,7 @@ function TemplatesTab() {
       setTemplates(list);
       setTotalHoursPerDay(dayTotal);
     } catch (e) {
-      setError(e.response?.data?.message || 'Tải thất bại');
+      setError(e.response?.data?.message || t(`${NS}.loadFailed`));
     } finally {
       setLoading(false);
     }
@@ -333,11 +358,11 @@ function TemplatesTab() {
   return (
     <div>
       <p style={{ marginBottom: 12, fontSize: '0.85rem', color: '#64748b' }}>
-        4 ca hệ thống — Ca Đêm (00:00–08:00), Ca Ngày (08:00–16:00), Ca Chiều/Tối (16:00–00:00), và Ca gãy (nhập giờ khi phân công).
+        {t(`${NS}.templatesTab.intro`)}
         {totalHoursPerDay != null && (
-          <> Tổng <strong>{totalHoursPerDay}h</strong>/ngày (3 ca cố định).</>
+          <> {t(`${NS}.templatesTab.introTotalHours`, { hours: totalHoursPerDay })}</>
         )}
-        {' '}Ca gãy dùng cho phân công đột xuất trong ngày.
+        {' '}{t(`${NS}.templatesTab.introSplitHint`)}
       </p>
 
       {error && <p className="form-error">{error}</p>}
@@ -345,43 +370,43 @@ function TemplatesTab() {
       <div className="tab-toolbar" style={{ marginBottom: 12 }}>
         <input
           type="search"
-          placeholder="Tìm mã ca hoặc tên ca..."
+          placeholder={t(`${NS}.templatesTab.searchPlaceholder`)}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
       </div>
 
-      {loading ? <p className="loading-text">Đang tải...</p> : (
+      {loading ? <p className="loading-text">{t(`${NS}.loading`)}</p> : (
         <>
         <table className="data-table">
           <thead>
             <tr>
-              <th>Mã</th>
-              <th>Tên ca</th>
-              <th>Loại</th>
-              <th>Giờ</th>
-              <th>Thời lượng</th>
-              <th>Mô tả</th>
+              <th>{t(`${NS}.templatesTab.colCode`)}</th>
+              <th>{t(`${NS}.templatesTab.colName`)}</th>
+              <th>{t(`${NS}.templatesTab.colType`)}</th>
+              <th>{t(`${NS}.templatesTab.colTime`)}</th>
+              <th>{t(`${NS}.templatesTab.colDuration`)}</th>
+              <th>{t(`${NS}.templatesTab.colDescription`)}</th>
             </tr>
           </thead>
           <tbody>
-            {paginatedTemplates.length === 0 && <tr><td colSpan={6} className="empty-row">Chưa có mẫu ca nào</td></tr>}
-            {paginatedTemplates.map((t) => (
-              <tr key={t._id}>
+            {paginatedTemplates.length === 0 && <tr><td colSpan={6} className="empty-row">{t(`${NS}.templatesTab.empty`)}</td></tr>}
+            {paginatedTemplates.map((tpl) => (
+              <tr key={tpl._id}>
                 <td>
                   <span style={{ fontFamily: 'monospace', background: '#f1f5f9', padding: '2px 6px', borderRadius: 4 }}>
-                    {t.shiftCode}
+                    {tpl.shiftCode}
                   </span>
                 </td>
                 <td>
-                  <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: t.colorLabel || '#607D8B', marginRight: 6 }} />
-                  {t.name}
-                  {t.crossesMidnight && <span style={{ marginLeft: 6, fontSize: '0.7rem', color: '#7c3aed' }}>🌙 qua ngày</span>}
+                  <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: tpl.colorLabel || '#607D8B', marginRight: 6 }} />
+                  {tpl.name}
+                  {tpl.crossesMidnight && <span style={{ marginLeft: 6, fontSize: '0.7rem', color: '#7c3aed' }}>{t(`${NS}.crossesMidnight`)}</span>}
                 </td>
-                <td>{SHIFT_TYPES.find((x) => x.value === t.shiftType)?.label || t.shiftType}</td>
-                <td>{formatTemplateTimeDisplay(t)}</td>
-                <td>{formatTemplateDurationDisplay(t)}</td>
-                <td style={{ fontSize: '0.8rem', color: '#64748b' }}>{t.description || '—'}</td>
+                <td>{shiftTypeOptions.find((x) => x.value === tpl.shiftType)?.label || tpl.shiftType}</td>
+                <td>{formatTemplateTimeDisplay(t, tpl)}</td>
+                <td>{formatTemplateDurationDisplay(t, tpl)}</td>
+                <td style={{ fontSize: '0.8rem', color: '#64748b' }}>{tpl.description || '—'}</td>
               </tr>
             ))}
           </tbody>
@@ -398,6 +423,7 @@ function TemplatesTab() {
 // ── Tab 2: Phân công ca (Assign Shifts) ──────────────────────────────────────
 
 function CreateShiftModal({ templates, onSave, onClose }) {
+  const { t } = useTranslation();
   const [form, setForm] = useState(emptyShift);
   const { staff, loading: staffLoading } = useAssignableStaffForDate(form.workDate);
   const [conflicts, setConflicts] = useState([]);
@@ -427,15 +453,15 @@ function CreateShiftModal({ templates, onSave, onClose }) {
     setError('');
     setConflicts([]);
     if (!form.shiftTemplateId) {
-      setError('Vui lòng chọn ca làm việc');
+      setError(t(`${NS}.createModal.selectShiftRequired`));
       return;
     }
     if (!form.assignedStaffId) {
-      setError('Vui lòng chọn nhân viên');
+      setError(t(`${NS}.createModal.selectStaffRequired`));
       return;
     }
     if (flexible && (!form.startTime || !form.endTime)) {
-      setError('Vui lòng nhập giờ bắt đầu và kết thúc cho ca gãy');
+      setError(t(`${NS}.createModal.splitTimeRequired`));
       return;
     }
     try {
@@ -445,7 +471,7 @@ function CreateShiftModal({ templates, onSave, onClose }) {
       setConflicts(c);
       if (!hasBlockingConflicts(c)) onClose();
     } catch (e) {
-      setError(e.response?.data?.message || e.message || 'Lỗi');
+      setError(e.response?.data?.message || e.message || t(`${NS}.errorGeneric`));
       setConflicts(conflictsFromError(e));
     }
   };
@@ -456,26 +482,26 @@ function CreateShiftModal({ templates, onSave, onClose }) {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal modal--scroll" style={{ maxWidth: 580 }} onClick={(e) => e.stopPropagation()}>
-        <h2 className="modal__title">Phân công ca làm việc</h2>
+        <h2 className="modal__title">{t(`${NS}.createModal.title`)}</h2>
         {error && <p className="form-error">{error}</p>}
-        {previewLoading && <p className="conflict-preview-hint">Đang kiểm tra xung đột...</p>}
+        {previewLoading && <p className="conflict-preview-hint">{t(`${NS}.checkingConflicts`)}</p>}
         <ConflictList
           conflicts={displayConflicts}
           title={
             conflicts.length
-              ? 'Không thể lưu — cần xử lý lỗi (🔴) trước'
+              ? t(`${NS}.conflictCannotSave`)
               : showPreviewHint
-                ? 'Kiểm tra trước khi lưu'
+                ? t(`${NS}.conflictPreview`)
                 : null
           }
         />
         <div className="form-grid">
           <div className="form-group form-grid--full">
-            <label>Ca làm việc *</label>
+            <label>{t(`${NS}.createModal.shiftLabel`)}</label>
             <select value={form.shiftTemplateId} onChange={(e) => handleTemplateSelect(e.target.value)}>
-              <option value="">— Chọn ca —</option>
-              {templates.map((t) => (
-                <option key={t._id} value={t._id}>{templateOptionLabel(t)}</option>
+              <option value="">{t(`${NS}.selectShift`)}</option>
+              {templates.map((tpl) => (
+                <option key={tpl._id} value={tpl._id}>{templateOptionLabel(t, tpl)}</option>
               ))}
             </select>
           </div>
@@ -487,12 +513,12 @@ function CreateShiftModal({ templates, onSave, onClose }) {
                 {selectedTemplate.name} · {selectedTemplate.shiftCode}
               </div>
               {flexible ? (
-                <div>Ca đột xuất — nhập khung giờ trong ngày (tối thiểu 1h, tối đa 12h)</div>
+                <div>{t(`${NS}.createModal.splitHint`)}</div>
               ) : (
                 <>
                   <div>🕐 {selectedTemplate.startTime} – {selectedTemplate.endTime} &nbsp;·&nbsp; ⏱ {templateHours(selectedTemplate)}h</div>
                   {selectedTemplate.crossesMidnight && (
-                    <div style={{ marginTop: 4, fontSize: '0.75rem' }}>🌙 Ca qua ngày (kết thúc sáng hôm sau)</div>
+                    <div style={{ marginTop: 4, fontSize: '0.75rem' }}>{t(`${NS}.createModal.crossesMidnightHint`)}</div>
                   )}
                 </>
               )}
@@ -500,42 +526,42 @@ function CreateShiftModal({ templates, onSave, onClose }) {
           )}
 
           <div className="form-group form-grid--full">
-            <label>Nhân viên *</label>
+            <label>{t(`${NS}.createModal.staffLabel`)}</label>
             <select
               value={form.assignedStaffId}
               onChange={(e) => set('assignedStaffId', e.target.value)}
               disabled={staffLoading || staff.length === 0}
             >
-              <option value="">— Chọn nhân viên —</option>
+              <option value="">{t(`${NS}.selectStaff`)}</option>
               {staff.map((s) => (
                 <option key={s._id} value={s._id}>
-                  {s.fullName} ({s.role === 'doctor' ? 'Bác sĩ' : s.role === 'nurse' ? 'Y tá' : s.role})
+                  {s.fullName} ({getStaffRoleLabel(t, s.role)})
                   {s.staffProfile?.staffCode ? ` · ${s.staffProfile.staffCode}` : ''}
                 </option>
               ))}
             </select>
-            {staffLoading && <small className="field-hint">Đang tải nhân viên...</small>}
+            {staffLoading && <small className="field-hint">{t(`${NS}.loadingStaff`)}</small>}
             {!staffLoading && staff.length === 0 && (
               <small className="field-hint field-hint--warn">
-                Không có nhân viên khả dụng trong ngày này (có thể đang nghỉ phép).
+                {t(`${NS}.createModal.noStaffAvailable`)}
               </small>
             )}
           </div>
 
           <div className="form-group">
-            <label>Ngày làm việc *</label>
+            <label>{t(`${NS}.createModal.workDateLabel`)}</label>
             <input type="date" min={utcToday()} value={form.workDate} onChange={(e) => set('workDate', e.target.value)} />
-            <small className="field-hint">Ngày tính theo UTC (khớp quy tắc PAST_DATE trên server)</small>
+            <small className="field-hint">{t(`${NS}.createModal.workDateHint`)}</small>
           </div>
 
           {selectedTemplate && flexible && (
             <>
               <div className="form-group">
-                <label>Giờ bắt đầu *</label>
+                <label>{t(`${NS}.createModal.startTimeLabel`)}</label>
                 <input type="time" value={form.startTime} onChange={(e) => set('startTime', e.target.value)} />
               </div>
               <div className="form-group">
-                <label>Giờ kết thúc *</label>
+                <label>{t(`${NS}.createModal.endTimeLabel`)}</label>
                 <input type="time" value={form.endTime} onChange={(e) => set('endTime', e.target.value)} />
               </div>
             </>
@@ -544,32 +570,32 @@ function CreateShiftModal({ templates, onSave, onClose }) {
           {selectedTemplate && !flexible && (
             <>
               <div className="form-group">
-                <label>Giờ bắt đầu</label>
+                <label>{t(`${NS}.createModal.startTimeReadonly`)}</label>
                 <div style={{ padding: '8px 12px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: '0.875rem', color: '#475569' }}>
-                  🕐 {selectedTemplate.startTime} <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>(từ mẫu)</span>
+                  🕐 {selectedTemplate.startTime} <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>{t(`${NS}.fromTemplate`)}</span>
                 </div>
               </div>
               <div className="form-group">
-                <label>Giờ kết thúc</label>
+                <label>{t(`${NS}.createModal.endTimeReadonly`)}</label>
                 <div style={{ padding: '8px 12px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: '0.875rem', color: '#475569' }}>
-                  🕐 {selectedTemplate.endTime} <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>(từ mẫu)</span>
+                  🕐 {selectedTemplate.endTime} <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>{t(`${NS}.fromTemplate`)}</span>
                 </div>
               </div>
             </>
           )}
 
           <div className="form-group form-grid--full">
-            <label>Mô tả công việc</label>
-            <input value={form.taskDescription} onChange={(e) => set('taskDescription', e.target.value)} placeholder="Nhiệm vụ cụ thể..." />
+            <label>{t(`${NS}.createModal.taskDescriptionLabel`)}</label>
+            <input value={form.taskDescription} onChange={(e) => set('taskDescription', e.target.value)} placeholder={t(`${NS}.createModal.taskDescriptionPlaceholder`)} />
           </div>
           <div className="form-group form-grid--full">
-            <label>Ghi chú</label>
-            <input value={form.notes} onChange={(e) => set('notes', e.target.value)} placeholder="Ghi chú thêm..." />
+            <label>{t(`${NS}.createModal.notesLabel`)}</label>
+            <input value={form.notes} onChange={(e) => set('notes', e.target.value)} placeholder={t(`${NS}.createModal.notesPlaceholder`)} />
           </div>
         </div>
         <div className="modal__actions">
-          <button className="btn-cancel" onClick={onClose}>Hủy</button>
-          <button className="btn-save" onClick={handleSave}>Tạo ca (Draft)</button>
+          <button className="btn-cancel" onClick={onClose}>{t(`${NS}.cancel`)}</button>
+          <button className="btn-save" onClick={handleSave}>{t(`${NS}.createModal.createDraft`)}</button>
         </div>
       </div>
     </div>
@@ -577,6 +603,7 @@ function CreateShiftModal({ templates, onSave, onClose }) {
 }
 
 function UpdateShiftModal({ shift, templates, onSave, onClose }) {
+  const { t } = useTranslation();
   const currentStaff = shift.assignedStaffId;
   const currentUserId = currentStaff?.userId?._id || currentStaff?.userId || '';
   const templateId = shift.shiftTemplateId?._id || shift.shiftTemplateId || '';
@@ -609,11 +636,11 @@ function UpdateShiftModal({ shift, templates, onSave, onClose }) {
     setError('');
     setConflicts([]);
     if (!form.shiftTemplateId) {
-      setError('Vui lòng chọn ca làm việc');
+      setError(t(`${NS}.createModal.selectShiftRequired`));
       return;
     }
     if (flexible && (!form.startTime || !form.endTime)) {
-      setError('Vui lòng nhập giờ bắt đầu và kết thúc cho ca gãy');
+      setError(t(`${NS}.createModal.splitTimeRequired`));
       return;
     }
     try {
@@ -623,7 +650,7 @@ function UpdateShiftModal({ shift, templates, onSave, onClose }) {
       setConflicts(c);
       if (!hasBlockingConflicts(c)) onClose();
     } catch (e) {
-      setError(e.response?.data?.message || e.message || 'Lỗi');
+      setError(e.response?.data?.message || e.message || t(`${NS}.errorGeneric`));
       setConflicts(conflictsFromError(e));
     }
   };
@@ -634,26 +661,26 @@ function UpdateShiftModal({ shift, templates, onSave, onClose }) {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal modal--scroll" style={{ maxWidth: 540 }} onClick={(e) => e.stopPropagation()}>
-        <h2 className="modal__title">Cập nhật ca làm việc</h2>
+        <h2 className="modal__title">{t(`${NS}.updateModal.title`)}</h2>
         {error && <p className="form-error">{error}</p>}
-        {previewLoading && <p className="conflict-preview-hint">Đang kiểm tra xung đột...</p>}
+        {previewLoading && <p className="conflict-preview-hint">{t(`${NS}.checkingConflicts`)}</p>}
         <ConflictList
           conflicts={displayConflicts}
           title={
             conflicts.length
-              ? 'Không thể lưu — cần xử lý lỗi (🔴) trước'
+              ? t(`${NS}.conflictCannotSave`)
               : showPreviewHint
-                ? 'Kiểm tra trước khi lưu'
+                ? t(`${NS}.conflictPreview`)
                 : null
           }
         />
         <div className="form-grid">
           <div className="form-group form-grid--full">
-            <label>Ca làm việc *</label>
+            <label>{t(`${NS}.createModal.shiftLabel`)}</label>
             <select value={form.shiftTemplateId} onChange={(e) => set('shiftTemplateId', e.target.value)}>
-              <option value="">— Chọn ca —</option>
-              {templates.map((t) => (
-                <option key={t._id} value={t._id}>{templateOptionLabel(t)}</option>
+              <option value="">{t(`${NS}.selectShift`)}</option>
+              {templates.map((tpl) => (
+                <option key={tpl._id} value={tpl._id}>{templateOptionLabel(t, tpl)}</option>
               ))}
             </select>
           </div>
@@ -665,7 +692,7 @@ function UpdateShiftModal({ shift, templates, onSave, onClose }) {
                 {selectedTemplate.name} · {selectedTemplate.shiftCode}
               </div>
               {flexible ? (
-                <div>Ca đột xuất — chỉnh khung giờ trong ngày</div>
+                <div>{t(`${NS}.updateModal.splitEditHint`)}</div>
               ) : (
                 <div>🕐 {selectedTemplate.startTime} – {selectedTemplate.endTime} &nbsp;·&nbsp; ⏱ {templateHours(selectedTemplate)}h</div>
               )}
@@ -675,61 +702,61 @@ function UpdateShiftModal({ shift, templates, onSave, onClose }) {
           {flexible && (
             <>
               <div className="form-group">
-                <label>Giờ bắt đầu *</label>
+                <label>{t(`${NS}.createModal.startTimeLabel`)}</label>
                 <input type="time" value={form.startTime} onChange={(e) => set('startTime', e.target.value)} />
               </div>
               <div className="form-group">
-                <label>Giờ kết thúc *</label>
+                <label>{t(`${NS}.createModal.endTimeLabel`)}</label>
                 <input type="time" value={form.endTime} onChange={(e) => set('endTime', e.target.value)} />
               </div>
             </>
           )}
 
           <div className="form-group form-grid--full">
-            <label>Nhân viên</label>
+            <label>{t(`${NS}.updateModal.staffLabel`)}</label>
             <select
               value={form.assignedStaffId}
               onChange={(e) => set('assignedStaffId', e.target.value)}
               disabled={staffLoading}
             >
-              <option value="">— Giữ nguyên —</option>
+              <option value="">{t(`${NS}.keepUnchanged`)}</option>
               {staff.map((s) => (
                 <option key={s._id} value={s._id}>
-                  {s.fullName} ({s.role === 'doctor' ? 'Bác sĩ' : s.role === 'nurse' ? 'Y tá' : s.role})
+                  {s.fullName} ({getStaffRoleLabel(t, s.role)})
                   {s.staffProfile?.staffCode ? ` · ${s.staffProfile.staffCode}` : ''}
                 </option>
               ))}
             </select>
             {!staffLoading && staff.length === 0 && (
               <small className="field-hint field-hint--warn">
-                Không có nhân viên khả dụng trong ngày này (có thể đang nghỉ phép).
+                {t(`${NS}.createModal.noStaffAvailable`)}
               </small>
             )}
           </div>
           <div className="form-group">
-            <label>Ngày làm việc</label>
+            <label>{t(`${NS}.updateModal.workDateLabel`)}</label>
             <input type="date" min={utcToday()} value={form.workDate} onChange={(e) => set('workDate', e.target.value)} />
           </div>
           <div className="form-group form-grid--full">
-            <label>Mô tả công việc</label>
+            <label>{t(`${NS}.updateModal.taskDescriptionLabel`)}</label>
             <input value={form.taskDescription} onChange={(e) => set('taskDescription', e.target.value)} />
           </div>
           <div className="form-group form-grid--full">
-            <label>Ghi chú</label>
+            <label>{t(`${NS}.updateModal.notesLabel`)}</label>
             <input value={form.notes} onChange={(e) => set('notes', e.target.value)} />
           </div>
           <div className="form-group form-grid--full">
-            <label>Lý do thay đổi</label>
+            <label>{t(`${NS}.updateModal.changeReasonLabel`)}</label>
             <input
               value={form.changeReason}
               onChange={(e) => set('changeReason', e.target.value)}
-              placeholder="Tùy chọn — ghi chú lý do nếu cần"
+              placeholder={t(`${NS}.updateModal.changeReasonPlaceholder`)}
             />
           </div>
         </div>
         <div className="modal__actions">
-          <button className="btn-cancel" onClick={onClose}>Hủy</button>
-          <button className="btn-save" onClick={handleSave}>Lưu thay đổi</button>
+          <button className="btn-cancel" onClick={onClose}>{t(`${NS}.cancel`)}</button>
+          <button className="btn-save" onClick={handleSave}>{t(`${NS}.save`)}</button>
         </div>
       </div>
     </div>
@@ -737,6 +764,8 @@ function UpdateShiftModal({ shift, templates, onSave, onClose }) {
 }
 
 function AssignTab() {
+  const { t, i18n } = useTranslation();
+  const shiftStatusLabels = useMemo(() => getShiftStatusLabels(t), [t]);
   const [shifts, setShifts]               = useState([]);
   const [listTotalHours, setListTotalHours] = useState(null);
   const [templates, setTemplates]         = useState([]);
@@ -789,7 +818,7 @@ function AssignTab() {
       setListTotalHours(parsed.totalHours);
       setShiftTotal(parsed.total ?? list.length);
       setTotalPages(parsed.totalPages ?? Math.max(1, Math.ceil((parsed.total ?? list.length) / ADMIN_LIST_PAGE_SIZE)));
-    } catch (e) { setError(e.response?.data?.message || 'Tải thất bại'); }
+    } catch (e) { setError(e.response?.data?.message || t(`${NS}.loadFailed`)); }
     finally { setLoading(false); }
   };
 
@@ -818,9 +847,12 @@ function AssignTab() {
     } catch (e) {
       const c = conflictsFromError(e);
       setActConflicts(c);
-      const msg = e.response?.data?.message || 'Đăng ca thất bại';
+      const msg = e.response?.data?.message || t(`${NS}.assignTab.publishFailed`);
       if (hasBlockingConflicts(c)) {
-        alert(`${msg}\n\nCó ${c.filter((x) => x.severity === 'ERROR').length} lỗi chặn đăng ca — xem chi tiết bên dưới.`);
+        alert(t(`${NS}.assignTab.publishBlockedAlert`, {
+          message: msg,
+          count: c.filter((x) => x.severity === 'ERROR').length,
+        }));
       } else {
         alert(msg);
       }
@@ -828,14 +860,14 @@ function AssignTab() {
   };
 
   const handleCancel = async (s) => {
-    const reason = prompt('Lý do hủy ca:');
+    const reason = prompt(t(`${NS}.assignTab.cancelReasonPrompt`));
     if (reason === null) return;
     setBlockingTasks([]);
     try {
       await shiftService.cancelShift(s._id, reason);
       load();
     } catch (e) {
-      const { message, blockingTasks: blocked } = getApiErrorPayload(e, 'Hủy ca thất bại');
+      const { message, blockingTasks: blocked } = getApiErrorPayload(e, t(`${NS}.assignTab.cancelFailed`));
       if (blocked.length) {
         setBlockingTasks(blocked);
         setError(blockingCareTasksMessage(message));
@@ -846,13 +878,13 @@ function AssignTab() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Xóa ca nháp này?')) return;
+    if (!confirm(t(`${NS}.assignTab.deleteConfirm`))) return;
     setBlockingTasks([]);
     try {
       await shiftService.deleteShift(id);
       load();
     } catch (e) {
-      const { message, blockingTasks: blocked } = getApiErrorPayload(e, 'Xóa ca thất bại');
+      const { message, blockingTasks: blocked } = getApiErrorPayload(e, t(`${NS}.assignTab.deleteFailed`));
       if (blocked.length) {
         setBlockingTasks(blocked);
         setError(blockingCareTasksMessage(message));
@@ -882,24 +914,28 @@ function AssignTab() {
         <span style={{ color: '#94a3b8' }}>→</span>
         <input type="date" value={filterTo} onChange={(e) => setFilterTo(e.target.value)} />
         <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
-          <option value="">Tất cả trạng thái</option>
-          {Object.entries(SHIFT_STATUS_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          <option value="">{t(`${NS}.assignTab.allStatuses`)}</option>
+          {Object.entries(shiftStatusLabels).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
         </select>
         <input
           type="search"
-          placeholder="Tìm tên ca hoặc nhân viên..."
+          placeholder={t(`${NS}.assignTab.searchPlaceholder`)}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        <button className="btn-primary" onClick={() => setShowCreate(true)}>+ Phân công ca</button>
+        <button className="btn-primary" onClick={() => setShowCreate(true)}>{t(`${NS}.assignTab.assignButton`)}</button>
       </div>
       <p style={{ marginBottom: 12, fontSize: '0.8rem', color: '#64748b' }}>
-        Sau khi <strong>Đăng ca</strong>, nhân viên tự xác nhận trong portal <strong>Ca của tôi</strong>.
-        Ca <strong>Đã đăng</strong> chưa xác nhận trong 30 phút sau giờ bắt đầu sẽ tự động hủy.
-        Chỉ ca <strong>Đã xác nhận</strong> mới được tính vào trang Sẵn sàng khẩn cấp.
-        Phân công tầng/phòng cho nhân viên ở tab <strong>Phân công khu vực</strong>.
+        {t(`${NS}.assignTab.hintAfterPublish`)} <strong>{t(`${NS}.assignTab.hintPublishAction`)}</strong>
+        {t(`${NS}.assignTab.hintStaffConfirm`)} <strong>{t(`${NS}.assignTab.hintMyShifts`)}</strong>.
+        {' '}{t(`${NS}.assignTab.hintPublishedUnconfirmed`)} <strong>{t(`${NS}.assignTab.hintPublishedStatus`)}</strong>{' '}
+        {t(`${NS}.assignTab.hintAutoCancel`)}
+        {' '}{t(`${NS}.assignTab.hintConfirmedOnly`)} <strong>{t(`${NS}.assignTab.hintConfirmedStatus`)}</strong>{' '}
+        {t(`${NS}.assignTab.hintEmergencyReady`)}
+        {' '}{t(`${NS}.assignTab.hintAreaAssignment`)} <strong>{t(`${NS}.assignTab.hintAreaTab`)}</strong>
+        {t(`${NS}.assignTab.hintAreaTabSuffix`)}
         {listTotalHours != null && shifts.length > 0 && (
-          <> Tổng giờ trong khoảng lọc: <strong>{listTotalHours}h</strong>.</>
+          <> {t(`${NS}.assignTab.hintTotalHours`)} <strong>{listTotalHours}h</strong>.</>
         )}
       </p>
 
@@ -908,21 +944,21 @@ function AssignTab() {
         <BlockingCareTasksAlert
           message={error}
           tasks={blockingTasks}
-          hint="Hoàn thành, bỏ qua hoặc xóa các nhiệm vụ ở trang Phân công nhân viên → Nhiệm vụ chăm sóc, rồi thử hủy/xóa ca lại."
+          hint={t(`${NS}.assignTab.blockingTasksHint`)}
         />
       )}
       {actionConflicts.length > 0 && (
         <ConflictList
           conflicts={actionConflicts}
-          title="Kết quả kiểm tra xung đột (đăng / cập nhật ca)"
+          title={t(`${NS}.conflictActionResult`)}
         />
       )}
 
-      {loading ? <p className="loading-text">Đang tải...</p> : (
+      {loading ? <p className="loading-text">{t(`${NS}.loading`)}</p> : (
         <table className="data-table">
-          <thead><tr><th>Tên ca</th><th>Nhân viên</th><th>Ngày</th><th>Giờ</th><th>Thời lượng</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
+          <thead><tr><th>{t(`${NS}.assignTab.colShiftName`)}</th><th>{t(`${NS}.assignTab.colStaff`)}</th><th>{t(`${NS}.assignTab.colDate`)}</th><th>{t(`${NS}.assignTab.colTime`)}</th><th>{t(`${NS}.assignTab.colDuration`)}</th><th>{t(`${NS}.assignTab.colStatus`)}</th><th>{t(`${NS}.assignTab.colActions`)}</th></tr></thead>
           <tbody>
-            {shifts.length === 0 && <tr><td colSpan={7} className="empty-row">Không có ca nào trong khoảng thời gian này</td></tr>}
+            {shifts.length === 0 && <tr><td colSpan={7} className="empty-row">{t(`${NS}.assignTab.empty`)}</td></tr>}
             {shifts.map((s) => {
               const staffObj  = s.assignedStaffId;
               const staffName = staffObj?.userId?.fullName || staffObj?.staffCode || '—';
@@ -936,15 +972,15 @@ function AssignTab() {
                     {s.name}
                   </td>
                   <td>{staffName}</td>
-                  <td>{new Date(s.workDate).toLocaleDateString('vi-VN')}</td>
+                  <td>{new Date(s.workDate).toLocaleDateString(i18n.language?.startsWith('vi') ? 'vi-VN' : 'en-US')}</td>
                   <td>{s.startTime} – {s.endTime}</td>
-                  <td>{hours != null ? `${hours}h` : '—'}</td>
-                  <td><StatusBadge value={s.status} map={SHIFT_STATUS_LABELS} prefix="shift" /></td>
+                  <td>{hours != null ? t(`${NS}.durationHours`, { hours }) : '—'}</td>
+                  <td><StatusBadge value={s.status} map={shiftStatusLabels} prefix="shift" /></td>
                   <td className="action-cell">
-                    {canPublish(s) && <button className="action-btn action-btn--publish" onClick={() => handlePublish(s._id)}>Đăng</button>}
-                    {canEdit(s)    && <button className="action-btn action-btn--edit"    onClick={() => setEditShift(s)}>Sửa</button>}
-                    {canCancel(s)  && <button className="action-btn action-btn--warning" onClick={() => handleCancel(s)}>Hủy</button>}
-                    {canDelete(s)  && <button className="action-btn action-btn--danger"  onClick={() => handleDelete(s._id)}>Xóa</button>}
+                    {canPublish(s) && <button className="action-btn action-btn--publish" onClick={() => handlePublish(s._id)}>{t(`${NS}.publish`)}</button>}
+                    {canEdit(s)    && <button className="action-btn action-btn--edit"    onClick={() => setEditShift(s)}>{t(`${NS}.edit`)}</button>}
+                    {canCancel(s)  && <button className="action-btn action-btn--warning" onClick={() => handleCancel(s)}>{t(`${NS}.cancel`)}</button>}
+                    {canDelete(s)  && <button className="action-btn action-btn--danger"  onClick={() => handleDelete(s._id)}>{t(`${NS}.delete`)}</button>}
                   </td>
                 </tr>
               );
@@ -970,7 +1006,7 @@ function AssignTab() {
 
 // ── Tab 3: Lịch làm việc (Schedule view — 3 cột ca cố định + ca gãy riêng) ───
 
-function ScheduleColumn({ template, shifts }) {
+function ScheduleColumn({ template, shifts, t, shiftStatusLabels }) {
   const columnShifts = shiftsForTemplate(shifts, template._id);
   const accent = template.colorLabel || '#607D8B';
   const flexible = isFlexibleTemplate(template);
@@ -981,7 +1017,7 @@ function ScheduleColumn({ template, shifts }) {
         <div className="schedule-column__title">{template.name}</div>
         <div className="schedule-column__time">
           {flexible
-            ? 'Nhập giờ khi phân công'
+            ? t(`${NS}.flexibleTimeOnAssign`)
             : `${template.startTime} – ${template.endTime}`}
           {!flexible && templateHours(template) != null && (
             <span className="schedule-column__hours"> · {templateHours(template)}h</span>
@@ -992,7 +1028,7 @@ function ScheduleColumn({ template, shifts }) {
         {columnShifts.length === 0 ? (
           <div className="schedule-column__row schedule-column__row--empty">
             <span className="schedule-column__row-index">1</span>
-            <span className="schedule-column__row-name">Chưa phân công</span>
+            <span className="schedule-column__row-name">{t(`${NS}.scheduleTab.unassigned`)}</span>
           </div>
         ) : (
           columnShifts.map((s, i) => (
@@ -1006,7 +1042,7 @@ function ScheduleColumn({ template, shifts }) {
                   </span>
                 )}
               </span>
-              <StatusBadge value={s.status} map={SHIFT_STATUS_LABELS} prefix="shift" />
+              <StatusBadge value={s.status} map={shiftStatusLabels} prefix="shift" />
             </div>
           ))
         )}
@@ -1015,23 +1051,23 @@ function ScheduleColumn({ template, shifts }) {
   );
 }
 
-function ScheduleDayBoard({ date, templates, shifts }) {
+function ScheduleDayBoard({ date, templates, shifts, t, i18n, shiftStatusLabels }) {
   const sortedTemplates = sortTemplatesByStart(templates);
-  const standardTemplates = sortedTemplates.filter((t) => !isFlexibleTemplate(t));
-  const splitTemplates = sortedTemplates.filter((t) => isFlexibleTemplate(t));
+  const standardTemplates = sortedTemplates.filter((tpl) => !isFlexibleTemplate(tpl));
+  const splitTemplates = sortedTemplates.filter((tpl) => isFlexibleTemplate(tpl));
 
   return (
     <div className="schedule-day">
-      <div className="schedule-day__header">{formatScheduleDayHeader(date)}</div>
+      <div className="schedule-day__header">{formatScheduleDayHeader(date, i18n.language)}</div>
       <div className="schedule-columns">
         {standardTemplates.map((template) => (
-          <ScheduleColumn key={template._id} template={template} shifts={shifts} />
+          <ScheduleColumn key={template._id} template={template} shifts={shifts} t={t} shiftStatusLabels={shiftStatusLabels} />
         ))}
       </div>
       {splitTemplates.length > 0 && (
         <div className="schedule-split-section">
           {splitTemplates.map((template) => (
-            <ScheduleColumn key={template._id} template={template} shifts={shifts} />
+            <ScheduleColumn key={template._id} template={template} shifts={shifts} t={t} shiftStatusLabels={shiftStatusLabels} />
           ))}
         </div>
       )}
@@ -1040,6 +1076,8 @@ function ScheduleDayBoard({ date, templates, shifts }) {
 }
 
 function ScheduleTab() {
+  const { t, i18n } = useTranslation();
+  const shiftStatusLabels = useMemo(() => getShiftStatusLabels(t), [t]);
   const [shifts, setShifts] = useState([]);
   const [templates, setTemplates] = useState([]);
   const [scheduleTotalHours, setScheduleTotalHours] = useState(null);
@@ -1067,7 +1105,7 @@ function ScheduleTab() {
       setShifts(list);
       setScheduleTotalHours(totalHours);
     } catch (e) {
-      setError(e.response?.data?.message || 'Tải thất bại');
+      setError(e.response?.data?.message || t(`${NS}.loadFailed`));
     } finally {
       setLoading(false);
     }
@@ -1089,47 +1127,52 @@ function ScheduleTab() {
           className="btn-secondary"
           onClick={() => setSelectedDate(addDays(selectedDate, -1))}
         >
-          ← Hôm qua
+          {t(`${NS}.scheduleTab.yesterday`)}
         </button>
         <button type="button" className="btn-secondary" onClick={() => setSelectedDate(today())}>
-          Hôm nay
+          {t(`${NS}.scheduleTab.today`)}
         </button>
         <input
           type="date"
           value={selectedDate}
           onChange={(e) => setSelectedDate(e.target.value)}
-          aria-label="Chọn ngày"
+          aria-label={t(`${NS}.scheduleTab.selectDateAria`)}
         />
         <button
           type="button"
           className="btn-secondary"
           onClick={() => setSelectedDate(addDays(selectedDate, 1))}
         >
-          Ngày mai →
+          {t(`${NS}.scheduleTab.tomorrow`)}
         </button>
       </div>
 
       {error && <p className="form-error">{error}</p>}
-      {loading && <p className="loading-text">Đang tải...</p>}
+      {loading && <p className="loading-text">{t(`${NS}.loading`)}</p>}
 
       {!loading && scheduleTotalHours != null && (
         <p className="schedule-summary">
-          Tổng giờ ca trong ngày: <strong>{scheduleTotalHours}h</strong>
+          {t(`${NS}.scheduleTab.totalHoursDay`)} <strong>{scheduleTotalHours}h</strong>
         </p>
       )}
 
       {!loading && templates.length > 0 && (
-        <ScheduleDayBoard date={selectedDate} templates={templates} shifts={shifts} />
+        <ScheduleDayBoard date={selectedDate} templates={templates} shifts={shifts} t={t} i18n={i18n} shiftStatusLabels={shiftStatusLabels} />
       )}
 
       {!loading && templates.length === 0 && !error && (
-        <p className="loading-text">Không tải được mẫu ca hệ thống</p>
+        <p className="loading-text">{t(`${NS}.scheduleTab.templatesLoadFailed`)}</p>
       )}
     </div>
   );
 }
 
 function CreateCareScheduleTab() {
+  const { t } = useTranslation();
+  const careTaskTypeOptions = useMemo(() => getCareTaskTypeOptions(t), [t]);
+  const careLevelOptions = useMemo(() => getCareLevelOptions(t), [t]);
+  const careScheduleStatusLabels = useMemo(() => getCareScheduleStatusLabels(t), [t]);
+  const CS = `${NS}.careScheduleTab`;
   const [workDate, setWorkDate] = useState(todayVN());
   const { staff: staffOptions } = useAssignableStaffForDate(workDate);
   const [residents, setResidents] = useState([]);
@@ -1298,15 +1341,15 @@ function CreateCareScheduleTab() {
     setError('');
     const tpl = templates.find((t) => t.key === templateKey);
     if (!tpl) {
-      setError('Vui lòng chọn mẫu lịch.');
+      setError(t(`${CS}.selectTemplateRequired`));
       return;
     }
     if (selectedResidents.length < 1) {
-      setError('Vui lòng chọn ít nhất 1 cư dân.');
+      setError(t(`${CS}.selectResidentRequired`));
       return;
     }
     if (!commonStaffProfileId || !commonShiftId) {
-      setError('Vui lòng chọn nhân viên và ca áp dụng.');
+      setError(t(`${CS}.selectStaffShiftRequired`));
       return;
     }
     const generated = [];
@@ -1331,7 +1374,7 @@ function CreateCareScheduleTab() {
   const addManualRow = () => {
     setError('');
     if (selectedResidents.length < 1) {
-      setError('Vui lòng chọn ít nhất 1 cư dân trước khi thêm đầu việc.');
+      setError(t(`${CS}.selectResidentBeforeManual`));
       return;
     }
     setEntries((prev) => [
@@ -1365,9 +1408,9 @@ function CreateCareScheduleTab() {
   };
 
   const validateBeforeSave = () => {
-    if (workDate < todayVN()) return 'Không thể tạo lịch cho ngày trong quá khứ.';
-    if (selectedResidents.length < 1) return 'Vui lòng chọn tối thiểu 1 cư dân.';
-    if (!entries.length) return 'Vui lòng thêm ít nhất một đầu việc.';
+    if (workDate < todayVN()) return t(`${CS}.pastDateError`);
+    if (selectedResidents.length < 1) return t(`${CS}.minResidentError`);
+    if (!entries.length) return t(`${CS}.minEntryError`);
     const invalid = entries.find(
       (e) =>
         !e.residentId ||
@@ -1377,13 +1420,13 @@ function CreateCareScheduleTab() {
         !e.careLevel ||
         !e.scheduledTime
     );
-    if (invalid) return 'Mỗi đầu việc phải có cư dân, nhân viên, ca, loại việc, mức độ và giờ.';
+    if (invalid) return t(`${CS}.entryFieldsError`);
     const invalidResident = entries.find((e) => {
       if (!e.residentId || !e.staffProfileId) return false;
       return !residentsForRow(e.staffProfileId).some((r) => String(r._id) === String(e.residentId));
     });
     if (invalidResident) {
-      return 'Mỗi đầu việc phải dùng cư dân đã tick phía trên và thuộc nhân viên của hàng.';
+      return t(`${CS}.entryResidentStaffError`);
     }
     return '';
   };
@@ -1406,7 +1449,7 @@ function CreateCareScheduleTab() {
       resetForm();
       loadDrafts();
     } catch (e) {
-      setError(e?.response?.data?.message || 'Lưu draft thất bại');
+      setError(e?.response?.data?.message || t(`${CS}.saveDraftFailed`));
     } finally {
       setSaving(false);
     }
@@ -1437,7 +1480,7 @@ function CreateCareScheduleTab() {
       const residentSet = [...new Set(rows.map((r) => String(r.residentId?._id || r.residentId || '')).filter(Boolean))];
       setSelectedResidents(residentSet);
     } catch (e) {
-      setError(e?.response?.data?.message || 'Không mở được draft');
+      setError(e?.response?.data?.message || t(`${CS}.openDraftFailed`));
     } finally {
       setSaving(false);
     }
@@ -1451,14 +1494,14 @@ function CreateCareScheduleTab() {
       if (editingScheduleId === id) resetForm();
       loadDrafts();
     } catch (e) {
-      setError(e?.response?.data?.message || 'Publish thất bại');
+      setError(e?.response?.data?.message || t(`${CS}.publishFailed`));
     } finally {
       setSaving(false);
     }
   };
 
   const deleteDraft = async (id) => {
-    if (!window.confirm('Bạn có chắc muốn xóa bản nháp này?')) return;
+    if (!window.confirm(t(`${CS}.deleteDraftConfirm`))) return;
     setSaving(true);
     setError('');
     try {
@@ -1466,7 +1509,7 @@ function CreateCareScheduleTab() {
       if (editingScheduleId === id) resetForm();
       loadDrafts();
     } catch (e) {
-      setError(e?.response?.data?.message || 'Xóa draft thất bại');
+      setError(e?.response?.data?.message || t(`${CS}.deleteDraftFailed`));
     } finally {
       setSaving(false);
     }
@@ -1479,7 +1522,7 @@ function CreateCareScheduleTab() {
       const data = await careScheduleService.getSchedule(id);
       setDetailSchedule(data || null);
     } catch (e) {
-      setError(e?.response?.data?.message || 'Không tải được chi tiết lịch');
+      setError(e?.response?.data?.message || t(`${CS}.detailLoadFailed`));
       setDetailSchedule(null);
     } finally {
       setDetailLoading(false);
@@ -1489,21 +1532,21 @@ function CreateCareScheduleTab() {
   return (
     <div>
       <p style={{ marginBottom: 12, fontSize: '0.85rem', color: '#64748b' }}>
-        Tạo lịch chăm sóc theo ngày cho nhiều cư dân, hỗ trợ mẫu + chỉnh tay. Lưu ở trạng thái nháp, sau đó Publish để sinh nhiệm vụ chăm sóc.
+        {t(`${CS}.intro`)}
       </p>
       {error && <p className="form-error">{error}</p>}
 
       <div className="form-grid">
         <div className="form-group">
-          <label>Ngày chăm sóc *</label>
+          <label>{t(`${CS}.careDateLabel`)}</label>
           <input type="date" min={todayVN()} value={workDate} onChange={(e) => setWorkDate(e.target.value)} />
         </div>
         <div className="form-group">
-          <label>Tiêu đề</label>
-          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="VD: Lịch chăm sóc khối A" />
+          <label>{t(`${CS}.titleLabel`)}</label>
+          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t(`${CS}.titlePlaceholder`)} />
         </div>
         <div className="form-group">
-          <label>Nhân viên phụ trách chung</label>
+          <label>{t(`${CS}.commonStaffLabel`)}</label>
           <select
             value={commonStaffProfileId}
             onChange={(e) => {
@@ -1513,7 +1556,7 @@ function CreateCareScheduleTab() {
               setEntries((prev) => prev.map((row) => ({ ...row, residentId: '', shiftId: '' })));
             }}
           >
-            <option value="">— Chọn nhân viên —</option>
+            <option value="">{t(`${NS}.selectStaff`)}</option>
             {staffOptions.map((s) => (
               <option key={s.staffProfile?._id || s._id} value={s.staffProfile?._id || ''}>
                 {s.fullName}
@@ -1522,9 +1565,9 @@ function CreateCareScheduleTab() {
           </select>
         </div>
         <div className="form-group">
-          <label>Ca áp dụng chung</label>
+          <label>{t(`${CS}.commonShiftLabel`)}</label>
           <select value={commonShiftId} onChange={(e) => setCommonShiftId(e.target.value)}>
-            <option value="">— Chọn ca —</option>
+            <option value="">{t(`${NS}.selectShift`)}</option>
             {shiftsBySelectedStaff.map((s) => (
               <option key={s._id} value={s._id}>
                 {s.name} ({s.startTime} - {s.endTime})
@@ -1536,20 +1579,20 @@ function CreateCareScheduleTab() {
 
       <div style={{ marginTop: 12, marginBottom: 12 }}>
         <label style={{ display: 'block', marginBottom: 6, fontWeight: 600 }}>
-          Cư dân áp dụng (chọn nhiều) *
+          {t(`${CS}.residentsLabel`)}
         </label>
         <p style={{ margin: '0 0 8px', fontSize: '0.8rem', color: '#64748b' }}>
-          Chỉ các cư dân đã tick mới xuất hiện trong bảng đầu việc bên dưới. Bỏ tick sẽ xóa các hàng tương ứng.
+          {t(`${CS}.residentsHint`)}
         </p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,minmax(0,1fr))', gap: 8, maxHeight: 160, overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: 8, padding: 8 }}>
           {!commonStaffProfileId && (
             <p style={{ gridColumn: '1 / -1', margin: 0, fontSize: '0.85rem', color: '#64748b' }}>
-              Chọn nhân viên phụ trách để xem cư dân được phân.
+              {t(`${CS}.selectStaffForResidents`)}
             </p>
           )}
           {commonStaffProfileId && !residents.length && (
             <p style={{ gridColumn: '1 / -1', margin: 0, fontSize: '0.85rem', color: '#64748b' }}>
-              Nhân viên chưa được phân cư dân.
+              {t(`${CS}.staffNoResidents`)}
             </p>
           )}
           {residents.map((r) => {
@@ -1571,36 +1614,36 @@ function CreateCareScheduleTab() {
 
       <div className="tab-toolbar">
         <select value={templateKey} onChange={(e) => setTemplateKey(e.target.value)}>
-          <option value="">— Chọn mẫu lịch —</option>
-          {templates.map((t) => (
-            <option key={t.key} value={t.key}>{t.name}</option>
+          <option value="">{t(`${NS}.selectScheduleTemplate`)}</option>
+          {templates.map((tpl) => (
+            <option key={tpl.key} value={tpl.key}>{tpl.name}</option>
           ))}
         </select>
         <button type="button" className="btn-primary" onClick={addEntriesFromTemplate}>
-          + Thêm từ mẫu
+          {t(`${CS}.addFromTemplate`)}
         </button>
         <button type="button" className="btn-secondary" onClick={addManualRow}>
-          + Thêm thủ công
+          {t(`${CS}.addManual`)}
         </button>
       </div>
 
       <table className="data-table">
         <thead>
           <tr>
-            <th>Cư dân</th>
-            <th>Nhân viên</th>
-            <th>Ca</th>
-            <th>Loại việc</th>
-            <th>Mức độ</th>
-            <th>Giờ</th>
-            <th>Nguồn</th>
-            <th>Ghi chú</th>
+            <th>{t(`${CS}.colResident`)}</th>
+            <th>{t(`${CS}.colStaff`)}</th>
+            <th>{t(`${CS}.colShift`)}</th>
+            <th>{t(`${CS}.colTaskType`)}</th>
+            <th>{t(`${CS}.colCareLevel`)}</th>
+            <th>{t(`${CS}.colTime`)}</th>
+            <th>{t(`${CS}.colSource`)}</th>
+            <th>{t(`${CS}.colNotes`)}</th>
             <th />
           </tr>
         </thead>
         <tbody>
           {entries.length === 0 && (
-            <tr><td colSpan={9} className="empty-state">Chưa có đầu việc</td></tr>
+            <tr><td colSpan={9} className="empty-state">{t(`${CS}.emptyEntries`)}</td></tr>
           )}
           {entries.map((row, idx) => (
             <tr key={`${idx}-${row.residentId}-${row.scheduledTime}`}>
@@ -1653,18 +1696,18 @@ function CreateCareScheduleTab() {
               </td>
               <td>
                 <select value={row.taskType} onChange={(e) => patchEntry(idx, { taskType: e.target.value })}>
-                  {CARE_TASK_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                  {careTaskTypeOptions.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                 </select>
               </td>
               <td>
                 <select value={row.careLevel} onChange={(e) => patchEntry(idx, { careLevel: e.target.value })}>
-                  {CARE_LEVELS.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
+                  {careLevelOptions.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
                 </select>
               </td>
               <td><input type="time" value={row.scheduledTime} onChange={(e) => patchEntry(idx, { scheduledTime: e.target.value })} /></td>
-              <td>{row.source === 'template' ? 'Mẫu' : 'Thủ công'}</td>
+              <td>{row.source === 'template' ? t(`${NS}.source.template`) : t(`${NS}.source.manual`)}</td>
               <td><input value={row.notes || ''} onChange={(e) => patchEntry(idx, { notes: e.target.value })} /></td>
-              <td><button type="button" className="btn btn--sm btn--delete" onClick={() => removeEntry(idx)}>Xóa</button></td>
+              <td><button type="button" className="btn btn--sm btn--delete" onClick={() => removeEntry(idx)}>{t(`${NS}.delete`)}</button></td>
             </tr>
           ))}
         </tbody>
@@ -1672,46 +1715,46 @@ function CreateCareScheduleTab() {
 
       <div className="tab-toolbar">
         <button type="button" className="btn-primary" disabled={saving} onClick={submitDraft}>
-          {saving ? 'Đang lưu...' : editingScheduleId ? 'Cập nhật Draft' : 'Lưu Draft'}
+          {saving ? t(`${CS}.saving`) : editingScheduleId ? t(`${CS}.updateDraft`) : t(`${CS}.saveDraft`)}
         </button>
-        <button type="button" className="btn-secondary" onClick={resetForm}>Làm mới</button>
+        <button type="button" className="btn-secondary" onClick={resetForm}>{t(`${NS}.reset`)}</button>
       </div>
 
-      <h4 style={{ marginTop: 20 }}>Lịch trong ngày</h4>
+      <h4 style={{ marginTop: 20 }}>{t(`${CS}.schedulesForDay`)}</h4>
       <div className="tab-toolbar" style={{ marginBottom: 8 }}>
         <input
           type="search"
-          placeholder="Tìm tiêu đề hoặc ngày..."
+          placeholder={t(`${CS}.searchDraftsPlaceholder`)}
           value={draftSearch}
           onChange={(e) => setDraftSearch(e.target.value)}
         />
       </div>
-      {loading ? <p className="loading-text">Đang tải...</p> : (
+      {loading ? <p className="loading-text">{t(`${NS}.loading`)}</p> : (
         <>
         <table className="data-table">
           <thead>
-            <tr><th>Tiêu đề</th><th>Ngày</th><th>Trạng thái</th><th>Cập nhật</th><th>Thao tác</th></tr>
+            <tr><th>{t(`${CS}.colTitle`)}</th><th>{t(`${CS}.colDate`)}</th><th>{t(`${CS}.colStatus`)}</th><th>{t(`${CS}.colUpdated`)}</th><th>{t(`${CS}.colActions`)}</th></tr>
           </thead>
           <tbody>
-            {paginatedDrafts.length === 0 && <tr><td colSpan={5} className="empty-state">Không có lịch</td></tr>}
+            {paginatedDrafts.length === 0 && <tr><td colSpan={5} className="empty-state">{t(`${CS}.emptySchedules`)}</td></tr>}
             {paginatedDrafts.map((d) => (
               <tr key={d._id}>
                 <td>{d.title || '—'}</td>
                 <td>{toVNDateString(d.workDate)}</td>
-                <td><StatusBadge value={d.status} map={{ draft: 'Nháp', published: 'Đã đăng' }} prefix="shift" /></td>
+                <td><StatusBadge value={d.status} map={careScheduleStatusLabels} prefix="shift" /></td>
                 <td>{formatDateTimeVN(d.updatedAt)}</td>
                 <td>
                   {d.status === 'draft' ? (
                     <>
-                      <button type="button" className="btn btn--sm btn--edit" onClick={() => openDraft(d._id)}>Mở</button>{' '}
-                      <button type="button" className="btn btn--sm btn--primary" onClick={() => publishDraft(d._id)}>Publish</button>{' '}
+                      <button type="button" className="btn btn--sm btn--edit" onClick={() => openDraft(d._id)}>{t(`${NS}.open`)}</button>{' '}
+                      <button type="button" className="btn btn--sm btn--primary" onClick={() => publishDraft(d._id)}>{t(`${NS}.publish`)}</button>{' '}
                       <button type="button" className="btn btn--sm btn--delete" onClick={() => deleteDraft(d._id)}>
-                        Xóa
+                        {t(`${NS}.delete`)}
                       </button>
                     </>
                   ) : (
                     <button type="button" className="btn btn--sm btn--edit" onClick={() => openPublishedDetail(d._id)}>
-                      Chi tiết
+                      {t(`${NS}.detail`)}
                     </button>
                   )}
                 </td>
@@ -1733,25 +1776,25 @@ function CreateCareScheduleTab() {
       {(detailLoading || detailSchedule) && (
         <div className="modal-overlay" onClick={!detailLoading ? () => setDetailSchedule(null) : undefined}>
           <div className="modal modal--scroll" style={{ maxWidth: 980 }} onClick={(e) => e.stopPropagation()}>
-            <h2 className="modal__title">Chi tiết lịch đã publish</h2>
-            {detailLoading && <p className="loading-text">Đang tải chi tiết...</p>}
+            <h2 className="modal__title">{t(`${CS}.detailPublishedTitle`)}</h2>
+            {detailLoading && <p className="loading-text">{t(`${CS}.detailLoading`)}</p>}
             {!detailLoading && detailSchedule && (
               <>
                 <p style={{ margin: '4px 0 12px', fontSize: '0.85rem', color: '#64748b' }}>
-                  Tiêu đề: <strong>{detailSchedule.title || '—'}</strong> · Ngày:{' '}
+                  {t(`${CS}.detailTitleLabel`)} <strong>{detailSchedule.title || '—'}</strong> · {t(`${CS}.detailDateLabel`)}{' '}
                   <strong>{toVNDateString(detailSchedule.workDate)}</strong>
                 </p>
                 <table className="data-table">
                   <thead>
                     <tr>
-                      <th>Cư dân</th>
-                      <th>Nhân viên</th>
-                      <th>Ca</th>
-                      <th>Loại việc</th>
-                      <th>Mức độ</th>
-                      <th>Giờ</th>
-                      <th>Nguồn</th>
-                      <th>Ghi chú</th>
+                      <th>{t(`${CS}.colResident`)}</th>
+                      <th>{t(`${CS}.colStaff`)}</th>
+                      <th>{t(`${CS}.colShift`)}</th>
+                      <th>{t(`${CS}.colTaskType`)}</th>
+                      <th>{t(`${CS}.colCareLevel`)}</th>
+                      <th>{t(`${CS}.colTime`)}</th>
+                      <th>{t(`${CS}.colSource`)}</th>
+                      <th>{t(`${CS}.colNotes`)}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1760,8 +1803,8 @@ function CreateCareScheduleTab() {
                         const residentName = row.residentId?.fullName || row.residentId?.residentCode || '—';
                         const staffName = row.staffProfileId?.userId?.fullName || row.staffProfileId?.staffCode || '—';
                         const shiftName = row.shiftId?.name || '—';
-                        const taskLabel = CARE_TASK_TYPES.find((t) => t.value === row.taskType)?.label || row.taskType || '—';
-                        const levelLabel = CARE_LEVELS.find((l) => l.value === row.careLevel)?.label || row.careLevel || '—';
+                        const taskLabel = careTaskTypeOptions.find((opt) => opt.value === row.taskType)?.label || row.taskType || '—';
+                        const levelLabel = careLevelOptions.find((l) => l.value === row.careLevel)?.label || row.careLevel || '—';
                         return (
                           <tr key={`${detailSchedule._id || 'detail'}-${idx}`}>
                             <td>{residentName}</td>
@@ -1770,18 +1813,18 @@ function CreateCareScheduleTab() {
                             <td>{taskLabel}</td>
                             <td>{levelLabel}</td>
                             <td>{row.scheduledTime || '—'}</td>
-                            <td>{row.source === 'template' ? 'Mẫu' : 'Thủ công'}</td>
+                            <td>{row.source === 'template' ? t(`${NS}.source.template`) : t(`${NS}.source.manual`)}</td>
                             <td>{row.notes || '—'}</td>
                           </tr>
                         );
                       })
                     ) : (
-                      <tr><td colSpan={8} className="empty-state">Lịch chưa có đầu việc</td></tr>
+                      <tr><td colSpan={8} className="empty-state">{t(`${CS}.emptyScheduleEntries`)}</td></tr>
                     )}
                   </tbody>
                 </table>
                 <div className="modal__actions">
-                  <button className="btn-cancel" onClick={() => setDetailSchedule(null)}>Đóng</button>
+                  <button className="btn-cancel" onClick={() => setDetailSchedule(null)}>{t(`${NS}.close`)}</button>
                 </div>
               </>
             )}
