@@ -80,7 +80,7 @@ export default function LockoutScreen({
         <div className="sap-lockout__banner-content">
           <h3 className="sap-lockout__banner-title">Phát hiện yêu cầu bị trùng lặp</h3>
           <p className="sap-lockout__banner-text">
-            Bạn đã có một yêu cầu tiếp nhận đang chờ xử lý cho cư dân này. Đội ngũ của chúng tôi hiện đang xem xét hồ sơ hiện có được gửi vào ngày <strong>{formatEnglishDate(activeRequest?.createdAt || new Date())}</strong>. Để tránh nhầm lẫn, các yêu cầu tiếp theo cho cá nhân này tạm thời bị hạn chế.
+            Bạn đã có một yêu cầu tiếp nhận đang chờ xử lý cho cư dân này. Đội ngũ của chúng tôi hiện đang xem xét hồ sơ hiện có được gửi vào ngày <strong>{formatViDate(activeRequest?.createdAt || new Date())}</strong>. Để tránh nhầm lẫn, các yêu cầu tiếp theo cho cá nhân này tạm thời bị hạn chế.
           </p>
         </div>
         <div className="sap-lockout__banner-actions">
@@ -197,7 +197,7 @@ export default function LockoutScreen({
                     {adm.applicant?.fullName || 'N/A'}
                   </td>
                   <td>
-                    {formatEnglishDate(adm.createdAt)}
+                    {formatViDate(adm.createdAt)}
                   </td>
                   <td>
                     <span className={`sap-status-badge sap-status-badge--${adm.status}`}>

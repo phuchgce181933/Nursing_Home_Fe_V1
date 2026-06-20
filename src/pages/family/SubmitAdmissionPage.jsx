@@ -111,6 +111,15 @@ export default function SubmitAdmissionPage() {
         if (dobDate >= new Date()) {
           return 'Ngày sinh phải ở trong quá khứ';
         }
+        const today = new Date();
+        let age = today.getFullYear() - dobDate.getFullYear();
+        const m = today.getMonth() - dobDate.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < dobDate.getDate())) {
+          age--;
+        }
+        if (age < 50) {
+          return 'Người đăng ký nhập viện phải từ 50 tuổi trở lên';
+        }
         return null;
 
       case 'gender':

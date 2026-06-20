@@ -335,6 +335,20 @@ function ResidentPage({ defaultMode }) {
       return;
     }
 
+    if (createForm.dateOfBirth) {
+      const dobDate = new Date(createForm.dateOfBirth);
+      const today = new Date();
+      let age = today.getFullYear() - dobDate.getFullYear();
+      const m = today.getMonth() - dobDate.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < dobDate.getDate())) {
+        age--;
+      }
+      if (age < 50) {
+        setCreateError('Cư dân phải từ 50 tuổi trở lên.');
+        return;
+      }
+    }
+
     const { contacts, error: contactsError } = buildContactsPayload(createContacts);
     if (contactsError) {
       setCreateError(contactsError);
@@ -382,6 +396,20 @@ function ResidentPage({ defaultMode }) {
     if (!personalForm.fullName.trim()) {
       setPersonalError('Họ tên là bắt buộc.');
       return;
+    }
+
+    if (personalForm.dateOfBirth) {
+      const dobDate = new Date(personalForm.dateOfBirth);
+      const today = new Date();
+      let age = today.getFullYear() - dobDate.getFullYear();
+      const m = today.getMonth() - dobDate.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < dobDate.getDate())) {
+        age--;
+      }
+      if (age < 50) {
+        setPersonalError('Cư dân phải từ 50 tuổi trở lên.');
+        return;
+      }
     }
 
     try {
