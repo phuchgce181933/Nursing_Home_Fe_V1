@@ -100,7 +100,10 @@ export default function SubmitAdmissionPage() {
         }
         return null;
 
-      case 'dob':
+      case 'dob': {
+        if (val === 'INVALID_DATE') {
+          return 'Ngày sinh không hợp lệ hoặc không đúng định dạng (ngày/tháng/năm)';
+        }
         if (!val) {
           return 'Ngày sinh là bắt buộc';
         }
@@ -117,10 +120,11 @@ export default function SubmitAdmissionPage() {
         if (m < 0 || (m === 0 && today.getDate() < dobDate.getDate())) {
           age--;
         }
-        if (age < 50) {
-          return 'Người đăng ký nhập viện phải từ 50 tuổi trở lên';
+        if (age < 50 || age > 110) {
+          return 'Người đăng ký nhập viện phải từ 50 đến 110 tuổi';
         }
         return null;
+      }
 
       case 'gender':
         if (!val) {

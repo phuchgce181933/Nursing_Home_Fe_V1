@@ -334,8 +334,11 @@ function ResidentPage({ defaultMode }) {
       setCreateError('Họ tên là bắt buộc.');
       return;
     }
-
     if (createForm.dateOfBirth) {
+      if (createForm.dateOfBirth === 'INVALID_DATE') {
+        setCreateError('Ngày sinh không hợp lệ hoặc không đúng định dạng (ngày/tháng/năm).');
+        return;
+      }
       const dobDate = new Date(createForm.dateOfBirth);
       const today = new Date();
       let age = today.getFullYear() - dobDate.getFullYear();
@@ -343,8 +346,8 @@ function ResidentPage({ defaultMode }) {
       if (m < 0 || (m === 0 && today.getDate() < dobDate.getDate())) {
         age--;
       }
-      if (age < 50) {
-        setCreateError('Cư dân phải từ 50 tuổi trở lên.');
+      if (age < 50 || age > 110) {
+        setCreateError('Cư dân phải từ 50 đến 110 tuổi.');
         return;
       }
     }
@@ -397,8 +400,11 @@ function ResidentPage({ defaultMode }) {
       setPersonalError('Họ tên là bắt buộc.');
       return;
     }
-
     if (personalForm.dateOfBirth) {
+      if (personalForm.dateOfBirth === 'INVALID_DATE') {
+        setPersonalError('Ngày sinh không hợp lệ hoặc không đúng định dạng (ngày/tháng/năm).');
+        return;
+      }
       const dobDate = new Date(personalForm.dateOfBirth);
       const today = new Date();
       let age = today.getFullYear() - dobDate.getFullYear();
@@ -406,8 +412,8 @@ function ResidentPage({ defaultMode }) {
       if (m < 0 || (m === 0 && today.getDate() < dobDate.getDate())) {
         age--;
       }
-      if (age < 50) {
-        setPersonalError('Cư dân phải từ 50 tuổi trở lên.');
+      if (age < 50 || age > 110) {
+        setPersonalError('Cư dân phải từ 50 đến 110 tuổi.');
         return;
       }
     }
@@ -773,16 +779,7 @@ function ResidentPage({ defaultMode }) {
                     placeholder="Tự động tạo nếu để trống"
                   />
                 </label>
-                <label>
-                  Ngày sinh
-                  <input
-                    type="date"
-                    value={createForm.dateOfBirth}
-                    onChange={(e) =>
-                      setCreateForm((prev) => ({ ...prev, dateOfBirth: e.target.value }))
-                    }
-                  />
-                </label>
+
                 <label>
                   Giới tính
                   <select
