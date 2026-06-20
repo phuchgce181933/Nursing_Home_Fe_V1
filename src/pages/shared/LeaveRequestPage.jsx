@@ -1,18 +1,20 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import {
+  PlusCircle,
+  FileText,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  CalendarDays,
+  X,
+  AlertTriangle,
+  Inbox,
+} from 'lucide-react';
 import leaveRequestService from '../../services/leaveRequest.service';
 import { calcInclusiveLeaveDays, formatLeaveDate } from '../../utils/leaveUtils';
+import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import '../../styles/shared/LeaveRequestPage.css';
-
-const LEAVE_TYPES = ['annual', 'sick', 'emergency', 'unpaid', 'other'];
-
-const STATUS_CLASS = {
-  draft: 'pending',
-  pending: 'pending',
-  approved: 'approved',
-  rejected: 'rejected',
-  cancelled: 'cancelled',
-};
 
 const minStartDate = (type) => {
   if (type === 'emergency') return new Date().toISOString().slice(0, 10);
@@ -25,12 +27,22 @@ const emptyForm = { type: 'annual', startDate: '', endDate: '', reason: '' };
 
 export default function LeaveRequestPage() {
   const { t } = useTranslation();
-  const ns = 'shared.leaveRequests';
 
-  const typeOptions = useMemo(
-    () => LEAVE_TYPES.map((value) => ({ value, label: t(`${ns}.types.${value}`) })),
-    [t, ns]
-  );
+  const STATUS_DISPLAY = {
+    draft: t('leaveRequest.statusDraft'),
+    pending: t('leaveRequest.statusPending'),
+    approved: t('leaveRequest.statusApproved'),
+    rejected: t('leaveRequest.statusRejected'),
+    cancelled: t('leaveRequest.statusCancelled'),
+  };
+
+  const TYPE_OPTIONS = [
+    { value: 'annual', label: t('leaveRequest.typeAnnual') },
+    { value: 'sick', label: t('leaveRequest.typeSick') },
+    { value: 'emergency', label: t('leaveRequest.typeEmergency') },
+    { value: 'unpaid', label: t('leaveRequest.typeUnpaid') },
+    { value: 'other', label: t('leaveRequest.typeOther') },
+  ];
 
   const [myRequests, setMyRequests] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -40,12 +52,23 @@ export default function LeaveRequestPage() {
   const [warnings, setWarnings] = useState([]);
   const [formError, setFormError] = useState('');
   const [cancellingId, setCancelId] = useState(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [cancelModal, setCancelModal] = useState(null);
 
   const previewDays = useMemo(
     () => calcInclusiveLeaveDays(form.startDate, form.endDate),
-    [form.startDate, form.endDate]
+    [form.startDate, form.endDate],
   );
 
+  /* ── Stats ───────────────────────────────────────────────── */
+  const stats = useMemo(() => ({
+    total: myRequests.length,
+    pending: myRequests.filter((r) => r.status === 'pending').length,
+    approved: myRequests.filter((r) => r.status === 'approved').length,
+    rejected: myRequests.filter((r) => r.status === 'rejected').length,
+  }), [myRequests]);
+
+  /* ── Data loading ──────────────────────────────────────────── */
   const loadRequests = async () => {
     setLoading(true);
     try {
@@ -60,6 +83,7 @@ export default function LeaveRequestPage() {
     loadRequests();
   }, []);
 
+  /* ── Handlers ──────────────────────────────────────────────── */
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.startDate || !form.endDate || !form.reason.trim()) return;
@@ -74,211 +98,285 @@ export default function LeaveRequestPage() {
         reason: form.reason.trim(),
       });
       setForm(emptyForm);
-      setSuccessMsg(t(`${ns}.successMsg`));
+      setDrawerOpen(false);
+      setSuccessMsg(t('leaveRequest.submitSuccess'));
       setTimeout(() => setSuccessMsg(''), 6000);
 
       const w = [];
-      if (res.balanceWarning) w.push(t(`${ns}.balanceWarning`, { message: res.balanceWarning }));
-      if (res.shiftWarning) w.push(t(`${ns}.shiftWarning`, { message: res.shiftWarning }));
+      if (res.balanceWarning) w.push(`${t('leaveRequest.balanceWarning')}: ${res.balanceWarning}`);
+      if (res.shiftWarning) w.push(`${t('leaveRequest.shiftWarning')}: ${res.shiftWarning}`);
       setWarnings(w);
-
       loadRequests();
     } catch (err) {
-      setFormError(err.response?.data?.message || t(`${ns}.submitFailed`));
+      setFormError(err.response?.data?.message || t('leaveRequest.submitFailed'));
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleCancel = async (id) => {
-    if (!window.confirm(t(`${ns}.cancelConfirm`))) return;
     setCancelId(id);
     try {
       await leaveRequestService.cancel(id);
       setMyRequests((prev) => prev.map((r) => (r._id === id ? { ...r, status: 'cancelled' } : r)));
     } catch (err) {
-      alert(err.response?.data?.message || t(`${ns}.cancelFailed`));
+      alert(err.response?.data?.message || t('leaveRequest.cancelFailed'));
     } finally {
       setCancelId(null);
+      setCancelModal(null);
     }
   };
 
-  const leaveTypeLabel = (type) => t(`${ns}.types.${type}`, { defaultValue: type });
-
-  const statusLabel = (status) =>
-    t(`common.leaveStatus.${status}`, { defaultValue: status });
-
   return (
-    <div className="leave-page">
-      <div className="leave-page__header">
-        <h1 className="leave-page__title">{t(`${ns}.title`)}</h1>
-        <p className="leave-page__subtitle">{t(`${ns}.subtitle`)}</p>
-      </div>
+    <div className="lr-page">
+      {/* ── Header ─────────────────────────────────────────── */}
+      <header className="lr-header">
+        <div>
+          <h1 className="lr-header__title">{t('leaveRequest.pageTitle')}</h1>
+          <p className="lr-header__subtitle">{t('leaveRequest.pageSubtitle')}</p>
+        </div>
+        <button type="button" className="lr-btn lr-btn--primary" onClick={() => setDrawerOpen(true)}>
+          <PlusCircle size={16} />
+          {t('leaveRequest.newRequest')}
+        </button>
+      </header>
 
+      {/* ── Toasts ─────────────────────────────────────────── */}
       {successMsg && (
-        <div className="success-toast">
-          <span>✅</span> {successMsg}
+        <div className="lr-toast lr-toast--success">
+          <CheckCircle2 size={16} /> {successMsg}
         </div>
       )}
       {warnings.map((w, i) => (
-        <div
-          key={i}
-          style={{
-            background: '#fffbeb',
-            border: '1px solid #fde68a',
-            color: '#92400e',
-            borderRadius: 8,
-            padding: '8px 14px',
-            marginBottom: 8,
-            fontSize: '0.875rem',
-          }}
-        >
-          {w}
+        <div key={i} className="lr-toast lr-toast--warning">
+          <AlertTriangle size={16} /> {w}
         </div>
       ))}
 
-      <div className="leave-form-card">
-        <h2 className="leave-form-card__title">{t(`${ns}.formTitle`)}</h2>
-        {formError && (
-          <div style={{ color: '#dc2626', marginBottom: 10, fontSize: '0.875rem' }}>{formError}</div>
-        )}
-        <form onSubmit={handleSubmit}>
-          <div className="leave-form-grid">
-            <div className="form-group leave-form-full">
-              <label>{t(`${ns}.typeLabel`)}</label>
-              <select
-                value={form.type}
-                onChange={(e) => setForm({ ...form, type: e.target.value, startDate: '', endDate: '' })}
-                required
-              >
-                {typeOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-              {form.type !== 'emergency' && (
-                <small style={{ color: '#94a3b8', fontSize: '0.75rem' }}>{t(`${ns}.advanceHint`)}</small>
-              )}
-            </div>
-            <div className="form-group">
-              <label>{t(`${ns}.startDateLabel`)}</label>
-              <input
-                type="date"
-                value={form.startDate}
-                min={minStartDate(form.type)}
-                onChange={(e) => setForm({ ...form, startDate: e.target.value })}
-                required
-              />
-            </div>
-            <div className="form-group">
-              <label>{t(`${ns}.endDateLabel`)}</label>
-              <input
-                type="date"
-                value={form.endDate}
-                min={form.startDate || minStartDate(form.type)}
-                onChange={(e) => setForm({ ...form, endDate: e.target.value })}
-                required
-              />
-              {previewDays > 0 && (
-                <small className="field-hint">{t(`${ns}.daysPreview`, { count: previewDays })}</small>
-              )}
-            </div>
-            <div className="form-group leave-form-full">
-              <label>{t(`${ns}.reasonLabel`)}</label>
-              <textarea
-                value={form.reason}
-                onChange={(e) => setForm({ ...form, reason: e.target.value })}
-                placeholder={t(`${ns}.reasonPlaceholder`)}
-                required
-              />
-            </div>
+      {/* ── Stats ──────────────────────────────────────────── */}
+      <div className="lr-stats">
+        <div className="lr-stat-card">
+          <div className="lr-stat-card__icon lr-stat-card__icon--total">
+            <FileText size={22} />
           </div>
-          <div className="form-actions">
-            <button type="submit" className="btn-submit" disabled={submitting}>
-              {submitting ? t(`${ns}.submitting`) : t(`${ns}.submit`)}
-            </button>
+          <div>
+            <div className="lr-stat-card__value">{stats.total}</div>
+            <div className="lr-stat-card__label">{t('leaveRequest.statTotal')}</div>
           </div>
-        </form>
+        </div>
+        <div className="lr-stat-card">
+          <div className="lr-stat-card__icon lr-stat-card__icon--pending">
+            <Clock size={22} />
+          </div>
+          <div>
+            <div className="lr-stat-card__value">{stats.pending}</div>
+            <div className="lr-stat-card__label">{t('leaveRequest.statPending')}</div>
+          </div>
+        </div>
+        <div className="lr-stat-card">
+          <div className="lr-stat-card__icon lr-stat-card__icon--approved">
+            <CheckCircle2 size={22} />
+          </div>
+          <div>
+            <div className="lr-stat-card__value">{stats.approved}</div>
+            <div className="lr-stat-card__label">{t('leaveRequest.statApproved')}</div>
+          </div>
+        </div>
+        <div className="lr-stat-card">
+          <div className="lr-stat-card__icon lr-stat-card__icon--rejected">
+            <XCircle size={22} />
+          </div>
+          <div>
+            <div className="lr-stat-card__value">{stats.rejected}</div>
+            <div className="lr-stat-card__label">{t('leaveRequest.statRejected')}</div>
+          </div>
+        </div>
       </div>
 
-      <div>
-        <h2 className="leave-history__title">{t(`${ns}.historyTitle`)}</h2>
-        <div className="data-table-wrap">
-          <table className="data-table">
+      {/* ── Table ──────────────────────────────────────────── */}
+      <div className="lr-table-card">
+        <div className="lr-table-header">
+          <h2 className="lr-table-header__title">{t('leaveRequest.historyTitle')}</h2>
+        </div>
+
+        {loading ? (
+          <LoadingSpinner label={t('leaveRequest.loading')} />
+        ) : myRequests.length === 0 ? (
+          <div className="lr-empty">
+            <div className="lr-empty__icon"><Inbox size={42} /></div>
+            <p>{t('leaveRequest.emptyList')}</p>
+          </div>
+        ) : (
+          <table className="lr-table">
             <thead>
               <tr>
-                <th>{t(`${ns}.colType`)}</th>
-                <th>{t(`${ns}.colFrom`)}</th>
-                <th>{t(`${ns}.colTo`)}</th>
-                <th>{t(`${ns}.colDays`)}</th>
-                <th>{t(`${ns}.colReason`)}</th>
-                <th>{t(`${ns}.colSubmitted`)}</th>
-                <th>{t('common.colStatus')}</th>
-                <th>{t(`${ns}.colReviewNote`)}</th>
-                <th>{t(`${ns}.colActions`)}</th>
+                <th>{t('leaveRequest.colType')}</th>
+                <th>{t('leaveRequest.colFromDate')}</th>
+                <th>{t('leaveRequest.colToDate')}</th>
+                <th>{t('leaveRequest.colDays')}</th>
+                <th>{t('leaveRequest.colReason')}</th>
+                <th>{t('leaveRequest.colSubmitDate')}</th>
+                <th>{t('leaveRequest.colStatus')}</th>
+                <th>{t('leaveRequest.colReviewNote')}</th>
+                <th>{t('leaveRequest.colActions')}</th>
               </tr>
             </thead>
             <tbody>
-              {loading && (
-                <tr>
-                  <td colSpan={9} className="empty-state">
-                    {t('common.loading')}
+              {myRequests.map((r) => (
+                <tr key={r._id}>
+                  <td>{TYPE_OPTIONS.find((opt) => opt.value === r.type)?.label || r.type}</td>
+                  <td>{formatLeaveDate(r.startDate)}</td>
+                  <td>{formatLeaveDate(r.endDate)}</td>
+                  <td style={{ textAlign: 'center' }}>
+                    {r.daysRequested
+                      ?? (r.startDate && r.endDate
+                        ? calcInclusiveLeaveDays(formatLeaveDate(r.startDate), formatLeaveDate(r.endDate))
+                        : '—')}
+                  </td>
+                  <td>{r.reason}</td>
+                  <td>{formatLeaveDate(r.createdAt)}</td>
+                  <td>
+                    <span className={`lr-badge lr-badge--${r.status}`}>
+                      {STATUS_DISPLAY[r.status] || r.status}
+                    </span>
+                  </td>
+                  <td className="lr-review-note">{r.reviewNote || '—'}</td>
+                  <td>
+                    {r.status === 'pending' && (
+                      <button
+                        type="button"
+                        className="lr-btn lr-btn--danger lr-btn--small"
+                        disabled={cancellingId === r._id}
+                        onClick={() => setCancelModal(r._id)}
+                      >
+                        {cancellingId === r._id ? '...' : t('leaveRequest.cancelRequest')}
+                      </button>
+                    )}
                   </td>
                 </tr>
-              )}
-              {!loading && myRequests.length === 0 && (
-                <tr>
-                  <td colSpan={9} className="empty-state">
-                    {t(`${ns}.emptyList`)}
-                  </td>
-                </tr>
-              )}
-              {!loading &&
-                myRequests.map((r) => (
-                  <tr key={r._id}>
-                    <td>{leaveTypeLabel(r.type)}</td>
-                    <td>{formatLeaveDate(r.startDate)}</td>
-                    <td>{formatLeaveDate(r.endDate)}</td>
-                    <td style={{ textAlign: 'center' }}>
-                      {r.daysRequested ??
-                        (r.startDate && r.endDate
-                          ? calcInclusiveLeaveDays(formatLeaveDate(r.startDate), formatLeaveDate(r.endDate))
-                          : '—')}
-                    </td>
-                    <td>{r.reason}</td>
-                    <td>{formatLeaveDate(r.createdAt)}</td>
-                    <td>
-                      <span className={`leave-status leave-status--${STATUS_CLASS[r.status] || r.status}`}>
-                        {statusLabel(r.status)}
-                      </span>
-                    </td>
-                    <td style={{ fontSize: '0.8rem', color: '#64748b' }}>{r.reviewNote || '—'}</td>
-                    <td>
-                      {r.status === 'pending' && (
-                        <button
-                          style={{
-                            padding: '4px 10px',
-                            fontSize: '0.75rem',
-                            borderRadius: 6,
-                            border: 'none',
-                            cursor: 'pointer',
-                            background: '#fee2e2',
-                            color: '#dc2626',
-                          }}
-                          disabled={cancellingId === r._id}
-                          onClick={() => handleCancel(r._id)}
-                        >
-                          {cancellingId === r._id ? '...' : t(`${ns}.cancelButton`)}
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+              ))}
             </tbody>
           </table>
-        </div>
+        )}
       </div>
+
+      {/* ── Create drawer ──────────────────────────────────── */}
+      {drawerOpen && (
+        <>
+          <div className="lr-drawer-overlay" onClick={() => setDrawerOpen(false)} />
+          <div className="lr-drawer">
+            <div className="lr-drawer__header">
+              <h2 className="lr-drawer__title">{t('leaveRequest.drawerTitle')}</h2>
+              <button type="button" className="lr-drawer__close" onClick={() => setDrawerOpen(false)}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="lr-drawer__body">
+              {formError && (
+                <div className="lr-toast lr-toast--error" style={{ marginBottom: 16 }}>
+                  <AlertTriangle size={16} /> {formError}
+                </div>
+              )}
+
+              <div className="lr-form-grid">
+                <div className="lr-field lr-form-full">
+                  <label className="lr-field__label">{t('leaveRequest.labelType')} *</label>
+                  <select
+                    className="lr-field__select"
+                    value={form.type}
+                    onChange={(e) => setForm({ ...form, type: e.target.value, startDate: '', endDate: '' })}
+                    required
+                  >
+                    {TYPE_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                  {form.type !== 'emergency' && (
+                    <span className="lr-field__hint">{t('leaveRequest.hint24h')}</span>
+                  )}
+                </div>
+
+                <div className="lr-field">
+                  <label className="lr-field__label">{t('leaveRequest.labelStartDate')} *</label>
+                  <input
+                    className="lr-field__input"
+                    type="date"
+                    value={form.startDate}
+                    min={minStartDate(form.type)}
+                    onChange={(e) => setForm({ ...form, startDate: e.target.value })}
+                    required
+                  />
+                </div>
+
+                <div className="lr-field">
+                  <label className="lr-field__label">{t('leaveRequest.labelEndDate')} *</label>
+                  <input
+                    className="lr-field__input"
+                    type="date"
+                    value={form.endDate}
+                    min={form.startDate || minStartDate(form.type)}
+                    onChange={(e) => setForm({ ...form, endDate: e.target.value })}
+                    required
+                  />
+                  {previewDays > 0 && (
+                    <span className="lr-field__preview">
+                      <CalendarDays size={13} style={{ verticalAlign: 'middle', marginRight: 4 }} />
+                      {t('leaveRequest.previewDays', { count: previewDays })}
+                    </span>
+                  )}
+                </div>
+
+                <div className="lr-field lr-form-full">
+                  <label className="lr-field__label">{t('leaveRequest.labelReason')} *</label>
+                  <textarea
+                    className="lr-field__textarea"
+                    value={form.reason}
+                    onChange={(e) => setForm({ ...form, reason: e.target.value })}
+                    placeholder={t('leaveRequest.placeholderReason')}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 24 }}>
+                <button type="button" className="lr-btn lr-btn--secondary" onClick={() => setDrawerOpen(false)}>
+                  {t('leaveRequest.btnCancel')}
+                </button>
+                <button type="submit" className="lr-btn lr-btn--primary" disabled={submitting}>
+                  <PlusCircle size={16} />
+                  {submitting ? t('leaveRequest.submitting') : t('leaveRequest.btnSubmit')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </>
+      )}
+
+      {/* ── Cancel confirm modal ───────────────────────────── */}
+      {cancelModal && (
+        <div className="lr-modal-overlay" onClick={() => setCancelModal(null)}>
+          <div className="lr-modal" onClick={(e) => e.stopPropagation()}>
+            <h3 className="lr-modal__title">{t('leaveRequest.confirmCancelTitle')}</h3>
+            <p className="lr-modal__text">
+              {t('leaveRequest.confirmCancelText')}
+            </p>
+            <div className="lr-modal__actions">
+              <button type="button" className="lr-btn lr-btn--secondary" onClick={() => setCancelModal(null)}>
+                {t('leaveRequest.btnGoBack')}
+              </button>
+              <button
+                type="button"
+                className="lr-btn lr-btn--danger"
+                disabled={cancellingId === cancelModal}
+                onClick={() => handleCancel(cancelModal)}
+              >
+                {cancellingId === cancelModal ? t('leaveRequest.cancelling') : t('leaveRequest.confirmCancel')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

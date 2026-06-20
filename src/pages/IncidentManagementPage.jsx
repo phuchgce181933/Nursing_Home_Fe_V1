@@ -1,10 +1,26 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Download, PlusCircle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import {
+  Download,
+  PlusCircle,
+  Search,
+  AlertTriangle,
+  ShieldAlert,
+  Eye,
+  CheckCircle2,
+  X,
+  MapPin,
+  Clock,
+  User,
+  FileWarning,
+  BarChart3,
+} from 'lucide-react';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import authService from '../services/auth.service';
 import residentService from '../services/resident.service';
 import { useAuth } from '../hooks/useAuth';
 import incidentService from '../services/incident.service';
+import '../styles/shared/IncidentManagementPage.css';
 
 const initialForm = {
   incidentType: '',
@@ -18,19 +34,19 @@ const initialForm = {
 
 const statusOptions = ['open', 'investigating', 'resolved', 'closed'];
 
-const STATUS_LABELS = {
-  open: 'Mở',
-  investigating: 'Đang điều tra',
-  resolved: 'Đã giải quyết',
-  closed: 'Đã đóng',
-};
+const getStatusDisplay = (t) => ({
+  open: t('incidents.status.open'),
+  investigating: t('incidents.status.investigating'),
+  resolved: t('incidents.status.resolved'),
+  closed: t('incidents.status.closed'),
+});
 
-const SEVERITY_LABELS = {
-  low: 'Thấp',
-  medium: 'Trung bình',
-  high: 'Cao',
-  critical: 'Nghiêm trọng',
-};
+const getSeverityDisplay = (t) => ({
+  low: t('incidents.severity.low'),
+  medium: t('incidents.severity.medium'),
+  high: t('incidents.severity.high'),
+  critical: t('incidents.severity.critical'),
+});
 
 function formatDate(value) {
   if (!value) return '—';
@@ -45,7 +61,10 @@ function toIsoDatetime(value) {
 }
 
 function IncidentManagementPage() {
+  const { t } = useTranslation();
   const { user } = useAuth();
+  const STATUS_DISPLAY = useMemo(() => getStatusDisplay(t), [t]);
+  const SEVERITY_DISPLAY = useMemo(() => getSeverityDisplay(t), [t]);
   const [incidents, setIncidents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [optionsLoading, setOptionsLoading] = useState(true);
@@ -57,25 +76,26 @@ function IncidentManagementPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [residents, setResidents] = useState([]);
   const [staffAccounts, setStaffAccounts] = useState([]);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const isAdmin = user?.role === 'admin';
 
   const formatResidentLabel = (resident) => {
-    const baseName = resident?.fullName || 'Cư dân không tên';
+    const baseName = resident?.fullName || t('incidents.unnamedResident');
     const code = resident?.residentCode ? ` (${resident.residentCode})` : '';
     return `${baseName}${code}`;
   };
 
   const formatStaffLabel = (staff) => {
-    const name = staff?.fullName || staff?.email || 'Nhân viên không tên';
+    const name = staff?.fullName || staff?.email || t('incidents.unnamedStaff');
     const role = staff?.role ? ` — ${staff.role.toUpperCase()}` : '';
     const email = staff?.email ? ` • ${staff.email}` : '';
     return `${name}${role}${email}`;
   };
 
+  /* ── Data loading ──────────────────────────────────────────── */
   const loadIncidents = async () => {
     setLoading(true);
-
     try {
       const payload = {
         page: 1,
@@ -84,74 +104,52 @@ function IncidentManagementPage() {
         ...(statusFilter ? { status: statusFilter } : {}),
         ...(isAdmin ? {} : { reporterRole: user?.role }),
       };
-
       const data = await incidentService.listIncidents(payload);
       setIncidents(data.items || []);
       setMessage('');
     } catch (error) {
       setMessageType('error');
-      setMessage(error?.response?.data?.message || 'Không thể tải danh sách sự cố.');
+      setMessage(error?.response?.data?.message || t('incidents.error.loadFailed'));
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (!user) {
-      return;
-    }
-
+    if (!user) return;
     loadIncidents();
   }, [user, search, statusFilter]);
 
   useEffect(() => {
-    if (!user) {
-      return;
-    }
-
+    if (!user) return;
     let active = true;
-
     const loadFormOptions = async () => {
       setOptionsLoading(true);
-
       try {
         const [residentResponse, staffResponse] = await Promise.all([
           residentService.getResidentList({ page: 1, limit: 200 }),
           authService.getStaffAccounts({ page: 1, limit: 500 }),
         ]);
-
-        if (!active) {
-          return;
-        }
-
+        if (!active) return;
         setResidents(residentResponse?.data || []);
         setStaffAccounts(staffResponse?.data || []);
       } catch (error) {
-        if (!active) {
-          return;
-        }
-
+        if (!active) return;
         setMessageType('error');
-        setMessage(error?.response?.data?.message || 'Không thể tải tùy chọn cư dân và nhân viên.');
+        setMessage(error?.response?.data?.message || t('incidents.error.loadOptionsFailed'));
       } finally {
-        if (active) {
-          setOptionsLoading(false);
-        }
+        if (active) setOptionsLoading(false);
       }
     };
-
     loadFormOptions();
-
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, [user]);
 
+  /* ── Handlers ──────────────────────────────────────────────── */
   const handleCreate = async (event) => {
     event.preventDefault();
     setIsSaving(true);
     setMessage('');
-
     try {
       const payload = {
         ...form,
@@ -159,15 +157,15 @@ function IncidentManagementPage() {
         residentId: form.residentId || undefined,
         assignedStaffIds: form.assignedStaffIds.length ? form.assignedStaffIds : undefined,
       };
-
       await incidentService.createIncident(payload);
       setMessageType('success');
-      setMessage('Tạo sự cố thành công.');
+      setMessage(t('incidents.success.created'));
       setForm(initialForm);
+      setDrawerOpen(false);
       await loadIncidents();
     } catch (error) {
       setMessageType('error');
-      setMessage(error?.response?.data?.message || 'Không thể tạo sự cố.');
+      setMessage(error?.response?.data?.message || t('incidents.error.createFailed'));
     } finally {
       setIsSaving(false);
     }
@@ -176,15 +174,14 @@ function IncidentManagementPage() {
   const handleStatusUpdate = async (incidentId, status) => {
     setIsSaving(true);
     setMessage('');
-
     try {
       await incidentService.updateIncidentStatus(incidentId, { status });
       setMessageType('success');
-      setMessage('Cập nhật trạng thái sự cố thành công.');
+      setMessage(t('incidents.success.statusUpdated'));
       await loadIncidents();
     } catch (error) {
       setMessageType('error');
-      setMessage(error?.response?.data?.message || 'Không thể cập nhật trạng thái sự cố.');
+      setMessage(error?.response?.data?.message || t('incidents.error.updateStatusFailed'));
     } finally {
       setIsSaving(false);
     }
@@ -197,7 +194,6 @@ function IncidentManagementPage() {
         ...(statusFilter ? { status: statusFilter } : {}),
         ...(isAdmin ? {} : { reporterRole: user?.role }),
       });
-
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -206,250 +202,312 @@ function IncidentManagementPage() {
       link.click();
       URL.revokeObjectURL(url);
       setMessageType('success');
-      setMessage('Bắt đầu xuất dữ liệu sự cố.');
+      setMessage(t('incidents.success.exportStarted'));
     } catch (error) {
       setMessageType('error');
-      setMessage(error?.response?.data?.message || 'Không thể xuất dữ liệu sự cố.');
+      setMessage(error?.response?.data?.message || t('incidents.error.exportFailed'));
     }
   };
 
+  /* ── Computed ──────────────────────────────────────────────── */
   const stats = useMemo(() => ({
     total: incidents.length,
-    open: incidents.filter((incident) => incident.status === 'open').length,
-    investigating: incidents.filter((incident) => incident.status === 'investigating').length,
-    resolved: incidents.filter((incident) => incident.status === 'resolved').length,
+    open: incidents.filter((i) => i.status === 'open').length,
+    investigating: incidents.filter((i) => i.status === 'investigating').length,
+    resolved: incidents.filter((i) => i.status === 'resolved').length,
   }), [incidents]);
 
   if (!user) {
-    return <LoadingSpinner label="Đang tải trang sự cố..." />;
+    return <LoadingSpinner label={t('incidents.loadingPage')} />;
   }
 
   return (
-    <div className="profile-page">
-      <header className="profile-page__header">
-        <div>
-          <h1 className="profile-page__title">Quản lý sự cố</h1>
-          <p className="profile-page__subtitle">Quản lý sự cố cho quản trị viên, bác sĩ và điều dưỡng.</p>
+    <div className="ic-page">
+      {/* ── Header ─────────────────────────────────────────── */}
+      <header className="ic-header">
+        <div className="ic-header__info">
+          <h1 className="ic-header__title">{t('incidents.title')}</h1>
+          <p className="ic-header__subtitle">{t('incidents.subtitle')}</p>
         </div>
-        <button type="button" className="button button--primary" onClick={handleExport}>
-          <Download size={16} />
-          Xuất CSV
-        </button>
+        <div className="ic-header__actions">
+          <button type="button" className="ic-btn ic-btn--secondary" onClick={handleExport}>
+            <Download size={16} />
+            {t('incidents.exportCsv')}
+          </button>
+          <button type="button" className="ic-btn ic-btn--primary" onClick={() => setDrawerOpen(true)}>
+            <PlusCircle size={16} />
+            {t('incidents.createIncident')}
+          </button>
+        </div>
       </header>
 
+      {/* ── Toast ──────────────────────────────────────────── */}
       {message && (
-        <div className={`message ${messageType === 'success' ? 'message--success' : 'message--error'}`}>
+        <div className={`ic-toast ic-toast--${messageType}`}>
+          {messageType === 'success' ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
           {message}
         </div>
       )}
 
-      <section className="profile-card">
-        <h2 className="profile-card__heading">Tạo sự cố</h2>
-        <form className="profile-form" onSubmit={handleCreate}>
-          <div
-            className="profile-form__grid"
-            style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}
+      {/* ── Stats ──────────────────────────────────────────── */}
+      <div className="ic-stats">
+        <div className="ic-stat-card">
+          <div className="ic-stat-card__icon ic-stat-card__icon--total">
+            <BarChart3 size={22} />
+          </div>
+          <div>
+            <div className="ic-stat-card__value">{stats.total}</div>
+            <div className="ic-stat-card__label">{t('incidents.stat.total')}</div>
+          </div>
+        </div>
+        <div className="ic-stat-card">
+          <div className="ic-stat-card__icon ic-stat-card__icon--open">
+            <FileWarning size={22} />
+          </div>
+          <div>
+            <div className="ic-stat-card__value">{stats.open}</div>
+            <div className="ic-stat-card__label">{t('incidents.stat.open')}</div>
+          </div>
+        </div>
+        <div className="ic-stat-card">
+          <div className="ic-stat-card__icon ic-stat-card__icon--invest">
+            <Eye size={22} />
+          </div>
+          <div>
+            <div className="ic-stat-card__value">{stats.investigating}</div>
+            <div className="ic-stat-card__label">{t('incidents.stat.investigating')}</div>
+          </div>
+        </div>
+        <div className="ic-stat-card">
+          <div className="ic-stat-card__icon ic-stat-card__icon--resolve">
+            <CheckCircle2 size={22} />
+          </div>
+          <div>
+            <div className="ic-stat-card__value">{stats.resolved}</div>
+            <div className="ic-stat-card__label">{t('incidents.stat.resolved')}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Filters ────────────────────────────────────────── */}
+      <div className="ic-filters">
+        <div className="ic-search">
+          <Search size={16} className="ic-search__icon" />
+          <input
+            className="ic-search__input"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={t('incidents.searchPlaceholder')}
+          />
+        </div>
+        <div className="ic-status-pills">
+          <button
+            type="button"
+            className={`ic-pill ${statusFilter === '' ? 'ic-pill--active' : ''}`}
+            onClick={() => setStatusFilter('')}
           >
-              <label className="profile-form__field">
-                <span className="profile-form__label">Loại sự cố</span>
-                <input
-                  className="profile-form__input"
-                  value={form.incidentType}
-                  onChange={(event) => setForm((current) => ({ ...current, incidentType: event.target.value }))}
-                  required
-                />
-              </label>
-
-              <label className="profile-form__field">
-                <span className="profile-form__label">Mức độ nghiêm trọng</span>
-                <select
-                  className="profile-form__input"
-                  value={form.severity}
-                  onChange={(event) => setForm((current) => ({ ...current, severity: event.target.value }))}
-                >
-                  <option value="low">Thấp</option>
-                  <option value="medium">Trung bình</option>
-                  <option value="high">Cao</option>
-                  <option value="critical">Nghiêm trọng</option>
-                </select>
-              </label>
-
-              <label className="profile-form__field">
-                <span className="profile-form__label">Thời gian xảy ra</span>
-                <input
-                  className="profile-form__input"
-                  type="datetime-local"
-                  value={form.incidentAt}
-                  onChange={(event) => setForm((current) => ({ ...current, incidentAt: event.target.value }))}
-                  required
-                />
-              </label>
-
-              <label className="profile-form__field">
-                <span className="profile-form__label">Địa điểm</span>
-                <input
-                  className="profile-form__input"
-                  value={form.location}
-                  onChange={(event) => setForm((current) => ({ ...current, location: event.target.value }))}
-                />
-              </label>
-
-              <label className="profile-form__field">
-                <span className="profile-form__label">Cư dân</span>
-                <select
-                  className="profile-form__input"
-                  value={form.residentId}
-                  onChange={(event) => setForm((current) => ({ ...current, residentId: event.target.value }))}
-                  disabled={optionsLoading}
-                >
-                  <option value="">Không chọn cư dân</option>
-                  {residents.map((resident) => (
-                    <option key={resident._id} value={resident._id}>
-                      {formatResidentLabel(resident)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="profile-form__field">
-                <span className="profile-form__label">Nhân viên phụ trách</span>
-                <select
-                  className="profile-form__input"
-                  multiple
-                  size={5}
-                  value={form.assignedStaffIds}
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      assignedStaffIds: Array.from(event.target.selectedOptions, (option) => option.value),
-                    }))
-                  }
-                  disabled={optionsLoading}
-                >
-                  <option value="">Không chọn nhân viên</option>
-                  {staffAccounts.map((staff) => (
-                    <option key={staff._id} value={staff._id}>
-                      {formatStaffLabel(staff)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="profile-form__field" style={{ gridColumn: '1 / -1' }}>
-                <span className="profile-form__label">Mô tả</span>
-                <textarea
-                  className="profile-form__input"
-                  rows={4}
-                  value={form.description}
-                  onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
-                  required
-                />
-              </label>
-            </div>
-
-          <div className="profile-page__actions">
-            <button type="submit" className="button button--primary" disabled={isSaving}>
-              <PlusCircle size={16} />
-              {isSaving ? 'Đang lưu...' : 'Tạo sự cố'}
+            {t('incidents.filter.all')}
+          </button>
+          {statusOptions.map((s) => (
+            <button
+              key={s}
+              type="button"
+              className={`ic-pill ${statusFilter === s ? 'ic-pill--active' : ''}`}
+              onClick={() => setStatusFilter(s)}
+            >
+              {STATUS_DISPLAY[s]}
             </button>
-          </div>
-        </form>
-      </section>
-      
-      <section className="profile-card profile-card--accent" style={{ marginTop: '1.5rem' }}>
-        <h2 className="profile-card__heading">Tổng quan</h2>
-        <div className="profile-form__grid">
-          <div>
-            <p className="profile-card__empty">Tổng sự cố</p>
-            <strong>{stats.total}</strong>
-          </div>
-          <div>
-            <p className="profile-card__empty">Đang mở</p>
-            <strong>{stats.open}</strong>
-          </div>
-          <div>
-            <p className="profile-card__empty">Đang điều tra</p>
-            <strong>{stats.investigating}</strong>
-          </div>
-          <div>
-            <p className="profile-card__empty">Đã giải quyết</p>
-            <strong>{stats.resolved}</strong>
-          </div>
+          ))}
         </div>
-      </section>
+      </div>
 
-      <section className="profile-card" style={{ marginTop: '1.5rem' }}>
-        <div className="profile-page__header">
-          <div>
-            <h2 className="profile-card__heading">Danh sách sự cố</h2>
-            <p className="profile-card__empty">Lọc và xem xét các sự cố hiện tại.</p>
-          </div>
-          <div className="profile-form__grid" style={{ width: '100%', maxWidth: 720 }}>
-            <label className="profile-form__field">
-              <span className="profile-form__label">Tìm kiếm</span>
-              <input
-                className="profile-form__input"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Tìm sự cố, địa điểm, người báo cáo"
-              />
-            </label>
-            <label className="profile-form__field">
-              <span className="profile-form__label">Trạng thái</span>
-              <select
-                className="profile-form__input"
-                value={statusFilter}
-                onChange={(event) => setStatusFilter(event.target.value)}
-              >
-                <option value="">Tất cả</option>
-                {statusOptions.map((option) => (
-                  <option key={option} value={option}>{STATUS_LABELS[option] || option}</option>
-                ))}
-              </select>
-            </label>
-          </div>
+      {/* ── Incident card list ─────────────────────────────── */}
+      {loading ? (
+        <LoadingSpinner label={t('incidents.loading')} />
+      ) : incidents.length === 0 ? (
+        <div className="ic-empty">
+          <div className="ic-empty__icon"><ShieldAlert size={42} /></div>
+          <p>{t('incidents.noIncidents')}</p>
         </div>
-
-        {loading ? (
-          <LoadingSpinner label="Đang tải sự cố..." />
-        ) : incidents.length === 0 ? (
-          <p className="profile-card__empty">Không tìm thấy sự cố nào.</p>
-        ) : (
-          <div className="profile-form__grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))' }}>
-            {incidents.map((incident) => (
-              <div key={incident._id} className="profile-card" style={{ margin: 0 }}>
-                <div className="profile-page__header" style={{ alignItems: 'flex-start' }}>
+      ) : (
+        <div className="ic-list">
+          {incidents.map((incident, idx) => (
+            <div
+              key={incident._id}
+              className="ic-card"
+              style={{ animationDelay: `${0.05 * (idx % 8)}s` }}
+            >
+              <div className={`ic-card__severity-bar ic-card__severity-bar--${incident.severity}`} />
+              <div className="ic-card__body">
+                <div className="ic-card__top">
                   <div>
-                    <p className="profile-card__role">{incident.incidentType}</p>
-                    <h3>{incident.residentId?.fullName || incident.residentId || 'Chưa xác định cư dân'}</h3>
+                    <span className="ic-card__type">{incident.incidentType}</span>
+                    <p className="ic-card__resident">
+                      {incident.residentId?.fullName || incident.residentId || t('incidents.unknownResident')}
+                    </p>
                   </div>
-                  <span className="profile-card__role">{STATUS_LABELS[incident.status] || incident.status}</span>
+                  <span className={`ic-badge ic-badge--${incident.status}`}>
+                    {STATUS_DISPLAY[incident.status] || incident.status}
+                  </span>
                 </div>
 
-                <p className="profile-card__empty">{incident.description}</p>
-                <p className="profile-card__empty">Địa điểm: {incident.location || '—'}</p>
-                <p className="profile-card__empty">Mức độ: {SEVERITY_LABELS[incident.severity] || incident.severity}</p>
-                <p className="profile-card__empty">Báo cáo bởi: {incident.reporterName || incident.reporterEmail || 'Không xác định'}</p>
-                <p className="profile-card__empty">Thời gian: {formatDate(incident.incidentAt)}</p>
+                <p className="ic-card__description">{incident.description}</p>
 
-                <div className="profile-page__actions">
+                <div className="ic-card__meta">
+                  <span className="ic-card__meta-item">
+                    <MapPin size={13} /> {incident.location || '—'}
+                  </span>
+                  <span className="ic-card__meta-item">
+                    <Clock size={13} /> {formatDate(incident.incidentAt)}
+                  </span>
+                  <span className="ic-card__meta-item">
+                    <User size={13} /> {incident.reporterName || incident.reporterEmail || t('incidents.unknown')}
+                  </span>
+                </div>
+
+                <div className="ic-card__meta">
+                  <span className={`ic-severity ic-severity--${incident.severity}`}>
+                    {SEVERITY_DISPLAY[incident.severity] || incident.severity}
+                  </span>
+                </div>
+
+                <div className="ic-card__actions">
                   {statusOptions.map((status) => (
                     <button
                       key={status}
                       type="button"
-                      className={status === incident.status ? 'button button--primary' : 'button button--secondary'}
+                      className={`ic-btn ic-btn--small ${status === incident.status ? 'ic-btn--primary' : 'ic-btn--secondary'}`}
                       onClick={() => handleStatusUpdate(incident._id, status)}
                       disabled={isSaving || status === incident.status}
                     >
-                      {STATUS_LABELS[status] || status}
+                      {STATUS_DISPLAY[status]}
                     </button>
                   ))}
                 </div>
               </div>
-            ))}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── Create drawer ──────────────────────────────────── */}
+      {drawerOpen && (
+        <>
+          <div className="ic-drawer-overlay" onClick={() => setDrawerOpen(false)} />
+          <div className="ic-drawer">
+            <div className="ic-drawer__header">
+              <h2 className="ic-drawer__title">{t('incidents.drawer.title')}</h2>
+              <button type="button" className="ic-drawer__close" onClick={() => setDrawerOpen(false)}>
+                <X size={20} />
+              </button>
+            </div>
+            <form onSubmit={handleCreate} className="ic-drawer__body">
+              <div className="ic-form-grid">
+                <div className="ic-field">
+                  <label className="ic-field__label">{t('incidents.form.incidentType')} *</label>
+                  <input
+                    className="ic-field__input"
+                    value={form.incidentType}
+                    onChange={(e) => setForm((c) => ({ ...c, incidentType: e.target.value }))}
+                    required
+                  />
+                </div>
+
+                <div className="ic-field">
+                  <label className="ic-field__label">{t('incidents.form.severity')}</label>
+                  <select
+                    className="ic-field__select"
+                    value={form.severity}
+                    onChange={(e) => setForm((c) => ({ ...c, severity: e.target.value }))}
+                  >
+                    <option value="low">{t('incidents.severity.low')}</option>
+                    <option value="medium">{t('incidents.severity.medium')}</option>
+                    <option value="high">{t('incidents.severity.high')}</option>
+                    <option value="critical">{t('incidents.severity.critical')}</option>
+                  </select>
+                </div>
+
+                <div className="ic-field">
+                  <label className="ic-field__label">{t('incidents.form.incidentAt')} *</label>
+                  <input
+                    className="ic-field__input"
+                    type="datetime-local"
+                    value={form.incidentAt}
+                    onChange={(e) => setForm((c) => ({ ...c, incidentAt: e.target.value }))}
+                    required
+                  />
+                </div>
+
+                <div className="ic-field">
+                  <label className="ic-field__label">{t('incidents.form.location')}</label>
+                  <input
+                    className="ic-field__input"
+                    value={form.location}
+                    onChange={(e) => setForm((c) => ({ ...c, location: e.target.value }))}
+                  />
+                </div>
+
+                <div className="ic-field">
+                  <label className="ic-field__label">{t('incidents.form.resident')}</label>
+                  <select
+                    className="ic-field__select"
+                    value={form.residentId}
+                    onChange={(e) => setForm((c) => ({ ...c, residentId: e.target.value }))}
+                    disabled={optionsLoading}
+                  >
+                    <option value="">{t('incidents.form.noResident')}</option>
+                    {residents.map((r) => (
+                      <option key={r._id} value={r._id}>{formatResidentLabel(r)}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="ic-field">
+                  <label className="ic-field__label">{t('incidents.form.assignedStaff')}</label>
+                  <select
+                    className="ic-field__select"
+                    multiple
+                    size={4}
+                    value={form.assignedStaffIds}
+                    onChange={(e) =>
+                      setForm((c) => ({
+                        ...c,
+                        assignedStaffIds: Array.from(e.target.selectedOptions, (o) => o.value),
+                      }))
+                    }
+                    disabled={optionsLoading}
+                  >
+                    {staffAccounts.map((s) => (
+                      <option key={s._id} value={s._id}>{formatStaffLabel(s)}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="ic-field ic-form-full">
+                  <label className="ic-field__label">{t('incidents.form.description')} *</label>
+                  <textarea
+                    className="ic-field__textarea"
+                    rows={4}
+                    value={form.description}
+                    onChange={(e) => setForm((c) => ({ ...c, description: e.target.value }))}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="ic-drawer__footer" style={{ padding: 0, border: 'none', marginTop: 20 }}>
+                <button type="button" className="ic-btn ic-btn--secondary" onClick={() => setDrawerOpen(false)}>
+                  {t('incidents.form.cancel')}
+                </button>
+                <button type="submit" className="ic-btn ic-btn--primary" disabled={isSaving}>
+                  <PlusCircle size={16} />
+                  {isSaving ? t('incidents.form.saving') : t('incidents.createIncident')}
+                </button>
+              </div>
+            </form>
           </div>
-        )}
-      </section>
+        </>
+      )}
     </div>
   );
 }

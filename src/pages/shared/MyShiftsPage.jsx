@@ -1,236 +1,364 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import AdminPageShell from '../../components/admin/AdminPageShell';
-import ListPagination from '../../components/ui/ListPagination';
-import useClientPagination from '../../hooks/useClientPagination';
+import {
+  Calendar,
+  Clock,
+  CheckCircle2,
+  Award,
+  ClipboardList,
+  MapPin,
+  User,
+  AlertTriangle,
+  Inbox,
+  RefreshCw,
+} from 'lucide-react';
 import shiftService from '../../services/shift.service';
-import { getLocalDateString } from '../../utils/dateUtils';
+import { useAuth } from '../../hooks/useAuth';
+import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import '../../styles/shared/MyShiftsPage.css';
 
-const STATUS_CLASS = {
-  published: 'pending',
-  confirmed: 'approved',
-  completed: 'approved',
-  cancelled: 'cancelled',
-};
+const statusOptions = ['', 'draft', 'published', 'confirmed', 'completed', 'cancelled'];
 
-const today = () => getLocalDateString();
+function formatTime(val) {
+  if (!val) return '—';
+  if (typeof val === 'string' && val.includes(':')) return val.slice(0, 5);
+  return new Date(val).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+}
 
-const addDays = (dateStr, delta) => {
-  const d = new Date(`${dateStr}T12:00:00`);
-  d.setDate(d.getDate() + delta);
-  return getLocalDateString(d);
-};
+function getDefaultDateRange() {
+  const now = new Date();
+  const from = new Date(now);
+  from.setDate(from.getDate() - 7);
+  const to = new Date(now);
+  to.setDate(to.getDate() + 21);
+  return {
+    fromDate: from.toISOString().slice(0, 10),
+    toDate: to.toISOString().slice(0, 10),
+  };
+}
+
+function parseWorkDate(val) {
+  if (!val) return null;
+  const d = new Date(typeof val === 'string' && val.length === 10 ? `${val}T00:00:00` : val);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
 
 export default function MyShiftsPage() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
+  const { user } = useAuth();
+
+  const STATUS_DISPLAY = {
+    draft: t('myShifts.statusDraft'),
+    published: t('myShifts.statusPublished'),
+    confirmed: t('myShifts.statusConfirmed'),
+    completed: t('myShifts.statusCompleted'),
+    cancelled: t('myShifts.statusCancelled'),
+  };
+
+  const STATUS_PILL_LABELS = {
+    '': t('myShifts.filterAll'),
+    draft: t('myShifts.statusDraft'),
+    published: t('myShifts.statusPublished'),
+    confirmed: t('myShifts.statusConfirmed'),
+    completed: t('myShifts.statusCompleted'),
+    cancelled: t('myShifts.statusCancelled'),
+  };
+
+  const WEEKDAYS_VI = [
+    t('myShifts.sunday'), t('myShifts.monday'), t('myShifts.tuesday'),
+    t('myShifts.wednesday'), t('myShifts.thursday'), t('myShifts.friday'),
+    t('myShifts.saturday'),
+  ];
+  const MONTHS_VI = [
+    t('myShifts.month1'), t('myShifts.month2'), t('myShifts.month3'),
+    t('myShifts.month4'), t('myShifts.month5'), t('myShifts.month6'),
+    t('myShifts.month7'), t('myShifts.month8'), t('myShifts.month9'),
+    t('myShifts.month10'), t('myShifts.month11'), t('myShifts.month12'),
+  ];
   const [shifts, setShifts] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState('');
+  const [messageType, setMessageType] = useState('success');
+  const [confirming, setConfirming] = useState(null);
+
+  const defaultRange = useMemo(() => getDefaultDateRange(), []);
+  const [fromDate, setFromDate] = useState(defaultRange.fromDate);
+  const [toDate, setToDate] = useState(defaultRange.toDate);
   const [statusFilter, setStatusFilter] = useState('');
-  const [selectedDate, setSelectedDate] = useState(today());
-  const [confirmingId, setConfirmingId] = useState(null);
 
-  const locale = i18n.language === 'vi' ? 'vi-VN' : 'en-US';
-
-  const formatDayLabel = useCallback(
-    (dateStr) => {
-      const d = new Date(`${dateStr}T12:00:00`);
-      return d.toLocaleDateString(locale, {
-        weekday: 'long',
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-      });
-    },
-    [locale]
-  );
-
-  const filterTabs = useMemo(
-    () => [
-      { value: 'published', label: t('shared.myShifts.tabNeedConfirm') },
-      { value: 'confirmed', label: t('shared.myShifts.tabConfirmed') },
-      { value: '', label: t('shared.myShifts.tabAll') },
-    ],
-    [t]
-  );
-
-  const load = useCallback(async () => {
+  /* ── Data loading ──────────────────────────────────────────── */
+  const loadShifts = async () => {
     setLoading(true);
-    setError('');
     try {
-      const res = await shiftService.getMyShifts({
-        status: statusFilter || undefined,
-        fromDate: selectedDate,
-        toDate: selectedDate,
-        limit: 50,
-      });
-      const body = res?.data ?? res;
-      setShifts(Array.isArray(body) ? body : body.data || []);
-    } catch (e) {
-      setError(e.response?.data?.message || t('shared.myShifts.loadFailed'));
-      setShifts([]);
+      const params = {
+        page: 1,
+        limit: 100,
+        ...(fromDate ? { fromDate } : {}),
+        ...(toDate ? { toDate } : {}),
+        ...(statusFilter ? { status: statusFilter } : {}),
+      };
+      const res = await shiftService.listShifts(params);
+      const items = Array.isArray(res) ? res : (res?.data || res?.items || []);
+      setShifts(Array.isArray(items) ? items : []);
+    } catch (err) {
+      setMessageType('error');
+      setMessage(err?.response?.data?.message || t('myShifts.loadError'));
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, selectedDate, t]);
+  };
 
   useEffect(() => {
-    load();
-  }, [load]);
+    if (!user) return;
+    loadShifts();
+  }, [user, fromDate, toDate, statusFilter]);
 
-  const {
-    paginatedItems: paginatedShifts,
-    page,
-    setPage,
-    totalPages,
-    total,
-  } = useClientPagination(shifts);
-
-  const todayStr = today();
-  const isToday = selectedDate === todayStr;
-
-  const handleConfirm = async (id) => {
-    if (!window.confirm(t('shared.myShifts.confirmPrompt'))) return;
-    setConfirmingId(id);
+  /* ── Confirm handler ───────────────────────────────────────── */
+  const handleConfirm = async (shiftId) => {
+    setConfirming(shiftId);
+    setMessage('');
     try {
-      await shiftService.confirmShift(id);
-      await load();
-    } catch (e) {
-      alert(e.response?.data?.message || t('shared.myShifts.confirmFailed'));
+      await shiftService.confirmShift(shiftId);
+      setMessageType('success');
+      setMessage(t('myShifts.confirmSuccess'));
+      loadShifts();
+    } catch (err) {
+      setMessageType('error');
+      setMessage(err?.response?.data?.message || t('myShifts.confirmError'));
     } finally {
-      setConfirmingId(null);
+      setConfirming(null);
     }
   };
 
+  /* ── Stats ───────────────────────────────────────────────── */
+  const stats = useMemo(() => ({
+    total: shifts.length,
+    published: shifts.filter((s) => s.status === 'published').length,
+    confirmed: shifts.filter((s) => s.status === 'confirmed').length,
+    completed: shifts.filter((s) => s.status === 'completed').length,
+  }), [shifts]);
+
+  /* ── Group by date ─────────────────────────────────────────── */
+  const groupedShifts = useMemo(() => {
+    const sorted = [...shifts].sort((a, b) => {
+      const da = parseWorkDate(a.workDate);
+      const db = parseWorkDate(b.workDate);
+      if (!da || !db) return 0;
+      return da.getTime() - db.getTime();
+    });
+
+    const groups = [];
+    let currentKey = '';
+    for (const shift of sorted) {
+      const d = parseWorkDate(shift.workDate);
+      const key = d ? d.toISOString().slice(0, 10) : 'unknown';
+      if (key !== currentKey) {
+        currentKey = key;
+        groups.push({ dateKey: key, date: d, shifts: [] });
+      }
+      groups[groups.length - 1].shifts.push(shift);
+    }
+    return groups;
+  }, [shifts]);
+
+  if (!user) {
+    return <LoadingSpinner label={t('myShifts.loading')} />;
+  }
+
   return (
-    <AdminPageShell title={t('shared.myShifts.title')} subtitle={t('shared.myShifts.subtitle')}>
-      <div className="my-shifts-page__toolbar">
-          <div className="my-shifts-page__tabs">
-            {filterTabs.map((tab) => (
+    <div className="ms-page">
+      {/* ── Header ─────────────────────────────────────────── */}
+      <header className="ms-header">
+        <div className="ms-header__info">
+          <h1 className="ms-header__title">{t('myShifts.pageTitle')}</h1>
+          <p className="ms-header__subtitle">{t('myShifts.pageSubtitle')}</p>
+        </div>
+        <button type="button" className="ms-btn ms-btn--secondary" onClick={loadShifts}>
+          <RefreshCw size={16} />
+          {t('myShifts.refresh')}
+        </button>
+      </header>
+
+      {/* ── Toast ──────────────────────────────────────────── */}
+      {message && (
+        <div className={`ms-toast ms-toast--${messageType}`}>
+          {messageType === 'success' ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
+          {message}
+        </div>
+      )}
+
+      {/* ── Stats ──────────────────────────────────────────── */}
+      <div className="ms-stats">
+        <div className="ms-stat-card">
+          <div className="ms-stat-card__icon ms-stat-card__icon--total">
+            <ClipboardList size={22} />
+          </div>
+          <div>
+            <div className="ms-stat-card__value">{stats.total}</div>
+            <div className="ms-stat-card__label">{t('myShifts.statTotal')}</div>
+          </div>
+        </div>
+        <div className="ms-stat-card">
+          <div className="ms-stat-card__icon ms-stat-card__icon--published">
+            <Calendar size={22} />
+          </div>
+          <div>
+            <div className="ms-stat-card__value">{stats.published}</div>
+            <div className="ms-stat-card__label">{t('myShifts.statPublished')}</div>
+          </div>
+        </div>
+        <div className="ms-stat-card">
+          <div className="ms-stat-card__icon ms-stat-card__icon--confirmed">
+            <CheckCircle2 size={22} />
+          </div>
+          <div>
+            <div className="ms-stat-card__value">{stats.confirmed}</div>
+            <div className="ms-stat-card__label">{t('myShifts.statConfirmed')}</div>
+          </div>
+        </div>
+        <div className="ms-stat-card">
+          <div className="ms-stat-card__icon ms-stat-card__icon--completed">
+            <Award size={22} />
+          </div>
+          <div>
+            <div className="ms-stat-card__value">{stats.completed}</div>
+            <div className="ms-stat-card__label">{t('myShifts.statCompleted')}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Filters ────────────────────────────────────────── */}
+      <div className="ms-filters">
+        <div className="ms-filter-field">
+          <label className="ms-filter-field__label">{t('myShifts.filterFromDate')}</label>
+          <input
+            className="ms-filter-field__input"
+            type="date"
+            value={fromDate}
+            onChange={(e) => setFromDate(e.target.value)}
+          />
+        </div>
+        <div className="ms-filter-field">
+          <label className="ms-filter-field__label">{t('myShifts.filterToDate')}</label>
+          <input
+            className="ms-filter-field__input"
+            type="date"
+            value={toDate}
+            onChange={(e) => setToDate(e.target.value)}
+          />
+        </div>
+        <div className="ms-filter-field">
+          <label className="ms-filter-field__label">{t('myShifts.filterStatus')}</label>
+          <div className="ms-status-pills">
+            {statusOptions.map((s) => (
               <button
-                key={tab.value || 'all'}
+                key={s}
                 type="button"
-                className={`my-shifts-page__tab${statusFilter === tab.value ? ' is-active' : ''}`}
-                onClick={() => setStatusFilter(tab.value)}
+                className={`ms-pill ${statusFilter === s ? 'ms-pill--active' : ''}`}
+                onClick={() => setStatusFilter(s)}
               >
-                {tab.label}
+                {STATUS_PILL_LABELS[s]}
               </button>
             ))}
           </div>
-          <div className="my-shifts-page__date-nav">
-            <button
-              type="button"
-              className="my-shifts-page__date-nav-btn"
-              onClick={() => setSelectedDate(addDays(selectedDate, -1))}
-              aria-label={t('common.previousDay')}
-            >
-              <ChevronLeft size={18} />
-            </button>
-            <div className="my-shifts-page__date-nav-center">
-              {isToday && <span className="my-shifts-page__date-nav-badge">{t('common.today')}</span>}
-              <span className="my-shifts-page__date-nav-label">{formatDayLabel(selectedDate)}</span>
-            </div>
-            {!isToday && (
-              <button
-                type="button"
-                className="my-shifts-page__date-nav-today"
-                onClick={() => setSelectedDate(todayStr)}
-              >
-                {t('common.backToToday')}
-              </button>
-            )}
-            <button
-              type="button"
-              className="my-shifts-page__date-nav-btn"
-              onClick={() => setSelectedDate(addDays(selectedDate, 1))}
-              aria-label={t('common.nextDay')}
-            >
-              <ChevronRight size={18} />
-            </button>
-          </div>
         </div>
+      </div>
 
-        {error && <div className="resident-page__error">{error}</div>}
+      {/* ── Timeline list ──────────────────────────────────── */}
+      {loading ? (
+        <LoadingSpinner label={t('myShifts.loadingShifts')} />
+      ) : shifts.length === 0 ? (
+        <div className="ms-empty">
+          <div className="ms-empty__icon"><Inbox size={42} /></div>
+          <p>{t('myShifts.emptyList')}</p>
+        </div>
+      ) : (
+        <div className="ms-timeline">
+          {groupedShifts.map((group) => (
+            <div key={group.dateKey}>
+              <div className="ms-date-group">
+                <span className="ms-date-group__label">
+                  {group.date
+                    ? `${WEEKDAYS_VI[group.date.getDay()]}, ${group.date.getDate()} ${MONTHS_VI[group.date.getMonth()]} ${group.date.getFullYear()}`
+                    : group.dateKey}
+                </span>
+                <div className="ms-date-group__line" />
+              </div>
 
-        {loading ? (
-          <div className="my-shifts-page__loading">
-            <div className="my-shifts-page__loading-ring" aria-hidden="true" />
-            <p className="my-shifts-page__loading-label">{t('common.loading')}</p>
-          </div>
-        ) : (
-          <div className="resident-page__table">
-            <table className="resident-page__table-element">
-              <thead>
-                <tr className="resident-page__table-header">
-                  <th>{t('shared.myShifts.colDate')}</th>
-                  <th>{t('shared.myShifts.colShiftName')}</th>
-                  <th>{t('shared.myShifts.colTime')}</th>
-                  <th>{t('shared.myShifts.colDuration')}</th>
-                  <th>{t('shared.myShifts.colStatus')}</th>
-                  <th>{t('shared.myShifts.colActions')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {!loading && shifts.length === 0 && (
-                  <tr>
-                    <td colSpan={6} className="my-shifts-page__empty-row">
-                      {t('shared.myShifts.emptyDay')}
-                    </td>
-                  </tr>
-                )}
-                {paginatedShifts.map((s) => (
-                  <tr key={s._id}>
-                    <td>{new Date(s.workDate).toLocaleDateString(locale)}</td>
-                    <td>
-                      <span className="my-shifts-page__shift-name">
-                        {s.shiftTemplateId?.colorLabel && (
-                          <span
-                            className="my-shifts-page__shift-dot"
-                            style={{ background: s.shiftTemplateId.colorLabel }}
-                          />
+              {group.shifts.map((shift, idx) => {
+                const d = parseWorkDate(shift.workDate);
+                const templateName = shift.shiftTemplateId?.name || shift.templateName || t('myShifts.defaultShiftName');
+                const startTime = shift.shiftTemplateId?.startTime || shift.startTime;
+                const endTime = shift.shiftTemplateId?.endTime || shift.endTime;
+
+                return (
+                  <div
+                    key={shift._id}
+                    className="ms-shift-card"
+                    style={{ animationDelay: `${0.05 * idx}s` }}
+                  >
+                    <div className="ms-shift-card__time-side">
+                      <div className="ms-shift-card__day">{d ? d.getDate() : '—'}</div>
+                      <div className="ms-shift-card__month">{d ? MONTHS_VI[d.getMonth()] : ''}</div>
+                      <div className="ms-shift-card__weekday">{d ? WEEKDAYS_VI[d.getDay()] : ''}</div>
+                    </div>
+
+                    <div className="ms-shift-card__body">
+                      <div className="ms-shift-card__top">
+                        <div>
+                          <h3 className="ms-shift-card__name">{templateName}</h3>
+                          {shift.taskDescription && (
+                            <span className="ms-shift-card__template">{shift.taskDescription}</span>
+                          )}
+                        </div>
+                        <span className={`ms-badge ms-badge--${shift.status}`}>
+                          {STATUS_DISPLAY[shift.status] || shift.status}
+                        </span>
+                      </div>
+
+                      <div className="ms-shift-card__time-range">
+                        <Clock size={14} />
+                        {formatTime(startTime)} &mdash; {formatTime(endTime)}
+                      </div>
+
+                      <div className="ms-shift-card__details">
+                        {shift.assignedStaffId?.fullName && (
+                          <span className="ms-shift-card__detail-item">
+                            <User size={13} /> {shift.assignedStaffId.fullName}
+                          </span>
                         )}
-                        {s.name}
-                      </span>
-                    </td>
-                    <td>
-                      {s.startTime} – {s.endTime}
-                    </td>
-                    <td>{s.totalHours != null ? `${s.totalHours}h` : '—'}</td>
-                    <td>
-                      <span
-                        className={`my-shifts-page__status my-shifts-page__status--${STATUS_CLASS[s.status] || 'pending'}`}
-                      >
-                        {t(`common.shiftStatus.${s.status}`, { defaultValue: s.status })}
-                      </span>
-                    </td>
-                    <td>
-                      {s.status === 'published' && (
-                        <button
-                          type="button"
-                          className="resident-page__button resident-page__button--primary"
-                          disabled={confirmingId === s._id}
-                          onClick={() => handleConfirm(s._id)}
-                        >
-                          {confirmingId === s._id ? t('common.confirming') : t('common.confirm')}
-                        </button>
+                        {shift.location && (
+                          <span className="ms-shift-card__detail-item">
+                            <MapPin size={13} /> {shift.location}
+                          </span>
+                        )}
+                      </div>
+
+                      {shift.notes && (
+                        <div className="ms-shift-card__notes">{shift.notes}</div>
                       )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {!loading && shifts.length > 0 && (
-              <ListPagination
-                page={page}
-                totalPages={totalPages}
-                total={total}
-                onPageChange={setPage}
-              />
-            )}
-          </div>
-        )}
-    </AdminPageShell>
+
+                      {shift.status === 'published' && (
+                        <div className="ms-shift-card__actions">
+                          <button
+                            type="button"
+                            className="ms-btn ms-btn--success ms-btn--small"
+                            disabled={confirming === shift._id}
+                            onClick={() => handleConfirm(shift._id)}
+                          >
+                            <CheckCircle2 size={14} />
+                            {confirming === shift._id ? t('myShifts.confirming') : t('myShifts.confirmShift')}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

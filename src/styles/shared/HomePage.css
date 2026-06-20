@@ -46,6 +46,9 @@
 }
 
 .home-nav a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   color: #334155;
   text-decoration: none;
   font-size: 0.95rem;
