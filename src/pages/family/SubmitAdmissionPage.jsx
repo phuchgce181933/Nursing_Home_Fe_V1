@@ -90,12 +90,31 @@ export default function SubmitAdmissionPage() {
           return 'Họ và tên chỉ được chứa chữ cái và khoảng trắng';
         return null;
 
-      case 'dob':
-        if (!val) return 'Ngày sinh là bắt buộc';
+      case 'dob': {
+        if (val === 'INVALID_DATE') {
+          return 'Ngày sinh không hợp lệ hoặc không đúng định dạng (ngày/tháng/năm)';
+        }
+        if (!val) {
+          return 'Ngày sinh là bắt buộc';
+        }
         const dobDate = new Date(val);
-        if (isNaN(dobDate.getTime())) return 'Ngày sinh không hợp lệ';
-        if (dobDate >= new Date()) return 'Ngày sinh phải ở trong quá khứ';
+        if (isNaN(dobDate.getTime())) {
+          return 'Ngày sinh không hợp lệ';
+        }
+        if (dobDate >= new Date()) {
+          return 'Ngày sinh phải ở trong quá khứ';
+        }
+        const today = new Date();
+        let age = today.getFullYear() - dobDate.getFullYear();
+        const m = today.getMonth() - dobDate.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < dobDate.getDate())) {
+          age--;
+        }
+        if (age < 50 || age > 110) {
+          return 'Người đăng ký nhập viện phải từ 50 đến 110 tuổi';
+        }
         return null;
+      }
 
       case 'gender':
         if (!val) return 'Giới tính là bắt buộc';
