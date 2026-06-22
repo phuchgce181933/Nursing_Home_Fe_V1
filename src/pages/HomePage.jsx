@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Check } from 'lucide-react';
+import { Check, Home, Info, HeartPulse, Cpu, Trees, CreditCard, Newspaper, Phone } from 'lucide-react';
+import { motion } from 'motion/react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../hooks/useAuth';
 import { getAuthToken } from '../utils/auth';
@@ -103,14 +104,25 @@ function HomePage() {
         </div>
 
         <nav className="home-nav">
-          <Link to="#home">{t('home.home')}</Link>
-          <Link to="#intro">{t('home.intro')}</Link>
-          <Link to="/services">{t('home.services')}</Link>
-          <Link to="#tech">{t('home.tech')}</Link>
-          <Link to="#living">{t('home.living')}</Link>
-          <Link to="#pricing">{t('home.pricing')}</Link>
-          <Link to="#news">{t('home.news')}</Link>
-          <Link to="#contact">{t('home.contact')}</Link>
+          {[
+            { to: '#home', label: t('home.home'), icon: <Home size={15} /> },
+            { to: '#intro', label: t('home.intro'), icon: <Info size={15} /> },
+            { to: '/services', label: t('home.services'), icon: <HeartPulse size={15} /> },
+            { to: '#tech', label: t('home.tech'), icon: <Cpu size={15} /> },
+            { to: '#living', label: t('home.living'), icon: <Trees size={15} /> },
+            { to: '#pricing', label: t('home.pricing'), icon: <CreditCard size={15} /> },
+            { to: '#news', label: t('home.news'), icon: <Newspaper size={15} /> },
+            { to: '#contact', label: t('home.contact'), icon: <Phone size={15} /> },
+          ].map((item) => (
+            <motion.div
+              key={item.to}
+              whileHover={{ scale: 1.12, y: -2 }}
+              whileTap={{ scale: 0.95 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+            >
+              <Link to={item.to}>{item.icon} {item.label}</Link>
+            </motion.div>
+          ))}
         </nav>
 
         <Link to={bookPath} className="home-header__button">
