@@ -1,0 +1,66 @@
+.notification-root { position: relative; }
+.notification-btn { position: relative; width: 40px; height: 40px; border-radius: 10px; border: 1px solid transparent; background: transparent; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+.notification-badge { position: absolute; top: -6px; right: -6px; background: #ef4444; color: #fff; border-radius: 999px; padding: 2px 6px; font-size: 11px; font-weight: 700; }
+.notification-panel { position: absolute; right: 0; margin-top: 8px; width: 360px; max-height: 70vh; overflow: auto; background: #0f1724; border-radius: 12px; box-shadow: 0 8px 24px rgba(2,6,23,0.7); border: 1px solid rgba(255,255,255,0.04); z-index: 60; color: #e6eef6; }
+
+.panel-header { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+.panel-header .meta { display: flex; gap: 8px; align-items: center; }
+.panel-header .actions { display: flex; gap: 8px; }
+.panel-actions button { padding: 6px 8px; border-radius: 8px; border: none; color: #fff; }
+
+.mark-all-btn { background: #0ea5a0; }
+
+.delete-all-btn { background: #ef4444; }
+
+.panel-tabs { display: flex; gap: 8px; padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+
+.tab-btn { padding: 8px; border-radius: 999px; background: transparent; border: 1px solid rgba(255,255,255,0.04); cursor: pointer; color: #cfeaf0; }
+.tab-btn.active { background: rgba(14,165,160,0.18); color: #e6fffB; }
+
+.bell-tabs { display: flex; gap: 8px; }
+.empty-bell { padding: 20px 8px; }
+
+.notification-list { }
+.notification-item { display: flex; justify-content: space-between; padding: 12px; border-bottom: 1px dashed rgba(255,255,255,0.03); background: transparent; }
+.notification-item.unread { background: rgba(14,165,160,0.04); }
+.notification-item .left { display: flex; gap: 10px; align-items: flex-start; }
+.notification-dot { width: 10px; height: 10px; border-radius: 99px; margin-top: 6px; }
+.notification-dot.unseen { background: #3b82f6; box-shadow: 0 0 6px rgba(59,130,246,0.35); }
+.notification-title { font-weight: 600; color: #e6eef6; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.notification-content { color: #c7d6de; margin-top: 6px; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; white-space: normal; overflow: hidden; text-overflow: ellipsis; font-size: 13px; }
+.notification-time { color: #94a3b8; margin-top: 8px; font-size: 12px; }
+
+/* Ensure text container inside item can shrink so ellipsis works */
+.notification-item .left > div { flex: 1 1 auto; min-width: 0; }
+
+/* Slightly reduce padding for tighter rows similar to mock */
+.notification-item { padding: 10px 12px; }
+.notification-item-actions { display: flex; flex-direction: column; gap: 8px; }
+.notification-action-btn { padding: 6px 8px; border-radius: 8px; color: #0f1724; border: none; cursor: pointer; }
+.read-btn { background: #e6fffB; }
+.delete-btn { background: #ef4444; color: #fff; }
+.view-all { padding: 12px; display: flex; justify-content: flex-end; gap: 8px; }
+.view-all a { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; color: #7dd3fc; }
+
+.settings-container { border: 1px solid rgba(255,255,255,0.04); padding: 12px; margin-bottom: 12px; background: rgba(255,255,255,0.02); }
+.settings-header { margin: 0 0 8px 0; color: #e6eef6; }
+.settings-row { display: flex; gap: 12px; align-items: center; }
+.settings-save { margin-top: 8px; }
+
+/* page title style to match activity page */
+.page-title { font-size: 28px; font-weight: 800; color: #0f1724; margin: 0; }
+.page-subtitle { margin-left: 8px; color: #6b7280; font-size: 14px; }
+
+/* pager hover */
+.pager-btn { padding: 6px 10px; border-radius: 8px; background: #0b1220; border: 1px solid rgba(255,255,255,0.06); color: #e6eef6; cursor: pointer; }
+.pager-btn:hover { background: rgba(255,255,255,0.03); transform: translateY(-1px); }
+
+/* framed filters block to match admin UI */
+.filters-frame { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 12px; background: #ffffff; border: 1px solid rgba(15, 23, 36, 0.06); color: #0f1724; margin-bottom: 12px; }
+.filters-frame select { background: #fff; color: #0f1724; border: 1px solid rgba(15,23,36,0.06); }
+
+/* pager variants to match Activity UI */
+.pager-btn.prev { background: #ffffff; color: #0f6b3e; border: 1px solid #0f6b3e; }
+.pager-btn.next { background: #ffffff; color: #0f1724; border: 1px solid rgba(15,23,36,0.08); }
+.pager-btn[disabled] { opacity: 0.6; cursor: not-allowed; }
+
