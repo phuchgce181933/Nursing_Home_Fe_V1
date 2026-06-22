@@ -3,17 +3,36 @@ import { useTranslation } from 'react-i18next';
 import medicationService from '../../services/medication.service';
 import '../../styles/medications/MedicationPage.css';
 
-/* -- helpers -- */
+/* ── helpers ── */
 const fmtDate = (d) => (d ? new Date(d).toLocaleDateString('en-GB') : '—');
 const fmtTime = (d) =>
   new Date(d).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-const fmtDatetime = (d) => (d ? `${fmtDate(d)} ${fmtTime(d)}` : '—');
 const fmtDayLabel = (d) =>
   new Date(d).toLocaleDateString('en-GB', {
     weekday: 'long', day: '2-digit', month: 'short', year: 'numeric',
   });
 
+const localDateStr = (d) => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+
 const MISSED_REASONS = ['refused', 'asleep', 'vomiting', 'hospitalized', 'other'];
+
+const AVATAR_COLORS = ['#3b5bdb', '#e64980', '#0ca678', '#f76707', '#7048e8', '#1098ad', '#d6336c', '#5c7cfa'];
+const getAvatarColor = (name) => {
+  let hash = 0;
+  for (let i = 0; i < (name || '').length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+};
+const getInitials = (name) => {
+  if (!name) return '?';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  return parts[0][0].toUpperCase();
+};
 
 const RX_STATUS_KEYS = { ACTIVE: 'statusActive', COMPLETED: 'statusCompleted', CANCELLED: 'statusCancelled' };
 const SCHED_STATUS_KEYS = {
@@ -44,7 +63,7 @@ const STAT_ICONS = {
   ),
 };
 
-/* -- StatusBadge -- */
+/* ── StatusBadge ── */
 function StatusBadge({ status, type }) {
   const { t } = useTranslation();
   const keyMap = type === 'sched' ? SCHED_STATUS_KEYS : RX_STATUS_KEYS;
@@ -54,27 +73,7 @@ function StatusBadge({ status, type }) {
   );
 }
 
-/* -- Drawer Modal (slides from right for forms) -- */
-function DrawerModal({ title, onClose, children, footer }) {
-  return (
-    <div className="med-drawer-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="med-drawer">
-        <div className="med-drawer__header">
-          <h2 className="med-drawer__title">{title}</h2>
-          <button className="med-drawer__close" onClick={onClose}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
-          </button>
-        </div>
-        <div className="med-drawer__body">{children}</div>
-        {footer && <div className="med-drawer__footer">{footer}</div>}
-      </div>
-    </div>
-  );
-}
-
-/* -- Center Modal (for confirmations) -- */
+/* ── Modal ── */
 function Modal({ title, onClose, children, footer, size }) {
   return (
     <div className="med-modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
@@ -94,7 +93,7 @@ function Modal({ title, onClose, children, footer, size }) {
   );
 }
 
-/* -- Mark Modal (taken or missed) -- */
+/* ── MarkModal ── */
 function MarkModal({ schedule, action, onConfirm, onClose, saving }) {
   const { t } = useTranslation();
   const isMissed = action === 'missed';
@@ -103,10 +102,8 @@ function MarkModal({ schedule, action, onConfirm, onClose, saving }) {
 
   const handleConfirm = () => {
     if (isMissed && !reason) return;
-    onConfirm(schedule._id, action, reason, notes);
+    onConfirm(schedule._scheduleId, action, reason, notes);
   };
-
-  const resident = schedule._resident || {};
 
   return (
     <Modal
@@ -136,7 +133,7 @@ function MarkModal({ schedule, action, onConfirm, onClose, saving }) {
           </span>
           <div className="med-confirm-info__content">
             <span className="med-confirm-info__label">{t('medication.colResident')}</span>
-            <span className="med-confirm-info__value">{resident.fullName} ({resident.residentCode})</span>
+            <span className="med-confirm-info__value">{schedule._residentName || '—'}</span>
           </div>
         </div>
         <div className="med-confirm-info__row">
@@ -196,9 +193,9 @@ function MarkModal({ schedule, action, onConfirm, onClose, saving }) {
   );
 }
 
-/* ================================================================
-   Tab 1 -- Daily Schedule
-   ================================================================ */
+/* ════════════════════════════════════════
+   Tab 1 — Daily Schedule
+   ════════════════════════════════════════ */
 function ScheduleTab() {
   const { t } = useTranslation();
   const [date, setDate] = useState(new Date());
@@ -209,7 +206,7 @@ function ScheduleTab() {
   const [markModal, setMarkModal] = useState(null);
   const [saving, setSaving] = useState(false);
 
-  const dateStr = date.toISOString().slice(0, 10);
+  const dateStr = localDateStr(date);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -234,9 +231,17 @@ function ScheduleTab() {
   const allRows = useMemo(() => {
     const flat = [];
     groups.forEach((group) => {
-      const resident = group.residentId || group.resident || {};
+      const residentName = group.residentName || group.residentId?.fullName || '—';
+      const residentCode = group.residentId?.residentCode || '';
+      const room = group.room || group.residentId?.roomId?.roomNumber || '';
       (group.schedules || []).forEach((s) => {
-        flat.push({ ...s, _resident: resident });
+        flat.push({
+          ...s,
+          _scheduleId: s.id || s._id,
+          _residentName: residentName,
+          _residentCode: residentCode,
+          _room: room,
+        });
       });
     });
     return flat.sort((a, b) => new Date(a.scheduledTime) - new Date(b.scheduledTime));
@@ -256,7 +261,7 @@ function ScheduleTab() {
     return allRows.filter((s) => {
       const matchSearch =
         !q ||
-        (s._resident?.fullName || '').toLowerCase().includes(q) ||
+        (s._residentName || '').toLowerCase().includes(q) ||
         (s.medicationName || '').toLowerCase().includes(q);
       const matchStatus = !statusFilter || s.status === statusFilter;
       return matchSearch && matchStatus;
@@ -267,9 +272,13 @@ function ScheduleTab() {
     setSaving(true);
     try {
       if (action === 'taken') {
-        await medicationService.markTaken(id, notes ? { notes } : {});
+        const payload = {};
+        if (notes) payload.notes = notes;
+        await medicationService.markTaken(id, payload);
       } else {
-        await medicationService.markMissed(id, { reason, notes: notes || undefined });
+        const payload = { reason };
+        if (notes) payload.notes = notes;
+        await medicationService.markMissed(id, payload);
       }
       setMarkModal(null);
       load();
@@ -302,7 +311,7 @@ function ScheduleTab() {
         </button>
       </div>
 
-      {/* Stats grid */}
+      {/* Stats */}
       <div className="med-stats">
         {[
           ['PENDING', 'schedPending'],
@@ -334,14 +343,14 @@ function ScheduleTab() {
             <strong>{t('medication.overdueAlert_other', { count: overdueRows.length })}</strong>
             <span className="med-alert__detail">
               {overdueRows
-                .map((s) => `${s._resident?.fullName} — ${s.medicationName} (${fmtTime(s.scheduledTime)})`)
+                .map((s) => `${s._residentName} — ${s.medicationName} (${fmtTime(s.scheduledTime)})`)
                 .join(' | ')}
             </span>
           </div>
         </div>
       )}
 
-      {/* Filter bar */}
+      {/* Filter */}
       <div className="med-filter-bar">
         <div className="med-filter-bar__search-wrap">
           <svg className="med-filter-bar__search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -408,23 +417,28 @@ function ScheduleTab() {
                 </tr>
               ) : (
                 filtered.map((s, idx) => (
-                  <tr key={s._id} className="med-table__row-animated" style={{ animationDelay: `${idx * 0.03}s` }}>
+                  <tr key={s._scheduleId} className="med-table__row-animated" style={{ animationDelay: `${idx * 0.03}s` }}>
                     <td>
                       <span className="med-time-badge">{fmtTime(s.scheduledTime)}</span>
                     </td>
                     <td>
                       <div className="med-resident-cell">
-                        <div className="med-resident-cell__name">{s._resident?.fullName}</div>
-                        <div className="med-resident-cell__code">{s._resident?.residentCode}</div>
+                        <div className="med-resident-cell__avatar" style={{ background: getAvatarColor(s._residentName) }}>
+                          {getInitials(s._residentName)}
+                        </div>
+                        <div className="med-resident-cell__info">
+                          <div className="med-resident-cell__name">{s._residentName}</div>
+                          {s._room && <div className="med-resident-cell__code">{s._room}</div>}
+                        </div>
                       </div>
                     </td>
                     <td><span className="med-drug-name">{s.medicationName}</span></td>
                     <td><span className="med-dosage">{s.dosage}</span></td>
                     <td>
                       <StatusBadge status={s.status} type="sched" />
-                      {s.status === 'MISSED' && s.reason && (
+                      {s.status === 'MISSED' && s.missedReason && (
                         <div className="med-reason-note">
-                          ({t(`medication.reason${s.reason.charAt(0).toUpperCase() + s.reason.slice(1)}`)})
+                          ({t(`medication.reason${s.missedReason.charAt(0).toUpperCase() + s.missedReason.slice(1)}`)})
                         </div>
                       )}
                     </td>
@@ -478,9 +492,9 @@ function ScheduleTab() {
   );
 }
 
-/* ================================================================
-   Tab 2 -- Prescriptions (read-only reference)
-   ================================================================ */
+/* ════════════════════════════════════════
+   Tab 2 — Prescriptions (read-only)
+   ════════════════════════════════════════ */
 function PrescriptionsTab() {
   const { t } = useTranslation();
   const [prescriptions, setPrescriptions] = useState([]);
@@ -525,7 +539,6 @@ function PrescriptionsTab() {
 
   return (
     <div className="med-tab-content">
-      {/* Filter bar */}
       <div className="med-filter-bar">
         <div className="med-filter-bar__search-wrap">
           <svg className="med-filter-bar__search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -551,7 +564,6 @@ function PrescriptionsTab() {
         </select>
       </div>
 
-      {/* Prescription cards */}
       {loading ? (
         <div className="med-loading">
           <div className="med-loading__spinner" />
@@ -591,7 +603,7 @@ function PrescriptionsTab() {
                       </div>
                       <div className="med-rx-card__meta-item">
                         <span className="med-rx-card__meta-label">{t('medication.colPrescribedBy')}</span>
-                        <span className="med-rx-card__meta-value">{p.prescribedByStaffId?.userId?.fullName || '—'}</span>
+                        <span className="med-rx-card__meta-value">{p.prescribedByStaffId?.userId?.fullName || p.doctorId?.fullName || '—'}</span>
                       </div>
                     </div>
                   </div>
@@ -651,9 +663,9 @@ function PrescriptionsTab() {
   );
 }
 
-/* ================================================================
-   Root -- NurseMedicationPage
-   ================================================================ */
+/* ════════════════════════════════════════
+   Root — NurseMedicationPage
+   ════════════════════════════════════════ */
 function NurseMedicationPage() {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState('schedule');

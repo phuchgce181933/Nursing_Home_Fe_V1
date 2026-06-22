@@ -1,0 +1,148 @@
+.stepper-outer-container {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.stepper-circle-container {
+  width: 100%;
+  border-radius: 2rem;
+}
+
+.stepper-indicator-row {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  padding: 2rem;
+}
+
+.stepper-content-default {
+  position: relative;
+  overflow: hidden;
+}
+
+.stepper-step-default {
+  padding-left: 2rem;
+  padding-right: 2rem;
+}
+
+.stepper-footer-container {
+  padding-left: 2rem;
+  padding-right: 2rem;
+  padding-bottom: 2rem;
+}
+
+.stepper-footer-nav {
+  margin-top: 2.5rem;
+  display: flex;
+}
+
+.stepper-footer-nav.spread {
+  justify-content: space-between;
+}
+
+.stepper-footer-nav.end {
+  justify-content: flex-end;
+}
+
+.stepper-back-button {
+  transition: all 350ms;
+  border-radius: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  color: #64748b;
+  cursor: pointer;
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.stepper-back-button:hover {
+  color: #1A365D;
+}
+
+.stepper-back-button.inactive {
+  pointer-events: none;
+  opacity: 0.5;
+  color: #94a3b8;
+}
+
+.stepper-next-button {
+  transition: all 350ms;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background-color: #1A365D;
+  color: #fff;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  padding: 0.5rem 1.25rem;
+  cursor: pointer;
+  border: none;
+  font-family: inherit;
+  font-size: 14px;
+  box-shadow: 0 4px 16px rgba(26, 54, 93, 0.25);
+}
+
+.stepper-next-button:hover {
+  background-color: #14294a;
+  box-shadow: 0 6px 20px rgba(26, 54, 93, 0.35);
+  transform: translateY(-1px);
+}
+
+.stepper-indicator {
+  position: relative;
+  cursor: pointer;
+  outline: none;
+}
+
+.stepper-indicator-inner {
+  display: flex;
+  height: 2.5rem;
+  width: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  font-weight: 600;
+  box-shadow: 0 0 0 4px #f8fafc;
+  transition: box-shadow 0.3s ease;
+}
+
+.stepper-active-dot {
+  height: 0.75rem;
+  width: 0.75rem;
+  border-radius: 9999px;
+  background-color: #fff;
+}
+
+.stepper-step-number {
+  font-size: 0.875rem;
+}
+
+.stepper-connector {
+  position: relative;
+  margin-left: 0.5rem;
+  margin-right: 0.5rem;
+  height: 0.125rem;
+  flex: 1;
+  overflow: hidden;
+  border-radius: 0.25rem;
+  background-color: #e2e8f0;
+}
+
+.stepper-connector-inner {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+}
+
+.stepper-check-icon {
+  height: 1rem;
+  width: 1rem;
+  color: #fff;
+}
