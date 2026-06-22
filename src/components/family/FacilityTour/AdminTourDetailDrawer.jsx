@@ -94,6 +94,8 @@ export default function AdminTourDetailDrawer({ isOpen, onClose, tourId, onActio
   const [rejectionReason, setRejectionReason] = useState('');
   const [rejecting, setRejecting] = useState(false);
 
+  const [completing, setCompleting] = useState(false);
+
   useEffect(() => {
     if (!isOpen || !tourId) return;
 
@@ -182,7 +184,24 @@ export default function AdminTourDetailDrawer({ isOpen, onClose, tourId, onActio
     }
   };
 
+  const handleCompleteSubmit = async () => {
+    if (!tourId) return;
+    setCompleting(true);
+    try {
+      await facilityTourService.adminCompleteTour(tourId);
+      if (onActionSuccess) onActionSuccess();
+      const res = await facilityTourService.adminGetTourDetail(tourId);
+      setTour(res?.tour || null);
+    } catch (err) {
+      console.error('Failed to complete tour:', err);
+      alert(err.response?.data?.message || 'Đã xảy ra lỗi khi xác nhận hoàn tất tham quan.');
+    } finally {
+      setCompleting(false);
+    }
+  };
+
   const isPending = tour?.status === 'pending';
+  const isConfirmed = tour?.status === 'confirmed';
   const isCancellable = ['pending', 'confirmed'].includes(tour?.status || '');
   const theme = tour ? getStatusTheme(tour.status) : null;
 
@@ -417,6 +436,34 @@ export default function AdminTourDetailDrawer({ isOpen, onClose, tourId, onActio
                 onClick={() => setShowApproveModal(true)}
               >
                 Duyệt tour
+              </button>
+            </div>
+          ) : isConfirmed ? (
+            <div className="w-full flex gap-3">
+              <button
+                className="ftd-btn ftd-btn--danger-outline flex-1 flex justify-center items-center gap-1.5"
+                onClick={() => setShowRejectModal(true)}
+                disabled={completing}
+              >
+                Từ chối
+              </button>
+              <button
+                className="ftd-btn flex-1 flex justify-center items-center gap-1.5"
+                style={{ backgroundColor: '#059669', color: '#fff', border: 'none' }}
+                onClick={handleCompleteSubmit}
+                disabled={completing}
+              >
+                {completing ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    Đang xử lý...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle size={14} />
+                    Xác nhận đã tham quan
+                  </>
+                )}
               </button>
             </div>
           ) : (

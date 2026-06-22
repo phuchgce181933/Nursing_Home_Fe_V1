@@ -345,7 +345,7 @@ export default function FacilityTourHistoryPage() {
                     <div className="arh-mobile-card__body">
                       <div className="arh-mobile-card__row">
                         <span>Ngày:</span>
-                        <strong>{formatEnglishDate(t.preferredDate)}</strong>
+                        <strong>{formatViDate(t.preferredDate)}</strong>
                       </div>
                       <div className="arh-mobile-card__row">
                         <span>Khung giờ:</span>

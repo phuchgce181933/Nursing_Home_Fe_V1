@@ -109,7 +109,7 @@ export default function FacilityTourDetailDrawer({ isOpen, onClose, tour, onCanc
     {
       key: 'submitted',
       title: 'Đã gửi yêu cầu',
-      desc: `Lịch hẹn đăng ký ngày ${formatEnglishDate(tour.createdAt)}`,
+      desc: `Lịch hẹn đăng ký ngày ${formatViDate(tour.createdAt)}`,
       isDone: true,
       isActive: false,
     },
@@ -124,9 +124,9 @@ export default function FacilityTourDetailDrawer({ isOpen, onClose, tour, onCanc
       key: 'confirmed',
       title: isCancelled ? 'Yêu cầu đã hủy' : 'Lịch tham quan đã xác nhận',
       desc: isCancelled
-        ? `Hủy ngày ${formatEnglishDate(tour.cancelledAt || tour.rejectedAt)}`
+        ? `Hủy ngày ${formatViDate(tour.cancelledAt || tour.rejectedAt)}`
         : tour.status === 'confirmed' || tour.status === 'completed'
-        ? `Xác nhận lịch vào ${formatEnglishDate(tour.preferredDate)}`
+        ? `Xác nhận lịch vào ${formatViDate(tour.preferredDate)}`
         : 'Đang chờ phê duyệt',
       isDone: tour.status === 'completed' || (isCancelled && true),
       isActive: tour.status === 'confirmed' || (isCancelled && true),
