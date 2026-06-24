@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Pill,
   PackageOpen,
@@ -27,18 +28,62 @@ const TABS = [
   { id: 'reports', label: 'Báo cáo', icon: Activity },
 ];
 
-const toDateTimeInput = (value) => {
-  if (!value) return '';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-  return date.toISOString().slice(0, 16);
-};
+const DEFAULT_FORMS_VN = [
+  'Viên nén',
+  'Viên nang cứng',
+  'Viên nang mềm',
+  'Siro',
+  'Dung dịch uống',
+  'Bột',
+  'Cốm',
+  'Gói',
+  'Thuốc tiêm',
+];
+
+const DEFAULT_UNITS_VN = [
+  'Viên',
+  'Vỉ',
+  'Hộp',
+  'Chai',
+  'Lọ',
+  'Ống',
+  'Gói',
+  'Túi',
+  'Ml (mililit)',
+  'G (gram)',
+  'Mg (milligram)',
+];
+
+const DEFAULT_STRENGTHS_VN = [
+  '100mg',
+  '250mg',
+  '500mg',
+  '5mg/ml',
+  '10mg/ml',
+  '100IU/ml',
+  '1g',
+  '0.5mg',
+  'Khác',
+];
 
 const toIsoDate = (value) => {
   if (!value) return undefined;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return undefined;
   return date.toISOString();
+};
+
+const localDateTimeNow = () => {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
+const toDateTimeInput = (value) => {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toISOString().slice(0, 16);
 };
 
 const formatDate = (value) => {
@@ -99,7 +144,7 @@ const emptyMedicationForm = {
   unit: '',
   manufacturer: '',
   description: '',
-  minStockLevel: 0,
+  minStockLevel: 10,
   isActive: true,
 };
 
@@ -136,6 +181,8 @@ const emptyDispenseForm = {
 
 function PharmacyPage({ defaultTab = 'overview' }) {
   const [activeTab, setActiveTab] = useState(defaultTab);
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const [summary, setSummary] = useState(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
@@ -178,7 +225,6 @@ function PharmacyPage({ defaultTab = 'overview' }) {
 
   const [medicationOptions, setMedicationOptions] = useState([]);
   const [supplierOptions, setSupplierOptions] = useState([]);
-  const [optionsLoading, setOptionsLoading] = useState(false);
   const [optionsError, setOptionsError] = useState(null);
 
   const medicationFormOptions = useMemo(() => {
@@ -199,11 +245,38 @@ function PharmacyPage({ defaultTab = 'overview' }) {
     };
   }, [supplierOptions]);
 
+  const combinedUnitOptions = useMemo(() => {
+    const items = [
+      ...DEFAULT_UNITS_VN,
+      ...(medicationFormOptions.units || []),
+    ];
+    return Array.from(new Set(items)).sort((a, b) => String(a).localeCompare(String(b)));
+  }, [medicationFormOptions]);
+
+  const combinedStrengthOptions = useMemo(() => {
+    const items = [
+      ...DEFAULT_STRENGTHS_VN,
+      ...(medicationFormOptions.strengths || []),
+    ];
+    return Array.from(new Set(items)).sort((a, b) => String(a).localeCompare(String(b)));
+  }, [medicationFormOptions]);
+
+
   const [showMedicationModal, setShowMedicationModal] = useState(false);
   const [editingMedication, setEditingMedication] = useState(null);
   const [medicationForm, setMedicationForm] = useState({ ...emptyMedicationForm });
   const [medicationSaving, setMedicationSaving] = useState(false);
   const [medicationError, setMedicationError] = useState(null);
+
+  const [showNameSuggestions, setShowNameSuggestions] = useState(false);
+
+  const nameSuggestions = useMemo(() => {
+    const q = (medicationForm.name || '').trim().toLowerCase();
+    if (!q) return [];
+    return medicationOptions
+      .filter((m) => (m.name || '').toLowerCase().includes(q))
+      .slice(0, 6);
+  }, [medicationForm.name, medicationOptions]);
 
   const [showSupplierModal, setShowSupplierModal] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState(null);
@@ -229,14 +302,6 @@ function PharmacyPage({ defaultTab = 'overview' }) {
   const [dispenseMessage, setDispenseMessage] = useState(null);
   const [verifyId, setVerifyId] = useState('');
   const [verifyMessage, setVerifyMessage] = useState(null);
-
-  const medStats = useMemo(() => {
-    const activeCount = medications.filter((item) => item.isActive).length;
-    const lowCount = medications.filter(
-      (item) => item.minStockLevel > 0 && item.availableQuantity <= item.minStockLevel
-    ).length;
-    return { activeCount, lowCount };
-  }, [medications]);
 
   const loadSummary = useCallback(async () => {
     try {
@@ -358,7 +423,6 @@ function PharmacyPage({ defaultTab = 'overview' }) {
 
   const loadOptions = useCallback(async () => {
     try {
-      setOptionsLoading(true);
       setOptionsError(null);
       const [medRes, supplierRes] = await Promise.all([
         pharmacyService.listMedications({ page: 1, limit: 200 }),
@@ -370,10 +434,8 @@ function PharmacyPage({ defaultTab = 'overview' }) {
       console.error('Failed to load select options:', err);
       setOptionsError('Không thể tải danh sách lựa chọn.');
     } finally {
-      setOptionsLoading(false);
     }
   }, []);
-
 
   useEffect(() => {
     loadSummary();
@@ -383,6 +445,30 @@ function PharmacyPage({ defaultTab = 'overview' }) {
   useEffect(() => {
     setActiveTab(defaultTab);
   }, [defaultTab]);
+
+  useEffect(() => {
+    // Sync active tab from the current pathname or `?tab=` query (admin embeds use query)
+    if (!location) return;
+    const known = TABS.map((t) => t.id);
+    // Prefer explicit ?tab= param when present
+    try {
+      const params = new URLSearchParams(location.search || '');
+      const tabParam = params.get('tab');
+      if (tabParam && known.includes(tabParam)) {
+        setActiveTab((prev) => (prev === tabParam ? prev : tabParam));
+        return;
+      }
+    } catch (e) {
+      // ignore malformed search
+    }
+
+    if (!location.pathname) return;
+    const parts = location.pathname.split('/').filter(Boolean);
+    const matches = parts.filter((p) => known.includes(p));
+    const found = matches.length ? matches[matches.length - 1] : null;
+    if (found) setActiveTab((prev) => (prev === found ? prev : found));
+    // Only run when pathname or search changes to avoid setState loops
+  }, [location.pathname, location.search]);
 
   useEffect(() => {
     if (activeTab === 'overview') {
@@ -437,13 +523,19 @@ function PharmacyPage({ defaultTab = 'overview' }) {
         unit: medication.unit || '',
         manufacturer: medication.manufacturer || '',
         description: medication.description || '',
-        minStockLevel: medication.minStockLevel || 0,
+        minStockLevel: medication.minStockLevel || 10,
         isActive: medication.isActive !== false,
       });
     } else {
       setMedicationForm({ ...emptyMedicationForm });
     }
     setMedicationError(null);
+    try {
+      // ensure supplier list is available for the manufacturer select
+      loadSuppliers();
+    } catch (e) {
+      // ignore
+    }
     setShowMedicationModal(true);
   };
 
@@ -556,8 +648,8 @@ function PharmacyPage({ defaultTab = 'overview' }) {
     setEditingStock(stock || null);
     if (stock) {
       setStockForm({
-        medicationId: stock.medicationId?.name || stock.medicationId?._id || stock.medicationId || '',
-        supplierId: stock.supplierId?.name || stock.supplierId?._id || stock.supplierId || '',
+        medicationId: stock.medicationId?._id || stock.medicationId || '',
+        supplierId: stock.supplierId?._id || stock.supplierId || '',
         quantity: stock.quantity || 0,
         unit: stock.unit || '',
         lotNumber: stock.lotNumber || '',
@@ -575,7 +667,8 @@ function PharmacyPage({ defaultTab = 'overview' }) {
 
   const saveStock = async (event) => {
     if (event) event.preventDefault();
-    if (!stockForm.medicationId.trim()) {
+    const medRaw = (stockForm.medicationId ?? '').toString();
+    if (!medRaw.trim()) {
       setStockError('Thuốc là bắt buộc.');
       return;
     }
@@ -587,20 +680,43 @@ function PharmacyPage({ defaultTab = 'overview' }) {
     try {
       setStockSaving(true);
       setStockError(null);
+      const medKey = medRaw.trim();
+      const supRaw = (stockForm.supplierId ?? '').toString();
+      const supKey = supRaw.trim();
+
       const resolvedMedicationId =
-        medicationOptions.find((med) => med._id === stockForm.medicationId.trim())?._id ||
-        findOptionMatch(medicationOptions, stockForm.medicationId, 'name')?._id ||
-        stockForm.medicationId.trim();
+        medicationOptions.find((med) => med._id === medKey)?._id ||
+        findOptionMatch(medicationOptions, medKey, 'name')?._id ||
+        medKey;
       const resolvedSupplierId =
-        supplierOptions.find((supplier) => supplier._id === stockForm.supplierId.trim())?._id ||
-        findOptionMatch(supplierOptions, stockForm.supplierId, 'name')?._id ||
-        stockForm.supplierId.trim();
+        supplierOptions.find((supplier) => supplier._id === supKey)?._id ||
+        findOptionMatch(supplierOptions, supKey, 'name')?._id ||
+        (supKey || undefined);
+      // Validate expiryDate is in the future
+      if (stockForm.expiryDate) {
+        const expiryTime = new Date(stockForm.expiryDate).getTime();
+        if (Number.isNaN(expiryTime) || expiryTime <= Date.now()) {
+          setStockError('Ngày hết hạn phải là ngày trong tương lai.');
+          setStockSaving(false);
+          return;
+        }
+      }
+
+      // Auto-generate lot number for new stock entries if empty
+      const rawLot = (stockForm.lotNumber || '').trim();
+      let finalLot = rawLot || undefined;
+      if (!rawLot && !editingStock) {
+        finalLot = `LOT-${Date.now().toString(36).toUpperCase().slice(-8)}`;
+        // show generated lot in the UI before saving so user sees it
+        setStockForm((prev) => ({ ...prev, lotNumber: finalLot }));
+      }
+
       const payload = {
         medicationId: resolvedMedicationId,
         supplierId: resolvedSupplierId || undefined,
         quantity: Number(stockForm.quantity),
         unit: stockForm.unit.trim() || undefined,
-        lotNumber: stockForm.lotNumber.trim() || undefined,
+        lotNumber: finalLot,
         expiryDate: stockForm.expiryDate ? toIsoDate(stockForm.expiryDate) : undefined,
         receivedDate: stockForm.receivedDate ? toIsoDate(stockForm.receivedDate) : undefined,
         costPerUnit: stockForm.costPerUnit ? Number(stockForm.costPerUnit) : undefined,
@@ -730,7 +846,43 @@ function PharmacyPage({ defaultTab = 'overview' }) {
               key={tab.id}
               type="button"
               className={`pharmacy-tab ${activeTab === tab.id ? 'is-active' : ''}`}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => {
+                try {
+                  const parts = (location?.pathname || '').split('/').filter(Boolean);
+                  const roles = ['pharmacist', 'admin', 'manager', 'nurse', 'doctor', 'caregiver', 'family'];
+                  const roleIdx = parts.findIndex((p) => roles.includes(p));
+                  let newPath = '';
+                  if (roleIdx !== -1) {
+                    // If inside admin area, always route back to /admin/medications and use ?tab= for sub-tabs
+                    if (parts[roleIdx] === 'admin') {
+                      newPath = `/admin/medications?tab=${tab.id}`;
+                    } else {
+                      newPath = `/${parts[roleIdx]}/${tab.id}`;
+                    }
+                  } else {
+                    const known = TABS.map((t) => t.id);
+                    const matches = parts.filter((p) => known.includes(p));
+                    if (matches.length) {
+                      const lastMatch = matches[matches.length - 1];
+                      const idx = parts.lastIndexOf(lastMatch);
+                      const newParts = parts.slice();
+                      newParts[idx] = tab.id;
+                      newPath = '/' + newParts.join('/');
+                    } else {
+                      newPath = '/' + tab.id;
+                    }
+                  }
+                  // avoid navigating to identical location (prevents redundant updates)
+                  try {
+                    const current = (location?.pathname || '') + (location?.search || '');
+                    if (newPath !== current) navigate(newPath);
+                  } catch (e) {
+                    navigate(newPath);
+                  }
+                } catch (e) {
+                  // ignore navigation errors
+                }
+              }}
             >
               <Icon size={16} />
               {tab.label}
@@ -795,7 +947,7 @@ function PharmacyPage({ defaultTab = 'overview' }) {
               </div>
               <div className="pharmacy-card__body">
                 <label className="pharmacy-inline">
-                  Số ngày
+                  Ngày hết hạn trong vòng
                   <input
                     type="number"
                     min="1"
@@ -834,7 +986,7 @@ function PharmacyPage({ defaultTab = 'overview' }) {
                 type="text"
                 value={medSearch}
                 onChange={(event) => setMedSearch(event.target.value)}
-                placeholder="Tìm theo thuốc, mã, nhà sản xuất"
+                placeholder="Tìm theo thuốc, mã, nhà cung cấp"
               />
             </div>
             <select value={medActive} onChange={(event) => setMedActive(event.target.value)}>
@@ -855,7 +1007,9 @@ function PharmacyPage({ defaultTab = 'overview' }) {
                 <tr>
                   <th>Mã</th>
                   <th>Tên</th>
-                  <th>Dạng bào chế</th>
+                  <th>Nhà cung cấp</th>
+                  <th>Mô tả</th>
+                  <th>Dạng thuốc</th>
                   <th>Hiện có</th>
                   <th>Mức tối thiểu</th>
                   <th>Trạng thái</th>
@@ -865,12 +1019,12 @@ function PharmacyPage({ defaultTab = 'overview' }) {
               <tbody>
                 {medLoading && (
                   <tr>
-                    <td colSpan="7" className="pharmacy-empty">Đang tải danh sách thuốc...</td>
+                    <td colSpan="9" className="pharmacy-empty">Đang tải danh sách thuốc...</td>
                   </tr>
                 )}
                 {!medLoading && medications.length === 0 && (
                   <tr>
-                    <td colSpan="7" className="pharmacy-empty">Không tìm thấy thuốc.</td>
+                    <td colSpan="9" className="pharmacy-empty">Không tìm thấy thuốc.</td>
                   </tr>
                 )}
                 {!medLoading &&
@@ -879,8 +1033,9 @@ function PharmacyPage({ defaultTab = 'overview' }) {
                       <td>{med.medicationCode}</td>
                       <td>
                         <strong>{med.name}</strong>
-                        <span className="pharmacy-muted">{med.manufacturer || 'N/A'}</span>
                       </td>
+                      <td className="pharmacy-supplier">{med.manufacturer || '—'}</td>
+                      <td className="pharmacy-desc pharmacy-muted">{med.description || '—'}</td>
                       <td>{med.form || 'N/A'}</td>
                       <td>{med.availableQuantity}</td>
                       <td>{med.minStockLevel}</td>
@@ -1032,40 +1187,30 @@ function PharmacyPage({ defaultTab = 'overview' }) {
 
       {activeTab === 'stocks' && (
         <section className="pharmacy-section">
-          <div className="pharmacy-toolbar wide">
-            <input
-              type="text"
-              list="medication-id-options"
+            <div className="pharmacy-toolbar wide">
+            <select
               value={stockFilters.medicationId}
               onChange={(event) =>
                 setStockFilters((prev) => ({ ...prev, medicationId: event.target.value }))
               }
-              placeholder="Thuốc"
-            />
-            <input
-              type="text"
-              list="supplier-id-options"
+            >
+              <option value="">Tất cả thuốc</option>
+              {medicationOptions.map((med) => (
+                <option key={med._id} value={med._id}>{med.name}</option>
+              ))}
+            </select>
+            <select
               value={stockFilters.supplierId}
               onChange={(event) =>
                 setStockFilters((prev) => ({ ...prev, supplierId: event.target.value }))
               }
-              placeholder="Nhà cung cấp"
-            />
-            <input
-              type="text"
-              placeholder="Số lô"
-              value={stockFilters.lotNumber}
-              onChange={(event) =>
-                setStockFilters((prev) => ({ ...prev, lotNumber: event.target.value }))
-              }
-            />
-            <input
-              type="date"
-              value={stockFilters.expiryFrom}
-              onChange={(event) =>
-                setStockFilters((prev) => ({ ...prev, expiryFrom: event.target.value }))
-              }
-            />
+            >
+              <option value="">Tất cả nhà cung cấp</option>
+              {supplierOptions.map((sup) => (
+                <option key={sup._id} value={sup._id}>{sup.name}</option>
+              ))}
+            </select>
+            {/* Lot filter removed per request */}
             <input
               type="date"
               value={stockFilters.expiryTo}
@@ -1090,19 +1235,19 @@ function PharmacyPage({ defaultTab = 'overview' }) {
                   <th>Đơn vị</th>
                   <th>Số lô</th>
                   <th>Hạn dùng</th>
-                  <th>Ngày nhập</th>
+                  <th className="pharmacy-supplier-col">Nhà cung cấp</th>
                   <th>Thao tác</th>
                 </tr>
               </thead>
               <tbody>
                 {stockLoading && (
                   <tr>
-                    <td colSpan="7" className="pharmacy-empty">Đang tải dữ liệu tồn kho...</td>
+                    <td colSpan="8" className="pharmacy-empty">Đang tải dữ liệu tồn kho...</td>
                   </tr>
                 )}
                 {!stockLoading && stocks.length === 0 && (
                   <tr>
-                    <td colSpan="7" className="pharmacy-empty">Không tìm thấy dữ liệu tồn kho.</td>
+                    <td colSpan="8" className="pharmacy-empty">Không tìm thấy dữ liệu tồn kho.</td>
                   </tr>
                 )}
                 {!stockLoading &&
@@ -1114,7 +1259,7 @@ function PharmacyPage({ defaultTab = 'overview' }) {
                       <td>{stock.unit || 'N/A'}</td>
                       <td>{stock.lotNumber || 'N/A'}</td>
                       <td>{formatDate(stock.expiryDate)}</td>
-                      <td>{formatDate(stock.receivedDate)}</td>
+                      <td className="pharmacy-supplier">{stock.supplierId?.name || stock.supplierId || 'N/A'}</td>
                       <td>
                         <button type="button" className="pharmacy-action" onClick={() => openStockModal(stock)}>
                           <Edit3 size={14} />
@@ -1160,15 +1305,17 @@ function PharmacyPage({ defaultTab = 'overview' }) {
                 </div>
               </div>
               <form className="pharmacy-form" onSubmit={handleDispense}>
-                <input
-                  type="text"
-                  list="medication-id-options"
+                <select
                   value={dispenseForm.medicationId}
                   onChange={(event) =>
                     setDispenseForm((prev) => ({ ...prev, medicationId: event.target.value }))
                   }
-                  placeholder="Chọn thuốc *"
-                />
+                >
+                  <option value="">-- Chọn thuốc --</option>
+                  {medicationOptions.map((med) => (
+                    <option key={med._id} value={med._id}>{med.name}</option>
+                  ))}
+                </select>
                 <input
                   type="text"
                   placeholder="ID đơn thuốc (tùy chọn)"
@@ -1312,65 +1459,113 @@ function PharmacyPage({ defaultTab = 'overview' }) {
             </div>
             <form className="pharmacy-modal__body" onSubmit={saveMedication}>
               <div className="pharmacy-form-grid">
-                <label>
-                  Tên *
+                <label className="full">
+                  Tên thuốc*
                   <input
                     type="text"
+                    placeholder="Paracetamol"
                     value={medicationForm.name}
+                    onFocus={() => setShowNameSuggestions(true)}
+                    onBlur={() => setTimeout(() => setShowNameSuggestions(false), 120)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape') setShowNameSuggestions(false);
+                    }}
                     onChange={(event) =>
                       setMedicationForm((prev) => ({ ...prev, name: event.target.value }))
                     }
                   />
-                  <div className="pharmacy-field-meta">
-                    <small>Ví dụ: Paracetamol 500mg</small>
-                  </div>
+                  {showNameSuggestions && nameSuggestions.length > 0 && (
+                    <ul className="pharmacy-suggestions">
+                      {nameSuggestions.map((s) => (
+                        <li
+                          key={s._id}
+                          onMouseDown={() => {
+                            setMedicationForm((prev) => ({ ...prev, name: s.name }));
+                            setShowNameSuggestions(false);
+                          }}
+                        >
+                          <strong>{s.name}</strong>
+                          <div className="pharmacy-muted" style={{ fontSize: 12 }}>{s.manufacturer || ''}</div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </label>
+
                 <label>
-                  Mã thuốc
-                  <input
-                    type="text"
-                    value={medicationForm.medicationCode}
-                    onChange={(event) =>
-                      setMedicationForm((prev) => ({ ...prev, medicationCode: event.target.value }))
-                    }
-                  />
-                </label>
-                <label>
-                  Dạng bào chế
-                  <input
-                    type="text"
-                    list="medication-form-options"
+                  Dạng thuốc
+                  <select
                     value={medicationForm.form}
                     onChange={(event) =>
                       setMedicationForm((prev) => ({ ...prev, form: event.target.value }))
                     }
-                    placeholder="Nhập để gợi ý"
-                  />
+                  >
+                    <option value="">-- Chọn dạng thuốc --</option>
+                    {[...new Set([...DEFAULT_FORMS_VN, ...(medicationFormOptions.forms || [])])].map((f) => (
+                      <option key={f} value={f}>{f}</option>
+                    ))}
+                  </select>
                 </label>
+                
                 <label>
                   Hàm lượng
-                  <input
-                    type="text"
-                    list="medication-strength-options"
+                  <select
                     value={medicationForm.strength}
                     onChange={(event) =>
                       setMedicationForm((prev) => ({ ...prev, strength: event.target.value }))
                     }
-                    placeholder="Nhập để gợi ý"
-                  />
+                  >
+                    <option value="">-- Chọn hàm lượng --</option>
+                    {withFallbackOption(combinedStrengthOptions, medicationForm.strength).map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
                 </label>
+                
                 <label>
                   Đơn vị
-                  <input
-                    type="text"
-                    list="medication-unit-options"
+                  <select
                     value={medicationForm.unit}
                     onChange={(event) =>
                       setMedicationForm((prev) => ({ ...prev, unit: event.target.value }))
                     }
-                    placeholder="Nhập để gợi ý"
-                  />
+                  >
+                    <option value="">-- Chọn đơn vị --</option>
+                    {combinedUnitOptions.map((u) => (
+                      <option key={u} value={u}>{u}</option>
+                    ))}
+                  </select>
                 </label>
+                
+                <label>
+                  Nhà cung cấp
+                  <select
+                    value={medicationForm.manufacturer}
+                    onChange={(event) =>
+                      setMedicationForm((prev) => ({ ...prev, manufacturer: event.target.value }))
+                    }
+                  >
+                    <option value="">-- Chọn nhà cung cấp --</option>
+                    {supplierOptions.map((s) => (
+                      <option key={s._id} value={s.name}>{s.name}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Mức tối thiểu
+                  <input
+                    type="number"
+                    min="0"
+                    value={medicationForm.minStockLevel}
+                    onChange={(event) =>
+                      setMedicationForm((prev) => ({ ...prev, minStockLevel: event.target.value }))
+                    }
+                  />
+                  <div className="pharmacy-field-meta">
+                    <small>Mức tồn kho tối thiểu để cảnh báo (ví dụ: 10)</small>
+                  </div>
+                </label>
+                
                 <label>
                   Trạng thái
                   <select
@@ -1383,6 +1578,7 @@ function PharmacyPage({ defaultTab = 'overview' }) {
                     <option value="false">Ngừng</option>
                   </select>
                 </label>
+                
                 <label className="full">
                   Mô tả
                   <textarea
@@ -1398,9 +1594,8 @@ function PharmacyPage({ defaultTab = 'overview' }) {
               {medicationError && <p className="pharmacy-error">{medicationError}</p>}
               {optionsError && <p className="pharmacy-error">{optionsError}</p>}
 
-              <div className="pharmacy-modal__footer">
+                  <div className="pharmacy-modal__footer">
                 <button type="button" onClick={() => setShowMedicationModal(false)} className="ghost">
-                  <X size={14} />
                   Hủy
                 </button>
                 <button type="submit" className="pharmacy-primary" disabled={medicationSaving}>
@@ -1431,70 +1626,54 @@ function PharmacyPage({ defaultTab = 'overview' }) {
                   Tên *
                   <input
                     type="text"
+                    placeholder="Tên công ty hoặc cá nhân cung cấp"
                     value={supplierForm.name}
                     onChange={(event) =>
                       setSupplierForm((prev) => ({ ...prev, name: event.target.value }))
                     }
                   />
-                  <div className="pharmacy-field-meta">
-                    <small>Tên công ty hoặc cá nhân cung cấp</small>
-                  </div>
                 </label>
                 <label>
                   Người liên hệ
                   <input
                     type="text"
-                    list="supplier-contact-name-options"
+                    placeholder="Nguyen Van A"
                     value={supplierForm.contactName}
                     onChange={(event) =>
                       setSupplierForm((prev) => ({ ...prev, contactName: event.target.value }))
                     }
-                    placeholder="Nhập để gợi ý"
                   />
                 </label>
                 <label>
                   Điện thoại
                   <input
                     type="text"
-                    list="supplier-phone-options"
+                    placeholder="0398765432"
                     value={supplierForm.phone}
                     onChange={(event) =>
                       setSupplierForm((prev) => ({ ...prev, phone: event.target.value }))
                     }
-                    placeholder="Nhập để gợi ý"
                   />
                 </label>
                 <label>
                   Email
                   <input
                     type="email"
-                    list="supplier-email-options"
+                    placeholder="Nhập email"
                     value={supplierForm.email}
                     onChange={(event) =>
                       setSupplierForm((prev) => ({ ...prev, email: event.target.value }))
                     }
-                    placeholder="Nhập để gợi ý"
                   />
                 </label>
                 <label className="full">
                   Địa chỉ
                   <input
                     type="text"
-                    list="supplier-address-options"
+                    placeholder="Nhập địa chỉ"
                     value={supplierForm.address}
                     onChange={(event) =>
                       setSupplierForm((prev) => ({ ...prev, address: event.target.value }))
-                    }
-                    placeholder="Nhập để gợi ý"
-                  />
-                </label>
-                <label className="full">
-                  Ghi chú
-                  <textarea
-                    rows="3"
-                    value={supplierForm.notes}
-                    onChange={(event) =>
-                      setSupplierForm((prev) => ({ ...prev, notes: event.target.value }))
                     }
                   />
                 </label>
@@ -1515,30 +1694,10 @@ function PharmacyPage({ defaultTab = 'overview' }) {
               {supplierError && <p className="pharmacy-error">{supplierError}</p>}
               {optionsError && <p className="pharmacy-error">{optionsError}</p>}
 
-              <datalist id="supplier-contact-name-options">
-                {withFallbackOption(supplierFormOptions.contactNames, supplierForm.contactName).map((option) => (
-                  <option key={option} value={option} />
-                ))}
-              </datalist>
-              <datalist id="supplier-phone-options">
-                {withFallbackOption(supplierFormOptions.phones, supplierForm.phone).map((option) => (
-                  <option key={option} value={option} />
-                ))}
-              </datalist>
-              <datalist id="supplier-email-options">
-                {withFallbackOption(supplierFormOptions.emails, supplierForm.email).map((option) => (
-                  <option key={option} value={option} />
-                ))}
-              </datalist>
-              <datalist id="supplier-address-options">
-                {withFallbackOption(supplierFormOptions.addresses, supplierForm.address).map((option) => (
-                  <option key={option} value={option} />
-                ))}
-              </datalist>
+              {/* supplier suggestion datalists removed — using selects */}
 
               <div className="pharmacy-modal__footer">
                 <button type="button" onClick={() => setShowSupplierModal(false)} className="ghost">
-                  <X size={14} />
                   Hủy
                 </button>
                 <button type="submit" className="pharmacy-primary" disabled={supplierSaving}>
@@ -1567,27 +1726,31 @@ function PharmacyPage({ defaultTab = 'overview' }) {
               <div className="pharmacy-form-grid">
                 <label>
                   Thuốc *
-                  <input
-                    type="text"
-                    list="medication-id-options"
-                    value={stockForm.medicationId}
-                    onChange={(event) =>
-                      setStockForm((prev) => ({ ...prev, medicationId: event.target.value }))
-                    }
-                    placeholder="Nhập để gợi ý"
-                  />
+                      <select
+                        value={stockForm.medicationId}
+                        onChange={(event) =>
+                          setStockForm((prev) => ({ ...prev, medicationId: event.target.value }))
+                        }
+                      >
+                        <option value="">-- Chọn thuốc --</option>
+                        {medicationOptions.map((med) => (
+                          <option key={med._id} value={med._id}>{med.name}</option>
+                        ))}
+                      </select>
                 </label>
                 <label>
                   Nhà cung cấp
-                  <input
-                    type="text"
-                    list="supplier-id-options"
-                    value={stockForm.supplierId}
-                    onChange={(event) =>
-                      setStockForm((prev) => ({ ...prev, supplierId: event.target.value }))
-                    }
-                    placeholder="Nhập để gợi ý"
-                  />
+                      <select
+                        value={stockForm.supplierId}
+                        onChange={(event) =>
+                          setStockForm((prev) => ({ ...prev, supplierId: event.target.value }))
+                        }
+                      >
+                        <option value="">-- Chọn nhà cung cấp --</option>
+                        {supplierOptions.map((sup) => (
+                          <option key={sup._id} value={sup._id}>{sup.name}</option>
+                        ))}
+                      </select>
                 </label>
                 <label>
                   Số lượng *
@@ -1605,13 +1768,15 @@ function PharmacyPage({ defaultTab = 'overview' }) {
                 </label>
                 <label>
                   Đơn vị
-                  <input
-                    type="text"
-                    list="medication-unit-options"
+                  <select
                     value={stockForm.unit}
                     onChange={(event) => setStockForm((prev) => ({ ...prev, unit: event.target.value }))}
-                    placeholder="Nhập để gợi ý"
-                  />
+                  >
+                    <option value="">-- Chọn đơn vị --</option>
+                    {combinedUnitOptions.map((u) => (
+                      <option key={u} value={u}>{u}</option>
+                    ))}
+                  </select>
                 </label>
                 <label>
                   Số lô
@@ -1621,12 +1786,14 @@ function PharmacyPage({ defaultTab = 'overview' }) {
                     onChange={(event) =>
                       setStockForm((prev) => ({ ...prev, lotNumber: event.target.value }))
                     }
+                    placeholder="Sẽ tự tạo nếu bỏ trống"
                   />
                 </label>
                 <label>
                   Ngày hết hạn
                   <input
                     type="datetime-local"
+                    min={localDateTimeNow()}
                     value={stockForm.expiryDate}
                     onChange={(event) =>
                       setStockForm((prev) => ({ ...prev, expiryDate: event.target.value }))
@@ -1654,55 +1821,13 @@ function PharmacyPage({ defaultTab = 'overview' }) {
                     }
                   />
                 </label>
-                <label className="full">
-                  Ghi chú
-                  <textarea
-                    rows="3"
-                    value={stockForm.notes}
-                    onChange={(event) => setStockForm((prev) => ({ ...prev, notes: event.target.value }))}
-                  />
-                </label>
               </div>
 
               {stockError && <p className="pharmacy-error">{stockError}</p>}
               {optionsError && <p className="pharmacy-error">{optionsError}</p>}
 
-              <datalist id="medication-id-options">
-                {medicationOptions.map((med) => (
-                  <option key={`${med._id}-name`} value={med.name || ''} />
-                ))}
-              </datalist>
-              <datalist id="supplier-id-options">
-                {supplierOptions.map((supplier) => (
-                  <option key={`${supplier._id}-name`} value={supplier.name || ''} />
-                ))}
-              </datalist>
-              <datalist id="medication-form-options">
-                {withFallbackOption(medicationFormOptions.forms, medicationForm.form).map((option) => (
-                  <option key={option} value={option} />
-                ))}
-              </datalist>
-              <datalist id="medication-strength-options">
-                {withFallbackOption(medicationFormOptions.strengths, medicationForm.strength).map((option) => (
-                  <option key={option} value={option} />
-                ))}
-              </datalist>
-              <datalist id="medication-unit-options">
-                {withFallbackOption(medicationFormOptions.units, medicationForm.unit).map((option) => (
-                  <option key={option} value={option} />
-                ))}
-              </datalist>
-              <datalist id="medication-manufacturer-options">
-                {withFallbackOption(medicationFormOptions.manufacturers, medicationForm.manufacturer).map(
-                  (option) => (
-                    <option key={option} value={option} />
-                  )
-                )}
-              </datalist>
-
               <div className="pharmacy-modal__footer">
                 <button type="button" onClick={() => setShowStockModal(false)} className="ghost">
-                  <X size={14} />
                   Hủy
                 </button>
                 <button type="submit" className="pharmacy-primary" disabled={stockSaving}>
@@ -1755,37 +1880,6 @@ function PharmacyPage({ defaultTab = 'overview' }) {
           </div>
         </div>
       )}
-
-      <datalist id="medication-id-options">
-        {medicationOptions.map((med) => (
-          <option key={`${med._id}-name`} value={med.name || ''} />
-        ))}
-      </datalist>
-      <datalist id="supplier-id-options">
-        {supplierOptions.map((supplier) => (
-          <option key={`${supplier._id}-name`} value={supplier.name || ''} />
-        ))}
-      </datalist>
-      <datalist id="medication-form-options">
-        {withFallbackOption(medicationFormOptions.forms, medicationForm.form).map((option) => (
-          <option key={option} value={option} />
-        ))}
-      </datalist>
-      <datalist id="medication-strength-options">
-        {withFallbackOption(medicationFormOptions.strengths, medicationForm.strength).map((option) => (
-          <option key={option} value={option} />
-        ))}
-      </datalist>
-      <datalist id="medication-unit-options">
-        {withFallbackOption(medicationFormOptions.units, medicationForm.unit).map((option) => (
-          <option key={option} value={option} />
-        ))}
-      </datalist>
-      <datalist id="medication-manufacturer-options">
-        {withFallbackOption(medicationFormOptions.manufacturers, medicationForm.manufacturer).map((option) => (
-          <option key={option} value={option} />
-        ))}
-      </datalist>
     </div>
   );
 }
