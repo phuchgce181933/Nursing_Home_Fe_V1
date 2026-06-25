@@ -27,10 +27,12 @@ function formatTime(val) {
 
 function getDefaultDateRange() {
   const now = new Date();
+  const day = now.getDay();
+  const diffToMon = day === 0 ? -6 : 1 - day;
   const from = new Date(now);
-  from.setDate(from.getDate() - 7);
-  const to = new Date(now);
-  to.setDate(to.getDate() + 21);
+  from.setDate(from.getDate() + diffToMon);
+  const to = new Date(from);
+  to.setDate(to.getDate() + 6);
   return {
     fromDate: from.toISOString().slice(0, 10),
     toDate: to.toISOString().slice(0, 10),
@@ -97,8 +99,9 @@ export default function MyShiftsPage() {
         ...(toDate ? { toDate } : {}),
         ...(statusFilter ? { status: statusFilter } : {}),
       };
-      const res = await shiftService.listShifts(params);
-      const items = Array.isArray(res) ? res : (res?.data || res?.items || []);
+      const res = await shiftService.getMyShifts(params);
+      const body = res?.data ?? res;
+      const items = Array.isArray(body) ? body : (body?.data || []);
       setShifts(Array.isArray(items) ? items : []);
     } catch (err) {
       setMessageType('error');

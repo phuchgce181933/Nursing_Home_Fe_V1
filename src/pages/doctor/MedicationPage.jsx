@@ -118,11 +118,11 @@ function HealthWarningPanel({ residentId }) {
 
   if (!profile) return null;
 
-  const allergies   = profile.drugAllergies || profile.allergies || [];
-  const chronic     = profile.chronicConditions || [];
-  const history     = profile.medicalHistory || [];
-  const initHealth  = profile.initialHealthCondition || '';
-  const bloodType   = profile.bloodType || '';
+  const allergies = profile.drugAllergies || profile.allergies || [];
+  const chronic = profile.chronicConditions || [];
+  const history = profile.medicalHistory || [];
+  const initHealth = profile.initialHealthCondition || '';
+  const bloodType = profile.bloodType || '';
   const hasAny = allergies.length || chronic.length || history.length || initHealth || bloodType;
 
   if (!hasAny) {
@@ -336,7 +336,7 @@ function ItemRow({ item, idx, onChange, onRemove, t, canRemove }) {
         {canRemove && (
           <button type="button" className="cpf-med-card__remove" onClick={() => onRemove(idx)} title={t('medication.removeMedication')}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
             </svg>
           </button>
         )}
@@ -543,7 +543,7 @@ function CreatePrescriptionModal({ residents, onSave, onClose }) {
           <div className="cpf-drawer__header-left">
             <div className="cpf-drawer__icon">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/>
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="12" y1="11" x2="12" y2="17" /><line x1="9" y1="14" x2="15" y2="14" />
               </svg>
             </div>
             <div>
@@ -553,7 +553,7 @@ function CreatePrescriptionModal({ residents, onSave, onClose }) {
           </div>
           <button className="cpf-drawer__close" onClick={onClose}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
             </svg>
           </button>
         </div>
@@ -566,7 +566,7 @@ function CreatePrescriptionModal({ residents, onSave, onClose }) {
               <div className="cpf-section">
                 <div className="cpf-section__head">
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
                   </svg>
                   <span>{t('medication.sectionResident')}</span>
                 </div>
@@ -591,7 +591,7 @@ function CreatePrescriptionModal({ residents, onSave, onClose }) {
               <div className="cpf-section">
                 <div className="cpf-section__head">
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                    <circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><line x1="12" y1="17" x2="12.01" y2="17" />
                   </svg>
                   <span>{t('medication.sectionDiagnosis')}</span>
                 </div>
@@ -640,7 +640,7 @@ function CreatePrescriptionModal({ residents, onSave, onClose }) {
               <div className="cpf-section">
                 <div className="cpf-section__head">
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M10.5 1.5H8A6.5 6.5 0 0 0 1.5 8v0A6.5 6.5 0 0 0 8 14.5h0a6.5 6.5 0 0 0 6.5-6.5V5.5"/><path d="M14 10l5.5-5.5"/><path d="M17 1.5L22.5 7"/>
+                    <path d="M10.5 1.5H8A6.5 6.5 0 0 0 1.5 8v0A6.5 6.5 0 0 0 8 14.5h0a6.5 6.5 0 0 0 6.5-6.5V5.5" /><path d="M14 10l5.5-5.5" /><path d="M17 1.5L22.5 7" />
                   </svg>
                   <span>{t('medication.sectionMedications')}</span>
                 </div>
@@ -652,7 +652,7 @@ function CreatePrescriptionModal({ residents, onSave, onClose }) {
 
                 <button type="button" className="cpf-add-btn" onClick={handleAddItem}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                    <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
                   </svg>
                   {t('medication.addMedication')}
                 </button>
@@ -736,7 +736,7 @@ function SetScheduleModal({ prescription, onSave, onClose }) {
           <div className="sched-header">
             <div className="cpf-drawer__icon">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
               </svg>
             </div>
             <div>
@@ -746,7 +746,7 @@ function SetScheduleModal({ prescription, onSave, onClose }) {
           </div>
           <button className="med-modal__close" onClick={onClose}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
             </svg>
           </button>
         </div>
@@ -786,7 +786,7 @@ function SetScheduleModal({ prescription, onSave, onClose }) {
               {current.times.map((tm, tIdx) => (
                 <div key={tIdx} className="sched-time-slot">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                    <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
                   </svg>
                   <input
                     type="time"
@@ -803,7 +803,7 @@ function SetScheduleModal({ prescription, onSave, onClose }) {
           <div className="sched-meal-timing">
             <div className="sched-meal-timing__left">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b5bdb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/>
+                <path d="M18 8h1a4 4 0 0 1 0 8h-1" /><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z" /><line x1="6" y1="1" x2="6" y2="4" /><line x1="10" y1="1" x2="10" y2="4" /><line x1="14" y1="1" x2="14" y2="4" />
               </svg>
               <div>
                 <span className="sched-meal-timing__label">{t('medication.mealTiming')}</span>
@@ -901,7 +901,7 @@ function HistoryModal({ prescription, onClose }) {
           <div className="cpf-drawer__header-left">
             <div className="cpf-drawer__icon" style={{ background: '#f0fdf4', color: '#16a34a' }}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
               </svg>
             </div>
             <div>
@@ -911,7 +911,7 @@ function HistoryModal({ prescription, onClose }) {
           </div>
           <button className="cpf-drawer__close" onClick={onClose}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
             </svg>
           </button>
         </div>
@@ -928,7 +928,7 @@ function HistoryModal({ prescription, onClose }) {
               <div className="mh-filters">
                 <div className="med-filter-bar__search-wrap" style={{ flex: 1 }}>
                   <svg className="med-filter-bar__search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                    <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
                   </svg>
                   <input
                     className="med-filter-bar__search"
@@ -996,7 +996,7 @@ function HistoryModal({ prescription, onClose }) {
                 <div className="mh-stat-card mh-stat-card--compliance">
                   <div className="mh-stat-card__icon" style={{ background: '#dcfce7', color: '#16a34a' }}>
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+                      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" />
                     </svg>
                   </div>
                   <div className="mh-stat-card__content">
@@ -1010,7 +1010,7 @@ function HistoryModal({ prescription, onClose }) {
                 <div className="mh-stat-card">
                   <div className="mh-stat-card__icon" style={{ background: '#fee2e2', color: '#dc2626' }}>
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+                      <circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" />
                     </svg>
                   </div>
                   <div className="mh-stat-card__content">
@@ -1022,7 +1022,7 @@ function HistoryModal({ prescription, onClose }) {
                 <div className="mh-stat-card">
                   <div className="mh-stat-card__icon" style={{ background: '#dbeafe', color: '#2563eb' }}>
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
                     </svg>
                   </div>
                   <div className="mh-stat-card__content">
@@ -1099,7 +1099,7 @@ function EditPrescriptionModal({ prescription, onSave, onClose }) {
           <div className="sched-header">
             <div className="cpf-drawer__icon" style={{ background: '#fef3c7', color: '#d97706' }}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
               </svg>
             </div>
             <div>
@@ -1109,7 +1109,7 @@ function EditPrescriptionModal({ prescription, onSave, onClose }) {
           </div>
           <button className="med-modal__close" onClick={onClose}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
             </svg>
           </button>
         </div>
@@ -1159,7 +1159,7 @@ function EditPrescriptionModal({ prescription, onSave, onClose }) {
             <label className="cpf-label">
               {t('medication.instructions')}
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#3b5bdb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: 4 }}>
-                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
               </svg>
             </label>
             <textarea
@@ -1181,7 +1181,7 @@ function EditPrescriptionModal({ prescription, onSave, onClose }) {
                 {current.times.map((tm, tIdx) => (
                   <div key={tIdx} className="sched-time-slot">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                      <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
                     </svg>
                     <input type="time" className="sched-time-input" value={tm} onChange={(e) => handleTimeChange(tIdx, e.target.value)} />
                   </div>
@@ -1203,7 +1203,7 @@ function EditPrescriptionModal({ prescription, onSave, onClose }) {
           {/* Info notice */}
           <div className="edit-notice">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3b5bdb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+              <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
             </svg>
             <div>
               <strong>{t('medication.editNoticeTitle')}</strong>
@@ -1280,7 +1280,7 @@ function PrescriptionsTab({ prescriptions, residents, loading, selectedResidentI
               </select>
               <div className="med-filter-bar__search-wrap" style={{ minWidth: 180 }}>
                 <svg className="med-filter-bar__search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                  <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
                 </svg>
                 <input
                   className="med-filter-bar__search"
@@ -1326,7 +1326,7 @@ function PrescriptionsTab({ prescriptions, residents, loading, selectedResidentI
                       <td colSpan={5}>
                         <div className="med-empty-state">
                           <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" />
                           </svg>
                           <span>{selectedResidentId ? t('medication.noData') : t('medication.selectResidentHint')}</span>
                         </div>
@@ -1401,7 +1401,7 @@ function PrescriptionsTab({ prescriptions, residents, loading, selectedResidentI
                                   <div className="med-rx-detail-actions">
                                     <button className="med-action-btn med-action-btn--edit" onClick={() => onOpenEdit(p)}>
                                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                                       </svg>
                                       {t('medication.editPrescription')}
                                     </button>
@@ -1448,7 +1448,7 @@ function PrescriptionsTab({ prescriptions, residents, loading, selectedResidentI
                 <div key={p._id} className="med-sidebar-alert med-sidebar-alert--warning">
                   <div className="med-sidebar-alert__icon">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
                     </svg>
                   </div>
                   <div className="med-sidebar-alert__content">
@@ -1463,7 +1463,7 @@ function PrescriptionsTab({ prescriptions, residents, loading, selectedResidentI
               <div className="med-sidebar-alert med-sidebar-alert--ok">
                 <div className="med-sidebar-alert__icon">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" />
                   </svg>
                 </div>
                 <div className="med-sidebar-alert__content">
@@ -1737,7 +1737,7 @@ function DoctorMedicationPage() {
             onClick={() => setModal({ type: 'create', prescription: null })}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+              <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
             </svg>
             {t('medication.createPrescription')}
           </button>
@@ -1750,7 +1750,7 @@ function DoctorMedicationPage() {
           onClick={() => setActiveTab('prescriptions')}
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" />
           </svg>
           {t('medication.tabPrescriptions')}
         </button>
@@ -1759,7 +1759,7 @@ function DoctorMedicationPage() {
           onClick={() => setActiveTab('daily')}
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
           </svg>
           {t('medication.tabDailySchedule')}
         </button>
