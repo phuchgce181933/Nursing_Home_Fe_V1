@@ -91,6 +91,12 @@ import ManagerActivityDashboard from '../pages/manager/ActivityDashboard';
 import ProtectedRoute from '../components/ProtectedRoute';
 import MessagesPage from '../pages/shared/MessagesPage';
 import GuestContact from '../pages/shared/GuestContact';
+import IntroPage from '../pages/IntroPage';
+import TechPage from '../pages/TechPage';
+import LivingPage from '../pages/LivingPage';
+import PricingPage from '../pages/PricingPage';
+import NewsPage from '../pages/NewsPage';
+import ContactPage from '../pages/ContactPage';
 
 function AppRoutes() {
   return (
@@ -315,6 +321,12 @@ function AppRoutes() {
       </Route>
 
       <Route path="/services" element={<ServicesPage />} />
+      <Route path="/intro" element={<IntroPage />} />
+      <Route path="/tech" element={<TechPage />} />
+      <Route path="/living" element={<LivingPage />} />
+      <Route path="/pricing" element={<PricingPage />} />
+      <Route path="/news" element={<NewsPage />} />
+      <Route path="/contact" element={<ContactPage />} />
       <Route path="/guest-contact" element={<GuestContact />} />
       <Route path="/" element={<HomePage />} />
       <Route path="*" element={<Navigate to="/" replace />} />

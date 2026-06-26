@@ -1,0 +1,115 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - banner [ref=e4]:
+      - generic [ref=e5]:
+        - img "Logo An Nhiên Care Home" [ref=e6]
+        - generic [ref=e7]: An Nhiên Care Home
+      - navigation [ref=e8]:
+        - link "Trang chủ" [ref=e10] [cursor=pointer]:
+          - /url: /
+          - img [ref=e11]
+          - text: Trang chủ
+        - link "Giới thiệu" [ref=e15] [cursor=pointer]:
+          - /url: /intro
+          - img [ref=e16]
+          - text: Giới thiệu
+        - link "Dịch vụ" [ref=e19] [cursor=pointer]:
+          - /url: /services
+          - img [ref=e20]
+          - text: Dịch vụ
+        - link "Công nghệ" [ref=e24] [cursor=pointer]:
+          - /url: /tech
+          - img [ref=e25]
+          - text: Công nghệ
+        - link "Không gian sống" [ref=e29] [cursor=pointer]:
+          - /url: /living
+          - img [ref=e30]
+          - text: Không gian sống
+        - link "Bảng giá" [ref=e34] [cursor=pointer]:
+          - /url: /pricing
+          - img [ref=e35]
+          - text: Bảng giá
+        - link "Tin tức" [ref=e38] [cursor=pointer]:
+          - /url: /news
+          - img [ref=e39]
+          - text: Tin tức
+        - link "Liên hệ" [ref=e43] [cursor=pointer]:
+          - /url: /contact
+          - img [ref=e44]
+          - text: Liên hệ
+      - link "Đăng ký nhập viện" [ref=e46] [cursor=pointer]:
+        - /url: /login
+    - main [ref=e47]:
+      - generic [ref=e48]:
+        - heading "Tin tức & Kiến thức" [level=1] [ref=e49]
+        - paragraph [ref=e50]: Cập nhật những thông tin mới nhất về chăm sóc sức khỏe, dinh dưỡng và các hoạt động tại An Nhiên Care Home.
+      - generic [ref=e51]:
+        - button "Tất cả" [ref=e52] [cursor=pointer]
+        - button "Chăm sóc người già" [ref=e53] [cursor=pointer]
+        - button "Dinh dưỡng" [ref=e54] [cursor=pointer]
+        - button "Alzheimer" [ref=e55] [cursor=pointer]
+        - button "Sức khỏe tinh thần" [ref=e56] [cursor=pointer]
+        - button "Công nghệ chăm sóc" [ref=e57] [cursor=pointer]
+      - generic [ref=e58]:
+        - article [ref=e59] [cursor=pointer]:
+          - generic [ref=e60]:
+            - img "Phương pháp tiếp cận mới trong chăm sóc người cao tuổi tại An Nhiên" [ref=e61]
+            - generic [ref=e62]: Chăm sóc người già
+          - generic [ref=e63]:
+            - heading "Phương pháp tiếp cận mới trong chăm sóc người cao tuổi tại An Nhiên" [level=2] [ref=e64]
+            - paragraph [ref=e65]: Tại An Nhiên Care Home, chúng tôi áp dụng triết lý "Warm Minimalism" không chỉ trong kiến trúc mà còn trong phương pháp chăm sóc. Sự kết hợp giữa công nghệ hiện đại và sự ân cần của con người tạo nên một môi trường sống lý tưởng.
+            - generic [ref=e66]:
+              - generic [ref=e67]: 15 Tháng 10, 2024
+              - generic [ref=e68]:
+                - text: Đọc tiếp
+                - img [ref=e69]
+        - article [ref=e71] [cursor=pointer]:
+          - generic [ref=e72]:
+            - 'img "Thực đơn cá nhân hóa: Chìa khóa cho sức khỏe người cao tuổi" [ref=e73]'
+            - generic [ref=e74]: Dinh dưỡng
+          - generic [ref=e75]:
+            - 'heading "Thực đơn cá nhân hóa: Chìa khóa cho sức khỏe người cao tuổi" [level=2] [ref=e76]'
+            - paragraph [ref=e77]: Dinh dưỡng đóng vai trò then chốt trong việc duy trì sức khỏe. Tìm hiểu cách chúng tôi thiết kế thực đơn phù hợp với từng cá nhân.
+            - generic [ref=e79]: 12 Tháng 10, 2024
+        - article [ref=e80] [cursor=pointer]:
+          - generic [ref=e81]:
+            - img "Liệu pháp nghệ thuật trong việc duy trì trí nhớ" [ref=e82]
+            - generic [ref=e83]: Sức khỏe tinh thần
+          - generic [ref=e84]:
+            - heading "Liệu pháp nghệ thuật trong việc duy trì trí nhớ" [level=2] [ref=e85]
+            - paragraph [ref=e86]: Nghệ thuật không chỉ mang lại niềm vui mà còn kích thích các vùng não bộ, giúp cải thiện trí nhớ và tâm trạng.
+            - generic [ref=e88]: 08 Tháng 10, 2024
+        - article [ref=e89] [cursor=pointer]:
+          - generic [ref=e90]:
+            - 'img "Cảm biến thông minh: Theo dõi sức khỏe 24/7" [ref=e91]'
+            - generic [ref=e92]: Công nghệ chăm sóc
+          - generic [ref=e93]:
+            - 'heading "Cảm biến thông minh: Theo dõi sức khỏe 24/7" [level=2] [ref=e94]'
+            - paragraph [ref=e95]: Hệ thống cảm biến tiên tiến giúp đội ngũ y tế theo dõi các chỉ số sinh tồn một cách liên tục mà không làm phiền giấc ngủ.
+            - generic [ref=e97]: 05 Tháng 10, 2024
+        - article [ref=e98] [cursor=pointer]:
+          - generic [ref=e99]:
+            - img "Thiết kế không gian \"Ma\" cho người bệnh Alzheimer" [ref=e100]
+            - generic [ref=e101]: Alzheimer
+          - generic [ref=e102]:
+            - heading "Thiết kế không gian \"Ma\" cho người bệnh Alzheimer" [level=2] [ref=e103]
+            - paragraph [ref=e104]: Tối giản không gian để giảm thiểu sự nhầm lẫn và lo âu. Nghệ thuật sử dụng khoảng trống trong kiến trúc chữa lành.
+            - generic [ref=e106]: 01 Tháng 10, 2024
+      - button "Xem thêm bài viết" [ref=e108] [cursor=pointer]:
+        - text: Xem thêm bài viết
+        - img [ref=e109]
+    - contentinfo [ref=e111]:
+      - generic [ref=e112]:
+        - paragraph [ref=e113]: An Nhiên Care Home
+        - paragraph [ref=e114]: Dịch vụ chăm sóc người cao tuổi chuyên nghiệp, tận tâm theo tiêu chuẩn quốc tế.
+      - generic [ref=e115]:
+        - link "Trang chủ" [ref=e116] [cursor=pointer]:
+          - /url: /
+        - link "Giới thiệu" [ref=e117] [cursor=pointer]:
+          - /url: /intro
+        - link "Dịch vụ" [ref=e118] [cursor=pointer]:
+          - /url: /services
+        - link "Liên hệ" [ref=e119] [cursor=pointer]:
+          - /url: /contact
+      - paragraph [ref=e121]: © 2026 An Nhiên Care Home. Bảo lưu mọi quyền.
+  - button "Chat" [ref=e123]

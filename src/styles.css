@@ -5,6 +5,9 @@
 @import './styles/shared/animations.css';
 @import './styles/shared/LoginForm.css';
 @import './styles/shared/HomePage.css';
+@import './styles/shared/PublicPages.css';
+@import './styles/shared/IntroPage.css';
+@import './styles/shared/ZenPages.css';
 
 /* Admin Styles */
 @import './styles/admin/AdminLayout.css';
