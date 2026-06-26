@@ -236,7 +236,11 @@ function MealPlanTab() {
         });
       });
     });
-    setEntries((prev) => [...prev, ...generated]);
+    setEntries((prev) => {
+      const existingKeys = new Set(prev.map((e) => `${String(e.residentId)}:${e.mealType}`));
+      const toAdd = generated.filter((g) => !existingKeys.has(`${String(g.residentId)}:${g.mealType}`));
+      return [...prev, ...toAdd];
+    });
   };
 
   const addManual = () => {
@@ -292,6 +296,20 @@ function MealPlanTab() {
     if (formWorkDate < today()) return t(`${MP}.pastDateMealPlan`);
     if (selectedResidents.length < 1) return t(`${MP}.scheduleNoResidents`);
     if (!entries.length) return t(`${MP}.addAtLeastOneMealEntry`);
+    const typeKeys = new Set();
+    const timeKeys = new Set();
+    for (const e of entries) {
+      const rid = String(e.residentId || '');
+      const typeKey = `${rid}:${e.mealType}`;
+      if (typeKeys.has(typeKey)) return t(`${TAB}.duplicateMealType`);
+      typeKeys.add(typeKey);
+      const mealTime = e.mealTime || resolveMealTime(e.residentId, e.mealType);
+      if (mealTime) {
+        const timeKey = `${rid}:${mealTime}`;
+        if (timeKeys.has(timeKey)) return t(`${TAB}.duplicateMealTime`, { time: mealTime });
+        timeKeys.add(timeKey);
+      }
+    }
     const hasInvalid = entries.some((e) => !e.residentId || !e.mealType || !e.mealName?.trim() || !e.mealTime);
     if (hasInvalid) return t(`${MP}.invalidMealRow`);
     return '';

@@ -35,6 +35,12 @@ export const sidebarData = [
     icon: Users,
     children: [
       { title: 'sidebar.residents', path: '/admin/residents' },
+      { title: 'sidebar.familyInfo', path: '/admin/residents/family' },
+      { title: 'sidebar.residentsByArea', path: '/admin/residents/by-area' },
+      { title: 'sidebar.initialHealth', path: '/admin/residents/initial-health' },
+      { title: 'sidebar.preExistingConditions', path: '/admin/residents/pre-existing-conditions' },
+      { title: 'sidebar.drugAllergies', path: '/admin/residents/drug-allergies' },
+      { title: 'sidebar.transferResident', path: '/admin/residents/transfer-room' },
     ],
   },
   {
@@ -44,12 +50,7 @@ export const sidebarData = [
       { title: 'sidebar.admissionRequests', path: '/admin/admission-requests' },
       { title: 'sidebar.tourRequests', path: '/admin/tour-requests' },
       { title: 'sidebar.servicePackages', path: '/admin/service-packages' },
-      { title: 'sidebar.familyInfo', path: '/admin/residents/family' },
-      { title: 'sidebar.residentsByArea', path: '/admin/residents/by-area' },
-      { title: 'sidebar.initialHealth', path: '/admin/residents/initial-health' },
-      { title: 'sidebar.preExistingConditions', path: '/admin/residents/pre-existing-conditions' },
-      { title: 'sidebar.drugAllergies', path: '/admin/residents/drug-allergies' },
-      { title: 'sidebar.transferResident', path: '/admin/residents/transfer-room' },
+
     ],
   },
   {
@@ -94,7 +95,7 @@ export const sidebarData = [
     title: 'sidebar.medication',
     icon: Pill,
     path: '/admin/medications',
-  },  {
+  }, {
     title: 'sidebar.appointments',
     icon: Calendar,
     path: '/admin/appointments',

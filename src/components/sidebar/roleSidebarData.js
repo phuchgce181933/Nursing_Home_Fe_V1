@@ -113,6 +113,11 @@ export const roleSidebarData = {
       path: '/caregiver/my-shifts',
     },
     {
+      title: 'sidebar.staffLeave',
+      icon: CalendarOff,
+      path: '/caregiver/leave',
+    },
+    {
       title: 'sidebar.dailyCareSchedule',
       icon: ClipboardList,
       path: '/caregiver/daily-care-schedule',

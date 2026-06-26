@@ -244,6 +244,7 @@ function AppRoutes() {
         <Route path="profile" element={<ProfilePage />} />
         <Route path="assigned-residents" element={<AssignedResidentsPage />} />
         <Route path="my-shifts" element={<MyShiftsPage />} />
+        <Route path="leave" element={<LeaveRequestPage />} />
         <Route path="daily-care-schedule" element={<DailyCareSchedulePage />} />
         <Route path="meal-intake-notes" element={<MealIntakeNotesPage />} />
         <Route path="hygiene-activities" element={<HygieneActivitiesPage />} />
