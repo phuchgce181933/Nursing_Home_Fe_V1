@@ -1,420 +1,448 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Calendar, Clock, MapPin, Users, Search, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
+import {
+  Calendar,
+  Clock,
+  MapPin,
+  Users,
+  Search,
+  RefreshCw,
+  ChevronLeft,
+  ChevronRight,
+  X,
+  List,
+  LayoutGrid,
+  Loader2,
+  User,
+  Tag,
+} from 'lucide-react';
 import activityService from '../../services/activity.service';
 import residentService from '../../services/resident.service';
-import '../../styles/admin/AdminAdmissionRequestsPage.css';
+import '../../styles/nurse/ActivitySchedulePage.css';
 
+/* ------------------------------------------------------------------ */
+/*  Status helpers                                                     */
+/* ------------------------------------------------------------------ */
+const getStatusOptions = (t) => [
+  { value: '', label: t('activitySchedule.status.all') },
+  { value: 'scheduled', label: t('activitySchedule.status.scheduled') },
+  { value: 'ongoing', label: t('activitySchedule.status.ongoing') },
+  { value: 'completed', label: t('activitySchedule.status.completed') },
+  { value: 'cancelled', label: t('activitySchedule.status.cancelled') },
+];
+
+const getStatusLabels = (t) => ({
+  draft: t('activitySchedule.status.draft'),
+  scheduled: t('activitySchedule.status.scheduled'),
+  ongoing: t('activitySchedule.status.ongoing'),
+  completed: t('activitySchedule.status.completed'),
+  cancelled: t('activitySchedule.status.cancelled'),
+});
+
+/* ------------------------------------------------------------------ */
+/*  Page                                                               */
+/* ------------------------------------------------------------------ */
 export default function ActivitySchedulePage() {
+  const { t } = useTranslation();
+  const statusOptions = useMemo(() => getStatusOptions(t), [t]);
+  const statusLabels = useMemo(() => getStatusLabels(t), [t]);
+
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [viewMode, setViewMode] = useState('list'); // 'list' or 'calendar'
+  const [viewMode, setViewMode] = useState('list');
   const [selectedActivity, setSelectedActivity] = useState(null);
   const [residents, setResidents] = useState({});
 
+  /* ---- fetch ---- */
   const fetchActivities = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       const monthStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
       const monthEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
-      
+
       const params = {
         from: monthStart.toISOString(),
         to: monthEnd.toISOString(),
         status: statusFilter || undefined,
         search: searchQuery || undefined,
       };
-      
+
       const res = await activityService.getActivityList(params);
       setActivities(res?.data || []);
-      
-      // Load resident details
+
+      /* Load resident names */
       if (res?.data?.length > 0) {
         const residentIds = new Set();
-        res.data.forEach(activity => {
-          if (activity.participantResidentIds?.length > 0) {
-            activity.participantResidentIds.forEach(id => residentIds.add(id));
-          }
+        res.data.forEach((a) => {
+          a.participantResidentIds?.forEach((id) => residentIds.add(id));
         });
-        
         if (residentIds.size > 0) {
           const residentList = await residentService.getResidentList({ page: 1, limit: 100 });
-          const residentMap = {};
-          residentList?.data?.forEach(resident => {
-            residentMap[resident._id] = resident;
-          });
-          setResidents(residentMap);
+          const map = {};
+          residentList?.data?.forEach((r) => { map[r._id] = r; });
+          setResidents(map);
         }
       }
     } catch (err) {
       console.error('Fetch activities failed:', err);
-      setError(err.response?.data?.message || 'Could not load activities.');
+      setError(err.response?.data?.message || t('activitySchedule.error.loadFailed'));
     } finally {
       setLoading(false);
     }
-  }, [currentDate, statusFilter, searchQuery]);
+  }, [currentDate, statusFilter, searchQuery, t]);
 
-  useEffect(() => {
-    fetchActivities();
-  }, [fetchActivities]);
+  useEffect(() => { fetchActivities(); }, [fetchActivities]);
 
-  const handlePrevMonth = () => {
+  /* ---- month nav ---- */
+  const handlePrevMonth = () =>
     setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1));
-  };
-
-  const handleNextMonth = () => {
+  const handleNextMonth = () =>
     setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1));
-  };
 
-  const getStatusColor = (status) => {
-    const colors = {
-      draft: '#94a3b8',
-      scheduled: '#3b82f6',
-      ongoing: '#f59e0b',
-      completed: '#10b981',
-      cancelled: '#ef4444',
-    };
-    return colors[status] || '#64748b';
-  };
-
-  const getWeekDays = () => {
+  /* ---- calendar helpers ---- */
+  const getDaysInMonth = () => {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
-    const daysInMonth = lastDay.getDate();
-    
-    let days = [];
-    for (let i = 1; i <= daysInMonth; i++) {
-      days.push(new Date(year, month, i));
-    }
-    return days;
+    const count = new Date(year, month + 1, 0).getDate();
+    return Array.from({ length: count }, (_, i) => new Date(year, month, i + 1));
   };
 
-  const getActivitiesForDate = (date) => {
-    return activities.filter(activity => {
-      const actDate = new Date(activity.scheduledAt);
-      return actDate.toDateString() === date.toDateString();
-    });
-  };
+  const getActivitiesForDate = (date) =>
+    activities.filter(
+      (a) => new Date(a.scheduledAt).toDateString() === date.toDateString(),
+    );
 
+  /* ================================================================ */
+  /*  List view                                                        */
+  /* ================================================================ */
   const ListViewContent = () => (
-    <div className="adm-table-card">
-      <div className="adm-table-responsive">
-        <table className="adm-table">
-          <thead>
+    <div className="as-list-card">
+      <table className="as-table">
+        <thead>
+          <tr>
+            <th>{t('activitySchedule.table.title')}</th>
+            <th>{t('activitySchedule.table.category')}</th>
+            <th>{t('activitySchedule.table.dateTime')}</th>
+            <th>{t('activitySchedule.table.location')}</th>
+            <th>{t('activitySchedule.table.status')}</th>
+            <th>{t('activitySchedule.table.participants')}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {loading ? (
             <tr>
-              <th>Tiêu đề</th>
-              <th>Danh mục</th>
-              <th>Ngày/Giờ</th>
-              <th>Địa điểm</th>
-              <th>Trạng thái</th>
-              <th>Người tham gia</th>
+              <td colSpan="6" className="as-table-empty">
+                <div className="as-loading">
+                  <Loader2 size={18} /> {t('activitySchedule.loading')}
+                </div>
+              </td>
             </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr>
-                <td colSpan="6" style={{ textAlign: 'center', padding: '24px' }}>
-                  Đang tải lịch hoạt động...
+          ) : activities.length === 0 ? (
+            <tr>
+              <td colSpan="6" className="as-table-empty">
+                {t('activitySchedule.noActivities')}
+              </td>
+            </tr>
+          ) : (
+            activities.map((activity) => (
+              <tr
+                key={activity._id}
+                onClick={() => setSelectedActivity(activity)}
+              >
+                <td className="as-table-title">{activity.title}</td>
+                <td>{activity.category || '-'}</td>
+                <td>
+                  {activity.scheduledAt
+                    ? new Date(activity.scheduledAt).toLocaleString('vi-VN')
+                    : '-'}
+                </td>
+                <td>{activity.location || '-'}</td>
+                <td>
+                  <span className={`as-status-badge as-status-badge--${activity.status || 'draft'}`}>
+                    {statusLabels[activity.status] || activity.status}
+                  </span>
+                </td>
+                <td className="as-participant-count">
+                  {t('activitySchedule.residentCount', { count: activity.participantResidentIds?.length || 0 })}
                 </td>
               </tr>
-            ) : activities.length === 0 ? (
-              <tr>
-                <td colSpan="6" style={{ textAlign: 'center', padding: '24px' }}>
-                  Không tìm thấy hoạt động nào.
-                </td>
-              </tr>
-            ) : (
-              activities.map((activity) => (
-                <tr 
-                  key={activity._id} 
-                  className="adm-table-row"
-                  onClick={() => setSelectedActivity(activity)}
-                  style={{ cursor: 'pointer' }}
-                >
-                  <td style={{ fontWeight: 500 }}>{activity.title}</td>
-                  <td>{activity.category || '-'}</td>
-                  <td>
-                    {activity.scheduledAt ? new Date(activity.scheduledAt).toLocaleString('vi-VN') : '-'}
-                  </td>
-                  <td>{activity.location || '-'}</td>
-                  <td>
-                    <span style={{
-                      display: 'inline-block',
-                      padding: '4px 12px',
-                      borderRadius: '20px',
-                      backgroundColor: getStatusColor(activity.status),
-                      color: 'white',
-                      fontSize: '12px',
-                      fontWeight: 500
-                    }}>
-                      {activity.status}
-                    </span>
-                  </td>
-                  <td style={{ textAlign: 'center' }}>
-                    {activity.participantResidentIds?.length || 0} cư dân
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+            ))
+          )}
+        </tbody>
+      </table>
     </div>
   );
 
+  /* ================================================================ */
+  /*  Calendar view                                                    */
+  /* ================================================================ */
   const CalendarViewContent = () => {
-    const days = getWeekDays();
-    const firstDay = days[0].getDay();
-    const gridItems = [];
-    
-    // Add empty cells for days before month starts
-    for (let i = 0; i < firstDay; i++) {
-      gridItems.push(<div key={`empty-${i}`} style={{ backgroundColor: '#f8fafc' }}></div>);
-    }
-    
-    // Add day cells
-    days.forEach(day => {
-      const dayActivities = getActivitiesForDate(day);
-      gridItems.push(
-        <div key={day.toISOString()} style={{
-          border: '1px solid #e2e8f0',
-          padding: '8px',
-          minHeight: '100px',
-          backgroundColor: day.toDateString() === new Date().toDateString() ? '#f0f9ff' : 'white'
-        }}>
-          <div style={{ fontWeight: 600, marginBottom: '4px' }}>{day.getDate()}</div>
-          {dayActivities.map(activity => (
-            <div
-              key={activity._id}
-              onClick={() => setSelectedActivity(activity)}
-              style={{
-                fontSize: '11px',
-                padding: '2px 4px',
-                marginBottom: '2px',
-                backgroundColor: getStatusColor(activity.status),
-                color: 'white',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap'
-              }}
-              title={activity.title}
-            >
-              {activity.title}
-            </div>
-          ))}
-        </div>
-      );
-    });
+    const days = getDaysInMonth();
+    const firstDayOfWeek = days[0].getDay(); // 0 = Sun
+    const todayStr = new Date().toDateString();
 
     return (
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(7, 1fr)',
-        gap: '0',
-        border: '1px solid #e2e8f0',
-        borderRadius: '8px',
-        overflow: 'hidden'
-      }}>
-        {['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'].map(day => (
-          <div
-            key={day}
-            style={{
-              backgroundColor: '#f1f5f9',
-              padding: '8px',
-              textAlign: 'center',
-              fontWeight: 600,
-              borderBottom: '2px solid #e2e8f0'
-            }}
-          >
-            {day}
-          </div>
-        ))}
-        {gridItems}
+      <div className="as-calendar-card">
+        <div className="as-calendar-grid">
+          {/* Day names */}
+          {[
+            t('activitySchedule.daySun'),
+            t('activitySchedule.dayMon'),
+            t('activitySchedule.dayTue'),
+            t('activitySchedule.dayWed'),
+            t('activitySchedule.dayThu'),
+            t('activitySchedule.dayFri'),
+            t('activitySchedule.daySat'),
+          ].map((d) => (
+            <div key={d} className="as-calendar-dayname">{d}</div>
+          ))}
+
+          {/* Empty leading cells */}
+          {Array.from({ length: firstDayOfWeek }, (_, i) => (
+            <div key={`e-${i}`} className="as-calendar-cell as-calendar-cell--empty" />
+          ))}
+
+          {/* Day cells */}
+          {days.map((day) => {
+            const isToday = day.toDateString() === todayStr;
+            const dayActivities = getActivitiesForDate(day);
+            return (
+              <div
+                key={day.toISOString()}
+                className={`as-calendar-cell ${isToday ? 'as-calendar-cell--today' : ''}`}
+              >
+                <div className="as-cell-date">{day.getDate()}</div>
+                {dayActivities.map((a) => (
+                  <div
+                    key={a._id}
+                    className={`as-event-pill as-event-pill--${a.status || 'draft'}`}
+                    onClick={() => setSelectedActivity(a)}
+                    title={a.title}
+                  >
+                    {a.title}
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+        </div>
       </div>
     );
   };
 
-  return (
-    <div className="adm-container">
-      <div className="adm-header">
-        <div>
-          <h1>
-            <Calendar size={26} />
-            Lịch hoạt động
-          </h1>
-          <p>Xem lịch hoạt động và chi tiết tham gia của cư dân.</p>
-        </div>
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button
-            type="button"
-            className={`adm-btn-refresh ${viewMode === 'list' ? 'active' : ''}`}
-            onClick={() => setViewMode('list')}
-            style={{ backgroundColor: viewMode === 'list' ? '#3b82f6' : undefined, color: viewMode === 'list' ? 'white' : undefined }}
-          >
-            Danh sách
-          </button>
-          <button
-            type="button"
-            className={`adm-btn-refresh ${viewMode === 'calendar' ? 'active' : ''}`}
-            onClick={() => setViewMode('calendar')}
-            style={{ backgroundColor: viewMode === 'calendar' ? '#3b82f6' : undefined, color: viewMode === 'calendar' ? 'white' : undefined }}
-          >
-            Lịch
-          </button>
-        </div>
-      </div>
+  /* ================================================================ */
+  /*  Drawer (detail modal — slides from right)                        */
+  /* ================================================================ */
+  const DetailDrawer = () => {
+    if (!selectedActivity) return null;
+    const a = selectedActivity;
 
-      <div className="adm-filter-panel">
-        <form className="adm-filter-grid">
-          <div>
-            <label className="text-sm font-semibold">Tìm kiếm</label>
-            <div className="adm-filter-input-wrapper">
-              <Search className="adm-filter-input-icon" size={14} />
-              <input
-                type="text"
-                placeholder="Tìm theo tiêu đề..."
-                className="adm-filter-input"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-          </div>
-          <div>
-            <label className="text-sm font-semibold">Trạng thái</label>
-            <select
-              className="adm-filter-select"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
+    return (
+      <div className="as-drawer-overlay" onClick={() => setSelectedActivity(null)}>
+        <div className="as-drawer" onClick={(e) => e.stopPropagation()}>
+          {/* Header */}
+          <div className="as-drawer-header">
+            <h2>{a.title}</h2>
+            <button
+              className="as-drawer-close"
+              onClick={() => setSelectedActivity(null)}
             >
-              <option value="">Tất cả trạng thái</option>
-              <option value="scheduled">Đã lên lịch</option>
-              <option value="ongoing">Đang diễn ra</option>
-              <option value="completed">Đã hoàn thành</option>
-              <option value="cancelled">Đã huỷ</option>
-            </select>
-          </div>
-          <div style={{ alignSelf: 'flex-end' }}>
-            <button type="button" className="adm-btn-refresh" onClick={() => fetchActivities()}>
-              <RefreshCw size={14} /> Làm mới
+              <X size={16} />
             </button>
           </div>
-        </form>
-      </div>
 
-      {viewMode === 'calendar' && (
-        <div className="adm-filter-panel" style={{ marginBottom: '20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <button type="button" className="adm-btn-refresh" onClick={handlePrevMonth}>
-              <ChevronLeft size={16} />
-            </button>
-            <h2 style={{ margin: 0 }}>
-              Tháng {currentDate.getMonth() + 1} năm {currentDate.getFullYear()}
-            </h2>
-            <button type="button" className="adm-btn-refresh" onClick={handleNextMonth}>
-              <ChevronRight size={16} />
-            </button>
-          </div>
-          <CalendarViewContent />
-        </div>
-      )}
-
-      {viewMode === 'list' && <ListViewContent />}
-
-      {selectedActivity && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000
-        }}>
-          <div style={{
-            backgroundColor: 'white',
-            borderRadius: '12px',
-            padding: '24px',
-            maxWidth: '600px',
-            width: '90%',
-            boxShadow: '0 20px 25px rgba(0, 0, 0, 0.15)'
-          }}>
-            <h2 style={{ marginTop: 0 }}>{selectedActivity.title}</h2>
-            <div style={{ marginBottom: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                <Calendar size={16} />
-                <span>{new Date(selectedActivity.scheduledAt).toLocaleString('vi-VN')}</span>
-              </div>
-              {selectedActivity.location && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                  <MapPin size={16} />
-                  <span>{selectedActivity.location}</span>
-                </div>
-              )}
-              {selectedActivity.durationMinutes && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                  <Clock size={16} />
-                  <span>{selectedActivity.durationMinutes} phút</span>
-                </div>
-              )}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Users size={16} />
-                <span>{selectedActivity.participantResidentIds?.length || 0} cư dân</span>
-              </div>
+          {/* Body */}
+          <div className="as-drawer-body">
+            {/* Status badge */}
+            <div style={{ marginBottom: 18 }}>
+              <span className={`as-status-badge as-status-badge--${a.status || 'draft'}`}>
+                {statusLabels[a.status] || a.status}
+              </span>
             </div>
-            
-            {selectedActivity.description && (
-              <div style={{ marginBottom: '16px', padding: '12px', backgroundColor: '#f8fafc', borderRadius: '8px' }}>
-                <strong>Mô tả:</strong>
-                <p style={{ margin: '8px 0 0 0' }}>{selectedActivity.description}</p>
+
+            {/* Detail rows */}
+            <div className="as-detail-row">
+              <Calendar size={16} />
+              <span className="as-detail-label">{t('activitySchedule.detail.dateTime')}</span>
+              <span className="as-detail-value">
+                {a.scheduledAt ? new Date(a.scheduledAt).toLocaleString('vi-VN') : '-'}
+              </span>
+            </div>
+
+            {a.location && (
+              <div className="as-detail-row">
+                <MapPin size={16} />
+                <span className="as-detail-label">{t('activitySchedule.detail.location')}</span>
+                <span className="as-detail-value">{a.location}</span>
               </div>
             )}
 
-            {selectedActivity.participantResidentIds?.length > 0 && (
-              <div style={{ marginBottom: '16px' }}>
-                <strong>Người tham gia ({selectedActivity.participantResidentIds.length}):</strong>
-                <div style={{ marginTop: '8px', maxHeight: '200px', overflow: 'auto' }}>
-                  {selectedActivity.participantResidentIds.map(residentId => (
-                    <div
-                      key={residentId}
-                      style={{
-                        padding: '8px',
-                        backgroundColor: '#f8fafc',
-                        borderRadius: '6px',
-                        marginBottom: '4px',
-                        fontSize: '14px'
-                      }}
-                    >
-                      {residents[residentId]?.fullName || `Cư dân ${residentId}`}
+            {a.durationMinutes && (
+              <div className="as-detail-row">
+                <Clock size={16} />
+                <span className="as-detail-label">{t('activitySchedule.detail.duration')}</span>
+                <span className="as-detail-value">{t('activitySchedule.minutes', { count: a.durationMinutes })}</span>
+              </div>
+            )}
+
+            {a.category && (
+              <div className="as-detail-row">
+                <Tag size={16} />
+                <span className="as-detail-label">{t('activitySchedule.detail.category')}</span>
+                <span className="as-detail-value">{a.category}</span>
+              </div>
+            )}
+
+            <div className="as-detail-row">
+              <Users size={16} />
+              <span className="as-detail-label">{t('activitySchedule.detail.participants')}</span>
+              <span className="as-detail-value">
+                {t('activitySchedule.residentCount', { count: a.participantResidentIds?.length || 0 })}
+              </span>
+            </div>
+
+            {/* Description */}
+            {a.description && (
+              <div className="as-description-box">
+                <strong>{t('activitySchedule.detail.description')}</strong>
+                <p>{a.description}</p>
+              </div>
+            )}
+
+            {/* Participants */}
+            {a.participantResidentIds?.length > 0 && (
+              <div className="as-participants-section">
+                <strong>
+                  {t('activitySchedule.detail.participantList', { count: a.participantResidentIds.length })}
+                </strong>
+                <div className="as-participant-list">
+                  {a.participantResidentIds.map((rid) => (
+                    <div key={rid} className="as-participant-item">
+                      <User size={14} />
+                      {residents[rid]?.fullName || t('activitySchedule.residentById', { id: rid })}
                     </div>
                   ))}
                 </div>
               </div>
             )}
+          </div>
 
+          {/* Footer */}
+          <div className="as-drawer-footer">
             <button
-              type="button"
-              className="adm-btn-refresh"
+              className="as-btn-close-drawer"
               onClick={() => setSelectedActivity(null)}
-              style={{ width: '100%' }}
             >
-              Đóng
+              {t('activitySchedule.close')}
             </button>
           </div>
         </div>
+      </div>
+    );
+  };
+
+  /* ================================================================ */
+  /*  Render                                                           */
+  /* ================================================================ */
+  return (
+    <div className="as-page">
+      {/* Header */}
+      <div className="as-header">
+        <div className="as-header-left">
+          <h1>
+            <Calendar size={24} />
+            {t('activitySchedule.title')}
+          </h1>
+          <p>{t('activitySchedule.subtitle')}</p>
+        </div>
+        <div className="as-view-toggle">
+          <button
+            type="button"
+            className={`as-view-btn ${viewMode === 'list' ? 'as-view-btn--active' : ''}`}
+            onClick={() => setViewMode('list')}
+          >
+            <List size={14} /> {t('activitySchedule.view.list')}
+          </button>
+          <button
+            type="button"
+            className={`as-view-btn ${viewMode === 'calendar' ? 'as-view-btn--active' : ''}`}
+            onClick={() => setViewMode('calendar')}
+          >
+            <LayoutGrid size={14} /> {t('activitySchedule.view.calendar')}
+          </button>
+        </div>
+      </div>
+
+      {/* Filter bar */}
+      <div className="as-filter-bar">
+        <div className="as-filter-group">
+          <span className="as-filter-label">{t('activitySchedule.filter.search')}</span>
+          <div className="as-search-wrapper">
+            <Search size={14} />
+            <input
+              type="text"
+              className="as-search-input"
+              placeholder={t('activitySchedule.filter.searchPlaceholder')}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="as-filter-group" style={{ flex: 'none', minWidth: 'auto' }}>
+          <span className="as-filter-label">{t('activitySchedule.filter.status')}</span>
+          <div className="as-pill-group">
+            {statusOptions.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                className={`as-pill ${statusFilter === opt.value ? 'as-pill--active' : ''}`}
+                onClick={() => setStatusFilter(opt.value)}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <button
+          type="button"
+          className="as-btn-refresh"
+          onClick={() => fetchActivities()}
+          style={{ alignSelf: 'flex-end' }}
+        >
+          <RefreshCw size={14} /> {t('activitySchedule.refresh')}
+        </button>
+      </div>
+
+      {/* Calendar month nav (only in calendar mode) */}
+      {viewMode === 'calendar' && (
+        <div className="as-calendar-nav">
+          <button type="button" className="as-nav-btn" onClick={handlePrevMonth}>
+            <ChevronLeft size={16} />
+          </button>
+          <h2>
+            {t('activitySchedule.monthYear', { month: currentDate.getMonth() + 1, year: currentDate.getFullYear() })}
+          </h2>
+          <button type="button" className="as-nav-btn" onClick={handleNextMonth}>
+            <ChevronRight size={16} />
+          </button>
+        </div>
       )}
 
-      {error && <div style={{ color: '#b91c1c', marginTop: '16px' }}>{error}</div>}
+      {/* Content */}
+      {viewMode === 'list' ? <ListViewContent /> : <CalendarViewContent />}
+
+      {/* Error */}
+      {error && <div className="as-error">{error}</div>}
+
+      {/* Detail drawer */}
+      <DetailDrawer />
     </div>
   );
 }

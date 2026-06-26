@@ -2,9 +2,22 @@ import { User, AlertCircle } from 'lucide-react';
 
 export default function Step1({ data = {}, onChange, errors = {}, touched = {}, onBlur }) {
   const field = (name) => ({
-    value: data[name] ?? '',
-    onChange: (e) => onChange(name, e.target.value),
-    onBlur: () => onBlur?.(name),
+    value: data[name] === 'INVALID_DATE' ? '' : (data[name] ?? ''),
+    onChange: (e) => {
+      if (name === 'dob' && e.target.validity.badInput) {
+        onChange(name, 'INVALID_DATE');
+      } else {
+        onChange(name, e.target.value);
+      }
+    },
+    onBlur: (e) => {
+      if (name === 'dob' && e.target.validity.badInput) {
+        onChange(name, 'INVALID_DATE');
+        onBlur?.(name);
+      } else {
+        onBlur?.(name);
+      }
+    },
     className: `sap-input ${touched[name] && errors[name] ? 'has-error' : ''}`,
   });
 

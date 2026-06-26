@@ -43,7 +43,7 @@ export default function SubmitFacilityTourPage() {
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
 
-  const validateField = (name, value) => {
+  const validateField = (name, value, currentFormData = formData) => {
     const val = typeof value === 'string' ? value.trim() : (value ?? '');
 
     switch (name) {
@@ -61,13 +61,34 @@ export default function SubmitFacilityTourPage() {
         if (val && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) return 'Địa chỉ email không hợp lệ';
         return null;
 
-      case 'preferredDate':
+      case 'preferredDate': {
         if (!val) return 'Ngày mong muốn là bắt buộc';
         const dateObj = new Date(val);
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         if (dateObj < today) return 'Ngày mong muốn phải là hôm nay hoặc trong tương lai';
+
+        // Check if selected time slot has passed if preferredDate is today
+        const y = today.getFullYear();
+        const m = String(today.getMonth() + 1).padStart(2, '0');
+        const d = String(today.getDate()).padStart(2, '0');
+        const todayStr = `${y}-${m}-${d}`;
+        if (val === todayStr && currentFormData.preferredTimeSlot) {
+          const [startPart] = currentFormData.preferredTimeSlot.split(' - ');
+          if (startPart) {
+            const [startHour, startMinute] = startPart.split(':').map(Number);
+            if (!isNaN(startHour) && !isNaN(startMinute)) {
+              const now = new Date();
+              const curHour = now.getHours();
+              const curMin = now.getMinutes();
+              if (curHour > startHour || (curHour === startHour && curMin >= startMinute)) {
+                return 'Khung giờ chọn cho ngày hôm nay đã ở quá khứ';
+              }
+            }
+          }
+        }
         return null;
+      }
 
       case 'numberOfVisitors':
         const visitors = parseInt(value, 10);
@@ -88,10 +109,15 @@ export default function SubmitFacilityTourPage() {
   };
 
   const setField = (name, value) => {
-    setFormData((prev) => ({ ...prev, [name]: value }));
-    if (touched[name]) {
-      const error = validateField(name, value);
-      setErrors((prev) => ({ ...prev, [name]: error }));
+    const nextFormData = { ...formData, [name]: value };
+    setFormData(nextFormData);
+    const error = validateField(name, value, nextFormData);
+    let nextErrors = { ...errors, [name]: error };
+    if (name === 'preferredTimeSlot' || name === 'preferredDate') {
+      nextErrors.preferredDate = validateField('preferredDate', nextFormData.preferredDate, nextFormData);
+    }
+    if (touched[name] || touched.preferredDate || name === 'preferredTimeSlot') {
+      setErrors(nextErrors);
     }
   };
 
@@ -280,7 +306,12 @@ export default function SubmitFacilityTourPage() {
 
           {/* Preferred Date */}
           <div className={`sftp-group ${errors.preferredDate && touched.preferredDate ? 'has-error' : ''}`}>
-            <label className="sftp-label">Ngày mong muốn *</label>
+            <label className="sftp-label">
+              Ngày mong muốn *{' '}
+              <span style={{ fontSize: '13px', color: '#64748b', fontWeight: 'normal', marginLeft: '4px' }}>
+                (Chọn ngày hôm nay hoặc tương lai)
+              </span>
+            </label>
             <div className="sftp-input-wrap">
               <Calendar size={16} className="sftp-input-icon" />
               <input

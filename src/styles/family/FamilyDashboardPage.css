@@ -13,7 +13,12 @@
   flex-direction: column;
   gap: 10px;
   padding: 24px 0 12px;
+  position: relative;
 }
+
+.header-bell { position: absolute; right: 24px; top: 28px; display: inline-flex; align-items: center; }
+.header-bell .notification-btn { width: 36px; height: 36px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid transparent; background: transparent; cursor: pointer; }
+.header-bell .notification-badge { position: absolute; top: -6px; right: -6px; background: #ef4444; color: #fff; border-radius: 999px; padding: 2px 6px; font-size: 11px; font-weight: 700; }
 
 .page-family-dashboard h1 {
   font-size: 32px;

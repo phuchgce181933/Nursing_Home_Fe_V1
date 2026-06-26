@@ -1,157 +1,783 @@
-.nutrition-reports__checkbox-filter {
-  flex-direction: row !important;
-  align-items: center;
-  gap: 8px;
+/* =============================================
+   NutritionReportsPage  (nr- prefix)
+   Color system: primary #3b5bdb, bg #f8fafc,
+   border #e2e8f0, text #1e293b / #475569 / #64748b
+   ============================================= */
+
+/* ---------- animations ---------- */
+@keyframes nr-fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
-.nutrition-reports__checkbox-filter input[type='checkbox'] {
-  width: auto;
-  min-width: 0;
+@keyframes nr-slideUp {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
-.nutrition-reports__kpi-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 12px;
-  padding: 16px;
-  margin-bottom: 16px;
+@keyframes nr-scaleIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes nr-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes nr-countFade {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ---------- page root ---------- */
+.nr-page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 24px;
+  max-width: 1340px;
+  margin: 0 auto;
+  animation: nr-fadeIn 0.4s ease;
+}
+
+/* ---------- page header ---------- */
+.nr-header {
+  background: linear-gradient(135deg, #3b5bdb 0%, #5c7cfa 100%);
+  border-radius: 16px;
+  padding: 28px 32px;
+  color: #fff;
+  box-shadow: 0 8px 32px rgba(59, 91, 219, 0.25);
+  animation: nr-slideUp 0.5s ease;
+}
+
+.nr-header__title {
+  margin: 0 0 6px;
+  font-size: 1.65rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.nr-header__sub {
+  margin: 0;
+  font-size: 0.9rem;
+  opacity: 0.88;
+  line-height: 1.55;
+}
+
+/* ---------- error ---------- */
+.nr-error {
+  padding: 12px 16px;
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  font-weight: 500;
+  animation: nr-slideUp 0.3s ease;
+}
+
+/* ---------- filter bar ---------- */
+.nr-filters {
   background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 16px;
-  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.06);
+  padding: 20px 24px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  box-shadow: 0 2px 12px rgba(15, 23, 42, 0.04);
+  animation: nr-slideUp 0.45s ease;
 }
 
-.nutrition-reports__kpi {
-  padding: 14px;
-  border-radius: 12px;
+.nr-filters__group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 14px;
+}
+
+.nr-filters__label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.nr-filters__label > span {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+}
+
+.nr-input {
+  padding: 9px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  color: #1e293b;
   background: #f8fafc;
+  min-width: 140px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  outline: none;
+}
+
+.nr-input:focus {
+  border-color: #3b5bdb;
+  box-shadow: 0 0 0 3px rgba(59, 91, 219, 0.12);
+  background: #fff;
+}
+
+.nr-filters__checkbox {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #475569;
+  cursor: pointer;
+  padding-bottom: 2px;
+}
+
+.nr-filters__checkbox input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  accent-color: #3b5bdb;
+  cursor: pointer;
+}
+
+.nr-filters__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ---------- buttons ---------- */
+.nr-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 18px;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.nr-btn--primary {
+  background: #3b5bdb;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(59, 91, 219, 0.25);
+}
+
+.nr-btn--primary:hover {
+  background: #364fc7;
+  box-shadow: 0 4px 14px rgba(59, 91, 219, 0.35);
+  transform: translateY(-1px);
+}
+
+.nr-btn--primary:active {
+  transform: translateY(0);
+}
+
+.nr-btn--primary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.nr-btn--ghost {
+  background: transparent;
+  color: #3b5bdb;
   border: 1px solid #e2e8f0;
 }
 
-.nutrition-reports__kpi-value {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: #0f766e;
+.nr-btn--ghost:hover {
+  background: #edf2ff;
+  border-color: #3b5bdb;
+  transform: translateY(-1px);
 }
 
-.nutrition-reports__kpi-label {
+.nr-btn--sm {
+  padding: 6px 14px;
   font-size: 0.8rem;
+  border-radius: 8px;
+}
+
+/* ---------- KPI grid ---------- */
+.nr-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  animation: nr-fadeIn 0.5s ease;
+}
+
+.nr-kpi {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: 0 2px 12px rgba(15, 23, 42, 0.04);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  animation: nr-countFade 0.5s ease both;
+}
+
+.nr-kpi:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.1);
+}
+
+.nr-kpi__icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  flex-shrink: 0;
+}
+
+.nr-kpi__body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.nr-kpi__value {
+  font-size: 1.65rem;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.nr-kpi__label {
+  font-size: 0.78rem;
   color: #64748b;
-  margin-top: 4px;
+  margin-top: 3px;
+  line-height: 1.3;
 }
 
-.nutrition-reports__kpi--warn .nutrition-reports__kpi-value {
-  color: #b45309;
+/* ---------- table card ---------- */
+.nr-table-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 2px 12px rgba(15, 23, 42, 0.04);
+  animation: nr-slideUp 0.5s ease;
 }
 
-.nutrition-reports__status-yes {
-  color: #059669;
+.nr-table-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.nr-table-card__title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 650;
+  color: #1e293b;
+}
+
+.nr-table-card__count {
+  font-size: 0.82rem;
+  color: #64748b;
+  background: #f1f5f9;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-weight: 500;
+}
+
+.nr-table-wrap {
+  overflow-x: auto;
+}
+
+.nr-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.nr-table thead th {
+  background: #f8fafc;
+  padding: 10px 16px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #64748b;
+  text-align: left;
+  border-bottom: 1px solid #e2e8f0;
+  white-space: nowrap;
+}
+
+.nr-table tbody td {
+  padding: 12px 16px;
+  font-size: 0.88rem;
+  color: #1e293b;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+}
+
+.nr-table__row {
+  animation: nr-slideUp 0.35s ease both;
+  transition: background 0.15s ease;
+}
+
+.nr-table__row:hover {
+  background: #f8fafc;
+}
+
+.nr-table__name {
   font-weight: 600;
+  color: #1e293b;
 }
 
-.nutrition-reports__status-no {
+.nr-table__num {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: #475569;
+}
+
+.nr-table__empty {
+  text-align: center;
+  padding: 40px 16px !important;
   color: #94a3b8;
+  font-size: 0.9rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
 }
 
-.nutrition-reports__modal-overlay {
+.nr-code {
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-size: 0.82rem;
+  background: #f1f5f9;
+  padding: 2px 8px;
+  border-radius: 6px;
+  color: #475569;
+}
+
+/* ---------- status icons ---------- */
+.nr-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nr-status--yes {
+  color: #059669;
+}
+
+.nr-status--no {
+  color: #cbd5e1;
+}
+
+/* ---------- spinner ---------- */
+.nr-spinner {
+  width: 22px;
+  height: 22px;
+  border: 3px solid #e2e8f0;
+  border-top-color: #3b5bdb;
+  border-radius: 50%;
+  animation: nr-spin 0.7s linear infinite;
+}
+
+.nr-spinner--lg {
+  width: 36px;
+  height: 36px;
+  border-width: 4px;
+}
+
+/* ============================================
+   DETAIL MODAL
+   ============================================ */
+
+.nr-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.45);
+  background: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
   padding: 16px;
+  animation: nr-fadeIn 0.25s ease;
 }
 
-.nutrition-reports__modal {
+.nr-modal {
   background: #fff;
-  border-radius: 16px;
-  max-width: 920px;
+  border-radius: 20px;
+  max-width: 900px;
   width: 100%;
   max-height: 90vh;
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.2);
+  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.22);
+  animation: nr-scaleIn 0.3s ease;
 }
 
-.nutrition-reports__modal-header {
+.nr-modal__header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 16px 20px;
+  justify-content: space-between;
+  padding: 20px 28px;
   border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
 }
 
-.nutrition-reports__modal-title {
+.nr-modal__header-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.nr-modal__avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #3b5bdb 0%, #5c7cfa 100%);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.15rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.nr-modal__title {
   margin: 0;
   font-size: 1.15rem;
+  font-weight: 700;
+  color: #1e293b;
 }
 
-.nutrition-reports__modal-close {
-  border: none;
-  background: transparent;
-  font-size: 1.5rem;
+.nr-modal__subtitle {
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.nr-modal__close {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
   color: #64748b;
+  transition: all 0.2s;
 }
 
-.nutrition-reports__modal-body {
-  padding: 16px 20px;
+.nr-modal__close:hover {
+  background: #fee2e2;
+  border-color: #fca5a5;
+  color: #dc2626;
+}
+
+.nr-modal__body {
+  padding: 24px 28px;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
 }
 
-.nutrition-reports__resident-meta {
-  margin: 0 0 12px;
-  color: #475569;
+.nr-modal__loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 48px 0;
+  color: #64748b;
+}
+
+/* ---------- resident meta ---------- */
+.nr-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  padding: 16px 20px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+}
+
+.nr-meta__item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nr-meta__key {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+}
+
+.nr-meta__val {
+  font-size: 0.9rem;
+  color: #1e293b;
+  font-weight: 500;
+}
+
+.nr-meta__val--tag {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+/* ---------- summary chips ---------- */
+.nr-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.nr-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 14px;
+  background: #edf2ff;
+  color: #3b5bdb;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border-radius: 20px;
+}
+
+/* ---------- empty state ---------- */
+.nr-empty {
+  text-align: center;
+  color: #94a3b8;
+  padding: 32px 0;
   font-size: 0.9rem;
 }
 
-.nutrition-reports__day-block {
-  margin-bottom: 12px;
-  padding: 12px 14px;
+/* ---------- day block ---------- */
+.nr-day {
   background: #ffffff;
   border: 1px solid #e2e8f0;
-  border-radius: 16px;
-  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.06);
+  border-radius: 14px;
+  overflow: hidden;
+  animation: nr-slideUp 0.35s ease both;
 }
 
-.nutrition-reports__day-title {
-  margin: 0 0 10px;
-  font-size: 1rem;
-  color: #0f766e;
+.nr-day__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 20px;
+  background: linear-gradient(135deg, #edf2ff 0%, #f0f4ff 100%);
+  border-bottom: 1px solid #e2e8f0;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: #3b5bdb;
 }
 
-.nutrition-reports__subsection {
-  margin-top: 10px;
+/* ---------- subsections ---------- */
+.nr-sub {
+  border-left: 4px solid #e2e8f0;
+  margin: 0;
+  padding: 0;
 }
 
-.nutrition-reports__subsection h4 {
-  margin: 0 0 6px;
-  font-size: 0.85rem;
-  color: #64748b;
+.nr-sub--time  { border-left-color: #0d9488; }
+.nr-sub--plan  { border-left-color: #3b5bdb; }
+.nr-sub--diet  { border-left-color: #7c3aed; }
+.nr-sub--intake { border-left-color: #2563eb; }
+.nr-sub--notes { border-left-color: #f59e0b; }
+
+.nr-sub__title {
+  margin: 0;
+  padding: 10px 20px 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-
-.nutrition-reports__note {
-  padding: 8px 10px;
-  border-left: 3px solid #0d9488;
-  background: #f0fdfa;
-  margin-bottom: 8px;
-  font-size: 0.9rem;
-}
-
-.nutrition-reports__note time {
-  display: block;
-  font-size: 0.75rem;
+  letter-spacing: 0.05em;
   color: #64748b;
+}
+
+.nr-sub__content {
+  padding: 0 20px 14px;
+}
+
+/* ---------- time tags ---------- */
+.nr-time-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  background: #f0fdfa;
+  border: 1px solid #ccfbf1;
+  border-radius: 8px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: #0d9488;
+  margin-right: 8px;
   margin-bottom: 4px;
 }
 
-@media (max-width: 768px) {
-  .nutrition-reports__kpi-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+.nr-time-note {
+  display: block;
+  margin-top: 6px;
+  font-size: 0.84rem;
+  color: #475569;
+  font-style: italic;
+}
+
+/* ---------- subsection tables ---------- */
+.nr-subtable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.84rem;
+}
+
+.nr-subtable thead th {
+  padding: 8px 12px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+  text-align: left;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.nr-subtable tbody td {
+  padding: 8px 12px;
+  color: #1e293b;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: top;
+}
+
+.nr-subtable tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.nr-subtable tbody tr:hover {
+  background: #f8fafc;
+}
+
+/* ---------- notes ---------- */
+.nr-note {
+  padding: 10px 14px;
+  border-left: 3px solid #f59e0b;
+  background: #fffbeb;
+  border-radius: 0 8px 8px 0;
+  margin-bottom: 8px;
+}
+
+.nr-note__time {
+  display: block;
+  font-size: 0.72rem;
+  color: #64748b;
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+
+.nr-note__body {
+  font-size: 0.88rem;
+  color: #1e293b;
+  line-height: 1.5;
+}
+
+.nr-note__author {
+  color: #3b5bdb;
+}
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+
+@media (max-width: 1100px) {
+  .nr-kpi-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 860px) {
+  .nr-kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .nr-page {
+    padding: 16px;
+  }
+
+  .nr-header {
+    padding: 22px 20px;
+  }
+
+  .nr-filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .nr-filters__actions {
+    justify-content: stretch;
+  }
+
+  .nr-filters__actions .nr-btn {
+    flex: 1;
+  }
+
+  .nr-modal {
+    max-width: 100%;
+    border-radius: 16px;
+  }
+
+  .nr-modal__body {
+    padding: 16px;
+  }
+}
+
+@media (max-width: 540px) {
+  .nr-kpi-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .nr-kpi {
+    padding: 14px;
+    gap: 10px;
+  }
+
+  .nr-kpi__icon {
+    width: 40px;
+    height: 40px;
+    font-size: 1.1rem;
+  }
+
+  .nr-kpi__value {
+    font-size: 1.3rem;
+  }
+
+  .nr-header__title {
+    font-size: 1.3rem;
+  }
+
+  .nr-meta {
+    flex-direction: column;
   }
 }

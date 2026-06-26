@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../hooks/useAuth';
 import { getAuthToken } from '../utils/auth';
 import servicePackageService from '../services/servicePackage.service';
+import PublicHeader from '../components/homepage/PublicHeader';
 import '../styles/shared/HomePage.css';
 
 const DEFAULT_PACKAGES = [
@@ -88,32 +89,7 @@ export default function ServicesPage() {
 
   return (
     <div className="home-page">
-      {/* Header — dùng chung với HomePage */}
-      <header className="home-header">
-        <div className="home-header__brand">
-          <img
-            src="https://res.cloudinary.com/dhcrddnss/image/upload/v1780035528/Logo_vi%E1%BB%87n_d%C6%B0%E1%BB%A1ng_l%C3%A3o_An_Nhi%C3%AAn_lrmocn.png"
-            alt={t('home.logoAlt')}
-            className="home-logo__img"
-          />
-          <span className="home-logo">{t('home.brand')}</span>
-        </div>
-
-        <nav className="home-nav">
-          <Link to="/#home">{t('home.home')}</Link>
-          <Link to="/#intro">{t('home.intro')}</Link>
-          <Link to="/services" className="text-blue-600 font-bold">{t('home.services')}</Link>
-          <Link to="/#tech">{t('home.tech')}</Link>
-          <Link to="/#living">{t('home.living')}</Link>
-          <Link to="/#pricing">{t('home.pricing')}</Link>
-          <Link to="/#news">{t('home.news')}</Link>
-          <Link to="/#contact">{t('home.contact')}</Link>
-        </nav>
-
-        <Link to={bookPath} className="home-header__button">
-          {t('home.registerAdmission')}
-        </Link>
-      </header>
+      <PublicHeader />
 
       <main>
         {/* Hero section */}

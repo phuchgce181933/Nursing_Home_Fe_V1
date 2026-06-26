@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react';
-import { AlertTriangle, CheckCircle, CreditCard, Package, Users, Wallet, PlusCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle, CreditCard, Package, Users, Wallet, PlusCircle, Bell } from 'lucide-react';
+import notificationsService from '../../services/notifications.service';
+import '../../styles/family/NotificationPage.css';
+import { useNavigate } from 'react-router-dom';
 import { getAuthToken } from '../../utils/auth';
 import residentService from '../../services/resident.service';
 import familyPortalService from '../../services/familyPortal.service';
@@ -42,6 +45,11 @@ function FamilyDashboardPage() {
   const [selectedPackages, setSelectedPackages] = useState({});
   const [currentResidentPayment, setCurrentResidentPayment] = useState(null);
   const [isBatchPaymentProcessing, setIsBatchPaymentProcessing] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [showBellPanel, setShowBellPanel] = useState(false);
+  const [bellItems, setBellItems] = useState([]);
+  const [bellTab, setBellTab] = useState('all');
+  const navigate = useNavigate();
 
   useEffect(() => {
     const loadResidents = async () => {
@@ -58,6 +66,16 @@ function FamilyDashboardPage() {
     };
 
     loadResidents();
+    // load unread count for notifications
+    const loadUnread = async () => {
+      try {
+        const res = await notificationsService.listNotifications({ isRead: false, limit: 1 });
+        setUnreadCount(res.total || 0);
+      } catch (e) {
+        setUnreadCount(0);
+      }
+    };
+    loadUnread();
   }, []);
 
   useEffect(() => {
@@ -303,6 +321,69 @@ function FamilyDashboardPage() {
           <h1>Trang Gia đình</h1>
           <p>Xem gói dịch vụ đã đăng ký và các khoản phí cần thanh toán cho cư dân của bạn.</p>
         </div>
+        <div className="header-bell">
+          <button title="Thông báo" className="notification-btn" onClick={async () => { setShowBellPanel(s => !s); if (!showBellPanel) {
+              const res = await notificationsService.listNotifications({ page: 1, limit: 6 });
+              setBellItems(res.items || []);
+            } }}>
+            <Bell size={20} />
+          </button>
+          {unreadCount > 0 && <span className="notification-badge">{unreadCount}</span>}
+        </div>
+        {showBellPanel && (
+          <div style={{ position: 'absolute', right: 24, top: 64, zIndex: 60 }}>
+            <div className="notification-panel" style={{ width: 360 }}>
+              <div className="panel-header">
+                <div className="meta" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                  <strong style={{ fontSize: 18 }}>Thông báo</strong>
+                  <div style={{ marginTop: 8 }} className="bell-tabs">
+                    <button className={bellTab === 'all' ? 'tab-btn active' : 'tab-btn'} onClick={() => setBellTab('all')}>Tất cả</button>
+                    <button className={bellTab === 'unread' ? 'tab-btn active' : 'tab-btn'} onClick={() => setBellTab('unread')}>Chưa đọc</button>
+                  </div>
+                </div>
+              </div>
+              {bellTab === 'all' && (
+                <div style={{ padding: '8px 12px 0 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#9aa4af', fontSize: 13 }}>
+                  <div>Trước đó</div>
+                  <div><a href="/family/notifications" style={{ color: '#7dd3fc', textDecoration: 'none' }}>Xem tất cả</a></div>
+                </div>
+              )}
+              <div className="notification-list" style={{ paddingTop: 8 }}>
+                {(() => {
+                  const filtered = bellTab === 'all' ? bellItems : bellItems.filter(i => !i.isRead);
+                  if (!filtered || filtered.length === 0) {
+                    if (bellTab === 'unread') {
+                      return (
+                        <div className="empty-bell" style={{ padding: 28, textAlign: 'center', color: '#94a3b8' }}>
+                          <div style={{ display: 'flex', justifyContent: 'center' }}><Bell size={64} /></div>
+                          <div style={{ marginTop: 14, fontSize: 16, color: '#cbd5e1' }}>Bạn không có thông báo nào</div>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="empty-bell" style={{ padding: 32, textAlign: 'center', color: '#94a3b8' }}>
+                        <div style={{ display: 'flex', justifyContent: 'center' }}><Bell size={48} /></div>
+                        <div style={{ marginTop: 12, fontSize: 16, color: '#cbd5e1' }}>Bạn không có thông báo nào</div>
+                      </div>
+                    );
+                  }
+                  return filtered.slice(0, 4).map(n => (
+                    <div key={n._id} className={`notification-item ${n.isRead ? '' : 'unread'}`}>
+                      <div className="left">
+                        <div className={`notification-dot ${n.isRead ? '' : 'unseen'}`} />
+                        <div>
+                          <div className="notification-title">{n.title}</div>
+                          <div className="notification-content">{n.content}</div>
+                          <div className="notification-time">{new Date(n.updatedAt || n.createdAt).toLocaleString()}</div>
+                        </div>
+                      </div>
+                    </div>
+                  ));
+                })()}
+              </div>
+            </div>
+          </div>
+        )}
       </header>
 
       <section className="wallet-summary-card">

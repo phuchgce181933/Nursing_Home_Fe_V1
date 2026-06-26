@@ -1,8 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import AdminPageShell from '../../components/admin/AdminPageShell';
-import ListPagination from '../../components/ui/ListPagination';
-import useClientPagination from '../../hooks/useClientPagination';
 import mealPlanService from '../../services/mealPlan.service';
 import mealTimeScheduleService from '../../services/mealTimeSchedule.service';
 import specialDietService from '../../services/specialDiet.service';
@@ -49,58 +46,20 @@ function MealPlanTab() {
   const [saving, setSaving] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailPlan, setDetailPlan] = useState(null);
-  const [publishedSchedules, setPublishedSchedules] = useState([]);
-  const [selectedScheduleId, setSelectedScheduleId] = useState('');
-  const [publishedTimes, setPublishedTimes] = useState({ byResident: {}, source: 'none' });
-  const [scheduleEntries, setScheduleEntries] = useState([]);
+  const [publishedTimes, setPublishedTimes] = useState({ byResident: {}, source: 'system_default' });
   const [error, setError] = useState('');
-
-  const residentIdsFromScheduleEntries = (entries) =>
-    [...new Set(
-      (entries || [])
-        .map((e) => String(e.residentId?._id || e.residentId || ''))
-        .filter(Boolean)
-    )];
-
-  const timesFromScheduleEntries = (scheduleEntries) => {
-    const byResident = {};
-    (scheduleEntries || []).forEach((e) => {
-      const rid = String(e.residentId?._id || e.residentId || '');
-      if (!rid) return;
-      byResident[rid] = {
-        breakfast: e.breakfastTime,
-        lunch: e.lunchTime,
-        dinner: e.dinnerTime,
-      };
-    });
-    return byResident;
-  };
 
   const resolveMealTime = (residentId, mealType) => {
     const rid = String(residentId || '');
     const fromSchedule = publishedTimes.byResident?.[rid]?.[mealType];
-    return fromSchedule || '';
+    if (fromSchedule) return fromSchedule;
+    return defaultMealTimeByType(mealType);
   };
 
   const residentMap = useMemo(
     () => Object.fromEntries(residents.map((r) => [String(r._id), r.fullName || r.residentCode])),
     [residents]
   );
-
-  const scheduleResidentOptions = useMemo(() => {
-    const idSet = new Set(selectedResidents);
-    return residents.filter((r) => idSet.has(String(r._id)));
-  }, [residents, selectedResidents]);
-
-  const scheduleResidentLabel = (residentId) => {
-    const rid = String(residentId || '');
-    if (residentMap[rid]) return residentMap[rid];
-    const entry = scheduleEntries.find(
-      (e) => String(e.residentId?._id || e.residentId) === rid
-    );
-    const r = entry?.residentId;
-    return r?.fullName || r?.residentCode || rid;
-  };
 
   const loadBoot = async () => {
     setLoading(true);
@@ -121,55 +80,21 @@ function MealPlanTab() {
     }
   };
 
-  const loadPublishedSchedules = async () => {
-    try {
-      const res = await mealTimeScheduleService.listSchedules({
+  const loadPublishedMealTimes = () => {
+    mealTimeScheduleService
+      .getPublishedTimes({
         workDate: formWorkDate,
-        status: 'published',
-        limit: 50,
+        residentIds: selectedResidents.join(','),
+      })
+      .then((data) => {
+        setPublishedTimes({
+          byResident: data?.byResident || {},
+          source: data?.source || 'system_default',
+        });
+      })
+      .catch(() => {
+        setPublishedTimes({ byResident: {}, source: 'system_default' });
       });
-      const list = Array.isArray(res?.data) ? res.data : [];
-      setPublishedSchedules(list);
-      if (list.length === 1) {
-        setSelectedScheduleId(String(list[0]._id));
-      } else if (!list.some((s) => String(s._id) === String(selectedScheduleId))) {
-        setSelectedScheduleId('');
-        setPublishedTimes({ byResident: {}, source: 'none' });
-        setScheduleEntries([]);
-        setSelectedResidents([]);
-      }
-    } catch {
-      setPublishedSchedules([]);
-      setSelectedScheduleId('');
-      setPublishedTimes({ byResident: {}, source: 'none' });
-      setScheduleEntries([]);
-      setSelectedResidents([]);
-    }
-  };
-
-  const loadScheduleTimes = async (scheduleId) => {
-    if (!scheduleId) {
-      setPublishedTimes({ byResident: {}, source: 'none' });
-      setScheduleEntries([]);
-      setSelectedResidents([]);
-      return;
-    }
-    try {
-      const data = await mealTimeScheduleService.getSchedule(scheduleId);
-      const entries = Array.isArray(data?.entries) ? data.entries : [];
-      const ids = residentIdsFromScheduleEntries(entries);
-      setScheduleEntries(entries);
-      setSelectedResidents(ids);
-      setPublishedTimes({
-        byResident: timesFromScheduleEntries(entries),
-        source: 'published_schedule',
-      });
-      setEntries((prev) => prev.filter((e) => ids.includes(String(e.residentId))));
-    } catch {
-      setPublishedTimes({ byResident: {}, source: 'none' });
-      setScheduleEntries([]);
-      setSelectedResidents([]);
-    }
   };
 
   const loadPlans = async (date) => {
@@ -198,27 +123,14 @@ function MealPlanTab() {
   }, [listDate]);
 
   useEffect(() => {
-    loadPublishedSchedules();
-  }, [formWorkDate]);
-
-  useEffect(() => {
-    loadScheduleTimes(selectedScheduleId);
-  }, [selectedScheduleId]);
-
-  const {
-    paginatedItems: paginatedPlans,
-    page: plansPage,
-    setPage: setPlansPage,
-    totalPages: plansTotalPages,
-    total: plansTotal,
-  } = useClientPagination(plans);
+    loadPublishedMealTimes();
+  }, [formWorkDate, selectedResidents]);
 
   const addFromTemplate = () => {
     setError('');
-    const tpl = templates.find((t) => t.key === selectedTemplate);
+    const tpl = templates.find((tp) => tp.key === selectedTemplate);
     if (!tpl) return setError(t(`${MP}.selectTemplate`));
-    if (!selectedScheduleId) return setError(t(`${MP}.selectSchedule`));
-    if (selectedResidents.length < 1) return setError(t(`${MP}.scheduleNoResidents`));
+    if (selectedResidents.length < 1) return setError(t(`${MP}.selectResidents`));
     const generated = [];
     selectedResidents.forEach((residentId) => {
       tpl.entries.forEach((it) => {
@@ -283,18 +195,15 @@ function MealPlanTab() {
     setTitle('');
     setSelectedTemplate('');
     setSelectedResidents([]);
-    setSelectedScheduleId('');
-    setScheduleEntries([]);
     setEntries([]);
     setEditingId('');
     setError('');
   };
 
   const validate = () => {
-    if (!selectedScheduleId) return t(`${MP}.selectSchedule`);
     if (!careStage) return t(`${MP}.selectCareStage`);
     if (formWorkDate < today()) return t(`${MP}.pastDateMealPlan`);
-    if (selectedResidents.length < 1) return t(`${MP}.scheduleNoResidents`);
+    if (selectedResidents.length < 1) return t(`${MP}.selectResidents`);
     if (!entries.length) return t(`${MP}.addAtLeastOneMealEntry`);
     const typeKeys = new Set();
     const timeKeys = new Set();
@@ -317,7 +226,6 @@ function MealPlanTab() {
 
   const buildPayload = () => ({
     workDate: formWorkDate,
-    mealTimeScheduleDayId: selectedScheduleId,
     careStage,
     title,
     entries: entries.map((e) => ({
@@ -328,9 +236,9 @@ function MealPlanTab() {
       ingredients: Array.isArray(e.ingredients)
         ? e.ingredients
         : String(e.ingredients || '')
-            .split(',')
-            .map((x) => x.trim())
-            .filter(Boolean),
+          .split(',')
+          .map((x) => x.trim())
+          .filter(Boolean),
       nutritionNote: e.nutritionNote || undefined,
       stageNote: e.stageNote || undefined,
       source: e.source || 'manual',
@@ -369,8 +277,6 @@ function MealPlanTab() {
       setTitle(data.title || '');
       setFormWorkDate((data.workDate || '').slice(0, 10) || today());
       setCareStage(data.careStage || '');
-      const scheduleId = String(data.mealTimeScheduleDayId?._id || data.mealTimeScheduleDayId || '');
-      setSelectedScheduleId(scheduleId);
       const rows = Array.isArray(data.entries) ? data.entries : [];
       setEntries(
         rows.map((r) => ({
@@ -386,6 +292,8 @@ function MealPlanTab() {
           mealTime: r.mealTime || defaultMealTimeByType(r.mealType),
         }))
       );
+      const picked = [...new Set(rows.map((r) => String(r.residentId?._id || r.residentId || '')).filter(Boolean))];
+      setSelectedResidents(picked);
     } catch (e) {
       setError(e?.response?.data?.message || t(`${MP}.openDraftFailed`));
     } finally {
@@ -438,39 +346,23 @@ function MealPlanTab() {
   const closePlanDetail = () => setDetailPlan(null);
 
   return (
-    <div className="page card meal-page">
-      <h1 className="meal-page__title">{t(`${TAB}.title`)}</h1>
-      <p className="meal-page__intro">{t(`${TAB}.intro`)}</p>
-      {error && <p className="form-error">{error}</p>}
-      {loading && <p>{t('common.loading')}</p>}
+    <div className="mp-page">
+      <h2 className="mp-page__title">{t(`${TAB}.title`)}</h2>
+      <p className="mp-intro">
+        {t(`${TAB}.intro`)}
+      </p>
+      {error && <p className="mp-error">{error}</p>}
+      {loading && <p className="mp-loading">{t('common.loading')}</p>}
 
       {!loading && (
         <>
-          <div className="form-grid">
+          <div className="mp-form-grid form-grid">
             <div className="form-group">
-              <label>{t(`${TAB}.workDate`)}</label>
+              <label>{t(`${TAB}.workDate`)} *</label>
               <input type="date" min={today()} value={formWorkDate} onChange={(e) => setFormWorkDate(e.target.value)} />
             </div>
             <div className="form-group">
-              <label>{t(`${TAB}.mealTimeSchedule`)}</label>
-              <select
-                value={selectedScheduleId}
-                onChange={(e) => setSelectedScheduleId(e.target.value)}
-                disabled={!publishedSchedules.length}
-              >
-                <option value="">{t(`${TAB}.selectPublishedSchedule`)}</option>
-                {publishedSchedules.map((s) => (
-                  <option key={s._id} value={s._id}>
-                    {t(`${TAB}.scheduleOption`, {
-                      title: s.title || t(`${TAB}.defaultScheduleTitle`),
-                      count: Array.isArray(s.entries) ? s.entries.length : '…',
-                    })}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="form-group">
-              <label>{t(`${TAB}.careStage`)}</label>
+              <label>{t(`${TAB}.careStage`)} *</label>
               <select value={careStage} onChange={(e) => setCareStage(e.target.value)}>
                 <option value="">{t(`${TAB}.selectOption`)}</option>
                 {careStages.map((s) => (
@@ -484,67 +376,57 @@ function MealPlanTab() {
             </div>
           </div>
 
-          {selectedScheduleId ? (
-            <div className="meal-page__resident-section">
-              <label className="meal-page__resident-label">
-                {t(`${TAB}.residentsFromSchedule`, { count: selectedResidents.length })}
-              </label>
-              {selectedResidents.length === 0 ? (
-                <p className="field-hint field-hint--warn">{t(`${TAB}.scheduleNoResidentsWarn`)}</p>
-              ) : (
-                <ul className="meal-page__resident-readonly">
-                  {selectedResidents.map((id) => (
-                    <li key={id}>{scheduleResidentLabel(id)}</li>
-                  ))}
-                </ul>
-              )}
+          <div className="mp-resident-section">
+            <label className="mp-resident-label">{t(`${TAB}.residentsLabel`)} *</label>
+            <div className="mp-resident-grid">
+              {residents.map((r) => {
+                const id = String(r._id);
+                const checked = selectedResidents.includes(id);
+                return (
+                  <label key={id} className="mp-resident-item">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={(e) =>
+                        setSelectedResidents((prev) => (e.target.checked ? [...prev, id] : prev.filter((x) => x !== id)))
+                      }
+                    />{' '}
+                    {r.fullName || r.residentCode}
+                  </label>
+                );
+              })}
             </div>
-          ) : (
-            <p className="meal-page__hint">{t(`${TAB}.selectScheduleHint`)}</p>
-          )}
+          </div>
 
-          <p className="meal-page__hint">
-            {selectedScheduleId && publishedTimes.source === 'published_schedule'
+          <p className="mp-hint">
+            {publishedTimes.source === 'published_schedule'
               ? t(`${TAB}.timesFromScheduleHint`)
-              : publishedSchedules.length
-                ? ''
-                : t(`${TAB}.noPublishedScheduleHint`)}
+              : t(`${TAB}.noPublishedScheduleHint`)}
           </p>
 
-          <div className="tab-toolbar">
+          <div className="mp-toolbar">
             <select value={selectedTemplate} onChange={(e) => setSelectedTemplate(e.target.value)}>
               <option value="">{t(`${TAB}.selectThreeMealTemplate`)}</option>
               {templates.map((tpl) => <option key={tpl.key} value={tpl.key}>{tpl.name}</option>)}
             </select>
-            <button type="button" className="btn-primary" onClick={addFromTemplate}>{t(`${MP}.addFromTemplate`)}</button>
-            <button type="button" className="btn-secondary" onClick={addManual} disabled={!selectedScheduleId}>{t(`${MP}.addManual`)}</button>
+            <button type="button" className="mp-btn-primary" onClick={addFromTemplate}>+ {t(`${MP}.addFromTemplate`)}</button>
+            <button type="button" className="mp-btn-secondary" onClick={addManual}>+ {t(`${MP}.addManual`)}</button>
           </div>
 
-          <table className="data-table">
+          <table className="mp-table">
             <thead>
               <tr>
                 <th>{t(`${TAB}.colResident`)}</th><th>{t(`${TAB}.colMeal`)}</th><th>{t(`${TAB}.colDish`)}</th><th>{t(`${TAB}.colKcal`)}</th><th>{t(`${TAB}.colTime`)}</th><th>{t(`${TAB}.colIngredients`)}</th><th>{t(`${TAB}.colSource`)}</th><th>{t(`${TAB}.colNotes`)}</th><th />
               </tr>
             </thead>
             <tbody>
-              {entries.length === 0 && <tr><td colSpan={9} className="empty-state">{t(`${MP}.emptyEntries`)}</td></tr>}
+              {entries.length === 0 && <tr><td colSpan={9} className="mp-empty">{t(`${MP}.emptyEntries`)}</td></tr>}
               {entries.map((row, idx) => (
                 <tr key={`${idx}-${row.residentId}-${row.mealType}`}>
                   <td>
-                    <select
-                      value={row.residentId}
-                      onChange={(e) => patchEntry(idx, { residentId: e.target.value })}
-                      disabled={!selectedScheduleId}
-                    >
+                    <select value={row.residentId} onChange={(e) => patchEntry(idx, { residentId: e.target.value })}>
                       <option value="">—</option>
-                      {scheduleResidentOptions.map((r) => (
-                        <option key={r._id} value={r._id}>{r.fullName || r.residentCode}</option>
-                      ))}
-                      {selectedResidents
-                        .filter((id) => !scheduleResidentOptions.some((r) => String(r._id) === id))
-                        .map((id) => (
-                          <option key={id} value={id}>{scheduleResidentLabel(id)}</option>
-                        ))}
+                      {residents.map((r) => <option key={r._id} value={r._id}>{r.fullName || r.residentCode}</option>)}
                     </select>
                   </td>
                   <td>
@@ -560,33 +442,33 @@ function MealPlanTab() {
                   <td><input value={Array.isArray(row.ingredients) ? row.ingredients.join(', ') : row.ingredients || ''} onChange={(e) => patchEntry(idx, { ingredients: e.target.value })} /></td>
                   <td>{sourceLabel(row.source, t)}</td>
                   <td><input value={row.nutritionNote || ''} onChange={(e) => patchEntry(idx, { nutritionNote: e.target.value })} /></td>
-                  <td><button type="button" className="btn btn--sm btn--delete" onClick={() => removeEntry(idx)}>{t('common.delete')}</button></td>
+                  <td><button type="button" className="mp-btn-sm mp-btn-sm--delete" onClick={() => removeEntry(idx)}>{t('common.delete')}</button></td>
                 </tr>
               ))}
             </tbody>
           </table>
 
-          <div className="tab-toolbar">
-            <button type="button" className="btn-primary" disabled={saving} onClick={saveDraft}>
+          <div className="mp-toolbar">
+            <button type="button" className="mp-btn-primary" disabled={saving} onClick={saveDraft}>
               {saving ? t('common.saving') : editingId ? t(`${MP}.updateDraft`) : t(`${MP}.saveDraft`)}
             </button>
-            <button type="button" className="btn-secondary" onClick={resetForm}>{t(`${MP}.reset`)}</button>
+            <button type="button" className="mp-btn-secondary" onClick={resetForm}>{t(`${MP}.reset`)}</button>
           </div>
 
-          <div className="meal-page__list-header">
-            <h3 className="meal-page__draft-title">{t(`${MP}.listTitleMealPlans`, { date: formatLocaleDate(listDate, i18n.language) })}</h3>
-            <div className="meal-page__date-switch">
-              <button type="button" className="btn-secondary" onClick={() => setListDate(addDays(listDate, -1))}>{t(`${MP}.yesterday`)}</button>
-              <button type="button" className="btn-secondary" onClick={() => setListDate(today())}>{t('common.today')}</button>
+          <div className="mp-list-header">
+            <h3 className="mp-draft-title">{t(`${MP}.listTitleMealPlans`, { date: formatLocaleDate(listDate, i18n.language) })}</h3>
+            <div className="mp-date-switch">
+              <button type="button" className="mp-btn-secondary" onClick={() => setListDate(addDays(listDate, -1))}>{t(`${MP}.yesterday`)}</button>
+              <button type="button" className="mp-btn-secondary" onClick={() => setListDate(today())}>{t('common.today')}</button>
               <input type="date" value={listDate} onChange={(e) => setListDate(e.target.value)} />
-              <button type="button" className="btn-secondary" onClick={() => setListDate(addDays(listDate, 1))}>{t(`${MP}.tomorrow`)}</button>
+              <button type="button" className="mp-btn-secondary" onClick={() => setListDate(addDays(listDate, 1))}>{t(`${MP}.tomorrow`)}</button>
             </div>
           </div>
-          <table className="data-table">
+          <table className="mp-table">
             <thead><tr><th>{t(`${TAB}.titleLabel`)}</th><th>{t(`${TAB}.detailStage`)}</th><th>{t('common.date')}</th><th>{t('common.colStatus')}</th><th>{t('common.colActions')}</th></tr></thead>
             <tbody>
-              {plans.length === 0 && <tr><td colSpan={5} className="empty-state">{t(`${MP}.emptyPlans`)}</td></tr>}
-              {paginatedPlans.map((d) => (
+              {plans.length === 0 && <tr><td colSpan={5} className="mp-empty">{t(`${MP}.emptyPlans`)}</td></tr>}
+              {plans.map((d) => (
                 <tr key={d._id}>
                   <td>{d.title || '—'}</td>
                   <td>{d.careStage || '—'}</td>
@@ -595,12 +477,12 @@ function MealPlanTab() {
                   <td>
                     {d.status === 'draft' ? (
                       <>
-                        <button type="button" className="btn btn--sm btn--edit" onClick={() => openDraft(d._id)}>{t(`${MP}.open`)}</button>{' '}
-                        <button type="button" className="btn btn--sm btn--primary" onClick={() => publishDraft(d._id)}>{t(`${MP}.publish`)}</button>{' '}
-                        <button type="button" className="btn btn--sm btn--delete" onClick={() => deleteDraft(d._id)}>{t('common.delete')}</button>
+                        <button type="button" className="mp-btn-sm mp-btn-sm--edit" onClick={() => openDraft(d._id)}>{t(`${MP}.open`)}</button>{' '}
+                        <button type="button" className="mp-btn-sm mp-btn-sm--publish" onClick={() => publishDraft(d._id)}>{t(`${MP}.publish`)}</button>{' '}
+                        <button type="button" className="mp-btn-sm mp-btn-sm--delete" onClick={() => deleteDraft(d._id)}>{t('common.delete')}</button>
                       </>
                     ) : (
-                      <button type="button" className="btn btn--sm meal-page__btn-view" onClick={() => openPlanDetail(d._id)}>
+                      <button type="button" className="mp-btn-sm mp-btn-sm--view" onClick={() => openPlanDetail(d._id)}>
                         {t('common.viewDetails')}
                       </button>
                     )}
@@ -609,17 +491,9 @@ function MealPlanTab() {
               ))}
             </tbody>
           </table>
-          {plans.length > 0 && (
-            <ListPagination
-              page={plansPage}
-              totalPages={plansTotalPages}
-              total={plansTotal}
-              onPageChange={setPlansPage}
-            />
-          )}
 
           {!!editingId && (
-            <p className="meal-page__editing-meta">
+            <p className="mp-editing-meta">
               {t(`${MP}.updateDraft`)}: <code>{editingId}</code>
               {entries.length > 0 && (
                 <> · {t('common.residents')}: {[...new Set(entries.map((e) => residentMap[e.residentId]).filter(Boolean))].join(', ')}</>
@@ -633,21 +507,21 @@ function MealPlanTab() {
       )}
 
       {(detailLoading || detailPlan) && (
-        <div className="meal-page__modal-overlay" onClick={!detailLoading ? closePlanDetail : undefined}>
-          <div className="meal-page__modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
-            <div className="meal-page__modal-header">
-              <h3 className="meal-page__modal-title">{t(`${TAB}.detailPublishedTitle`)}</h3>
+        <div className="mp-modal-overlay" onClick={!detailLoading ? closePlanDetail : undefined}>
+          <div className="mp-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+            <div className="mp-modal-header">
+              <h3 className="mp-modal-title">{t(`${TAB}.detailPublishedTitle`)}</h3>
               {!detailLoading && (
-                <button type="button" className="meal-page__modal-close" onClick={closePlanDetail}>×</button>
+                <button type="button" className="mp-modal-close" onClick={closePlanDetail}>×</button>
               )}
             </div>
-            {detailLoading && <p className="meal-page__modal-loading">{t('common.loading')}</p>}
+            {detailLoading && <p className="mp-modal-loading">{t('common.loading')}</p>}
             {!detailLoading && detailPlan && (
-              <div className="meal-page__modal-body">
-                <p className="meal-page__modal-meta">
+              <div className="mp-modal-body">
+                <p className="mp-modal-meta">
                   <strong>{t(`${TAB}.detailTitle`)}:</strong> {detailPlan.title || '—'} · <strong>{t(`${TAB}.detailDate`)}:</strong> {formatLocaleDate((detailPlan.workDate || '').slice(0, 10), i18n.language)} · <strong>{t(`${TAB}.detailStage`)}:</strong> {detailPlan.careStage || '—'}
                 </p>
-                <table className="data-table meal-page__detail-table">
+                <table className="mp-table mp-detail-table">
                   <thead>
                     <tr>
                       <th>{t(`${TAB}.colResident`)}</th><th>{t(`${TAB}.colMeal`)}</th><th>{t(`${TAB}.colDish`)}</th><th>{t(`${TAB}.colKcal`)}</th><th>{t(`${TAB}.colTime`)}</th><th>{t(`${TAB}.colIngredients`)}</th><th>{t(`${TAB}.colSource`)}</th><th>{t(`${TAB}.colNotes`)}</th>
@@ -670,7 +544,7 @@ function MealPlanTab() {
                         </tr>
                       );
                     }) : (
-                      <tr><td colSpan={8} className="empty-state">{t(`${TAB}.emptyDetailMeals`)}</td></tr>
+                      <tr><td colSpan={8} className="mp-empty">{t(`${TAB}.emptyDetailMeals`)}</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -746,17 +620,9 @@ function SpecialDietTab() {
     loadPlans(listDate);
   }, [listDate]);
 
-  const {
-    paginatedItems: paginatedPlans,
-    page: plansPage,
-    setPage: setPlansPage,
-    totalPages: plansTotalPages,
-    total: plansTotal,
-  } = useClientPagination(plans);
-
   const addFromTemplate = () => {
     setError('');
-    const tpl = templates.find((t) => t.key === selectedTemplate);
+    const tpl = templates.find((tp) => tp.key === selectedTemplate);
     if (!tpl) return setError(t(`${MP}.selectTemplate`));
     if (selectedResidents.length < 1) return setError(t(`${MP}.selectResidents`));
     const generated = selectedResidents.map((residentId) => ({
@@ -820,9 +686,9 @@ function SpecialDietTab() {
       restrictions: Array.isArray(e.restrictions)
         ? e.restrictions
         : String(e.restrictions || '')
-            .split(',')
-            .map((x) => x.trim())
-            .filter(Boolean),
+          .split(',')
+          .map((x) => x.trim())
+          .filter(Boolean),
       nutritionGoal: e.nutritionGoal || undefined,
       notes: e.notes || undefined,
       source: e.source || 'manual',
@@ -927,16 +793,18 @@ function SpecialDietTab() {
   const closePlanDetail = () => setDetailPlan(null);
 
   return (
-    <div className="meal-page">
-      <p className="meal-page__intro">{t(`${TAB}.intro`)}</p>
-      {error && <p className="form-error">{error}</p>}
-      {loading && <p>{t('common.loading')}</p>}
+    <div className="mp-page">
+      <p className="mp-intro">
+        {t(`${TAB}.intro`)}
+      </p>
+      {error && <p className="mp-error">{error}</p>}
+      {loading && <p className="mp-loading">{t('common.loading')}</p>}
 
       {!loading && (
         <>
-          <div className="form-grid">
+          <div className="mp-form-grid form-grid">
             <div className="form-group">
-              <label>{t(`${TAB}.workDate`)}</label>
+              <label>{t(`${TAB}.workDate`)} *</label>
               <input type="date" min={today()} value={workDate} onChange={(e) => setWorkDate(e.target.value)} />
             </div>
             <div className="form-group">
@@ -945,14 +813,14 @@ function SpecialDietTab() {
             </div>
           </div>
 
-          <div className="meal-page__resident-section">
-            <label className="meal-page__resident-label">{t(`${TAB}.residentsLabel`)}</label>
-            <div className="meal-page__resident-grid">
+          <div className="mp-resident-section">
+            <label className="mp-resident-label">{t(`${TAB}.residentsLabel`)} *</label>
+            <div className="mp-resident-grid">
               {residents.map((r) => {
                 const id = String(r._id);
                 const checked = selectedResidents.includes(id);
                 return (
-                  <label key={id} className="meal-page__resident-item">
+                  <label key={id} className="mp-resident-item">
                     <input
                       type="checkbox"
                       checked={checked}
@@ -967,23 +835,23 @@ function SpecialDietTab() {
             </div>
           </div>
 
-          <div className="tab-toolbar">
+          <div className="mp-toolbar">
             <select value={selectedTemplate} onChange={(e) => setSelectedTemplate(e.target.value)}>
               <option value="">{t(`${TAB}.selectSpecialTemplate`)}</option>
-              {templates.map((tpl) => <option key={tpl.key} value={tpl.key}>{tpl.name}</option>)}
+              {templates.map((tp) => <option key={tp.key} value={tp.key}>{tp.name}</option>)}
             </select>
-            <button type="button" className="btn-primary" onClick={addFromTemplate}>{t(`${MP}.addFromTemplate`)}</button>
-            <button type="button" className="btn-secondary" onClick={addManual}>{t(`${MP}.addManual`)}</button>
+            <button type="button" className="mp-btn-primary" onClick={addFromTemplate}>+ {t(`${MP}.addFromTemplate`)}</button>
+            <button type="button" className="mp-btn-secondary" onClick={addManual}>+ {t(`${MP}.addManual`)}</button>
           </div>
 
-          <table className="data-table">
+          <table className="mp-table">
             <thead>
               <tr>
                 <th>{t(`${TAB}.colResident`)}</th><th>{t(`${TAB}.colDietType`)}</th><th>{t(`${TAB}.colRestrictions`)}</th><th>{t(`${TAB}.colGoal`)}</th><th>{t(`${TAB}.colEffectiveTime`)}</th><th>{t(`${TAB}.colSource`)}</th><th>{t(`${TAB}.colNotes`)}</th><th />
               </tr>
             </thead>
             <tbody>
-              {entries.length === 0 && <tr><td colSpan={8} className="empty-state">{t(`${TAB}.emptyEntries`)}</td></tr>}
+              {entries.length === 0 && <tr><td colSpan={8} className="mp-empty">{t(`${TAB}.emptyEntries`)}</td></tr>}
               {entries.map((row, idx) => (
                 <tr key={`${idx}-${row.residentId}-${row.dietType}`}>
                   <td>
@@ -1007,33 +875,33 @@ function SpecialDietTab() {
                   <td><input type="time" value={row.effectiveTime || '07:00'} onChange={(e) => patchEntry(idx, { effectiveTime: e.target.value })} /></td>
                   <td>{sourceLabel(row.source, t)}</td>
                   <td><input value={row.notes || ''} onChange={(e) => patchEntry(idx, { notes: e.target.value })} /></td>
-                  <td><button type="button" className="btn btn--sm btn--delete" onClick={() => removeEntry(idx)}>{t('common.delete')}</button></td>
+                  <td><button type="button" className="mp-btn-sm mp-btn-sm--delete" onClick={() => removeEntry(idx)}>{t('common.delete')}</button></td>
                 </tr>
               ))}
             </tbody>
           </table>
 
-          <div className="tab-toolbar">
-            <button type="button" className="btn-primary" disabled={saving} onClick={saveDraft}>
+          <div className="mp-toolbar">
+            <button type="button" className="mp-btn-primary" disabled={saving} onClick={saveDraft}>
               {saving ? t('common.saving') : editingId ? t(`${MP}.updateDraft`) : t(`${MP}.saveDraft`)}
             </button>
-            <button type="button" className="btn-secondary" onClick={resetForm}>{t(`${MP}.reset`)}</button>
+            <button type="button" className="mp-btn-secondary" onClick={resetForm}>{t(`${MP}.reset`)}</button>
           </div>
 
-          <div className="meal-page__list-header">
-            <h3 className="meal-page__draft-title">{t(`${MP}.listTitleSpecialDiets`, { date: formatLocaleDate(listDate, i18n.language) })}</h3>
-            <div className="meal-page__date-switch">
-              <button type="button" className="btn-secondary" onClick={() => setListDate(addDays(listDate, -1))}>{t(`${MP}.yesterday`)}</button>
-              <button type="button" className="btn-secondary" onClick={() => setListDate(today())}>{t('common.today')}</button>
+          <div className="mp-list-header">
+            <h3 className="mp-draft-title">{t(`${MP}.listTitleSpecialDiets`, { date: formatLocaleDate(listDate, i18n.language) })}</h3>
+            <div className="mp-date-switch">
+              <button type="button" className="mp-btn-secondary" onClick={() => setListDate(addDays(listDate, -1))}>{t(`${MP}.yesterday`)}</button>
+              <button type="button" className="mp-btn-secondary" onClick={() => setListDate(today())}>{t('common.today')}</button>
               <input type="date" value={listDate} onChange={(e) => setListDate(e.target.value)} />
-              <button type="button" className="btn-secondary" onClick={() => setListDate(addDays(listDate, 1))}>{t(`${MP}.tomorrow`)}</button>
+              <button type="button" className="mp-btn-secondary" onClick={() => setListDate(addDays(listDate, 1))}>{t(`${MP}.tomorrow`)}</button>
             </div>
           </div>
-          <table className="data-table">
+          <table className="mp-table">
             <thead><tr><th>{t(`${TAB}.titleLabel`)}</th><th>{t('common.date')}</th><th>{t('common.colStatus')}</th><th>{t('common.colActions')}</th></tr></thead>
             <tbody>
-              {plans.length === 0 && <tr><td colSpan={4} className="empty-state">{t(`${MP}.emptyPlans`)}</td></tr>}
-              {paginatedPlans.map((d) => (
+              {plans.length === 0 && <tr><td colSpan={4} className="mp-empty">{t(`${MP}.emptyPlans`)}</td></tr>}
+              {plans.map((d) => (
                 <tr key={d._id}>
                   <td>{d.title || '—'}</td>
                   <td>{formatLocaleDate((d.workDate || '').slice(0, 10), i18n.language)}</td>
@@ -1041,12 +909,12 @@ function SpecialDietTab() {
                   <td>
                     {d.status === 'draft' ? (
                       <>
-                        <button type="button" className="btn btn--sm btn--edit" onClick={() => openDraft(d._id)}>{t(`${MP}.open`)}</button>{' '}
-                        <button type="button" className="btn btn--sm btn--primary" onClick={() => publishDraft(d._id)}>{t(`${MP}.publish`)}</button>{' '}
-                        <button type="button" className="btn btn--sm btn--delete" onClick={() => deleteDraft(d._id)}>{t('common.delete')}</button>
+                        <button type="button" className="mp-btn-sm mp-btn-sm--edit" onClick={() => openDraft(d._id)}>{t(`${MP}.open`)}</button>{' '}
+                        <button type="button" className="mp-btn-sm mp-btn-sm--publish" onClick={() => publishDraft(d._id)}>{t(`${MP}.publish`)}</button>{' '}
+                        <button type="button" className="mp-btn-sm mp-btn-sm--delete" onClick={() => deleteDraft(d._id)}>{t('common.delete')}</button>
                       </>
                     ) : (
-                      <button type="button" className="btn btn--sm meal-page__btn-view" onClick={() => openPlanDetail(d._id)}>
+                      <button type="button" className="mp-btn-sm mp-btn-sm--view" onClick={() => openPlanDetail(d._id)}>
                         {t('common.viewDetails')}
                       </button>
                     )}
@@ -1055,33 +923,25 @@ function SpecialDietTab() {
               ))}
             </tbody>
           </table>
-          {plans.length > 0 && (
-            <ListPagination
-              page={plansPage}
-              totalPages={plansTotalPages}
-              total={plansTotal}
-              onPageChange={setPlansPage}
-            />
-          )}
         </>
       )}
 
       {(detailLoading || detailPlan) && (
-        <div className="meal-page__modal-overlay" onClick={!detailLoading ? closePlanDetail : undefined}>
-          <div className="meal-page__modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
-            <div className="meal-page__modal-header">
-              <h3 className="meal-page__modal-title">{t(`${TAB}.detailPublishedTitle`)}</h3>
+        <div className="mp-modal-overlay" onClick={!detailLoading ? closePlanDetail : undefined}>
+          <div className="mp-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+            <div className="mp-modal-header">
+              <h3 className="mp-modal-title">{t(`${TAB}.detailPublishedTitle`)}</h3>
               {!detailLoading && (
-                <button type="button" className="meal-page__modal-close" onClick={closePlanDetail}>×</button>
+                <button type="button" className="mp-modal-close" onClick={closePlanDetail}>×</button>
               )}
             </div>
-            {detailLoading && <p className="meal-page__modal-loading">{t('common.loading')}</p>}
+            {detailLoading && <p className="mp-modal-loading">{t('common.loading')}</p>}
             {!detailLoading && detailPlan && (
-              <div className="meal-page__modal-body">
-                <p className="meal-page__modal-meta">
+              <div className="mp-modal-body">
+                <p className="mp-modal-meta">
                   <strong>{t(`${TAB}.titleLabel`)}:</strong> {detailPlan.title || '—'} · <strong>{t('common.date')}:</strong> {formatLocaleDate((detailPlan.workDate || '').slice(0, 10), i18n.language)}
                 </p>
-                <table className="data-table meal-page__detail-table">
+                <table className="mp-table mp-detail-table">
                   <thead>
                     <tr>
                       <th>{t(`${TAB}.colResident`)}</th><th>{t(`${TAB}.colDietType`)}</th><th>{t(`${TAB}.colRestrictions`)}</th><th>{t(`${TAB}.colGoal`)}</th><th>{t(`${TAB}.colEffectiveTime`)}</th><th>{t(`${TAB}.colSource`)}</th><th>{t(`${TAB}.colNotes`)}</th>
@@ -1102,7 +962,7 @@ function SpecialDietTab() {
                         </tr>
                       );
                     }) : (
-                      <tr><td colSpan={7} className="empty-state">{t(`${TAB}.emptyDetail`)}</td></tr>
+                      <tr><td colSpan={7} className="mp-empty">{t(`${TAB}.emptyDetail`)}</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -1189,17 +1049,9 @@ function MealTimeScheduleTab() {
     loadSchedules(listDate);
   }, [listDate]);
 
-  const {
-    paginatedItems: paginatedSchedules,
-    page: schedulesPage,
-    setPage: setSchedulesPage,
-    totalPages: schedulesTotalPages,
-    total: schedulesTotal,
-  } = useClientPagination(schedules);
-
   const addFromTemplate = () => {
     setError('');
-    const tpl = templates.find((t) => t.key === selectedTemplate);
+    const tpl = templates.find((tp) => tp.key === selectedTemplate);
     if (!tpl) return setError(t(`${MP}.selectTemplate`));
     if (selectedResidents.length < 1) return setError(t(`${MP}.selectResidents`));
     const existing = new Set(entries.map((e) => String(e.residentId)));
@@ -1374,15 +1226,17 @@ function MealTimeScheduleTab() {
   const closeScheduleDetail = () => setDetailSchedule(null);
 
   return (
-    <div className="page card meal-page">
-      <h1 className="meal-page__title">{t(`${TAB}.title`)}</h1>
-      <p className="meal-page__intro">{t(`${TAB}.intro`)}</p>
-      {error && <p className="form-error">{error}</p>}
-      {loading && <p>{t('common.loading')}</p>}
+    <div className="mp-page">
+      <h2 className="mp-page__title">{t(`${TAB}.title`)}</h2>
+      <p className="mp-intro">
+        {t(`${TAB}.intro`)}
+      </p>
+      {error && <p className="mp-error">{error}</p>}
+      {loading && <p className="mp-loading">{t('common.loading')}</p>}
 
       {!loading && (
         <>
-          <div className="form-grid">
+          <div className="mp-form-grid form-grid">
             <div className="form-group">
               <label>{t(`${TAB}.workDate`)}</label>
               <input type="date" min={today()} value={formWorkDate} onChange={(e) => setFormWorkDate(e.target.value)} />
@@ -1393,14 +1247,14 @@ function MealTimeScheduleTab() {
             </div>
           </div>
 
-          <div className="meal-page__resident-section">
-            <label className="meal-page__resident-label">{t(`${TAB}.residentsLabel`)}</label>
-            <div className="meal-page__resident-grid">
+          <div className="mp-resident-section">
+            <label className="mp-resident-label">{t(`${TAB}.residentsLabel`)} *</label>
+            <div className="mp-resident-grid">
               {residents.map((r) => {
                 const id = String(r._id);
                 const checked = selectedResidents.includes(id);
                 return (
-                  <label key={id} className="meal-page__resident-item">
+                  <label key={id} className="mp-resident-item">
                     <input
                       type="checkbox"
                       checked={checked}
@@ -1415,25 +1269,25 @@ function MealTimeScheduleTab() {
             </div>
           </div>
 
-          <div className="tab-toolbar">
+          <div className="mp-toolbar">
             <select value={selectedTemplate} onChange={(e) => setSelectedTemplate(e.target.value)}>
               <option value="">{t(`${TAB}.selectPattern`)}</option>
-              {templates.map((tpl) => (
-                <option key={tpl.key} value={tpl.key}>{tpl.name}</option>
+              {templates.map((tp) => (
+                <option key={tp.key} value={tp.key}>{tp.name}</option>
               ))}
             </select>
-            <button type="button" className="btn-primary" onClick={addFromTemplate}>{t(`${MP}.addFromPattern`)}</button>
-            <button type="button" className="btn-secondary" onClick={addManual}>{t(`${MP}.addManual`)}</button>
+            <button type="button" className="mp-btn-primary" onClick={addFromTemplate}>+ {t(`${MP}.addFromPattern`)}</button>
+            <button type="button" className="mp-btn-secondary" onClick={addManual}>+ {t(`${MP}.addManual`)}</button>
           </div>
 
-          <table className="data-table">
+          <table className="mp-table">
             <thead>
               <tr>
                 <th>{t(`${TAB}.colResident`)}</th><th>{t(`${TAB}.colBreakfast`)}</th><th>{t(`${TAB}.colLunch`)}</th><th>{t(`${TAB}.colDinner`)}</th><th>{t(`${TAB}.colNotes`)}</th><th>{t(`${TAB}.colSource`)}</th><th />
               </tr>
             </thead>
             <tbody>
-              {entries.length === 0 && <tr><td colSpan={7} className="empty-state">{t(`${TAB}.emptyEntries`)}</td></tr>}
+              {entries.length === 0 && <tr><td colSpan={7} className="mp-empty">{t(`${TAB}.emptyEntries`)}</td></tr>}
               {entries.map((row, idx) => (
                 <tr key={`${idx}-${row.residentId}`}>
                   <td>
@@ -1449,33 +1303,33 @@ function MealTimeScheduleTab() {
                   <td><input type="time" value={row.dinnerTime} onChange={(e) => patchEntry(idx, { dinnerTime: e.target.value })} /></td>
                   <td><input value={row.notes || ''} onChange={(e) => patchEntry(idx, { notes: e.target.value })} /></td>
                   <td>{row.source === 'template' ? t(`${MP}.sourcePattern`) : sourceLabel(row.source, t)}</td>
-                  <td><button type="button" className="btn btn--sm btn--delete" onClick={() => removeEntry(idx)}>{t('common.delete')}</button></td>
+                  <td><button type="button" className="mp-btn-sm mp-btn-sm--delete" onClick={() => removeEntry(idx)}>{t('common.delete')}</button></td>
                 </tr>
               ))}
             </tbody>
           </table>
 
-          <div className="tab-toolbar">
-            <button type="button" className="btn-primary" disabled={saving} onClick={saveDraft}>
+          <div className="mp-toolbar">
+            <button type="button" className="mp-btn-primary" disabled={saving} onClick={saveDraft}>
               {saving ? t('common.saving') : editingId ? t(`${MP}.updateDraft`) : t(`${MP}.saveDraft`)}
             </button>
-            <button type="button" className="btn-secondary" onClick={resetForm}>{t(`${MP}.reset`)}</button>
+            <button type="button" className="mp-btn-secondary" onClick={resetForm}>{t(`${MP}.reset`)}</button>
           </div>
 
-          <div className="meal-page__list-header">
-            <h3 className="meal-page__draft-title">{t(`${MP}.listTitleMealTimes`, { date: formatLocaleDate(listDate, i18n.language) })}</h3>
-            <div className="meal-page__date-switch">
-              <button type="button" className="btn-secondary" onClick={() => setListDate(addDays(listDate, -1))}>{t(`${MP}.yesterday`)}</button>
-              <button type="button" className="btn-secondary" onClick={() => setListDate(today())}>{t('common.today')}</button>
+          <div className="mp-list-header">
+            <h3 className="mp-draft-title">{t(`${MP}.listTitleMealTimes`, { date: formatLocaleDate(listDate, i18n.language) })}</h3>
+            <div className="mp-date-switch">
+              <button type="button" className="mp-btn-secondary" onClick={() => setListDate(addDays(listDate, -1))}>{t(`${MP}.yesterday`)}</button>
+              <button type="button" className="mp-btn-secondary" onClick={() => setListDate(today())}>{t('common.today')}</button>
               <input type="date" value={listDate} onChange={(e) => setListDate(e.target.value)} />
-              <button type="button" className="btn-secondary" onClick={() => setListDate(addDays(listDate, 1))}>{t(`${MP}.tomorrow`)}</button>
+              <button type="button" className="mp-btn-secondary" onClick={() => setListDate(addDays(listDate, 1))}>{t(`${MP}.tomorrow`)}</button>
             </div>
           </div>
-          <table className="data-table">
+          <table className="mp-table">
             <thead><tr><th>{t(`${TAB}.titleLabel`)}</th><th>{t('common.date')}</th><th>{t('common.colStatus')}</th><th>{t('common.colActions')}</th></tr></thead>
             <tbody>
-              {schedules.length === 0 && <tr><td colSpan={4} className="empty-state">{t(`${MP}.emptyPlans`)}</td></tr>}
-              {paginatedSchedules.map((d) => (
+              {schedules.length === 0 && <tr><td colSpan={4} className="mp-empty">{t(`${MP}.emptyPlans`)}</td></tr>}
+              {schedules.map((d) => (
                 <tr key={d._id}>
                   <td>{d.title || '—'}</td>
                   <td>{formatLocaleDate((d.workDate || '').slice(0, 10), i18n.language)}</td>
@@ -1483,12 +1337,12 @@ function MealTimeScheduleTab() {
                   <td>
                     {d.status === 'draft' ? (
                       <>
-                        <button type="button" className="btn btn--sm btn--edit" onClick={() => openDraft(d._id)}>{t(`${MP}.open`)}</button>{' '}
-                        <button type="button" className="btn btn--sm btn--primary" onClick={() => publishDraft(d._id)}>{t(`${MP}.publish`)}</button>{' '}
-                        <button type="button" className="btn btn--sm btn--delete" onClick={() => removeDraft(d._id)}>{t('common.delete')}</button>
+                        <button type="button" className="mp-btn-sm mp-btn-sm--edit" onClick={() => openDraft(d._id)}>{t(`${MP}.open`)}</button>{' '}
+                        <button type="button" className="mp-btn-sm mp-btn-sm--publish" onClick={() => publishDraft(d._id)}>{t(`${MP}.publish`)}</button>{' '}
+                        <button type="button" className="mp-btn-sm mp-btn-sm--delete" onClick={() => removeDraft(d._id)}>{t('common.delete')}</button>
                       </>
                     ) : (
-                      <button type="button" className="btn btn--sm meal-page__btn-view" onClick={() => openScheduleDetail(d._id)}>
+                      <button type="button" className="mp-btn-sm mp-btn-sm--view" onClick={() => openScheduleDetail(d._id)}>
                         {t('common.viewDetails')}
                       </button>
                     )}
@@ -1498,17 +1352,8 @@ function MealTimeScheduleTab() {
             </tbody>
           </table>
 
-          {schedules.length > 0 && (
-            <ListPagination
-              page={schedulesPage}
-              totalPages={schedulesTotalPages}
-              total={schedulesTotal}
-              onPageChange={setSchedulesPage}
-            />
-          )}
-
           {!!editingId && (
-            <p className="meal-page__editing-meta">
+            <p className="mp-editing-meta">
               {t(`${MP}.updateDraft`)}: <code>{editingId}</code>
               {entries.length > 0 && (
                 <> · {t('common.residents')}: {[...new Set(entries.map((e) => residentMap[e.residentId]).filter(Boolean))].join(', ')}</>
@@ -1519,22 +1364,22 @@ function MealTimeScheduleTab() {
       )}
 
       {(detailLoading || detailSchedule) && (
-        <div className="meal-page__modal-overlay" onClick={!detailLoading ? closeScheduleDetail : undefined}>
-          <div className="meal-page__modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
-            <div className="meal-page__modal-header">
-              <h3 className="meal-page__modal-title">{t(`${TAB}.detailPublishedTitle`)}</h3>
+        <div className="mp-modal-overlay" onClick={!detailLoading ? closeScheduleDetail : undefined}>
+          <div className="mp-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+            <div className="mp-modal-header">
+              <h3 className="mp-modal-title">{t(`${TAB}.detailPublishedTitle`)}</h3>
               {!detailLoading && (
-                <button type="button" className="meal-page__modal-close" onClick={closeScheduleDetail}>×</button>
+                <button type="button" className="mp-modal-close" onClick={closeScheduleDetail}>×</button>
               )}
             </div>
-            {detailLoading && <p className="meal-page__modal-loading">{t('common.loading')}</p>}
+            {detailLoading && <p className="mp-modal-loading">{t('common.loading')}</p>}
             {!detailLoading && detailSchedule && (
-              <div className="meal-page__modal-body">
-                <p className="meal-page__modal-meta">
+              <div className="mp-modal-body">
+                <p className="mp-modal-meta">
                   <strong>{t(`${TAB}.titleLabel`)}:</strong> {detailSchedule.title || '—'} · <strong>{t('common.date')}:</strong>{' '}
                   {formatLocaleDate((detailSchedule.workDate || '').slice(0, 10), i18n.language)}
                 </p>
-                <table className="data-table meal-page__detail-table">
+                <table className="mp-table mp-detail-table">
                   <thead>
                     <tr>
                       <th>{t(`${TAB}.colResident`)}</th><th>{t(`${TAB}.colBreakfast`)}</th><th>{t(`${TAB}.colLunch`)}</th><th>{t(`${TAB}.colDinner`)}</th><th>{t(`${TAB}.colNotes`)}</th><th>{t(`${TAB}.colSource`)}</th>
@@ -1557,7 +1402,7 @@ function MealTimeScheduleTab() {
                         );
                       })
                     ) : (
-                      <tr><td colSpan={6} className="empty-state">{t(`${TAB}.emptyDetail`)}</td></tr>
+                      <tr><td colSpan={6} className="mp-empty">{t(`${TAB}.emptyDetail`)}</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -1575,25 +1420,23 @@ export default function MealPlansPage() {
   const [tab, setTab] = useState('meal');
 
   return (
-    <AdminPageShell title={t('nurse.mealPlans.title')}>
-      <div className="meal-page">
-      <div className="tabs meal-page__tabs">
-        <button className={`tab-btn ${tab === 'schedule' ? 'tab-btn--active' : ''}`} onClick={() => setTab('schedule')}>
-          {t('nurse.mealPlans.tabSchedule')}
+    <div className="page card mp-page">
+      <h1 className="mp-page__title">{t(`${MP}.pageTitle`)}</h1>
+      <div className="mp-tabs">
+        <button className={`mp-tab-btn ${tab === 'schedule' ? 'mp-tab-btn--active' : ''}`} onClick={() => setTab('schedule')}>
+          {t(`${MP}.tabSchedule`)}
         </button>
-        <button className={`tab-btn ${tab === 'meal' ? 'tab-btn--active' : ''}`} onClick={() => setTab('meal')}>
-          {t('nurse.mealPlans.tabMealPlans')}
+        <button className={`mp-tab-btn ${tab === 'meal' ? 'mp-tab-btn--active' : ''}`} onClick={() => setTab('meal')}>
+          {t(`${MP}.tabMealPlan`)}
         </button>
-        <button className={`tab-btn ${tab === 'special' ? 'tab-btn--active' : ''}`} onClick={() => setTab('special')}>
-          {t('nurse.mealPlans.tabSpecialDiets')}
+        <button className={`mp-tab-btn ${tab === 'special' ? 'mp-tab-btn--active' : ''}`} onClick={() => setTab('special')}>
+          {t(`${MP}.tabSpecialDiet`)}
         </button>
       </div>
 
       {tab === 'schedule' && <MealTimeScheduleTab />}
       {tab === 'meal' && <MealPlanTab />}
       {tab === 'special' && <SpecialDietTab />}
-      </div>
-    </AdminPageShell>
+    </div>
   );
 }
-

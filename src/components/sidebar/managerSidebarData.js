@@ -4,82 +4,56 @@ import {
   ClipboardList,
   UserCircle,
   Activity,
+  Heart,
+  MapPin,
+  HeartPulse,
+  FileText,
+  Pill,
+  DoorOpen,
+  UserCog,
+  Clock,
+  AlertTriangle,
+  CalendarClock,
+  Briefcase,
 } from 'lucide-react';
 
-/** Sidebar cho role manager — vận hành cư dân + quản lý nhân sự (trừ tạo admin/manager). */
 export const managerSidebarData = [
   {
-    title: 'Dashboard',
+    title: 'sidebar.dashboard',
     icon: LayoutDashboard,
     path: '/manager/dashboard',
   },
   {
-    title: 'Hồ sơ cá nhân',
+    title: 'sidebar.myProfile',
     icon: UserCircle,
     path: '/manager/profile',
   },
   {
-    title: 'Cư dân',
+    title: 'sidebar.residents',
     icon: Users,
     children: [
-      {
-        title: 'Quản lý cư dân',
-        path: '/manager/residents',
-      },
-      {
-        title: 'Thông tin thân nhân',
-        path: '/manager/residents/family',
-      },
-      {
-        title: 'Cư dân theo khu vực',
-        path: '/manager/residents/by-area',
-      },
-      {
-        title: 'Sức khỏe ban đầu',
-        path: '/manager/residents/initial-health',
-      },
-      {
-        title: 'Bệnh lý nền & tiền sử',
-        path: '/manager/residents/pre-existing-conditions',
-      },
-      {
-        title: 'Dị ứng thuốc',
-        path: '/manager/residents/drug-allergies',
-      },
-      {
-        title: 'Chuyển phòng cư dân',
-        path: '/manager/residents/transfer-room',
-      },
+      { title: 'sidebar.residents', icon: Users, path: '/manager/residents' },
+      { title: 'sidebar.familyInfo', icon: Heart, path: '/manager/residents/family' },
+      { title: 'sidebar.residentsByArea', icon: MapPin, path: '/manager/residents/by-area' },
+      { title: 'sidebar.initialHealth', icon: HeartPulse, path: '/manager/residents/initial-health' },
+      { title: 'sidebar.preExistingConditions', icon: FileText, path: '/manager/residents/pre-existing-conditions' },
+      { title: 'sidebar.drugAllergies', icon: Pill, path: '/manager/residents/drug-allergies' },
+      { title: 'sidebar.transferResident', icon: DoorOpen, path: '/manager/residents/transfer-room' },
     ],
   },
   {
-    title: 'Quản lý nhân sự',
-    icon: ClipboardList,
+    title: 'sidebar.staffManagement',
+    icon: Briefcase,
     children: [
-      {
-        title: 'Hồ sơ nhân viên',
-        path: '/manager/staff/profiles',
-      },
-      {
-        title: 'Ca làm việc',
-        path: '/manager/staff/shifts',
-      },
-      {
-        title: 'Phân công khu vực',
-        path: '/manager/staff/assignments',
-      },
-      {
-        title: 'Sẵn sàng khẩn cấp',
-        path: '/manager/staff/emergency',
-      },
-      {
-        title: 'Đơn nghỉ phép',
-        path: '/manager/staff/leave-requests',
-      },
+      { title: 'sidebar.staffProfiles', icon: UserCog, path: '/manager/staff/profiles' },
+      { title: 'sidebar.shifts', icon: Clock, path: '/manager/staff/shifts' },
+      { title: 'sidebar.assignments', icon: MapPin, path: '/manager/staff/assignments' },
+      { title: 'sidebar.emergencyAvailability', icon: AlertTriangle, path: '/manager/staff/emergency' },
+      { title: 'sidebar.leaveRequests', icon: CalendarClock, path: '/manager/staff/leave-requests' },
     ],
   },
   {
-    title: 'Quản lý Hoạt động',
+    title: 'sidebar.activityManagement',
     icon: Activity,
     path: '/manager/activity-dashboard',
   },

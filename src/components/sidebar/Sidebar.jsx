@@ -1,10 +1,30 @@
-import { NavLink } from 'react-router-dom';
+import { useState, useCallback } from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { motion, AnimatePresence } from 'motion/react';
+import { ChevronDown } from 'lucide-react';
 import { sidebarData } from './sidebarData';
-
 
 function Sidebar({ items = sidebarData }) {
   const { t, i18n } = useTranslation();
+  const location = useLocation();
+
+  const getInitialOpen = useCallback(() => {
+    const open = {};
+    items.forEach((item, index) => {
+      if (item.children) {
+        const isActive = item.children.some((child) => location.pathname === child.path);
+        if (isActive) open[index] = true;
+      }
+    });
+    return open;
+  }, [items, location.pathname]);
+
+  const [openGroups, setOpenGroups] = useState(getInitialOpen);
+
+  const toggleGroup = (index) => {
+    setOpenGroups((prev) => ({ ...prev, [index]: !prev[index] }));
+  };
 
   const handleLanguageChange = (event) => {
     const nextLang = event.target.value;
@@ -41,7 +61,6 @@ function Sidebar({ items = sidebarData }) {
             <option value="en">{t('language.en')}</option>
           </select>
         </div>
-
       </div>
 
       <div className="sidebar__nav">
@@ -58,28 +77,79 @@ function Sidebar({ items = sidebarData }) {
                 <span className="sidebar__text">{t(item.title)}</span>
               </NavLink>
             ) : (
-              <div>
-                <div className="sidebar__group-title">{t(item.title)}</div>
-
-                <div className="sidebar__subnav">
-                  {item.children?.map((child, childIndex) => (
-                    <NavLink
-                      key={childIndex}
-                      to={child.path}
-                      className={({ isActive }) =>
-                        `sidebar__subitem ${isActive ? 'sidebar__subitem--active' : ''}`
-                      }
-                    >
-                      {t(child.title)}
-                    </NavLink>
-                  ))}
-                </div>
-              </div>
+              <SidebarGroup
+                item={item}
+                isOpen={!!openGroups[index]}
+                onToggle={() => toggleGroup(index)}
+                t={t}
+                pathname={location.pathname}
+              />
             )}
           </div>
         ))}
       </div>
     </aside>
+  );
+}
+
+function SidebarGroup({ item, isOpen, onToggle, t, pathname }) {
+  const hasActiveChild = item.children?.some((child) => pathname === child.path);
+
+  return (
+    <div className="sidebar__group">
+      <button
+        type="button"
+        className={`sidebar__group-toggle ${hasActiveChild ? 'sidebar__group-toggle--active' : ''}`}
+        onClick={onToggle}
+        aria-expanded={isOpen}
+      >
+        <item.icon size={20} className="sidebar__icon" />
+        <span className="sidebar__group-toggle-text">{t(item.title)}</span>
+        <motion.span
+          className="sidebar__group-chevron"
+          animate={{ rotate: isOpen ? 180 : 0 }}
+          transition={{ duration: 0.25, ease: 'easeInOut' }}
+        >
+          <ChevronDown size={16} />
+        </motion.span>
+      </button>
+
+      <AnimatePresence initial={false}>
+        {isOpen && (
+          <motion.div
+            className="sidebar__dropdown"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.25, ease: 'easeInOut' }}
+          >
+            <div className="sidebar__dropdown-inner">
+              {item.children?.map((child, childIndex) => {
+                const ChildIcon = child.icon;
+                return (
+                  <motion.div
+                    key={childIndex}
+                    initial={{ opacity: 0, x: -12 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.2, delay: childIndex * 0.04 }}
+                  >
+                    <NavLink
+                      to={child.path}
+                      className={({ isActive }) =>
+                        `sidebar__subitem ${isActive ? 'sidebar__subitem--active' : ''}`
+                      }
+                    >
+                      {ChildIcon && <ChildIcon size={16} className="sidebar__subitem-icon" />}
+                      <span>{t(child.title)}</span>
+                    </NavLink>
+                  </motion.div>
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
 
