@@ -54,6 +54,12 @@ export const sidebarData = [
     icon: Users,
     children: [
       { title: 'sidebar.residents', icon: Users, path: '/admin/residents' },
+      { title: 'sidebar.familyInfo', icon: Heart, path: '/admin/residents/family' },
+      { title: 'sidebar.residentsByArea', icon: MapPin, path: '/admin/residents/by-area' },
+      { title: 'sidebar.initialHealth', icon: HeartPulse, path: '/admin/residents/initial-health' },
+      { title: 'sidebar.preExistingConditions', icon: FileText, path: '/admin/residents/pre-existing-conditions' },
+      { title: 'sidebar.drugAllergies', icon: Pill, path: '/admin/residents/drug-allergies' },
+      { title: 'sidebar.transferResident', icon: DoorOpen, path: '/admin/residents/transfer-room' },
     ],
   },
   {
@@ -63,12 +69,6 @@ export const sidebarData = [
       { title: 'sidebar.admissionRequests', icon: UserPlus, path: '/admin/admission-requests' },
       { title: 'sidebar.tourRequests', icon: Compass, path: '/admin/tour-requests' },
       { title: 'sidebar.servicePackages', icon: Package, path: '/admin/service-packages' },
-      { title: 'sidebar.familyInfo', icon: Heart, path: '/admin/residents/family' },
-      { title: 'sidebar.residentsByArea', icon: MapPin, path: '/admin/residents/by-area' },
-      { title: 'sidebar.initialHealth', icon: HeartPulse, path: '/admin/residents/initial-health' },
-      { title: 'sidebar.preExistingConditions', icon: FileText, path: '/admin/residents/pre-existing-conditions' },
-      { title: 'sidebar.drugAllergies', icon: Pill, path: '/admin/residents/drug-allergies' },
-      { title: 'sidebar.transferResident', icon: DoorOpen, path: '/admin/residents/transfer-room' },
     ],
   },
   {

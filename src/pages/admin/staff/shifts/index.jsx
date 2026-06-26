@@ -215,7 +215,7 @@ function useAssignableStaffForDate(workDate) {
     let cancelled = false;
     setLoading(true);
     staffService
-      .getAll({ limit: 200, isActive: true, assignmentDate: workDate })
+      .getAll({ limit: 200, isActive: true, isBanned: false, assignmentDate: workDate })
       .then((res) => {
         if (cancelled) return;
         const list = (res.data || []).filter(
@@ -259,18 +259,21 @@ function ConflictList({ conflicts, title }) {
 /** Live preview via GET /shifts/check-conflicts (debounced). */
 function useConflictPreview(form, { excludeId, templates = [] } = {}) {
   const [preview, setPreview] = useState([]);
+  const [availableTimeSlots, setAvailableTimeSlots] = useState(undefined);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const { assignedStaffId, workDate, shiftTemplateId, startTime, endTime } = form;
     if (!assignedStaffId || !workDate || !shiftTemplateId) {
       setPreview([]);
+      setAvailableTimeSlots(undefined);
       return undefined;
     }
 
     const template = templates.find((x) => x._id === shiftTemplateId);
     if (isFlexibleTemplate(template) && (!startTime || !endTime)) {
       setPreview([]);
+      setAvailableTimeSlots(undefined);
       return undefined;
     }
 
@@ -284,8 +287,12 @@ function useConflictPreview(form, { excludeId, templates = [] } = {}) {
         }
         const res = await shiftService.checkConflicts(params);
         setPreview(res.conflicts || []);
+        setAvailableTimeSlots(
+          isFlexibleTemplate(template) ? res.availableTimeSlots || [] : undefined
+        );
       } catch {
         setPreview([]);
+        setAvailableTimeSlots(undefined);
       } finally {
         setLoading(false);
       }
@@ -302,7 +309,39 @@ function useConflictPreview(form, { excludeId, templates = [] } = {}) {
     templates,
   ]);
 
-  return { preview, loading };
+  return { preview, loading, availableTimeSlots };
+}
+
+function SplitAvailableSlotsHint({ slots, onUseSlot }) {
+  const { t } = useTranslation();
+  if (slots === null || slots === undefined) return null;
+  if (!slots.length) {
+    return (
+      <div className="form-grid--full">
+        <small className="field-hint field-hint--warn">{t(`${NS}.splitNoAvailableSlots`)}</small>
+      </div>
+    );
+  }
+  const slotsText = slots
+    .map((s) => `${s.displayStart || s.startTime}–${s.displayEnd || s.endTime}`)
+    .join(', ');
+  return (
+    <div className="form-grid--full split-slots-hint">
+      <small className="field-hint">{t(`${NS}.splitAvailableSlots`, { slots: slotsText })}</small>
+      <div className="split-slots-hint__actions">
+        {slots.map((slot, i) => (
+          <button
+            key={`${slot.startTime}-${slot.endTime}-${i}`}
+            type="button"
+            className="btn btn--ghost btn--sm"
+            onClick={() => onUseSlot(slot)}
+          >
+            {t(`${NS}.splitUseSlot`)} ({slot.displayStart || slot.startTime}–{slot.displayEnd || slot.endTime})
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function StatusBadge({ value, map, prefix }) {
@@ -428,10 +467,19 @@ function CreateShiftModal({ templates, onSave, onClose }) {
   const { staff, loading: staffLoading } = useAssignableStaffForDate(form.workDate);
   const [conflicts, setConflicts] = useState([]);
   const [error, setError] = useState('');
-  const { preview, loading: previewLoading } = useConflictPreview(form, { templates });
+  const { preview, loading: previewLoading, availableTimeSlots } = useConflictPreview(form, { templates });
   const set = (k, v) => {
     setConflicts([]);
     setForm((p) => ({ ...p, [k]: v }));
+  };
+
+  const applySplitSlot = (slot) => {
+    setConflicts([]);
+    setForm((p) => ({
+      ...p,
+      startTime: slot.startTime,
+      endTime: slot.endTime,
+    }));
   };
 
   const selectedTemplate = form.shiftTemplateId
@@ -564,6 +612,9 @@ function CreateShiftModal({ templates, onSave, onClose }) {
                 <label>{t(`${NS}.createModal.endTimeLabel`)}</label>
                 <input type="time" value={form.endTime} onChange={(e) => set('endTime', e.target.value)} />
               </div>
+              {form.assignedStaffId && form.workDate && !previewLoading && availableTimeSlots !== undefined && (
+                <SplitAvailableSlotsHint slots={availableTimeSlots} onUseSlot={applySplitSlot} />
+              )}
             </>
           )}
 
@@ -621,10 +672,19 @@ function UpdateShiftModal({ shift, templates, onSave, onClose }) {
   const [conflicts, setConflicts] = useState([]);
   const [error, setError] = useState('');
   const { staff, loading: staffLoading } = useAssignableStaffForDate(form.workDate);
-  const { preview, loading: previewLoading } = useConflictPreview(form, { excludeId: shift._id, templates });
+  const { preview, loading: previewLoading, availableTimeSlots } = useConflictPreview(form, { excludeId: shift._id, templates });
   const set = (k, v) => {
     setConflicts([]);
     setForm((p) => ({ ...p, [k]: v }));
+  };
+
+  const applySplitSlot = (slot) => {
+    setConflicts([]);
+    setForm((p) => ({
+      ...p,
+      startTime: slot.startTime,
+      endTime: slot.endTime,
+    }));
   };
 
   const selectedTemplate = form.shiftTemplateId
@@ -709,6 +769,9 @@ function UpdateShiftModal({ shift, templates, onSave, onClose }) {
                 <label>{t(`${NS}.createModal.endTimeLabel`)}</label>
                 <input type="time" value={form.endTime} onChange={(e) => set('endTime', e.target.value)} />
               </div>
+              {form.assignedStaffId && form.workDate && !previewLoading && availableTimeSlots !== undefined && (
+                <SplitAvailableSlotsHint slots={availableTimeSlots} onUseSlot={applySplitSlot} />
+              )}
             </>
           )}
 

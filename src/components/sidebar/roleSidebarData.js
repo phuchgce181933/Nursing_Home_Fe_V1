@@ -39,16 +39,63 @@ export const roleSidebarData = {
     { title: 'sidebar.messages', icon: MessageSquare, path: '/doctor/messages' },
   ],
   caregiver: [
-    { title: 'sidebar.dashboard', icon: LayoutDashboard, path: '/caregiver/dashboard' },
-    { title: 'sidebar.myProfile', icon: UserCircle, path: '/caregiver/profile' },
-    { title: 'sidebar.assignedResidents', icon: Users, path: '/caregiver/assigned-residents' },
-    { title: 'sidebar.myShifts', icon: Calendar, path: '/caregiver/my-shifts' },
-    { title: 'sidebar.dailyCareSchedule', icon: ClipboardList, path: '/caregiver/daily-care-schedule' },
-    { title: 'sidebar.mealIntakeNotes', icon: Soup, path: '/caregiver/meal-intake-notes' },
-    { title: 'sidebar.dietPlans', icon: Apple, path: '/caregiver/diet-plans' },
-    { title: 'sidebar.rehabSchedule', icon: Dumbbell, path: '/caregiver/rehabilitation-schedule' },
-    { title: 'sidebar.hygieneActivities', icon: Droplets, path: '/caregiver/hygiene-activities' },
-    { title: 'sidebar.dailyBehaviors', icon: Brain, path: '/caregiver/daily-behaviors' },
+
+    {
+      title: 'Dashboard Caregiver',
+      icon: LayoutDashboard,
+      path: '/caregiver/dashboard',
+    },
+    {
+      title: 'Hồ sơ cá nhân',
+      icon: UserCircle,
+      path: '/caregiver/profile',
+    },
+    {
+      title: 'sidebar.assignedResidents',
+      icon: Users,
+      path: '/caregiver/assigned-residents',
+    },
+    {
+      title: 'sidebar.myShifts',
+      icon: Calendar,
+      path: '/caregiver/my-shifts',
+    },
+    {
+      title: 'sidebar.staffLeave',
+      icon: CalendarOff,
+      path: '/caregiver/leave',
+    },
+    {
+      title: 'sidebar.dailyCareSchedule',
+      icon: ClipboardList,
+      path: '/caregiver/daily-care-schedule',
+    },
+    {
+      title: 'sidebar.mealIntakeNotes',
+      icon: Soup,
+      path: '/caregiver/meal-intake-notes',
+    },
+    {
+      title: 'sidebar.dietPlans',
+      icon: Apple,
+      path: '/caregiver/diet-plans',
+    },
+    {
+      title: 'sidebar.rehabSchedule',
+      icon: Dumbbell,
+      path: '/caregiver/rehabilitation-schedule',
+    },
+    {
+      title: 'sidebar.hygieneActivities',
+
+      icon: Droplets,
+      path: '/caregiver/hygiene-activities',
+    },
+    {
+      title: 'sidebar.dailyBehaviors',
+      icon: Brain,
+      path: '/caregiver/daily-behaviors',
+    },
   ],
   nurse: [
     { title: 'sidebar.nurseDashboard', icon: LayoutDashboard, path: '/nurse/dashboard' },

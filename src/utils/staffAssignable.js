@@ -9,14 +9,23 @@ export const canReceiveCareTask = (staff) =>
 
 const fallbackAssignable = (role) => !NON_ASSIGNABLE_ROLES.includes(String(role || '').toLowerCase());
 
-/** @param {{ assignable?: { shift?: boolean }, role?: string }} staff */
-export const canAssignShift = (staff) =>
-  staff?.assignable ? staff.assignable.shift !== false : fallbackAssignable(staff?.role);
+const isStaffAccountAssignable = (staff) =>
+  staff?.isBanned !== true && staff?.isActive !== false;
 
-export const canAssignAreas = (staff) =>
-  staff?.assignable ? staff.assignable.areas !== false : fallbackAssignable(staff?.role);
+/** @param {{ assignable?: { shift?: boolean }, role?: string, isBanned?: boolean, isActive?: boolean }} staff */
+export const canAssignShift = (staff) => {
+  if (!isStaffAccountAssignable(staff)) return false;
+  return staff?.assignable ? staff.assignable.shift !== false : fallbackAssignable(staff?.role);
+};
 
-export const canAssignResidents = (staff) =>
-  staff?.assignable ? staff.assignable.residents !== false : fallbackAssignable(staff?.role);
+export const canAssignAreas = (staff) => {
+  if (!isStaffAccountAssignable(staff)) return false;
+  return staff?.assignable ? staff.assignable.areas !== false : fallbackAssignable(staff?.role);
+};
+
+export const canAssignResidents = (staff) => {
+  if (!isStaffAccountAssignable(staff)) return false;
+  return staff?.assignable ? staff.assignable.residents !== false : fallbackAssignable(staff?.role);
+};
 
 export const canAssignCareTask = (staff) => canReceiveCareTask(staff);
