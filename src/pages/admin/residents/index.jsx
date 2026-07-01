@@ -111,6 +111,10 @@ const buildContactsPayload = (contacts) => {
   return { contacts: payload };
 };
 
+const AVATAR_PLACEHOLDER = `data:image/svg+xml;utf8,${encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96"><rect fill="#DEE2E6" width="100%" height="100%"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#6C757D" font-family="Arial, sans-serif" font-size="14">Avatar</text></svg>'
+)}`;
+
 const emptyPersonalForm = {
   residentCode: '',
   fullName: '',
@@ -129,7 +133,7 @@ const emptyPersonalForm = {
   servicePackage: '',
 };
 
-function ResidentPage({ defaultMode }) {
+function ResidentPage({ defaultMode = '' }) {
   const { t } = useTranslation();
   const { user } = useAuth();
   const isManager = user?.role === 'manager';
@@ -172,6 +176,7 @@ function ResidentPage({ defaultMode }) {
   const [selectedResident, setSelectedResident] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
 
   const [personalForm, setPersonalForm] = useState({ ...emptyPersonalForm });
   const [personalError, setPersonalError] = useState(null);
@@ -206,6 +211,9 @@ function ResidentPage({ defaultMode }) {
       };
 
       const res = await residentService.getResidentList(params);
+      // DEBUG: log first resident to verify avatarUrl is present (remove in production)
+      // eslint-disable-next-line no-console
+      console.debug('admin resident list sample:', res?.data?.[0]);
       setResidents(res?.data || []);
       setTotal(res?.total || 0);
       setTotalPages(res?.totalPages || 1);
@@ -273,6 +281,29 @@ function ResidentPage({ defaultMode }) {
 
     loadDetail();
   }, [selectedResidentId, showDetailModal]);
+
+  const handleAvatarFileChange = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file || !selectedResidentId) return;
+    // basic validations
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Ảnh quá lớn. Kích thước tối đa 5MB.');
+      return;
+    }
+
+    try {
+      setAvatarUploading(true);
+      const data = await residentService.adminUploadAvatar(selectedResidentId, file);
+      const resident = data?.resident || null;
+      setSelectedResident(resident);
+    } catch (err) {
+      console.error('Upload avatar failed', err);
+      alert(err?.response?.data?.message || err.message || 'Không thể tải ảnh lên. Vui lòng thử lại.');
+    } finally {
+      setAvatarUploading(false);
+      event.target.value = '';
+    }
+  };
 
   const handleApplyFilters = (event) => {
     if (event) event.preventDefault();
@@ -658,6 +689,7 @@ function ResidentPage({ defaultMode }) {
           <thead>
             <tr className="resident-page__table-header">
               <th>Mã</th>
+              <th>Ảnh</th>
               <th>Họ tên</th>
               <th>Trạng thái</th>
               <th>Phòng</th>
@@ -667,9 +699,10 @@ function ResidentPage({ defaultMode }) {
             </tr>
           </thead>
           <tbody>
+
             {loading && (
               <tr>
-                <td colSpan="7" className="resident-page__empty">
+                <td colSpan="8" className="resident-page__empty">
                   Đang tải danh sách cư dân...
                 </td>
               </tr>
@@ -677,7 +710,7 @@ function ResidentPage({ defaultMode }) {
 
             {!loading && residents.length === 0 && (
               <tr>
-                <td colSpan="7" className="resident-page__empty">
+                <td colSpan="8" className="resident-page__empty">
                   Không tìm thấy cư dân nào.
                 </td>
               </tr>
@@ -687,6 +720,13 @@ function ResidentPage({ defaultMode }) {
               residents.map((resident) => (
                 <tr key={resident._id} className="resident-page__table-row">
                   <td>{resident.residentCode}</td>
+                  <td>
+                    <img
+                      src={resident.avatarUrl || AVATAR_PLACEHOLDER}
+                      alt={resident.fullName || 'avatar'}
+                      className="resident-page__avatar"
+                    />
+                  </td>
                   <td>
                     <div className="resident-page__name">
                       <strong>{resident.fullName}</strong>
@@ -1050,9 +1090,27 @@ function ResidentPage({ defaultMode }) {
             {!detailLoading && selectedResident && (
               <div className="resident-modal__body">
                 <div className="resident-detail-card">
-                  <div>
-                    <h3>{selectedResident.fullName}</h3>
-                    <p>{selectedResident.residentCode}</p>
+                  <div className="resident-detail-card__identity">
+                                    <div className="resident-avatar">
+                                      <img
+                                        src={selectedResident.avatarUrl || AVATAR_PLACEHOLDER}
+                                        alt="avatar"
+                                        width="96"
+                                        height="96"
+                                      />
+                      {canManageResidents && (
+                        <div className="resident-avatar__upload">
+                          <label className="button button--ghost">
+                            {avatarUploading ? 'Đang tải...' : 'Đổi ảnh'}
+                            <input type="file" accept="image/*" onChange={handleAvatarFileChange} style={{ display: 'none' }} />
+                          </label>
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <h3>{selectedResident.fullName}</h3>
+                      <p>{selectedResident.residentCode}</p>
+                    </div>
                   </div>
                   <div>
                     <span>Trạng thái</span>
@@ -1318,8 +1376,6 @@ function ResidentPage({ defaultMode }) {
   );
 }
 
-ResidentPage.defaultProps = {
-  defaultMode: '',
-};
+// defaultMode default parameter is set in the function signature
 
 export default ResidentPage;

@@ -344,3 +344,69 @@
 .wallet-alert {
   margin: 0;
 }
+
+.otp-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 120;
+  padding: 20px;
+}
+
+.otp-modal {
+  width: min(520px, 100%);
+  background: #ffffff;
+  border-radius: 20px;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.18);
+  padding: 28px;
+  max-width: 480px;
+}
+
+.otp-modal h3 {
+  margin: 0 0 12px;
+  font-size: 22px;
+  color: #0f172a;
+}
+
+.otp-modal p {
+  margin: 0 0 18px;
+  color: #475569;
+  line-height: 1.6;
+}
+
+.otp-modal label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.otp-input {
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid #cbd5e1;
+  font-size: 16px;
+  color: #0f172a;
+  margin-bottom: 12px;
+}
+
+.otp-error {
+  margin-bottom: 14px;
+  color: #b91c1c;
+  font-size: 14px;
+}
+
+.otp-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.otp-actions .button {
+  min-width: 140px;
+}

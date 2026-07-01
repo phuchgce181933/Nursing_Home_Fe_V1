@@ -521,8 +521,13 @@ export default function CareAppointmentsPage() {
         }
       }
 
-      // 4. Set appointment status to completed
-      await careAppointmentService.updateStatus(selectedAppt._id, 'completed');
+      // 4. Mark appointment complete once the clinical exam workflow is finished.
+      if (selectedAppt?.status && selectedAppt.status !== 'completed') {
+        if (selectedAppt.status === 'scheduled') {
+          await careAppointmentService.updateStatus(selectedAppt._id, 'in_progress');
+        }
+        await careAppointmentService.updateStatus(selectedAppt._id, 'completed');
+      }
 
       setShowWizardModal(false);
       setSelectedAppt(null);
