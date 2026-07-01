@@ -21,6 +21,16 @@ const updateResidentPersonalInfo = async (residentId, body) => {
   return response.data;
 };
 
+const adminUploadAvatar = async (residentId, file) => {
+  const id = residentPathId(residentId);
+  const fd = new FormData();
+  fd.append('avatar', file);
+  const response = await axiosClient.post(`/admin/residents/${id}/avatar`, fd, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return response.data;
+};
+
 const updateResidentFamilyInfo = async (residentId, body) => {
   const response = await axiosClient.patch(`/admin/residents/${residentId}/family-info`, body);
   return response.data;
@@ -968,6 +978,7 @@ const residentService = {
   fetchAllResidentsByAreaForExport,
   getFamilyResidentList,
   updateResidentPersonalInfo,
+  adminUploadAvatar,
   updateResidentFamilyInfo,
   listForAssignment,
   listForFamilyManagement,

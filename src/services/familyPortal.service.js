@@ -35,6 +35,16 @@ const payInvoice = async (residentId, invoiceId, body) => {
   return response.data.data || response.data;
 };
 
+const initiateWalletPayment = async (payload) => {
+  const response = await axiosClient.post('/family/wallet/payments/initiate', payload);
+  return response.data.data || response.data;
+};
+
+const verifyWalletPayment = async (payload) => {
+  const response = await axiosClient.post('/family/wallet/payments/verify', payload);
+  return response.data.data || response.data;
+};
+
 const batchPayment = async (residentId, body) => {
   const response = await axiosClient.post(`/residents/${residentId}/invoices/batch-pay`, body);
   return response.data.data || response.data;
@@ -48,5 +58,7 @@ export default {
   getResidentInvoices,
   createInvoice,
   payInvoice,
+  initiateWalletPayment,
+  verifyWalletPayment,
   batchPayment,
 };

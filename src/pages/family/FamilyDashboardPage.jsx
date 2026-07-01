@@ -41,6 +41,13 @@ function FamilyDashboardPage() {
   const [topupAmount, setTopupAmount] = useState(500000);
   const [isTopupProcessing, setIsTopupProcessing] = useState(false);
   const [isWalletPaymentProcessing, setIsWalletPaymentProcessing] = useState(false);
+  const [showOtpModal, setShowOtpModal] = useState(false);
+  const [otpId, setOtpId] = useState(null);
+  const [otpMaskedPhone, setOtpMaskedPhone] = useState('');
+  const [otpCode, setOtpCode] = useState('');
+  const [otpError, setOtpError] = useState(null);
+  const [isOtpVerifying, setIsOtpVerifying] = useState(false);
+  const [pendingWalletPayment, setPendingWalletPayment] = useState(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedPackages, setSelectedPackages] = useState({});
   const [currentResidentPayment, setCurrentResidentPayment] = useState(null);
@@ -151,24 +158,80 @@ function FamilyDashboardPage() {
 
     try {
       setWalletError(null);
+      setOtpError(null);
       setIsWalletPaymentProcessing(true);
-      await familyPortalService.payInvoice(residentId, invoiceId, {
-        paymentMethod: 'wallet',
+
+      const payload = await familyPortalService.initiateWalletPayment({
         amount,
+        invoiceIds: [invoiceId],
       });
-      // Reload invoices for resident and wallet info
-      const [updatedInvoices, updatedWallet] = await Promise.all([
-        familyPortalService.getResidentInvoices(residentId),
-        familyPortalService.getWalletBalance(),
-      ]);
-      setInvoicesList(prev => ({
-        ...prev,
-        [residentId]: Array.isArray(updatedInvoices) ? updatedInvoices : updatedInvoices?.data || [],
-      }));
-      setWalletInfo(updatedWallet);
+
+      setOtpId(payload.otpId);
+      setOtpMaskedPhone(payload.maskedPhone || '');
+      setOtpCode('');
+      setPendingWalletPayment({ residentId, invoiceIds: [invoiceId], amount });
+      setShowOtpModal(true);
     } catch (err) {
       console.error('Wallet payment failed:', err);
-      setWalletError(err?.response?.data?.message || err.message || 'Không thể thanh toán bằng ví');
+      setWalletError(err?.response?.data?.message || err.message || 'Không thể gửi yêu cầu OTP xác thực');
+    } finally {
+      setIsWalletPaymentProcessing(false);
+    }
+  };
+
+  const handleVerifyWalletOtp = async () => {
+    if (!otpCode.trim()) {
+      setOtpError('Vui lòng nhập mã OTP.');
+      return;
+    }
+
+    if (!otpId) {
+      setOtpError('OTP không hợp lệ. Vui lòng thử lại.');
+      return;
+    }
+
+    try {
+      setOtpError(null);
+      setIsOtpVerifying(true);
+      await familyPortalService.verifyWalletPayment({ otpId, code: otpCode });
+
+      if (pendingWalletPayment?.residentId) {
+        const updatedInvoices = await familyPortalService.getResidentInvoices(pendingWalletPayment.residentId);
+        setInvoicesList(prev => ({
+          ...prev,
+          [pendingWalletPayment.residentId]: Array.isArray(updatedInvoices) ? updatedInvoices : updatedInvoices?.data || [],
+        }));
+      }
+      const updatedWallet = await familyPortalService.getWalletBalance();
+      setWalletInfo(updatedWallet);
+      setShowOtpModal(false);
+      setOtpId(null);
+      setOtpMaskedPhone('');
+      setOtpCode('');
+      setPendingWalletPayment(null);
+    } catch (err) {
+      console.error('OTP verification failed:', err);
+      setOtpError(err?.response?.data?.message || err.message || 'Mã OTP không hợp lệ hoặc đã hết hạn');
+    } finally {
+      setIsOtpVerifying(false);
+    }
+  };
+
+  const handleResendWalletOtp = async () => {
+    if (!pendingWalletPayment) return;
+    try {
+      setOtpError(null);
+      setIsWalletPaymentProcessing(true);
+      const payload = await familyPortalService.initiateWalletPayment({
+        amount: pendingWalletPayment.amount,
+        invoiceIds: pendingWalletPayment.invoiceIds,
+      });
+      setOtpId(payload.otpId);
+      setOtpMaskedPhone(payload.maskedPhone || '');
+      setOtpCode('');
+    } catch (err) {
+      console.error('OTP resend failed:', err);
+      setOtpError(err?.response?.data?.message || err.message || 'Không thể gửi lại mã OTP');
     } finally {
       setIsWalletPaymentProcessing(false);
     }
@@ -763,7 +826,36 @@ function FamilyDashboardPage() {
         })}
       </div>
 
-      {/* Batch payment modal removed: per-invoice payment buttons are used instead */}
+      {/* OTP verification modal for wallet payments */}
+      {showOtpModal && (
+        <div className="otp-modal-backdrop" onClick={() => setShowOtpModal(false)}>
+          <div className="otp-modal" onClick={(event) => event.stopPropagation()}>
+            <h3>Xác thực thanh toán bằng SMS OTP</h3>
+            <p>Chúng tôi đã gửi mã OTP đến số <strong>{otpMaskedPhone || '***'}.</strong></p>
+            <label htmlFor="wallet-otp-code">Mã OTP</label>
+            <input
+              id="wallet-otp-code"
+              type="text"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              value={otpCode}
+              onChange={(event) => setOtpCode(event.target.value)}
+              placeholder="Nhập mã OTP"
+              className="otp-input"
+              maxLength={6}
+            />
+            {otpError && <div className="otp-error">{otpError}</div>}
+            <div className="otp-actions">
+              <button type="button" className="button button-secondary" onClick={handleResendWalletOtp} disabled={isWalletPaymentProcessing}>
+                Gửi lại mã OTP
+              </button>
+              <button type="button" className="button button-primary" onClick={handleVerifyWalletOtp} disabled={isOtpVerifying}>
+                {isOtpVerifying ? 'Đang xác thực...' : 'Xác nhận'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
