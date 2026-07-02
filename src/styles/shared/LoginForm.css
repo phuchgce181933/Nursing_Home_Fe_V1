@@ -36,6 +36,37 @@
   gap: 8px;
 }
 
+.login-form__group--password {
+  position: relative;
+}
+
+.login-form__password-wrapper {
+  position: relative;
+}
+
+.login-form__password-toggle {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: none;
+  background: transparent;
+  color: #475569;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+}
+
+.login-form__password-toggle:hover {
+  color: #2563eb;
+}
+
+.login-form__input--password {
+  padding-right: 42px;
+}
+
 .login-form__label {
   font-size: 13px;
   font-weight: 600;

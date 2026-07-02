@@ -154,6 +154,42 @@
   background: #1d4ed8;
 }
 
+.sidebar__footer {
+  padding: 14px 16px;
+  border-top: 1px solid #1f2937;
+}
+
+.sidebar__logout-button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: none;
+  background: #111827;
+  color: #cbd5e1;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.sidebar__logout-button:hover {
+  background: #1e293b;
+  color: #ffffff;
+  transform: translateX(3px);
+}
+
+.sidebar__logout-button:active {
+  transform: translateX(1px) scale(0.98);
+}
+
+.sidebar__logout-text {
+  flex: 1;
+  text-align: left;
+}
+
 .sidebar__icon {
   flex-shrink: 0;
   transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);

@@ -128,7 +128,7 @@ export default function StaffEditModal({
               </label>
               <select value={form.role} onChange={(e) => set('role', e.target.value)}>
                 {roleOptions.map((r) => (
-                  <option key={r.value} value={r.value}>{t(`common.roles.${r.value}`, { defaultValue: r.value })}</option>
+                  <option key={r.value} value={r.value}>{r.label || t(`common.roles.${r.value}`, { defaultValue: r.value })}</option>
                 ))}
               </select>
             </div>

@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { STAFF_ROLE_LABELS } from '../../../../constants/rolePolicy';
 
 function StatusBadge({ s, t }) {
   if (s.isBanned) return <span className="status-badge status-badge--banned">{t('admin.staff.profiles.statusBanned')}</span>;
@@ -56,7 +57,7 @@ export default function StaffTable({ staff, loading, onView, onEdit, onBan, canM
               <td>{s.phone || '—'}</td>
               <td>
                 <span className={`role-badge role-badge--${s.role}`}>
-                  {t(`common.roles.${s.role}`, { defaultValue: s.role })}
+                  {STAFF_ROLE_LABELS[s.role] || t(`common.roles.${s.role}`, { defaultValue: s.role })}
                 </span>
               </td>
               <td>{s.staffProfile?.specialty || '—'}</td>

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   Mail, Phone, Shield, BadgeCheck, UserCircle, Pencil,
   User, Contact, Lock, Clock, MapPin, Calendar, Briefcase,
-  Hash, Users, MapPinned, LogOut, KeyRound,
+  Hash, Users, MapPinned, LogOut, KeyRound, Eye, EyeOff,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -19,10 +19,9 @@ const TABS = [
 
 const initialProfileForm = {
   fullName: '',
+  email: '',
   phone: '',
   gender: 'unknown',
-  address: '',
-  dateOfBirth: '',
 };
 
 const initialPasswordForm = {
@@ -38,33 +37,59 @@ function formatDate(value) {
   });
 }
 
-function toDateInput(value) {
-  if (!value) return '';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-  return date.toISOString().slice(0, 10);
+function getGenderDisplay(value, t) {
+  if (!value) return '—';
+  return t(`common.gender.${value}`, { defaultValue: value });
+}
+
+function capitalizeGender(value) {
+  if (!value) return 'Unknown';
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function formatGenderLabel(value) {
+  const labels = {
+    male: 'Nam',
+    female: 'Nữ',
+    other: 'Khác',
+    unknown: 'Không rõ',
+  };
+  return labels[value] || value;
 }
 
 function AdminProfile() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user, loading, logout, refreshUser } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('personal');
   const [editing, setEditing] = useState(false);
   const [profileForm, setProfileForm] = useState(initialProfileForm);
   const [passwordForm, setPasswordForm] = useState(initialPasswordForm);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('success');
   const [isSaving, setIsSaving] = useState(false);
+  const [otpModalVisible, setOtpModalVisible] = useState(false);
+  const [otpContext, setOtpContext] = useState('email');
+  const [otpId, setOtpId] = useState(null);
+  const [emailOtpId, setEmailOtpId] = useState(null);
+  const [phoneOtpId, setPhoneOtpId] = useState(null);
+  const [otpMaskedRecipient, setOtpMaskedRecipient] = useState('');
+  const [emailMaskedRecipient, setEmailMaskedRecipient] = useState('');
+  const [phoneMaskedRecipient, setPhoneMaskedRecipient] = useState('');
+  const [pendingEmailChange, setPendingEmailChange] = useState(false);
+  const [pendingPhoneChange, setPendingPhoneChange] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+  const [otpError, setOtpError] = useState('');
 
   useEffect(() => {
     if (user) {
       setProfileForm({
         fullName: user.fullName || '',
+        email: user.email || '',
         phone: user.phone || '',
         gender: user.gender || 'unknown',
-        address: user.address || '',
-        dateOfBirth: toDateInput(user.dateOfBirth),
       });
     }
   }, [user]);
@@ -83,16 +108,124 @@ function AdminProfile() {
     setIsSaving(true);
     setMessage('');
     try {
-      await authService.updateProfile(profileForm);
-      setMessageType('success');
-      setMessage(t('profile.updateSuccess'));
-      setEditing(false);
-      setTimeout(() => { logout(); navigate('/login'); }, 1300);
+      // If email changed, request OTP verification first (compare normalized)
+      const normalizedNewEmail = profileForm.email ? String(profileForm.email).trim().toLowerCase() : '';
+      const normalizedOldEmail = user?.email ? String(user.email).trim().toLowerCase() : '';
+      const normalizedNewPhone = profileForm.phone ? String(profileForm.phone).trim() : '';
+      const normalizedOldPhone = user?.phone ? String(user.phone).trim() : '';
+
+      const bothEmailAndPhoneChanged = normalizedNewEmail && normalizedNewEmail !== normalizedOldEmail && normalizedNewPhone && normalizedNewPhone !== normalizedOldPhone;
+      if (bothEmailAndPhoneChanged) {
+        const emailResp = await authService.requestEmailChangeOtp({ email: profileForm.email });
+        const phoneResp = await authService.requestPhoneChangeOtp({ phone: normalizedNewPhone });
+        setPendingEmailChange(true);
+        setPendingPhoneChange(true);
+        setEmailOtpId(emailResp.otpId);
+        setPhoneOtpId(phoneResp.otpId);
+        setEmailMaskedRecipient(emailResp.maskedRecipient || profileForm.email);
+        setPhoneMaskedRecipient(phoneResp.maskedRecipient || normalizedNewPhone);
+        setOtpContext('email');
+        setOtpId(emailResp.otpId);
+        setOtpMaskedRecipient(emailResp.maskedRecipient || profileForm.email);
+        setOtpCode('');
+        setOtpError('');
+        setOtpModalVisible(true);
+      } else if (normalizedNewEmail && normalizedNewEmail !== normalizedOldEmail) {
+        const resp = await authService.requestEmailChangeOtp({ email: profileForm.email });
+        setPendingEmailChange(true);
+        setOtpContext('email');
+        setOtpId(resp.otpId);
+        setEmailOtpId(resp.otpId);
+        setEmailMaskedRecipient(resp.maskedRecipient || profileForm.email);
+        setOtpMaskedRecipient(resp.maskedRecipient || profileForm.email);
+        setOtpCode('');
+        setOtpError('');
+        setOtpModalVisible(true);
+      } else if (normalizedNewPhone && normalizedNewPhone !== normalizedOldPhone) {
+        const nextPhone = normalizedNewPhone;
+        const resp = await authService.requestPhoneChangeOtp({ phone: nextPhone });
+        setPendingPhoneChange(true);
+        setOtpContext('phone');
+        setOtpId(resp.otpId);
+        setPhoneOtpId(resp.otpId);
+        setPhoneMaskedRecipient(resp.maskedRecipient || nextPhone);
+        setOtpMaskedRecipient(resp.maskedRecipient || nextPhone);
+        setOtpCode('');
+        setOtpError('');
+        setOtpModalVisible(true);
+      } else {
+        // Ensure we don't send the email field if it wasn't actually changed
+        const payload = { ...profileForm };
+        delete payload.email;
+        await authService.updateProfile(payload);
+        setMessageType('success');
+        setMessage(t('profile.updateSuccess'));
+        setEditing(false);
+        if (refreshUser) refreshUser();
+      }
     } catch (error) {
       setMessageType('error');
-      setMessage(error?.response?.data?.message || t('profile.updateError'));
+      const serverMessage = error?.response?.data?.message;
+      setMessage(
+        serverMessage === 'Email is already in use'
+          ? t('profile.emailInUse')
+          : serverMessage === 'Phone number is already in use'
+            ? t('profile.phoneInUse')
+            : serverMessage || t('profile.updateError')
+      );
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    if (!otpId) return;
+    setIsVerifyingOtp(true);
+    setOtpError('');
+    try {
+      if (otpContext === 'email') {
+        await authService.verifyEmailChangeOtp({ otpId, code: otpCode });
+        setPendingEmailChange(false);
+        if (pendingPhoneChange && phoneOtpId) {
+          setOtpContext('phone');
+          setOtpId(phoneOtpId);
+          setOtpMaskedRecipient(phoneMaskedRecipient);
+          setOtpCode('');
+          setOtpError('');
+          setMessageType('success');
+          setMessage(t('profile.emailVerifiedContinuePhone') || 'Email đã được xác thực. Vui lòng xác thực số điện thoại.');
+          return;
+        }
+        setMessageType('success');
+        setMessage(t('profile.emailChangeSuccess') || 'Email updated');
+      } else {
+        await authService.verifyPhoneChangeOtp({ otpId, code: otpCode });
+        setPendingPhoneChange(false);
+        if (pendingEmailChange && emailOtpId) {
+          setOtpContext('email');
+          setOtpId(emailOtpId);
+          setOtpMaskedRecipient(emailMaskedRecipient);
+          setOtpCode('');
+          setOtpError('');
+          setMessageType('success');
+          setMessage(t('profile.phoneVerifiedContinueEmail') || 'Phone đã được xác thực. Vui lòng xác thực email.');
+          return;
+        }
+        setMessageType('success');
+        setMessage(
+          pendingEmailChange
+            ? t('profile.emailAndPhoneChangeSuccess') || 'Email and phone updated'
+            : t('profile.phoneChangeSuccess') || 'Phone updated'
+        );
+      }
+      setOtpModalVisible(false);
+      setEditing(false);
+      if (refreshUser) refreshUser();
+    } catch (err) {
+      const serverMessage = err?.response?.data?.message || err.message;
+      setOtpError(serverMessage === 'Invalid OTP' ? t('profile.invalidOtp') : serverMessage);
+    } finally {
+      setIsVerifyingOtp(false);
     }
   };
 
@@ -163,12 +296,46 @@ function AdminProfile() {
           </button>
         </div>
       </div>
+      {otpModalVisible && (
+        <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200 }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)' }} onClick={() => setOtpModalVisible(false)} />
+          <div style={{ background: '#fff', padding: 20, borderRadius: 6, width: 420, zIndex: 1201 }}>
+            <h3 style={{ marginTop: 0 }}>{t(otpContext === 'phone' ? 'profile.verifyPhoneTitle' : 'profile.verifyEmailTitle') || (otpContext === 'phone' ? 'Xác thực số điện thoại' : 'Xác thực email')}</h3>
+            <p style={{ marginTop: 0, marginBottom: 12 }}>{t('profile.verifyEmailSentTo') || 'Mã xác thực đã được gửi tới'}: <strong>{otpMaskedRecipient}</strong></p>
+            <input className="ap-form__input" value={otpCode} onChange={(e) => setOtpCode(e.target.value)} placeholder={t('profile.enterOtp') || 'Nhập mã OTP'} />
+            {otpError && <div style={{ color: 'red', marginTop: 8 }}>{otpError}</div>}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
+              <button type="button" className="ap-btn ap-btn--outline" onClick={() => setOtpModalVisible(false)}>{t('common.cancel')}</button>
+              <button type="button" className="ap-btn ap-btn--primary" onClick={handleVerifyOtp} disabled={isVerifyingOtp}>{isVerifyingOtp ? t('profile.verifying') : t('profile.verify')}</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {message && (
         <div className={`ap-message ${messageType === 'success' ? 'ap-message--success' : 'ap-message--error'}`}>
           {message}
         </div>
       )}
+
+      <div className="ap-summary">
+        <div className="ap-summary__card">
+          <span className="ap-summary__label">{t('profile.email')}</span>
+          <p className="ap-summary__value">{user.email}</p>
+        </div>
+        <div className="ap-summary__card">
+          <span className="ap-summary__label">{t('profile.phoneNumber')}</span>
+          <p className="ap-summary__value">{user.phone || '—'}</p>
+        </div>
+        <div className="ap-summary__card">
+          <span className="ap-summary__label">{t('profile.roleCategory')}</span>
+          <p className="ap-summary__value">{roleLabel}</p>
+        </div>
+        <div className="ap-summary__card">
+          <span className="ap-summary__label">{t('profile.lastLogin')}</span>
+          <p className="ap-summary__value">{formatDate(user.lastLoginAt)}</p>
+        </div>
+      </div>
 
       {/* Body */}
       <div className="ap-body">
@@ -199,6 +366,10 @@ function AdminProfile() {
                       <input className="ap-form__input" value={profileForm.fullName}
                         onChange={(e) => setProfileForm(p => ({ ...p, fullName: e.target.value }))} />
                     </FormField>
+                    <FormField label={t('profile.email')} icon={Mail}>
+                      <input className="ap-form__input" type="email" value={profileForm.email}
+                        onChange={(e) => setProfileForm(p => ({ ...p, email: e.target.value }))} />
+                    </FormField>
                     <FormField label={t('profile.gender')} icon={Users}>
                       <select className="ap-form__input" value={profileForm.gender}
                         onChange={(e) => setProfileForm(p => ({ ...p, gender: e.target.value }))}>
@@ -208,17 +379,9 @@ function AdminProfile() {
                         <option value="unknown">{t('profile.genderUnknown')}</option>
                       </select>
                     </FormField>
-                    <FormField label={t('profile.dateOfBirth')} icon={Calendar}>
-                      <input className="ap-form__input" type="date" value={profileForm.dateOfBirth}
-                        onChange={(e) => setProfileForm(p => ({ ...p, dateOfBirth: e.target.value }))} />
-                    </FormField>
                     <FormField label={t('profile.phoneNumber')} icon={Phone}>
                       <input className="ap-form__input" value={profileForm.phone}
                         onChange={(e) => setProfileForm(p => ({ ...p, phone: e.target.value }))} />
-                    </FormField>
-                    <FormField label={t('profile.address')} icon={MapPin} full>
-                      <input className="ap-form__input" value={profileForm.address}
-                        onChange={(e) => setProfileForm(p => ({ ...p, address: e.target.value }))} />
                     </FormField>
                   </div>
                   <div className="ap-form__actions">
@@ -237,9 +400,10 @@ function AdminProfile() {
                   <h2 className="ap-section__title">{t('profile.personalInfo')}</h2>
                   <div className="ap-info-grid">
                     <InfoField label={t('profile.fullName')} value={user.fullName} />
-                    <InfoField label={t('profile.gender')} value={user.gender || '—'} />
-                    <InfoField label={t('profile.dateOfBirth')} value={formatDate(user.dateOfBirth)} />
-                    <InfoField label={t('profile.address')} value={user.address || '—'} />
+                    <InfoField
+                      label={t('profile.gender')}
+                      value={getGenderDisplay(user.gender, t)}
+                    />
                   </div>
                 </section>
 
@@ -266,7 +430,6 @@ function AdminProfile() {
               <div className="ap-info-grid">
                 <InfoField label="Email" value={user.email} icon={Mail} />
                 <InfoField label={t('profile.phoneNumber')} value={user.phone || '—'} icon={Phone} />
-                <InfoField label={t('profile.address')} value={user.address || '—'} icon={MapPin} />
               </div>
             </section>
           )}
@@ -277,9 +440,19 @@ function AdminProfile() {
               <form className="ap-form" onSubmit={handlePasswordSubmit}>
                 <div className="ap-form__grid">
                   <FormField label={t('profile.currentPassword')} icon={Lock} full>
-                    <input className="ap-form__input" type="password" required
-                      value={passwordForm.currentPassword}
-                      onChange={(e) => setPasswordForm(p => ({ ...p, currentPassword: e.target.value }))} />
+                    <div className="ap-form__input-wrap">
+                      <input className="ap-form__input" type={showCurrentPassword ? 'text' : 'password'} required
+                        value={passwordForm.currentPassword}
+                        onChange={(e) => setPasswordForm(p => ({ ...p, currentPassword: e.target.value }))} />
+                      <button
+                        type="button"
+                        className="ap-form__toggle"
+                        onClick={() => setShowCurrentPassword((prev) => !prev)}
+                        aria-label={showCurrentPassword ? t('profile.hidePassword') : t('profile.showPassword')}
+                      >
+                        {showCurrentPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </button>
+                    </div>
                   </FormField>
                   <FormField label={t('profile.newPassword')} icon={KeyRound}>
                     <input className="ap-form__input" type="password" required
@@ -315,7 +488,6 @@ function AdminProfile() {
               <div className="ap-info-grid">
                 <InfoField label={t('profile.userId')} value={user._id} icon={Hash} mono />
                 <InfoField label={t('profile.roleCategory')} value={user.role} icon={Shield} />
-                <InfoField label={t('profile.createdAt')} value={formatDate(user.createdAt)} icon={Calendar} />
                 <InfoField label={t('profile.lastLogin')} value={formatDate(user.lastLoginAt)} icon={Clock} />
               </div>
             </section>
