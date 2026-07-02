@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { STAFF_ROLE_LABELS } from '../../../../constants/rolePolicy';
 
 function DetailRow({ label, value }) {
   return (
@@ -39,7 +40,7 @@ export default function StaffDetailModal({ staff, onClose, onEdit, canEdit = tru
   const rooms = profile.responsibleRoomIds || [];
   const residents = profile.assignedResidentIds || [];
 
-  const roleLabel = t(`common.roles.${staff.role}`, { defaultValue: staff.role });
+  const roleLabel = t(`common.roles.${staff.role}`, { defaultValue: STAFF_ROLE_LABELS[staff.role] || staff.role });
   const genderLabel = staff.gender
     ? t(`common.gender.${staff.gender}`, { defaultValue: staff.gender })
     : null;

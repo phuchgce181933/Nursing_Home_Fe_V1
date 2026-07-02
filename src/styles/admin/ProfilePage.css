@@ -105,14 +105,21 @@
   color: #b91c1c;
 }
 
-.ap-hero__edit-btn {
+.ap-hero__actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+.ap-hero__edit-btn,
+.ap-hero__logout-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 9px 18px;
   border-radius: 10px;
-  background: #1A365D;
-  color: #ffffff;
   font-size: 13px;
   font-weight: 700;
   border: none;
@@ -123,10 +130,29 @@
   box-shadow: 0 2px 8px rgba(26, 54, 93, 0.2);
 }
 
+.ap-hero__edit-btn {
+  background: #1A365D;
+  color: #ffffff;
+}
+
 .ap-hero__edit-btn:hover {
   background: #14294a;
   box-shadow: 0 4px 14px rgba(26, 54, 93, 0.3);
   transform: translateY(-1px);
+}
+
+.ap-hero__logout-btn {
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.ap-hero__logout-btn:hover {
+  background: #e2e8f0;
+  transform: translateY(-1px);
+}
+
+.ap-hero__logout-btn:active {
+  transform: translateY(0);
 }
 
 /* ─── Message ─── */
@@ -135,6 +161,44 @@
   border-radius: 10px;
   font-size: 14px;
   font-weight: 600;
+}
+
+.ap-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 20px;
+  margin: 20px 0;
+  grid-auto-flow: dense;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.ap-summary__card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 20px 22px;
+  box-shadow: 0 3px 18px rgba(15, 23, 42, 0.06);
+  min-width: 260px;
+  width: auto;
+}
+
+.ap-summary__label {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #64748b;
+  margin-bottom: 10px;
+}
+
+.ap-summary__value {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
 }
 
 .ap-message--success {
@@ -150,10 +214,15 @@
 }
 
 /* ─── Body Layout ─── */
+.ap {
+  width: 100%;
+  padding: 0 20px 24px;
+}
+
 .ap-body {
   display: grid;
-  grid-template-columns: 200px 1fr;
-  gap: 20px;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 24px;
   align-items: start;
 }
 
@@ -215,6 +284,57 @@
   box-shadow: 0 2px 12px rgba(15, 23, 42, 0.04);
 }
 
+.ap-info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.ap-info-row {
+  display: grid;
+  gap: 8px;
+}
+
+.ap-info-label {
+  color: #475569;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.ap-info-value {
+  color: #0f172a;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.ap-btn {
+  min-width: 120px;
+}
+
+.ap-form__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.ap-form__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 26px;
+}
+
+.ap-section__empty {
+  padding: 36px 24px;
+  text-align: center;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 14px;
+  color: #475569;
+}
+
 .ap-section__title {
   font-size: 18px;
   font-weight: 800;
@@ -229,6 +349,41 @@
   height: 1px;
   background: #f1f5f9;
   margin: 24px 0;
+}
+
+@media (max-width: 1080px) {
+  .ap-body {
+    grid-template-columns: 1fr;
+  }
+
+  .ap-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ap-tabs {
+    position: relative;
+    top: 0;
+  }
+}
+
+@media (max-width: 720px) {
+  .ap-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .ap-hero__content {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ap-hero__meta {
+    gap: 10px;
+  }
+
+  .ap-form__grid,
+  .ap-info-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* ─── Info Grid ─── */
@@ -298,6 +453,25 @@
 
 .ap-form__field--full {
   grid-column: 1 / -1;
+}
+
+.ap-form__input-wrap {
+  position: relative;
+}
+
+.ap-form__toggle {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  transform: translateY(-50%);
+  border: none;
+  background: transparent;
+  color: #475569;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 4px;
 }
 
 .ap-form__label {

@@ -17,6 +17,25 @@ const updateProfile = async (payload) => {
   return response.data;
 };
 
+const requestEmailChangeOtp = async (payload) => {
+  const response = await axiosClient.post('/auth/profile/email-otp', payload);
+  return response.data;
+};
+
+const verifyEmailChangeOtp = async (payload) => {
+  const response = await axiosClient.post('/auth/profile/email-verify', payload);
+  return response.data;
+};
+
+const requestPhoneChangeOtp = async (payload) => {
+  const response = await axiosClient.post('/auth/profile/phone-otp', payload);
+  return response.data;
+};
+
+const verifyPhoneChangeOtp = async (payload) => {
+  const response = await axiosClient.post('/auth/profile/phone-verify', payload);
+  return response.data;
+};
 const changePassword = async (payload) => {
   const response = await axiosClient.put('/auth/change-password', payload);
   return response.data;
@@ -102,4 +121,8 @@ export default {
   updateUserByAdmin,
   logout,
   getFirebaseToken,
+  requestEmailChangeOtp,
+  verifyEmailChangeOtp,
+  requestPhoneChangeOtp,
+  verifyPhoneChangeOtp,
 };

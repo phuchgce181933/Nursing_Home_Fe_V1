@@ -1,13 +1,21 @@
 import { useState, useCallback } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'motion/react';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, LogOut } from 'lucide-react';
 import { sidebarData } from './sidebarData';
+import { useAuth } from '../../hooks/useAuth';
 
 function Sidebar({ items = sidebarData }) {
   const { t, i18n } = useTranslation();
   const location = useLocation();
+  const navigate = useNavigate();
+  const { logout } = useAuth();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
 
   const getInitialOpen = useCallback(() => {
     const open = {};
@@ -87,6 +95,13 @@ function Sidebar({ items = sidebarData }) {
             )}
           </div>
         ))}
+      </div>
+
+      <div className="sidebar__footer">
+        <button type="button" className="sidebar__logout-button" onClick={handleLogout}>
+          <LogOut size={18} className="sidebar__icon" />
+          <span className="sidebar__logout-text">{t('sidebar.logout')}</span>
+        </button>
       </div>
     </aside>
   );
