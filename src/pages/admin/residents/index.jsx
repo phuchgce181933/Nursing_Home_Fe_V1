@@ -15,6 +15,7 @@ import {
 import residentService from '../../../services/resident.service';
 import { useAuth } from '../../../hooks/useAuth';
 import '../../../styles/admin/ResidentPage.css';
+import { resolveApiError } from '../../../utils/apiMessage';
 
 const GENDERS = [
   { value: '', label: 'Tất cả giới tính' },
@@ -219,7 +220,7 @@ function ResidentPage({ defaultMode = '' }) {
       setTotalPages(res?.totalPages || 1);
     } catch (err) {
       console.error('Failed to load residents:', err);
-      setError('Không thể tải danh sách cư dân. Vui lòng kiểm tra quyền truy cập hoặc kết nối mạng.');
+      setError(resolveApiError(err, t, 'admin.residents.common.loadListFailed'));
     } finally {
       setLoading(false);
     }
@@ -273,7 +274,7 @@ function ResidentPage({ defaultMode = '' }) {
         );
       } catch (err) {
         console.error('Failed to load resident details:', err);
-        setDetailError('Không thể tải thông tin chi tiết cư dân.');
+        setDetailError(resolveApiError(err, t, 'admin.residents.common.loadDetailFailed'));
       } finally {
         setDetailLoading(false);
       }
@@ -298,7 +299,7 @@ function ResidentPage({ defaultMode = '' }) {
       setSelectedResident(resident);
     } catch (err) {
       console.error('Upload avatar failed', err);
-      alert(err?.response?.data?.message || err.message || 'Không thể tải ảnh lên. Vui lòng thử lại.');
+      alert(resolveApiError(err, t, 'admin.residents.common.updateFailed'));
     } finally {
       setAvatarUploading(false);
       event.target.value = '';
@@ -418,7 +419,7 @@ function ResidentPage({ defaultMode = '' }) {
       fetchResidents();
     } catch (err) {
       console.error('Failed to create resident:', err);
-      setCreateError(err.response?.data?.message || 'Không thể tạo hồ sơ cư dân.');
+      setCreateError(resolveApiError(err, t, 'admin.residents.common.saveFailed'));
     } finally {
       setCreating(false);
     }
@@ -472,7 +473,7 @@ function ResidentPage({ defaultMode = '' }) {
       fetchResidents();
     } catch (err) {
       console.error('Failed to update personal info:', err);
-      setPersonalError(err.response?.data?.message || 'Không thể cập nhật thông tin cá nhân.');
+      setPersonalError(resolveApiError(err, t, 'admin.residents.common.updateFailed'));
     } finally {
       setPersonalSaving(false);
     }
@@ -500,7 +501,7 @@ function ResidentPage({ defaultMode = '' }) {
       fetchResidents();
     } catch (err) {
       console.error('Failed to update family info:', err);
-      setFamilyError(err.response?.data?.message || 'Không thể cập nhật thông tin gia đình.');
+      setFamilyError(resolveApiError(err, t, 'admin.residents.common.updateFailed'));
     } finally {
       setFamilySaving(false);
     }

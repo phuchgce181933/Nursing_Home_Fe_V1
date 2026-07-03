@@ -10,6 +10,7 @@ import {
   mealTypeLabel,
 } from '../../utils/nutritionLabels';
 import '../../styles/nurse/NutritionReportsPage.css';
+import { resolveApiError } from '../../utils/apiMessage';
 
 const today = () => getLocalDateString();
 const addDays = (dateStr, delta) => {
@@ -131,7 +132,7 @@ function NutritionReportsPage() {
       setSummary(summaryRes || null);
       setResidents(Array.isArray(listRes?.data) ? listRes.data : []);
     } catch (e) {
-      setError(e?.response?.data?.message || 'Không tải được báo cáo dinh dưỡng');
+      setError(resolveApiError(e, t, 'nurse.nutritionReports.loadFailed'));
       setSummary(null);
       setResidents([]);
     } finally {
@@ -162,7 +163,7 @@ function NutritionReportsPage() {
       const data = await nutritionReportService.getResidentReport(residentId, { from, to });
       setDetail(data);
     } catch (e) {
-      setError(e?.response?.data?.message || 'Không tải được chi tiết cư dân');
+      setError(resolveApiError(e, t, 'nurse.nutritionReports.detailLoadFailed'));
     } finally {
       setDetailLoading(false);
     }

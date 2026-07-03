@@ -14,13 +14,21 @@ const getById = (id) =>
  * @param {object} data - { fullName, phone, gender, specialty, address, avatarFile?, password? }
  */
 const update = (id, data) => {
-  const { avatarFile, ...rest } = data;
-  if (avatarFile) {
+  const { avatarFile, certificationFiles, removedCertPublicIds, ...rest } = data;
+  const hasRemovals = Array.isArray(removedCertPublicIds) && removedCertPublicIds.length > 0;
+  const hasFiles = avatarFile || (Array.isArray(certificationFiles) && certificationFiles.length > 0);
+  if (hasFiles || hasRemovals) {
     const form = new FormData();
     Object.entries(rest).forEach(([k, v]) => {
       if (v !== undefined && v !== '') form.append(k, v);
     });
-    form.append('avatar', avatarFile);
+    if (avatarFile) form.append('avatar', avatarFile);
+    if (Array.isArray(certificationFiles)) {
+      certificationFiles.forEach((file) => form.append('certificationFiles', file));
+    }
+    if (hasRemovals) {
+      form.append('removedCertPublicIds', JSON.stringify(removedCertPublicIds));
+    }
     return axiosClient.put(`/staff/${id}`, form, {
       headers: { 'Content-Type': 'multipart/form-data' },
     }).then((r) => r.data);

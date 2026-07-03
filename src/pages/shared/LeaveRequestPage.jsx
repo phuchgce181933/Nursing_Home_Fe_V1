@@ -15,6 +15,7 @@ import leaveRequestService from '../../services/leaveRequest.service';
 import { calcInclusiveLeaveDays, formatLeaveDate } from '../../utils/leaveUtils';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import '../../styles/shared/LeaveRequestPage.css';
+import { resolveApiError } from '../../utils/apiMessage';
 
 const minStartDate = (type) => {
   if (type === 'emergency') return new Date().toISOString().slice(0, 10);
@@ -108,7 +109,7 @@ export default function LeaveRequestPage() {
       setWarnings(w);
       loadRequests();
     } catch (err) {
-      setFormError(err.response?.data?.message || t('leaveRequest.submitFailed'));
+      setFormError(resolveApiError(err, t, 'leaveRequest.submitFailed'));
     } finally {
       setSubmitting(false);
     }
@@ -120,7 +121,7 @@ export default function LeaveRequestPage() {
       await leaveRequestService.cancel(id);
       setMyRequests((prev) => prev.map((r) => (r._id === id ? { ...r, status: 'cancelled' } : r)));
     } catch (err) {
-      alert(err.response?.data?.message || t('leaveRequest.cancelFailed'));
+      alert(resolveApiError(err, t, 'leaveRequest.cancelFailed'));
     } finally {
       setCancelId(null);
       setCancelModal(null);

@@ -8,6 +8,7 @@ import caregiverCareTaskService from '../../../services/caregiverCareTask.servic
 import caregiverResidentService from '../../../services/caregiverResident.service';
 import { getLocalDateString } from '../../../utils/dateUtils';
 import '../../../styles/caregiver/DailyCareSchedulePage.css';
+import { resolveApiError } from '../../../utils/apiMessage';
 import CareTaskDetailModal from './components/CareTaskDetailModal';
 import CareTasksTable from './components/CareTasksTable';
 import ScheduleFilters from './components/ScheduleFilters';
@@ -65,7 +66,7 @@ function DailyCareSchedulePage() {
         res.totalPages ?? Math.max(1, Math.ceil(count / ADMIN_LIST_PAGE_SIZE))
       );
     } catch (e) {
-      setError(e?.response?.data?.message || t(`${ns}.loadFailed`));
+      setError(resolveApiError(e, t, `${ns}.loadFailed`));
       setTasks([]);
     } finally {
       setLoading(false);

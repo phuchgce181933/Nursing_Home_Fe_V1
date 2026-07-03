@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import mealIntakeNoteService from '../../../../services/mealIntakeNote.service';
+import { resolveApiError } from '../../../../utils/apiMessage';
 import { mealTypeLabel } from '../../../../utils/nutritionLabels';
 import { getIntakeStatusOptions, getMealTypeOptions } from '../constants';
 import MealIntakePlannedMealBanner from './MealIntakePlannedMealBanner';
@@ -64,7 +65,7 @@ function MealIntakeFormModal({ open, mode, recordId, residents, defaultWorkDate,
         plannedMealName: data.plannedMealName,
       });
     } catch (e) {
-      setError(e?.response?.data?.message || t(`${c}.detailLoadFailed`));
+      setError(resolveApiError(e, t, `${c}.detailLoadFailed`));
     } finally {
       setLoading(false);
     }
@@ -129,7 +130,7 @@ function MealIntakeFormModal({ open, mode, recordId, residents, defaultWorkDate,
       }
       onSuccess();
     } catch (err) {
-      setError(err?.response?.data?.message || t(`${c}.saveFailed`));
+      setError(resolveApiError(err, t, `${c}.saveFailed`));
     } finally {
       setSaving(false);
     }

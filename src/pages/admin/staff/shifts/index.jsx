@@ -25,10 +25,13 @@ import { isStaffOnLeaveForAssignment } from '../../../../utils/leaveUtils';
 import { getApiErrorPayload, blockingCareTasksMessage } from '../../../../utils/blockingCareTasks';
 import BlockingCareTasksAlert from '../../../../components/staff/BlockingCareTasksAlert';
 import { useTranslation } from 'react-i18next';
+import { resolveApiError } from '../../../../utils/apiMessage';
 import AdminPageShell from '../../../../components/admin/AdminPageShell';
 import '../../../../styles/admin/ShiftManagementPage.css';
 
 // ── Constants & label helpers ─────────────────────────────────────────────────
+
+const SHOW_CARE_SCHEDULE_TAB = false;
 
 const NS = 'admin.staff.shifts';
 
@@ -163,8 +166,6 @@ const buildShiftPayload = (form, { isUpdate = false, template = null } = {}) => 
     if (form.shiftTemplateId) payload.shiftTemplateId = form.shiftTemplateId;
     if (form.workDate) payload.workDate = form.workDate;
     if (form.assignedStaffId) payload.assignedStaffId = form.assignedStaffId;
-    if (form.taskDescription !== undefined) payload.taskDescription = form.taskDescription;
-    if (form.notes !== undefined) payload.notes = form.notes;
     if (isFlexibleTemplate(template)) {
       if (form.startTime) payload.startTime = form.startTime;
       if (form.endTime) payload.endTime = form.endTime;
@@ -177,8 +178,6 @@ const buildShiftPayload = (form, { isUpdate = false, template = null } = {}) => 
     workDate: form.workDate,
     assignedStaffId: form.assignedStaffId,
   };
-  if (form.taskDescription) payload.taskDescription = form.taskDescription;
-  if (form.notes) payload.notes = form.notes;
   if (isFlexibleTemplate(template)) {
     payload.startTime = form.startTime;
     payload.endTime = form.endTime;
@@ -199,8 +198,6 @@ const emptyShift = {
   assignedStaffId: '',
   startTime: '08:00',
   endTime: '12:00',
-  taskDescription: '',
-  notes: '',
 };
 
 function useAssignableStaffForDate(workDate) {
@@ -386,7 +383,7 @@ function TemplatesTab() {
       setTemplates(list);
       setTotalHoursPerDay(dayTotal);
     } catch (e) {
-      setError(e.response?.data?.message || t(`${NS}.loadFailed`));
+      setError(resolveApiError(e, t, `${NS}.loadFailed`));
     } finally {
       setLoading(false);
     }
@@ -519,7 +516,7 @@ function CreateShiftModal({ templates, onSave, onClose }) {
       setConflicts(c);
       if (!hasBlockingConflicts(c)) onClose();
     } catch (e) {
-      setError(e.response?.data?.message || e.message || t(`${NS}.errorGeneric`));
+      setError(resolveApiError(e, t, `${NS}.errorGeneric`));
       setConflicts(conflictsFromError(e));
     }
   };
@@ -634,15 +631,6 @@ function CreateShiftModal({ templates, onSave, onClose }) {
               </div>
             </>
           )}
-
-          <div className="form-group form-grid--full">
-            <label>{t(`${NS}.createModal.taskDescriptionLabel`)}</label>
-            <input value={form.taskDescription} onChange={(e) => set('taskDescription', e.target.value)} placeholder={t(`${NS}.createModal.taskDescriptionPlaceholder`)} />
-          </div>
-          <div className="form-group form-grid--full">
-            <label>{t(`${NS}.createModal.notesLabel`)}</label>
-            <input value={form.notes} onChange={(e) => set('notes', e.target.value)} placeholder={t(`${NS}.createModal.notesPlaceholder`)} />
-          </div>
         </div>
         <div className="modal__actions">
           <button className="btn-cancel" onClick={onClose}>{t(`${NS}.cancel`)}</button>
@@ -665,8 +653,6 @@ function UpdateShiftModal({ shift, templates, onSave, onClose }) {
     shiftTemplateId: templateId?.toString() || '',
     startTime:       shift.startTime || '08:00',
     endTime:         shift.endTime || '12:00',
-    taskDescription: shift.taskDescription || '',
-    notes:           shift.notes || '',
     changeReason:    '',
   });
   const [conflicts, setConflicts] = useState([]);
@@ -710,7 +696,7 @@ function UpdateShiftModal({ shift, templates, onSave, onClose }) {
       setConflicts(c);
       if (!hasBlockingConflicts(c)) onClose();
     } catch (e) {
-      setError(e.response?.data?.message || e.message || t(`${NS}.errorGeneric`));
+      setError(resolveApiError(e, t, `${NS}.errorGeneric`));
       setConflicts(conflictsFromError(e));
     }
   };
@@ -801,14 +787,6 @@ function UpdateShiftModal({ shift, templates, onSave, onClose }) {
             <input type="date" min={utcToday()} value={form.workDate} onChange={(e) => set('workDate', e.target.value)} />
           </div>
           <div className="form-group form-grid--full">
-            <label>{t(`${NS}.updateModal.taskDescriptionLabel`)}</label>
-            <input value={form.taskDescription} onChange={(e) => set('taskDescription', e.target.value)} />
-          </div>
-          <div className="form-group form-grid--full">
-            <label>{t(`${NS}.updateModal.notesLabel`)}</label>
-            <input value={form.notes} onChange={(e) => set('notes', e.target.value)} />
-          </div>
-          <div className="form-group form-grid--full">
             <label>{t(`${NS}.updateModal.changeReasonLabel`)}</label>
             <input
               value={form.changeReason}
@@ -881,7 +859,7 @@ function AssignTab() {
       setListTotalHours(parsed.totalHours);
       setShiftTotal(parsed.total ?? list.length);
       setTotalPages(parsed.totalPages ?? Math.max(1, Math.ceil((parsed.total ?? list.length) / ADMIN_LIST_PAGE_SIZE)));
-    } catch (e) { setError(e.response?.data?.message || t(`${NS}.loadFailed`)); }
+    } catch (e) { setError(resolveApiError(e, t, `${NS}.loadFailed`)); }
     finally { setLoading(false); }
   };
 
@@ -910,7 +888,7 @@ function AssignTab() {
     } catch (e) {
       const c = conflictsFromError(e);
       setActConflicts(c);
-      const msg = e.response?.data?.message || t(`${NS}.assignTab.publishFailed`);
+      const msg = resolveApiError(e, t, `${NS}.assignTab.publishFailed`);
       if (hasBlockingConflicts(c)) {
         alert(t(`${NS}.assignTab.publishBlockedAlert`, {
           message: msg,
@@ -1168,7 +1146,7 @@ function ScheduleTab() {
       setShifts(list);
       setScheduleTotalHours(totalHours);
     } catch (e) {
-      setError(e.response?.data?.message || t(`${NS}.loadFailed`));
+      setError(resolveApiError(e, t, `${NS}.loadFailed`));
     } finally {
       setLoading(false);
     }
@@ -1512,7 +1490,7 @@ function CreateCareScheduleTab() {
       resetForm();
       loadDrafts();
     } catch (e) {
-      setError(e?.response?.data?.message || t(`${CS}.saveDraftFailed`));
+      setError(resolveApiError(e, t, `${CS}.saveDraftFailed`));
     } finally {
       setSaving(false);
     }
@@ -1543,7 +1521,7 @@ function CreateCareScheduleTab() {
       const residentSet = [...new Set(rows.map((r) => String(r.residentId?._id || r.residentId || '')).filter(Boolean))];
       setSelectedResidents(residentSet);
     } catch (e) {
-      setError(e?.response?.data?.message || t(`${CS}.openDraftFailed`));
+      setError(resolveApiError(e, t, `${CS}.openDraftFailed`));
     } finally {
       setSaving(false);
     }
@@ -1557,7 +1535,7 @@ function CreateCareScheduleTab() {
       if (editingScheduleId === id) resetForm();
       loadDrafts();
     } catch (e) {
-      setError(e?.response?.data?.message || t(`${CS}.publishFailed`));
+      setError(resolveApiError(e, t, `${CS}.publishFailed`));
     } finally {
       setSaving(false);
     }
@@ -1572,7 +1550,7 @@ function CreateCareScheduleTab() {
       if (editingScheduleId === id) resetForm();
       loadDrafts();
     } catch (e) {
-      setError(e?.response?.data?.message || t(`${CS}.deleteDraftFailed`));
+      setError(resolveApiError(e, t, `${CS}.deleteDraftFailed`));
     } finally {
       setSaving(false);
     }
@@ -1585,7 +1563,7 @@ function CreateCareScheduleTab() {
       const data = await careScheduleService.getSchedule(id);
       setDetailSchedule(data || null);
     } catch (e) {
-      setError(e?.response?.data?.message || t(`${CS}.detailLoadFailed`));
+      setError(resolveApiError(e, t, `${CS}.detailLoadFailed`));
       setDetailSchedule(null);
     } finally {
       setDetailLoading(false);
@@ -1904,13 +1882,16 @@ const TABS = (t) => [
   { key: 'templates', label: `📋 ${t('admin.staff.shifts.tabTemplates')}` },
   { key: 'assign', label: `👤 ${t('admin.staff.shifts.tabAssign')}` },
   { key: 'schedule', label: `📅 ${t('admin.staff.shifts.tabSchedule')}` },
-  { key: 'care-schedule', label: `🩺 ${t('admin.staff.shifts.tabCareSchedule')}` },
+  ...(SHOW_CARE_SCHEDULE_TAB
+    ? [{ key: 'care-schedule', label: `🩺 ${t('admin.staff.shifts.tabCareSchedule')}` }]
+    : []),
 ];
 
 export default function ShiftManagementPage() {
   const { t } = useTranslation();
   const [tab, setTab] = useState('templates');
   const tabs = TABS(t);
+  const activeTab = tabs.some((item) => item.key === tab) ? tab : tabs[0].key;
 
   return (
     <AdminPageShell
@@ -1921,7 +1902,7 @@ export default function ShiftManagementPage() {
         {tabs.map((tabItem) => (
           <button
             key={tabItem.key}
-            className={`tab-btn ${tab === tabItem.key ? 'tab-btn--active' : ''}`}
+            className={`tab-btn ${activeTab === tabItem.key ? 'tab-btn--active' : ''}`}
             onClick={() => setTab(tabItem.key)}
           >
             {tabItem.label}
@@ -1930,10 +1911,10 @@ export default function ShiftManagementPage() {
       </div>
 
       <div className="tab-content">
-        {tab === 'templates' && <TemplatesTab />}
-        {tab === 'assign'    && <AssignTab />}
-        {tab === 'schedule'  && <ScheduleTab />}
-        {tab === 'care-schedule' && <CreateCareScheduleTab />}
+        {activeTab === 'templates' && <TemplatesTab />}
+        {activeTab === 'assign'    && <AssignTab />}
+        {activeTab === 'schedule'  && <ScheduleTab />}
+        {SHOW_CARE_SCHEDULE_TAB && activeTab === 'care-schedule' && <CreateCareScheduleTab />}
       </div>
     </AdminPageShell>
   );

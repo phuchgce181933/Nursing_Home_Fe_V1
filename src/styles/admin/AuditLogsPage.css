@@ -164,6 +164,160 @@
   word-break: break-word;
 }
 
+.audit-logs-page__technical-details summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #475569;
+  margin-bottom: 10px;
+}
+
+.audit-logs-page__technical-details summary:hover {
+  color: #1e293b;
+}
+
+.audit-shift-detail {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 18px;
+  display: grid;
+  gap: 18px;
+}
+
+.audit-shift-detail__title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.audit-shift-detail__summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+}
+
+.audit-shift-detail__summary-item {
+  display: grid;
+  gap: 4px;
+}
+
+.audit-shift-detail__label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.audit-shift-detail__value {
+  font-size: 14px;
+  color: #1e293b;
+  font-weight: 500;
+}
+
+.audit-shift-diff-wrap {
+  display: grid;
+  gap: 10px;
+}
+
+.audit-shift-diff__title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #334155;
+}
+
+.audit-shift-diff {
+  width: 100%;
+  border-collapse: collapse;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.audit-shift-diff th,
+.audit-shift-diff td {
+  padding: 12px 14px;
+  text-align: left;
+  border-bottom: 1px solid #e2e8f0;
+  color: #334155;
+  font-size: 14px;
+}
+
+.audit-shift-diff th {
+  background: #f1f5f9;
+  font-weight: 700;
+  color: #475569;
+}
+
+.audit-shift-diff tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.audit-shift-diff__row--changed {
+  background: #fffbeb;
+}
+
+.audit-shift-diff__row--changed td:first-child {
+  font-weight: 600;
+  color: #92400e;
+}
+
+.audit-shift-cancel {
+  background: #fee2e2;
+  border: 1px solid #fecaca;
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: grid;
+  gap: 10px;
+  color: #991b1b;
+}
+
+.audit-shift-cancel strong {
+  font-size: 15px;
+}
+
+.audit-shift-cancel p {
+  margin: 0;
+  font-size: 14px;
+}
+
+.audit-shift-cancel__status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.audit-shift-cancel__arrow {
+  color: #b91c1c;
+  font-weight: 700;
+}
+
+.audit-shift-reason {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-left: 4px solid #0ea5e9;
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+
+.audit-shift-reason strong {
+  display: block;
+  margin-bottom: 6px;
+  color: #0f172a;
+  font-size: 14px;
+}
+
+.audit-shift-reason p {
+  margin: 0;
+  color: #334155;
+  font-size: 14px;
+  white-space: pre-wrap;
+}
+
 @media (max-width: 920px) {
   .audit-logs-page__toolbar {
     flex-direction: column;

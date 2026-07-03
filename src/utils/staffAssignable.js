@@ -2,7 +2,7 @@
 export const NON_ASSIGNABLE_ROLES = ['admin', 'manager'];
 
 /** Matches backend CARE_TASK_ASSIGNEE_ROLES */
-export const CARE_TASK_ASSIGNEE_ROLES = ['nurse', 'doctor'];
+export const CARE_TASK_ASSIGNEE_ROLES = ['nurse', 'doctor', 'caregiver'];
 
 export const canReceiveCareTask = (staff) =>
   CARE_TASK_ASSIGNEE_ROLES.includes(String(staff?.role || '').toLowerCase());

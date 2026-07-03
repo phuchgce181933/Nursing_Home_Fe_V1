@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { resolveApiError, resolveApiSuccess } from '../../../../utils/apiMessage';
 import staffService from '../../../../services/staff.service';
 import careTaskService from '../../../../services/careTask.service';
 import facilityService from '../../../../services/facility.service';
@@ -17,7 +18,7 @@ import { isStaffOnLeaveForAssignment } from '../../../../utils/leaveUtils';
 import { getApiErrorPayload, blockingCareTasksMessage } from '../../../../utils/blockingCareTasks';
 import BlockingCareTasksAlert from '../../../../components/staff/BlockingCareTasksAlert';
 import AdminPageShell from '../../../../components/admin/AdminPageShell';
-import { filterShiftsNotEnded, getLocalDateString, todayVN } from '../../../../utils/dateUtils';
+import { filterShiftsNotEnded, todayVN } from '../../../../utils/dateUtils';
 import '../../../../styles/admin/StaffAssignmentPage.css';
 
 const TASK_TYPE_VALUES = [
@@ -46,8 +47,6 @@ const roleLabel = (t, role) => t(`common.roles.${role}`, { defaultValue: role })
 
 const shiftStatusLabel = (t, status) =>
   t(`common.shiftStatus.${status}`, { defaultValue: status });
-
-const today = () => getLocalDateString();
 
 const filterAssignableStaff = (list) =>
   (list || []).filter(
@@ -639,7 +638,7 @@ function ResidentTab({ staff, staffPool, loading, assignmentDate, displayNow, on
         )
       );
       if (res.message) {
-        setResidentHint(res.message);
+        setResidentHint(resolveApiSuccess(res, t));
       } else if (!list.length) {
         setResidentHint(
           res.filterMode === 'rooms'
@@ -650,7 +649,7 @@ function ResidentTab({ staff, staffPool, loading, assignmentDate, displayNow, on
     } catch (e) {
       setResidentOptions([]);
       setResidentFilterMode(null);
-      setResidentHint(e.response?.data?.message || t('admin.staff.assignments.residents.loadResidentsFailed'));
+      setResidentHint(resolveApiError(e, t, 'admin.staff.assignments.residents.loadResidentsFailed'));
     } finally {
       setLoadingResidents(false);
     }
@@ -994,7 +993,7 @@ function careResidentOptionLabel(r, t) {
   return residentPickerLabel(r, t);
 }
 
-function CareTaskTab({ assignmentDate, staff }) {
+function CareTaskTab({ staff }) {
   const { t } = useTranslation();
   const [tasks, setTasks]               = useState([]);
   const [loading, setLoading]           = useState(false);
@@ -1016,9 +1015,9 @@ function CareTaskTab({ assignmentDate, staff }) {
     totalPages: taskTotalPages,
     total: taskTotal,
   } = useClientPagination(filteredTasks);
-  const [filterDate, setFilterDate]     = useState(assignmentDate);
+  const [filterDate, setFilterDate]     = useState(() => todayVN());
   const [showForm, setShowForm]         = useState(false);
-  const [form, setForm]                 = useState(emptyTaskForm(assignmentDate));
+  const [form, setForm]                 = useState(() => emptyTaskForm(todayVN()));
   const [saveError, setSaveErr]         = useState('');
   const [saving, setSaving]             = useState(false);
   const [ctx, setCtx]                   = useState(null);
@@ -1026,11 +1025,6 @@ function CareTaskTab({ assignmentDate, staff }) {
   const [assignedResidents, setAssignedResidents] = useState([]);
   const [residentsLoading, setResidentsLoading] = useState(false);
   const [residentHint, setResidentHint] = useState('');
-
-  useEffect(() => {
-    setFilterDate(assignmentDate);
-    setForm((prev) => ({ ...prev, workDate: assignmentDate }));
-  }, [assignmentDate]);
 
   const taskTypeOptions = ctx?.taskTypes?.length
     ? ctx.taskTypes
@@ -1096,7 +1090,7 @@ function CareTaskTab({ assignmentDate, staff }) {
         return fallback;
       }
       setCtx(buildAssignmentContextFallback(staff, t));
-      setSaveErr(e.response?.data?.message || t('admin.staff.assignments.tasks.loadFormFailed'));
+      setSaveErr(resolveApiError(e, t, 'admin.staff.assignments.tasks.loadFormFailed'));
       return null;
     } finally {
       setCtxLoading(false);
@@ -1116,13 +1110,13 @@ function CareTaskTab({ assignmentDate, staff }) {
       const list = Array.isArray(res.data) ? res.data : [];
       setAssignedResidents(list);
       if (res.message) {
-        setResidentHint(res.message);
+        setResidentHint(resolveApiSuccess(res, t));
       } else if (!list.length) {
         setResidentHint(t('admin.staff.assignments.tasks.noAssignedResidents'));
       }
     } catch (e) {
       setAssignedResidents([]);
-      setResidentHint(e.response?.data?.message || t('admin.staff.assignments.tasks.loadAssignedFailed'));
+      setResidentHint(resolveApiError(e, t, 'admin.staff.assignments.tasks.loadAssignedFailed'));
     } finally {
       setResidentsLoading(false);
     }
@@ -1139,7 +1133,7 @@ function CareTaskTab({ assignmentDate, staff }) {
         setTasks([]);
         setError('');
       } else {
-        setError(e.response?.data?.message || t('common.loadFailed'));
+        setError(resolveApiError(e, t, 'common.loadFailed'));
       }
     } finally {
       setLoading(false);
@@ -1151,17 +1145,31 @@ function CareTaskTab({ assignmentDate, staff }) {
   }, [filterDate]);
 
   useEffect(() => {
-    if (showForm && form.workDate === assignmentDate) {
-      loadContext(assignmentDate);
-    }
-  }, [showForm, assignmentDate]);
+    if (!showForm || !form.workDate) return;
+    if (form.workDate < todayVN()) return;
+    loadContext(form.workDate);
+  }, [showForm, form.workDate]);
 
   const handleOpenForm = () => {
-    setForm(emptyTaskForm(assignmentDate));
+    const defaultWorkDate = filterDate >= todayVN() ? filterDate : todayVN();
+    setForm(emptyTaskForm(defaultWorkDate));
     setSaveErr('');
     setAssignedResidents([]);
     setResidentHint('');
     setShowForm(true);
+  };
+
+  const handleWorkDateChange = (newDate) => {
+    if (!newDate || newDate < todayVN()) return;
+    setForm((prev) => ({
+      ...prev,
+      workDate: newDate,
+      staffProfileId: '',
+      shiftId: '',
+      residentId: '',
+    }));
+    setAssignedResidents([]);
+    setResidentHint('');
   };
 
   const handleStaffChange = (profileId) => {
@@ -1177,7 +1185,7 @@ function CareTaskTab({ assignmentDate, staff }) {
   };
 
   const minScheduledTime =
-    form.workDate === (ctx?.todayVN || today()) ? (ctx?.minScheduledTime || '') : '';
+    form.workDate === (ctx?.todayVN || todayVN()) ? (ctx?.minScheduledTime || '') : '';
 
   const handleCreate = async () => {
     setSaveErr('');
@@ -1223,7 +1231,7 @@ function CareTaskTab({ assignmentDate, staff }) {
       setShowForm(false);
       loadTasks();
     } catch (e) {
-      setSaveErr(e.response?.data?.message || t('common.saveFailed'));
+      setSaveErr(resolveApiError(e, t, 'common.saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -1249,17 +1257,15 @@ function CareTaskTab({ assignmentDate, staff }) {
   };
 
   const staffOnShiftHint =
-    form.workDate !== assignmentDate
-      ? t('admin.staff.assignments.tasks.changeDateHint')
-      : ctxLoading
+    ctxLoading
+      ? ''
+      : !showForm
         ? ''
-        : !showForm
-          ? ''
-          : staffWithShiftsAvailable.length === 0
-            ? staffWithShifts.length > 0
-              ? t('admin.staff.assignments.tasks.allOnLeave')
-              : t('admin.staff.assignments.tasks.noStaffWithShift')
-            : '';
+        : staffWithShiftsAvailable.length === 0
+          ? staffWithShifts.length > 0
+            ? t('admin.staff.assignments.tasks.allOnLeave')
+            : t('admin.staff.assignments.tasks.noStaffWithShift')
+          : '';
 
   return (
     <div>
@@ -1298,7 +1304,12 @@ function CareTaskTab({ assignmentDate, staff }) {
           <div className="form-grid">
             <div className="form-group">
               <label>{t('admin.staff.assignments.tasks.workDate')}</label>
-              <input type="date" value={form.workDate} readOnly />
+              <input
+                type="date"
+                min={todayVN()}
+                value={form.workDate}
+                onChange={(e) => handleWorkDateChange(e.target.value)}
+              />
               <small className="field-hint">{t('admin.staff.assignments.tasks.workDateHint')}</small>
             </div>
 
@@ -1530,7 +1541,7 @@ export default function StaffAssignmentPage() {
   const { t, i18n } = useTranslation();
   const tabs = TABS(t);
   const [activeTab, setActiveTab] = useState('area');
-  const [assignmentDate, setAssignmentDate] = useState(today());
+  const [assignmentDate, setAssignmentDate] = useState(() => todayVN());
   const [allStaff, setAllStaff]   = useState([]);
   const [loading, setLoading]     = useState(false);
   const { search: staffSearch, setSearch: setStaffSearch, debouncedSearch: debouncedStaffSearch } = useDebouncedSearch();
@@ -1565,7 +1576,7 @@ export default function StaffAssignmentPage() {
   };
 
   useEffect(() => {
-    const minDate = today();
+    const minDate = todayVN();
     if (assignmentDate < minDate) setAssignmentDate(minDate);
   }, [assignmentDate]);
 
@@ -1598,7 +1609,7 @@ export default function StaffAssignmentPage() {
           id="assignment-date"
           type="date"
           className="assignment-toolbar__date"
-          min={today()}
+          min={todayVN()}
           value={assignmentDate}
           onChange={(e) => setAssignmentDate(e.target.value)}
         />
@@ -1652,7 +1663,7 @@ export default function StaffAssignmentPage() {
           />
         )}
         {activeTab === 'tasks'     && (
-          <CareTaskTab assignmentDate={assignmentDate} staff={allStaff} />
+          <CareTaskTab staff={allStaff} />
         )}
       </div>
     </AdminPageShell>

@@ -5,6 +5,7 @@ import ListPagination from '../../../components/ui/ListPagination';
 import useClientPagination from '../../../hooks/useClientPagination';
 import useDebouncedSearch from '../../../hooks/useDebouncedSearch';
 import caregiverDietPlanService from '../../../services/caregiverDietPlan.service';
+import { resolveApiError } from '../../../utils/apiMessage';
 import { getLocalDateString } from '../../../utils/dateUtils';
 import { formatLocaleDate } from '../../../utils/nutritionLabels';
 import '../../../styles/caregiver/DietPlansPage.css';
@@ -35,7 +36,7 @@ function DietPlansPage() {
       const res = await caregiverDietPlanService.listResidents();
       setResidents(Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : []);
     } catch (e) {
-      setError(e?.response?.data?.message || t('caregiver.dietPlans.loadFailed'));
+      setError(resolveApiError(e, t, 'caregiver.dietPlans.loadFailed'));
     }
   };
 
@@ -56,7 +57,7 @@ function DietPlansPage() {
         specialDietDayTitle: res.specialDietDayTitle,
       });
     } catch (e) {
-      setError(e?.response?.data?.message || t('caregiver.dietPlans.loadFailed'));
+      setError(resolveApiError(e, t, 'caregiver.dietPlans.loadFailed'));
       setRows([]);
       setDayMeta(null);
     } finally {
@@ -89,7 +90,7 @@ function DietPlansPage() {
       const data = await caregiverDietPlanService.getResidentPlan(rid, { workDate });
       setDetail(data);
     } catch (e) {
-      setError(e?.response?.data?.message || t('caregiver.dietPlans.detailLoadFailed'));
+      setError(resolveApiError(e, t, 'caregiver.dietPlans.detailLoadFailed'));
       setDetailOpen(false);
     } finally {
       setDetailLoading(false);

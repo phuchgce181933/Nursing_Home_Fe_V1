@@ -5,6 +5,7 @@ import ListPagination from '../../../components/ui/ListPagination';
 import useClientPagination from '../../../hooks/useClientPagination';
 import useDebouncedSearch from '../../../hooks/useDebouncedSearch';
 import caregiverRehabilitationScheduleService from '../../../services/caregiverRehabilitationSchedule.service';
+import { resolveApiError } from '../../../utils/apiMessage';
 import { getLocalDateString } from '../../../utils/dateUtils';
 import { formatLocaleDate } from '../../../utils/nutritionLabels';
 import '../../../styles/caregiver/RehabilitationSchedulePage.css';
@@ -40,7 +41,7 @@ function RehabilitationSchedulePage() {
       const res = await caregiverRehabilitationScheduleService.listResidents();
       setResidents(Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : []);
     } catch (e) {
-      setError(e?.response?.data?.message || t('caregiver.rehabSchedule.loadFailed'));
+      setError(resolveApiError(e, t, 'caregiver.rehabSchedule.loadFailed'));
     }
   };
 
@@ -59,7 +60,7 @@ function RehabilitationSchedulePage() {
         planTitle: res.planTitle,
       });
     } catch (e) {
-      setError(e?.response?.data?.message || t('caregiver.rehabSchedule.loadFailed'));
+      setError(resolveApiError(e, t, 'caregiver.rehabSchedule.loadFailed'));
       setRows([]);
       setDayMeta(null);
     } finally {
@@ -92,7 +93,7 @@ function RehabilitationSchedulePage() {
       const data = await caregiverRehabilitationScheduleService.getResidentSchedule(rid, { workDate });
       setDetail(data);
     } catch (e) {
-      setError(e?.response?.data?.message || t('caregiver.rehabSchedule.detailLoadFailed'));
+      setError(resolveApiError(e, t, 'caregiver.rehabSchedule.detailLoadFailed'));
       setDetailOpen(false);
     } finally {
       setDetailLoading(false);
