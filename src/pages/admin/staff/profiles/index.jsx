@@ -19,6 +19,7 @@ import StaffEditModal from './StaffEditModal';
 import StaffBanModal from './StaffBanModal';
 import StaffCreateModal from './StaffCreateModal';
 import { staffToEditForm } from '../../../../utils/staffFormSnapshot';
+import { resolveApiError } from '../../../../utils/apiMessage';
 import './profiles.css';
 
 const emptyEditForm = {
@@ -88,7 +89,7 @@ export default function StaffManagementPage() {
         setTotalPages(res.totalPages ?? Math.max(1, Math.ceil((res.total ?? data.length) / ADMIN_LIST_PAGE_SIZE)));
       }
     } catch (e) {
-      setPageError(e.response?.data?.message || t('admin.staff.common.loadFailed'));
+      setPageError(resolveApiError(e, t, 'admin.staff.common.loadFailed'));
     } finally {
       setLoading(false);
     }
@@ -144,7 +145,7 @@ export default function StaffManagementPage() {
       setEditStaff(fresh);
       setEditForm(staffToEditForm(fresh));
     } catch (e) {
-      setEditError(e.response?.data?.message || t('admin.staff.profiles.loadProfilePartial'));
+      setEditError(resolveApiError(e, t, 'admin.staff.profiles.loadProfilePartial'));
     } finally {
       setEditLoading(false);
     }
@@ -161,7 +162,8 @@ export default function StaffManagementPage() {
         specialty: editForm.specialty,
         address: editForm.address,
         avatarFile: editForm.avatarFile || undefined,
-        password: editForm.password || undefined,
+        certificationFiles: editForm.certificationFiles?.length ? editForm.certificationFiles : undefined,
+        removedCertPublicIds: editForm.removedCertPublicIds?.length ? editForm.removedCertPublicIds : undefined,
       };
       const roleChanged = editForm.role !== editStaff.role;
 
@@ -174,7 +176,7 @@ export default function StaffManagementPage() {
       closeEditModal();
       loadStaff();
     } catch (e) {
-      setEditError(e.response?.data?.message || t('common.saveFailed'));
+      setEditError(resolveApiError(e, t, 'common.saveFailed'));
     }
   };
 
@@ -193,7 +195,7 @@ export default function StaffManagementPage() {
       );
       setBanStaff(null);
     } catch (e) {
-      alert(e.response?.data?.message || t('admin.staff.profiles.banFailed'));
+      alert(resolveApiError(e, t, 'admin.staff.profiles.banFailed'));
     } finally {
       setBanLoading(false);
     }
@@ -208,7 +210,7 @@ export default function StaffManagementPage() {
       );
       setBanStaff(null);
     } catch (e) {
-      alert(e.response?.data?.message || t('admin.staff.profiles.unbanFailed'));
+      alert(resolveApiError(e, t, 'admin.staff.profiles.unbanFailed'));
     } finally {
       setBanLoading(false);
     }
@@ -222,7 +224,7 @@ export default function StaffManagementPage() {
       setShowCreate(false);
       loadStaff();
     } catch (e) {
-      setCreateError(e.response?.data?.message || t('admin.staff.profiles.createFailed'));
+      setCreateError(resolveApiError(e, t, 'admin.staff.profiles.createFailed'));
     }
   };
 

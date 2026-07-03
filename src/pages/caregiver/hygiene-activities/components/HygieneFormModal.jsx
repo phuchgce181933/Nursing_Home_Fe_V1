@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import hygieneActivityService from '../../../../services/hygieneActivity.service';
+import { resolveApiError } from '../../../../utils/apiMessage';
 import {
   hygieneActivityLabel,
   hygieneCategoryLabel,
@@ -69,7 +70,7 @@ function HygieneFormModal({ open, mode, recordId, residents, defaultWorkDate, ma
         activityCategory: data.activityCategory,
       });
     } catch (e) {
-      setError(e?.response?.data?.message || t(`${c}.detailLoadFailed`));
+      setError(resolveApiError(e, t, `${c}.detailLoadFailed`));
     } finally {
       setLoading(false);
     }
@@ -125,7 +126,7 @@ function HygieneFormModal({ open, mode, recordId, residents, defaultWorkDate, ma
       }
       onSuccess();
     } catch (err) {
-      setError(err?.response?.data?.message || t(`${c}.saveFailed`));
+      setError(resolveApiError(err, t, `${c}.saveFailed`));
     } finally {
       setSaving(false);
     }

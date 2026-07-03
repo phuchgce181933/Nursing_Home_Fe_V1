@@ -5,6 +5,7 @@ import LoginForm from '../components/LoginForm';
 import '../styles/shared/LoginForm.css';
 import { useAuth } from '../hooks/useAuth';
 import { getHomePath } from '../constants/routes';
+import { resolveApiError } from '../utils/apiMessage';
 
 function LoginPage() {
   const { t } = useTranslation();
@@ -20,7 +21,7 @@ function LoginPage() {
       setMessage(t('login.loginSuccess'));
       navigate(getHomePath(role));
     } catch (err) {
-      setMessage(err?.response?.data?.message || t('login.loginFailed'));
+      setMessage(resolveApiError(err, t, 'login.loginFailed'));
     }
   };
 

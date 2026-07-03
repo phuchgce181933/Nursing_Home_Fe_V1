@@ -1,9 +1,13 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
+import { apiErrorsEn, apiSuccessEn } from './i18n/apiMessages.en';
+import { apiErrorsVi, apiSuccessVi } from './i18n/apiMessages.vi';
 
 const resources = {
   en: {
     translation: {
+      apiErrors: apiErrorsEn,
+      apiSuccess: apiSuccessEn,
       app: {
         title: "Nursing Home",
         subtitle: "Senior care management system",
@@ -1372,7 +1376,9 @@ const resources = {
             REQUEST_PUT: "API request PUT",
             REQUEST_PATCH: "API request PATCH",
             REQUEST_DELETE: "API request DELETE",
-            TRANSFER_RESIDENT_ROOM: "Transfer resident room"
+            TRANSFER_RESIDENT_ROOM: "Transfer resident room",
+            UPDATE_SHIFT: "Update work shift",
+            CANCEL_SHIFT: "Cancel work shift"
           },
           role: "Role",
           rolePlaceholder: "e.g. admin",
@@ -1396,7 +1402,33 @@ const resources = {
           userAgent: "User agent",
           beforeData: "Before data",
           afterData: "After data",
-          loadError: "Unable to load audit logs."
+          loadError: "Unable to load audit logs.",
+          showTechnicalJson: "View technical data (JSON)",
+          shiftDetail: {
+            summaryTitle: "Shift summary",
+            changesTitle: "Changes",
+            fieldLabel: "Field",
+            before: "Before",
+            after: "After",
+            changeReason: "Change reason",
+            cancelReason: "Cancellation reason",
+            cancelledTitle: "Shift cancelled",
+            timeRange: "Time",
+            fields: {
+              workDate: "Work date",
+              staffName: "Assigned staff",
+              shiftTemplate: "Shift template",
+              startTime: "Start time",
+              endTime: "End time",
+              status: "Status",
+              name: "Shift name",
+              totalHours: "Total hours"
+            },
+            descriptionUpdate: "Updated shift {{target}}. Changed: {{fields}}",
+            descriptionUpdateNoFields: "Updated shift {{target}}",
+            descriptionCancel: "Cancelled shift {{target}}. Reason: {{reason}}",
+            descriptionCancelNoReason: "Cancelled shift {{target}}"
+          }
         },
         contractManagement: {
           title: "Contract Management",
@@ -1957,10 +1989,12 @@ const resources = {
             labelGender: "Gender",
             labelRoleRequired: "Role *",
             labelSpecialty: "Specialty",
-            labelCertificationsUpload: "Certifications (DOC/PDF)",
-            chooseCertFiles: "Choose certificate files",
+            labelCertificationsUpload: "Certifications (images)",
+            chooseCertFiles: "Choose certificate images",
             certFilesSelected: "{{count}} file(s) selected",
-            certFilesHint: "PDF, DOC, DOCX supported",
+            certFilesHint: "JPG, PNG, WebP supported",
+            removeCertFile: "Remove certificate",
+            removeCertFileAria: "Remove certificate {{name}}",
             createAccount: "Create account",
             loadingProfile: "Loading information...",
             changeAvatar: "Change photo",
@@ -2010,6 +2044,9 @@ const resources = {
               passwordDigit: "Password must contain at least 1 number",
               roleRequired: "Please select a role",
               phoneInvalid: "Invalid phone number (e.g. 0912345678 or +84912345678)",
+              phoneDuplicate: "Phone number is already in use",
+              dateOfBirthInvalid: "Invalid date of birth",
+              dateOfBirthMinAge: "Staff must be at least 18 years old",
               usernameInvalid: "Username must be 3–30 characters, letters, numbers and underscore only",
               passwordMinEdit: "At least 8 characters",
               passwordLetterEdit: "Must contain at least 1 letter",
@@ -2333,7 +2370,7 @@ const resources = {
               formTitle: "Assign new care task",
               formHint: "Staff must have a published/confirmed shift (not ended), residents assigned in step 2, and scheduled time from now onward. Incomplete tasks auto-change to «Missed» when shift ends (different from manager «Skipped»).",
               workDate: "Work date *",
-              workDateHint: "Based on assignment date in toolbar above.",
+              workDateHint: "Select today or a future date. Staff and shifts load for this date.",
               staffOnShift: "Staff with shift *",
               loadingStaff: "Loading staff list...",
               selectStaff: "— Select staff —",
@@ -3233,6 +3270,8 @@ const resources = {
   },
   vi: {
     translation: {
+      apiErrors: apiErrorsVi,
+      apiSuccess: apiSuccessVi,
       app: {
         title: "Nursing Home",
         subtitle: "Hệ thống quản lý viện dưỡng lão",
@@ -4607,7 +4646,9 @@ const resources = {
             REQUEST_PUT: "Yêu cầu API PUT",
             REQUEST_PATCH: "Yêu cầu API PATCH",
             REQUEST_DELETE: "Yêu cầu API DELETE",
-            TRANSFER_RESIDENT_ROOM: "Chuyển cư dân"
+            TRANSFER_RESIDENT_ROOM: "Chuyển cư dân",
+            UPDATE_SHIFT: "Cập nhật ca làm việc",
+            CANCEL_SHIFT: "Hủy ca làm việc"
           },
           role: "Vai trò",
           rolePlaceholder: "Ví dụ: admin",
@@ -4631,7 +4672,33 @@ const resources = {
           userAgent: "User Agent",
           beforeData: "Dữ liệu trước",
           afterData: "Dữ liệu sau",
-          loadError: "Không thể tải nhật ký hoạt động."
+          loadError: "Không thể tải nhật ký hoạt động.",
+          showTechnicalJson: "Xem dữ liệu kỹ thuật (JSON)",
+          shiftDetail: {
+            summaryTitle: "Thông tin ca",
+            changesTitle: "Thay đổi",
+            fieldLabel: "Trường",
+            before: "Trước",
+            after: "Sau",
+            changeReason: "Lý do thay đổi",
+            cancelReason: "Lý do hủy",
+            cancelledTitle: "Đã hủy ca",
+            timeRange: "Khung giờ",
+            fields: {
+              workDate: "Ngày làm việc",
+              staffName: "Nhân viên phân công",
+              shiftTemplate: "Mẫu ca",
+              startTime: "Giờ bắt đầu",
+              endTime: "Giờ kết thúc",
+              status: "Trạng thái",
+              name: "Tên ca",
+              totalHours: "Tổng giờ"
+            },
+            descriptionUpdate: "Cập nhật ca {{target}}. Trường đổi: {{fields}}",
+            descriptionUpdateNoFields: "Cập nhật ca {{target}}",
+            descriptionCancel: "Hủy ca {{target}}. Lý do: {{reason}}",
+            descriptionCancelNoReason: "Hủy ca {{target}}"
+          }
         },
         contractManagement: {
           title: "Quản lý Hợp đồng",
@@ -5148,10 +5215,12 @@ const resources = {
             labelGender: "Giới tính",
             labelRoleRequired: "Vai trò *",
             labelSpecialty: "Chuyên môn",
-            labelCertificationsUpload: "Chứng chỉ (DOC/PDF)",
-            chooseCertFiles: "Chọn file chứng chỉ",
+            labelCertificationsUpload: "Chứng chỉ (ảnh)",
+            chooseCertFiles: "Chọn ảnh chứng chỉ",
             certFilesSelected: "{{count}} file đã chọn",
-            certFilesHint: "Hỗ trợ PDF, DOC, DOCX",
+            certFilesHint: "Hỗ trợ JPG, PNG, WebP",
+            removeCertFile: "Xóa chứng chỉ",
+            removeCertFileAria: "Xóa chứng chỉ {{name}}",
             createAccount: "Tạo tài khoản",
             loadingProfile: "Đang tải thông tin...",
             changeAvatar: "Đổi ảnh",
@@ -5201,6 +5270,9 @@ const resources = {
               passwordDigit: "Mật khẩu phải chứa ít nhất 1 chữ số",
               roleRequired: "Vui lòng chọn vai trò",
               phoneInvalid: "Số điện thoại không hợp lệ (VD: 0912345678 hoặc +84912345678)",
+              phoneDuplicate: "Số điện thoại đã được sử dụng",
+              dateOfBirthInvalid: "Ngày sinh không hợp lệ",
+              dateOfBirthMinAge: "Nhân viên phải đủ 18 tuổi",
               usernameInvalid: "Username 3–30 ký tự, chỉ chữ cái, số và dấu gạch dưới",
               passwordMinEdit: "Ít nhất 8 ký tự",
               passwordLetterEdit: "Phải có ít nhất 1 chữ cái",
@@ -5523,7 +5595,7 @@ const resources = {
               formTitle: "Giao nhiệm vụ chăm sóc mới",
               formHint: "Nhân viên phải có ca đã đăng/xác nhận (chưa kết thúc), cư dân đã giao ở bước 2, và giờ dự kiến từ thời điểm hiện tại trở đi. Nhiệm vụ chưa hoàn thành sẽ tự chuyển «Bỏ lỡ» khi hết ca (khác «Bỏ qua» do quản lý chủ động chọn).",
               workDate: "Ngày thực hiện *",
-              workDateHint: "Theo ngày phân công ở thanh trên.",
+              workDateHint: "Chọn hôm nay hoặc ngày tương lai. Nhân viên và ca được tải theo ngày này.",
               staffOnShift: "Nhân viên có ca *",
               loadingStaff: "Đang tải danh sách nhân viên...",
               selectStaff: "— Chọn nhân viên —",

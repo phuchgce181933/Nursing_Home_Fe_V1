@@ -7,6 +7,17 @@ const PHONE_REGEX = /^(\+84|0)[0-9]{8,10}$/;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,30}$/;
 
+const validateDateOfBirth = (dob, t) => {
+  if (!dob) return null;
+  const d = new Date(dob);
+  if (Number.isNaN(d.getTime())) return t('admin.staff.profiles.validation.dateOfBirthInvalid');
+  if (d > new Date()) return t('admin.staff.profiles.validation.dateOfBirthInvalid');
+  const minAge = new Date();
+  minAge.setFullYear(minAge.getFullYear() - 18);
+  if (d > minAge) return t('admin.staff.profiles.validation.dateOfBirthMinAge');
+  return null;
+};
+
 const validate = (form, t) => {
   const errs = {};
   const v = (key) => t(`admin.staff.profiles.validation.${key}`);
@@ -33,12 +44,15 @@ const validate = (form, t) => {
     errs.username = v('usernameInvalid');
   }
 
+  const dobError = validateDateOfBirth(form.dateOfBirth, t);
+  if (dobError) errs.dateOfBirth = dobError;
+
   return errs;
 };
 
 const emptyForm = {
   fullName: '', email: '', password: '', role: 'nurse',
-  phone: '', username: '', gender: '',
+  phone: '', username: '', gender: '', dateOfBirth: '',
   address: '', specialty: '', certificationFiles: [],
 };
 
@@ -71,8 +85,16 @@ export default function StaffCreateModal({
 
   const handleCertificationChange = (e) => {
     const files = Array.from(e.target.files || []);
-    setCertificationFiles(files);
+    if (!files.length) return;
+    setCertificationFiles((prev) => [...prev, ...files]);
+    if (certFileRef.current) certFileRef.current.value = '';
   };
+
+  const handleRemoveNewCert = (index) => {
+    setCertificationFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const certFileKey = (file) => `${file.name}-${file.size}-${file.lastModified}`;
 
   const handleSubmit = () => {
     const errs = validate(form, t);
@@ -145,6 +167,15 @@ export default function StaffCreateModal({
               <option value="other">{t('common.gender.other')}</option>
             </select>
           </div>
+          <div className="form-group">
+            <label>{t('admin.staff.profiles.labelDateOfBirth')}</label>
+            <input
+              type="date"
+              value={form.dateOfBirth || ''}
+              onChange={(e) => set('dateOfBirth', e.target.value)}
+            />
+            {errors.dateOfBirth && <span className="field-error">{errors.dateOfBirth}</span>}
+          </div>
           {field(t('admin.staff.profiles.labelAddress'), 'address', { placeholder: t('admin.staff.profiles.placeholderAddress'), full: true })}
         </div>
 
@@ -175,17 +206,50 @@ export default function StaffCreateModal({
             <input
               ref={certFileRef}
               type="file"
-              accept=".pdf,.doc,.docx"
+              accept="image/*"
               multiple
               style={{ display: 'none' }}
               onChange={handleCertificationChange}
             />
             {certificationFiles.length > 0 && (
-              <ul className="file-list">
-                {certificationFiles.map((file) => (
-                  <li key={file.name}>{file.name}</li>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '0.5rem' }}>
+                {certificationFiles.map((file, index) => (
+                  <span
+                    key={certFileKey(file)}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '6px 10px',
+                      borderRadius: '999px',
+                      backgroundColor: '#e2e8f0',
+                      fontSize: '13px',
+                    }}
+                  >
+                    {file.name}
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveNewCert(index)}
+                      aria-label={t('admin.staff.profiles.removeCertFileAria', { name: file.name })}
+                      title={t('admin.staff.profiles.removeCertFile')}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: 0,
+                        border: 'none',
+                        background: 'transparent',
+                        cursor: 'pointer',
+                        fontSize: '16px',
+                        lineHeight: 1,
+                        color: '#64748b',
+                      }}
+                    >
+                      ×
+                    </button>
+                  </span>
                 ))}
-              </ul>
+              </div>
             )}
           </div>
         </div>

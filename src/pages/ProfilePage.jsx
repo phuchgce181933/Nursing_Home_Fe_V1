@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import authService from '../services/auth.service';
 import { useAuth } from '../hooks/useAuth';
+import { resolveApiError } from '../utils/apiMessage';
 
 const TABS = [
   { key: 'personal', icon: User },
@@ -148,14 +149,7 @@ function ProfilePage() {
       }
     } catch (error) {
       setMessageType('error');
-      const serverMessage = error?.response?.data?.message;
-      setMessage(
-        serverMessage === 'Email is already in use'
-          ? t('profile.emailInUse')
-          : serverMessage === 'Phone number is already in use'
-            ? t('profile.phoneInUse')
-            : serverMessage || t('profile.updateError')
-      );
+      setMessage(resolveApiError(error, t, 'profile.updateError'));
     } finally {
       setIsSaving(false);
     }
@@ -205,8 +199,7 @@ function ProfilePage() {
       setEditing(false);
       if (refreshUser) await refreshUser();
     } catch (err) {
-      const serverMessage = err?.response?.data?.message || err.message;
-      setOtpError(serverMessage === 'Invalid OTP' ? t('profile.invalidOtp') : serverMessage);
+      setOtpError(resolveApiError(err, t, 'profile.invalidOtp'));
     } finally {
       setIsVerifyingOtp(false);
     }
@@ -231,7 +224,7 @@ function ProfilePage() {
       setPasswordForm(initialPasswordForm);
     } catch (error) {
       setMessageType('error');
-      setMessage(error?.response?.data?.message || t('profile.passwordChangeError'));
+      setMessage(resolveApiError(error, t, 'profile.passwordChangeError'));
     } finally {
       setIsSaving(false);
     }

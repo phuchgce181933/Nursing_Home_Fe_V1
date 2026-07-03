@@ -4,6 +4,7 @@ import { Search, RefreshCw } from 'lucide-react';
 import AdminPageShell from '../../components/admin/AdminPageShell';
 import auditLogService from '../../services/auditLog.service';
 import ListPagination from '../../components/ui/ListPagination';
+import ShiftAuditDetail, { formatShiftAuditDescription, isShiftAuditLog } from '../../components/admin/audit/ShiftAuditDetail';
 import '../../styles/admin/AuditLogsPage.css';
 
 const BUSINESS_MODULE_LABELS = {
@@ -16,6 +17,8 @@ const BUSINESS_MODULE_LABELS = {
   servicePackage: 'Gói dịch vụ',
   servicepackage: 'Gói dịch vụ',
   careAppointment: 'Cuộc hẹn chăm sóc',
+  Shift: 'Ca làm việc',
+  shift: 'Ca làm việc',
   facilityTour: 'Tham quan cơ sở',
   CareNote: 'Ghi chú chăm sóc',
   careNote: 'Ghi chú chăm sóc',
@@ -48,6 +51,7 @@ const TARGET_ENTITY_LABELS = {
   ServicePackage: 'Gói dịch vụ',
   FacilityTour: 'Tour cơ sở',
   CareAppointment: 'Cuộc hẹn chăm sóc',
+  Shift: 'Ca làm việc',
   CareNote: 'Ghi chú chăm sóc',
   Activity: 'Hoạt động',
   Incident: 'Sự cố',
@@ -339,7 +343,11 @@ export default function AuditLogsPage() {
                       <td>{log.performedBy || log.actorUserId || '—'}</td>
                       <td>{formatRoleLabel(log.performedByRole || log.actorRole)}</td>
                       <td>{formatTargetLabel(log.targetName, log.targetEntityType)}</td>
-                      <td>{truncateText(log.description || log.afterData?.summary || log.action)}</td>
+                      <td>{truncateText(
+                        isShiftAuditLog(log)
+                          ? formatShiftAuditDescription(log, t)
+                          : (log.description || log.afterData?.summary || log.action)
+                      )}</td>
                     </tr>
                   ))
                 ) : (
@@ -388,25 +396,53 @@ export default function AuditLogsPage() {
               </div>
               <div>
                 <strong>{t('admin.auditLogs.description')}</strong>
-                <p>{selectedLog.description || '—'}</p>
+                <p>
+                  {isShiftAuditLog(selectedLog)
+                    ? formatShiftAuditDescription(selectedLog, t)
+                    : (selectedLog.description || '—')}
+                </p>
               </div>
               <div className="audit-logs-page__details-section">
                 <strong>{t('admin.auditLogs.businessDetails')}</strong>
-                <pre>{selectedLog.afterData ? JSON.stringify(selectedLog.afterData, null, 2) : '—'}</pre>
+                {isShiftAuditLog(selectedLog) ? (
+                  <ShiftAuditDetail log={selectedLog} />
+                ) : (
+                  <pre>{selectedLog.afterData ? JSON.stringify(selectedLog.afterData, null, 2) : '—'}</pre>
+                )}
               </div>
               <div className="audit-logs-page__details-section">
-                <strong>{t('admin.auditLogs.technicalDetails')}</strong>
-                <pre>{JSON.stringify({
-                  requestMethod: selectedLog.requestMethod,
-                  requestUrl: selectedLog.requestUrl,
-                  statusCode: selectedLog.statusCode,
-                  ipAddress: selectedLog.ipAddress,
-                  userAgent: selectedLog.userAgent,
-                  requestQuery: selectedLog.requestQuery,
-                  requestParams: selectedLog.requestParams,
-                  metadata: selectedLog.metadata,
-                  beforeData: selectedLog.beforeData,
-                }, null, 2)}</pre>
+                {isShiftAuditLog(selectedLog) ? (
+                  <details className="audit-logs-page__technical-details">
+                    <summary>{t('admin.auditLogs.showTechnicalJson')}</summary>
+                    <pre>{JSON.stringify({
+                      requestMethod: selectedLog.requestMethod,
+                      requestUrl: selectedLog.requestUrl,
+                      statusCode: selectedLog.statusCode,
+                      ipAddress: selectedLog.ipAddress,
+                      userAgent: selectedLog.userAgent,
+                      requestQuery: selectedLog.requestQuery,
+                      requestParams: selectedLog.requestParams,
+                      metadata: selectedLog.metadata,
+                      beforeData: selectedLog.beforeData,
+                      afterData: selectedLog.afterData,
+                    }, null, 2)}</pre>
+                  </details>
+                ) : (
+                  <>
+                    <strong>{t('admin.auditLogs.technicalDetails')}</strong>
+                    <pre>{JSON.stringify({
+                      requestMethod: selectedLog.requestMethod,
+                      requestUrl: selectedLog.requestUrl,
+                      statusCode: selectedLog.statusCode,
+                      ipAddress: selectedLog.ipAddress,
+                      userAgent: selectedLog.userAgent,
+                      requestQuery: selectedLog.requestQuery,
+                      requestParams: selectedLog.requestParams,
+                      metadata: selectedLog.metadata,
+                      beforeData: selectedLog.beforeData,
+                    }, null, 2)}</pre>
+                  </>
+                )}
               </div>
             </div>
           </section>

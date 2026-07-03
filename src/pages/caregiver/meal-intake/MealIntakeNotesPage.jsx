@@ -4,6 +4,7 @@ import AdminPageShell from '../../../components/admin/AdminPageShell';
 import ListPagination from '../../../components/ui/ListPagination';
 import useClientPagination from '../../../hooks/useClientPagination';
 import mealIntakeNoteService from '../../../services/mealIntakeNote.service';
+import { resolveApiError } from '../../../utils/apiMessage';
 import { getLocalDateString } from '../../../utils/dateUtils';
 import { formatLocaleDate, mealTypeLabel } from '../../../utils/nutritionLabels';
 import '../../../styles/caregiver/MealIntakeNotesPage.css';
@@ -33,7 +34,7 @@ function MealIntakeNotesPage() {
       const res = await mealIntakeNoteService.listResidents();
       setResidents(Array.isArray(res?.data) ? res.data : []);
     } catch (e) {
-      setListError(e?.response?.data?.message || t('caregiver.mealIntake.loadResidentsFailed'));
+      setListError(resolveApiError(e, t, 'caregiver.mealIntake.loadResidentsFailed'));
     }
   };
 
@@ -48,7 +49,7 @@ function MealIntakeNotesPage() {
       });
       setRecords(Array.isArray(res?.data) ? res.data : []);
     } catch (e) {
-      setListError(e?.response?.data?.message || t('caregiver.mealIntake.loadRecordsFailed'));
+      setListError(resolveApiError(e, t, 'caregiver.mealIntake.loadRecordsFailed'));
       setRecords([]);
     } finally {
       setLoading(false);
@@ -96,7 +97,7 @@ function MealIntakeNotesPage() {
       setDeleteModal(null);
       loadRecords();
     } catch (e) {
-      setDeleteError(e?.response?.data?.message || t('common.deleteFailed'));
+      setDeleteError(resolveApiError(e, t, 'common.deleteFailed'));
     } finally {
       setDeleting(false);
     }

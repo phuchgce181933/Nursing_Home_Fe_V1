@@ -12,6 +12,7 @@ import {
   sourceLabel,
 } from '../../utils/nutritionLabels';
 import '../../styles/nurse/MealPlansPage.css';
+import { resolveApiError } from '../../utils/apiMessage';
 
 const MP = 'nurse.mealPlans';
 
@@ -74,7 +75,7 @@ function MealPlanTab() {
       setTemplates(Array.isArray(tplRes.templates) ? tplRes.templates : []);
       setResidents(Array.isArray(residentRes?.data) ? residentRes.data : []);
     } catch (e) {
-      setError(e?.response?.data?.message || t(`${MP}.loadBootFailed`));
+      setError(resolveApiError(e, t, `${MP}.loadBootFailed`));
     } finally {
       setLoading(false);
     }
@@ -262,7 +263,7 @@ function MealPlanTab() {
       resetForm();
       loadPlans(listDate);
     } catch (e) {
-      setError(e?.response?.data?.message || t(`${MP}.saveDraftFailed`));
+      setError(resolveApiError(e, t, `${MP}.saveDraftFailed`));
     } finally {
       setSaving(false);
     }
@@ -295,7 +296,7 @@ function MealPlanTab() {
       const picked = [...new Set(rows.map((r) => String(r.residentId?._id || r.residentId || '')).filter(Boolean))];
       setSelectedResidents(picked);
     } catch (e) {
-      setError(e?.response?.data?.message || t(`${MP}.openDraftFailed`));
+      setError(resolveApiError(e, t, `${MP}.openDraftFailed`));
     } finally {
       setSaving(false);
     }
@@ -309,7 +310,7 @@ function MealPlanTab() {
       if (editingId === id) resetForm();
       loadPlans(listDate);
     } catch (e) {
-      setError(e?.response?.data?.message || t(`${MP}.publishFailed`));
+      setError(resolveApiError(e, t, `${MP}.publishFailed`));
     } finally {
       setSaving(false);
     }
@@ -324,7 +325,7 @@ function MealPlanTab() {
       if (editingId === id) resetForm();
       loadPlans(listDate);
     } catch (e) {
-      setError(e?.response?.data?.message || t(`${MP}.deleteDraftFailed`));
+      setError(resolveApiError(e, t, `${MP}.deleteDraftFailed`));
     } finally {
       setSaving(false);
     }
@@ -337,7 +338,7 @@ function MealPlanTab() {
       const data = await mealPlanService.getPlan(id);
       setDetailPlan(data || null);
     } catch (e) {
-      setError(e?.response?.data?.message || t(`${MP}.detailLoadFailed`));
+      setError(resolveApiError(e, t, `${MP}.detailLoadFailed`));
     } finally {
       setDetailLoading(false);
     }
@@ -589,7 +590,7 @@ function SpecialDietTab() {
       setDietTypes(Array.isArray(tplRes.dietTypes) ? tplRes.dietTypes : []);
       setResidents(Array.isArray(residentRes?.data) ? residentRes.data : []);
     } catch (e) {
-      setError(e?.response?.data?.message || t(`${MP}.loadSpecialBootFailed`));
+      setError(resolveApiError(e, t, `${MP}.loadSpecialBootFailed`));
     } finally {
       setLoading(false);
     }
@@ -712,7 +713,7 @@ function SpecialDietTab() {
       resetForm();
       loadPlans(listDate);
     } catch (e) {
-      setError(e?.response?.data?.message || t(`${MP}.saveDraftFailed`));
+      setError(resolveApiError(e, t, `${MP}.saveDraftFailed`));
     } finally {
       setSaving(false);
     }
@@ -742,7 +743,7 @@ function SpecialDietTab() {
       const picked = [...new Set(rows.map((r) => String(r.residentId?._id || r.residentId || '')).filter(Boolean))];
       setSelectedResidents(picked);
     } catch (e) {
-      setError(e?.response?.data?.message || t(`${MP}.openDraftFailed`));
+      setError(resolveApiError(e, t, `${MP}.openDraftFailed`));
     } finally {
       setSaving(false);
     }
@@ -756,7 +757,7 @@ function SpecialDietTab() {
       if (editingId === id) resetForm();
       loadPlans(listDate);
     } catch (e) {
-      setError(e?.response?.data?.message || t(`${MP}.publishFailed`));
+      setError(resolveApiError(e, t, `${MP}.publishFailed`));
     } finally {
       setSaving(false);
     }
@@ -771,7 +772,7 @@ function SpecialDietTab() {
       if (editingId === id) resetForm();
       loadPlans(listDate);
     } catch (e) {
-      setError(e?.response?.data?.message || t(`${MP}.deleteDraftFailed`));
+      setError(resolveApiError(e, t, `${MP}.deleteDraftFailed`));
     } finally {
       setSaving(false);
     }
@@ -784,7 +785,7 @@ function SpecialDietTab() {
       const data = await specialDietService.getPlan(id);
       setDetailPlan(data || null);
     } catch (e) {
-      setError(e?.response?.data?.message || t(`${MP}.detailLoadFailed`));
+      setError(resolveApiError(e, t, `${MP}.detailLoadFailed`));
     } finally {
       setDetailLoading(false);
     }
@@ -1018,7 +1019,7 @@ function MealTimeScheduleTab() {
       }
       setResidents(Array.isArray(residentRes?.data) ? residentRes.data : []);
     } catch (e) {
-      setError(e?.response?.data?.message || t(`${MP}.loadScheduleBootFailed`));
+      setError(resolveApiError(e, t, `${MP}.loadScheduleBootFailed`));
     } finally {
       setLoading(false);
     }
@@ -1146,7 +1147,7 @@ function MealTimeScheduleTab() {
       resetForm();
       loadSchedules(listDate);
     } catch (e) {
-      setError(e?.response?.data?.message || t(`${MP}.saveDraftFailed`));
+      setError(resolveApiError(e, t, `${MP}.saveDraftFailed`));
     } finally {
       setSaving(false);
     }
@@ -1175,7 +1176,7 @@ function MealTimeScheduleTab() {
       const picked = [...new Set(rows.map((r) => String(r.residentId?._id || r.residentId || '')).filter(Boolean))];
       setSelectedResidents(picked);
     } catch (e) {
-      setError(e?.response?.data?.message || t(`${MP}.openDraftFailed`));
+      setError(resolveApiError(e, t, `${MP}.openDraftFailed`));
     } finally {
       setSaving(false);
     }
@@ -1189,7 +1190,7 @@ function MealTimeScheduleTab() {
       if (editingId === id) resetForm();
       loadSchedules(listDate);
     } catch (e) {
-      setError(e?.response?.data?.message || t(`${MP}.publishFailed`));
+      setError(resolveApiError(e, t, `${MP}.publishFailed`));
     } finally {
       setSaving(false);
     }
@@ -1204,7 +1205,7 @@ function MealTimeScheduleTab() {
       if (editingId === id) resetForm();
       loadSchedules(listDate);
     } catch (e) {
-      setError(e?.response?.data?.message || t(`${MP}.deleteDraftFailed`));
+      setError(resolveApiError(e, t, `${MP}.deleteDraftFailed`));
     } finally {
       setSaving(false);
     }
@@ -1217,7 +1218,7 @@ function MealTimeScheduleTab() {
       const data = await mealTimeScheduleService.getSchedule(id);
       setDetailSchedule(data || null);
     } catch (e) {
-      setError(e?.response?.data?.message || t(`${MP}.detailLoadFailed`));
+      setError(resolveApiError(e, t, `${MP}.detailLoadFailed`));
     } finally {
       setDetailLoading(false);
     }

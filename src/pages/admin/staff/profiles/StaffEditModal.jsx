@@ -2,8 +2,7 @@ import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ALL_STAFF_ROLE_OPTIONS } from '../../../../constants/rolePolicy';
 
-const PASSWORD_REGEX_LETTER = /[a-zA-Z]/;
-const PASSWORD_REGEX_DIGIT = /[0-9]/;
+const PHONE_REGEX = /^(\+84|0)[0-9]{8,10}$/;
 
 export default function StaffEditModal({
   loading = false,
@@ -15,19 +14,20 @@ export default function StaffEditModal({
   roleOptions = ALL_STAFF_ROLE_OPTIONS,
 }) {
   const { t } = useTranslation();
-  const [showPassword, setShowPassword] = useState(false);
-  const [pwError, setPwError] = useState('');
+  const [phoneError, setPhoneError] = useState('');
   const fileRef = useRef();
+  const certFileRef = useRef();
 
   const set = (field, value) => onChange({ ...form, [field]: value });
 
-  const handlePasswordChange = (val) => {
-    set('password', val);
-    if (!val) { setPwError(''); return; }
-    if (val.length < 8) { setPwError(t('admin.staff.profiles.validation.passwordMinEdit')); return; }
-    if (!PASSWORD_REGEX_LETTER.test(val)) { setPwError(t('admin.staff.profiles.validation.passwordLetterEdit')); return; }
-    if (!PASSWORD_REGEX_DIGIT.test(val)) { setPwError(t('admin.staff.profiles.validation.passwordDigitEdit')); return; }
-    setPwError('');
+  const handlePhoneChange = (val) => {
+    set('phone', val);
+    if (!val.trim()) { setPhoneError(''); return; }
+    if (!PHONE_REGEX.test(val.trim())) {
+      setPhoneError(t('admin.staff.profiles.validation.phoneInvalid'));
+      return;
+    }
+    setPhoneError('');
   };
 
   const handleAvatarChange = (e) => {
@@ -35,10 +35,39 @@ export default function StaffEditModal({
     if (file) set('avatarFile', file);
   };
 
+  const handleCertificationChange = (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    set('certificationFiles', [...(form.certificationFiles || []), ...files]);
+    if (certFileRef.current) certFileRef.current.value = '';
+  };
+
+  const handleRemoveNewCert = (index) => {
+    set('certificationFiles', (form.certificationFiles || []).filter((_, i) => i !== index));
+  };
+
+  const handleRemoveExistingCert = (doc) => {
+    if (!doc.publicId) return;
+    onChange({
+      ...form,
+      existingCertDocs: (form.existingCertDocs || []).filter((d) => d.publicId !== doc.publicId),
+      removedCertPublicIds: [...(form.removedCertPublicIds || []), doc.publicId],
+    });
+  };
+
+  const certFileKey = (file) => `${file.name}-${file.size}-${file.lastModified}`;
+
   const handleSave = () => {
-    if (pwError || loading) return;
+    if (phoneError || loading) return;
+    if (form.phone?.trim() && !PHONE_REGEX.test(form.phone.trim())) {
+      setPhoneError(t('admin.staff.profiles.validation.phoneInvalid'));
+      return;
+    }
     onSave();
   };
+
+  const existingCerts = form.existingCertDocs || [];
+  const newCerts = form.certificationFiles || [];
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -66,9 +95,10 @@ export default function StaffEditModal({
               <label>{t('admin.staff.profiles.labelPhone')}</label>
               <input
                 value={form.phone}
-                onChange={(e) => set('phone', e.target.value)}
+                onChange={(e) => handlePhoneChange(e.target.value)}
                 placeholder={t('admin.staff.profiles.placeholderPhone')}
               />
+              {phoneError && <span className="field-error">{phoneError}</span>}
             </div>
 
             <div className="form-group">
@@ -141,37 +171,113 @@ export default function StaffEditModal({
                 placeholder={t('admin.staff.profiles.placeholderSpecialtyEdit')}
               />
             </div>
-          </div>
 
-          <div className="form-section-title">{t('admin.staff.profiles.sectionSecurity')}</div>
-          <div className="form-grid">
             <div className="form-group form-grid--full">
-              <label>
-                {t('admin.staff.profiles.labelResetPassword')}
-                <span style={{ fontWeight: 400, color: '#94a3b8', fontSize: '0.7rem', marginLeft: 4 }}>
-                  {t('admin.staff.profiles.resetPasswordHint')}
-                </span>
-              </label>
-              <div style={{ position: 'relative' }}>
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={form.password || ''}
-                  onChange={(e) => handlePasswordChange(e.target.value)}
-                  placeholder={t('admin.staff.profiles.placeholderPassword')}
-                  style={{ paddingRight: 64, width: '100%', boxSizing: 'border-box' }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((v) => !v)}
-                  style={{
-                    position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
-                    background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.75rem', color: '#64748b',
-                  }}
-                >
-                  {showPassword ? t('admin.staff.profiles.hidePassword') : t('admin.staff.profiles.showPassword')}
+              <label>{t('admin.staff.profiles.labelCertificationsUpload')}</label>
+              {existingCerts.length > 0 && (
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+                  {existingCerts.map((doc) => (
+                    <div key={doc.publicId || doc.url} style={{ position: 'relative', display: 'inline-block' }}>
+                      <a
+                        href={doc.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={doc.fileName || t('admin.staff.profiles.labelCertifications')}
+                      >
+                        <img
+                          src={doc.url}
+                          alt={doc.fileName || ''}
+                          style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 6, border: '1px solid #e2e8f0' }}
+                        />
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveExistingCert(doc)}
+                        aria-label={t('admin.staff.profiles.removeCertFileAria', { name: doc.fileName || '' })}
+                        title={t('admin.staff.profiles.removeCertFile')}
+                        style={{
+                          position: 'absolute',
+                          top: -6,
+                          right: -6,
+                          width: 20,
+                          height: 20,
+                          borderRadius: '50%',
+                          border: '1px solid #e2e8f0',
+                          background: '#fff',
+                          cursor: 'pointer',
+                          fontSize: '14px',
+                          lineHeight: 1,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#64748b',
+                          padding: 0,
+                        }}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                <button type="button" className="btn-outline-sm" onClick={() => certFileRef.current?.click()}>
+                  {t('admin.staff.profiles.chooseCertFiles')}
                 </button>
+                <span style={{ color: '#64748b', fontSize: '0.9rem' }}>
+                  {newCerts.length
+                    ? t('admin.staff.profiles.certFilesSelected', { count: newCerts.length })
+                    : t('admin.staff.profiles.certFilesHint')}
+                </span>
               </div>
-              {pwError && <span className="field-error">{pwError}</span>}
+              <input
+                ref={certFileRef}
+                type="file"
+                accept="image/*"
+                multiple
+                style={{ display: 'none' }}
+                onChange={handleCertificationChange}
+              />
+              {newCerts.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '0.5rem' }}>
+                  {newCerts.map((file, index) => (
+                    <span
+                      key={certFileKey(file)}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '6px 10px',
+                        borderRadius: '999px',
+                        backgroundColor: '#e2e8f0',
+                        fontSize: '13px',
+                      }}
+                    >
+                      {file.name}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveNewCert(index)}
+                        aria-label={t('admin.staff.profiles.removeCertFileAria', { name: file.name })}
+                        title={t('admin.staff.profiles.removeCertFile')}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          padding: 0,
+                          border: 'none',
+                          background: 'transparent',
+                          cursor: 'pointer',
+                          fontSize: '16px',
+                          lineHeight: 1,
+                          color: '#64748b',
+                        }}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </fieldset>
@@ -182,7 +288,7 @@ export default function StaffEditModal({
             type="button"
             className="btn-save"
             onClick={handleSave}
-            disabled={!!pwError || loading}
+            disabled={!!phoneError || loading}
           >
             {t('admin.staff.profiles.saveChanges')}
           </button>

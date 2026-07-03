@@ -12,6 +12,7 @@ import {
   getConflictLabel,
 } from '../../../../constants/shiftConflicts';
 import AdminPageShell from '../../../../components/admin/AdminPageShell';
+import { resolveApiError } from '../../../../utils/apiMessage';
 import '../../../../styles/admin/LeaveRequestAdminPage.css';
 
 const STATUS_LABELS = (t, status) => {
@@ -57,7 +58,7 @@ function ApproveLeaveModal({ requestRow, onClose, onSuccess }) {
       })
       .catch((e) => {
         if (!cancelled) {
-          setLoadError(e.response?.data?.message || t('admin.staff.leaveRequests.approveModal.loadCandidatesFailed'));
+          setLoadError(resolveApiError(e, t, 'admin.staff.leaveRequests.approveModal.loadCandidatesFailed'));
         }
       })
       .finally(() => {
@@ -93,7 +94,7 @@ function ApproveLeaveModal({ requestRow, onClose, onSuccess }) {
       onClose();
     } catch (e) {
       const data = e.response?.data || {};
-      setSubmitError(data.message || t('admin.staff.leaveRequests.approveModal.approveFailed'));
+      setSubmitError(resolveApiError(e, t, 'admin.staff.leaveRequests.approveModal.approveFailed'));
       setConflicts(conflictsFromError(e));
       setBlockingTasks(Array.isArray(data.blockingTasks) ? data.blockingTasks : []);
     } finally {
@@ -270,7 +271,7 @@ export default function LeaveRequestAdminPage() {
       const res = await leaveRequestService.getAll(params);
       setRequests(Array.isArray(res.data) ? res.data : []);
     } catch (e) {
-      setError(e.response?.data?.message || t('admin.staff.leaveRequests.loadFailed'));
+      setError(resolveApiError(e, t, 'admin.staff.leaveRequests.loadFailed'));
     } finally {
       setLoading(false);
     }
@@ -332,7 +333,7 @@ export default function LeaveRequestAdminPage() {
         prev.map((r) => (r._id === id ? { ...r, status: 'rejected', reviewNote: note } : r))
       );
     } catch (e) {
-      alert(e.response?.data?.message || t('admin.staff.leaveRequests.actionFailed'));
+      alert(resolveApiError(e, t, 'admin.staff.leaveRequests.actionFailed'));
     } finally {
       setActLoad(null);
     }

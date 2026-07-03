@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import authService from '../../services/auth.service';
+import { resolveApiError } from '../../utils/apiMessage';
 
 const initialCreateForm = {
   fullName: '',
@@ -12,7 +14,6 @@ const initialCreateForm = {
   address: '',
   specialty: '',
   staffCode: '',
-  certifications: '',
 };
 
 const initialEditForm = {
@@ -32,10 +33,12 @@ function formatDate(value) {
 }
 
 function AdminAccountsPage() {
+  const { t } = useTranslation();
   const [accounts, setAccounts] = useState([]);
   const [pagination, setPagination] = useState({ page: 1, totalPages: 1, total: 0, limit: 20 });
   const [filters, setFilters] = useState({ search: '', role: '', isActive: '' });
   const [createForm, setCreateForm] = useState(initialCreateForm);
+  const [certificationFiles, setCertificationFiles] = useState([]);
   const [editUser, setEditUser] = useState(null);
   const [editForm, setEditForm] = useState(initialEditForm);
   const [loading, setLoading] = useState(true);
@@ -64,7 +67,7 @@ function AdminAccountsPage() {
         limit: data.limit,
       });
     } catch (error) {
-      setMessage(error?.response?.data?.message || 'Không thể tải danh sách tài khoản.');
+      setMessage(resolveApiError(error, t, 'admin.staff.common.loadFailed'));
       setMessageType('error');
     } finally {
       setLoading(false);
@@ -101,20 +104,18 @@ function AdminAccountsPage() {
       const payload = {
         ...createForm,
         dateOfBirth: createForm.dateOfBirth || undefined,
-        certifications: createForm.certifications
-          .split(',')
-          .map((item) => item.trim())
-          .filter(Boolean),
+        certificationFiles: certificationFiles.length ? certificationFiles : undefined,
       };
 
       await authService.createStaffAccount(payload);
       setMessageType('success');
       setMessage('Tạo tài khoản nhân viên thành công.');
       setCreateForm(initialCreateForm);
+      setCertificationFiles([]);
       await loadAccounts(1);
     } catch (error) {
       setMessageType('error');
-      setMessage(error?.response?.data?.message || 'Không thể tạo tài khoản.');
+      setMessage(resolveApiError(error, t, 'admin.staff.profiles.createFailed'));
     } finally {
       setSubmitting(false);
     }
@@ -153,7 +154,7 @@ function AdminAccountsPage() {
       await loadAccounts(pagination.page);
     } catch (error) {
       setMessageType('error');
-      setMessage(error?.response?.data?.message || 'Không thể cập nhật tài khoản.');
+      setMessage(resolveApiError(error, t, 'admin.residents.common.updateFailed'));
     } finally {
       setSubmitting(false);
     }
@@ -170,7 +171,7 @@ function AdminAccountsPage() {
       await loadAccounts(pagination.page);
     } catch (error) {
       setMessageType('error');
-      setMessage(error?.response?.data?.message || 'Không thể thay đổi trạng thái tài khoản.');
+      setMessage(resolveApiError(error, t, 'admin.residents.common.updateFailed'));
     } finally {
       setSubmitting(false);
     }
@@ -190,7 +191,7 @@ function AdminAccountsPage() {
       await loadAccounts(pagination.page);
     } catch (error) {
       setMessageType('error');
-      setMessage(error?.response?.data?.message || 'Không thể thực hiện thao tác cấm/bỏ cấm.');
+      setMessage(resolveApiError(error, t, 'admin.staff.profiles.banFailed'));
     } finally {
       setSubmitting(false);
     }
@@ -325,12 +326,19 @@ function AdminAccountsPage() {
               </label>
 
               <label className="profile-form__field">
-                <span className="profile-form__label">Chứng chỉ (cách nhau bởi dấu phẩy)</span>
+                <span className="profile-form__label">Chứng chỉ (ảnh)</span>
                 <input
                   className="profile-form__input"
-                  value={createForm.certifications}
-                  onChange={(event) => setCreateForm((current) => ({ ...current, certifications: event.target.value }))}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={(event) => setCertificationFiles(Array.from(event.target.files || []))}
                 />
+                {certificationFiles.length > 0 && (
+                  <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                    {certificationFiles.length} ảnh đã chọn
+                  </span>
+                )}
               </label>
             </div>
             <div className="profile-page__actions">

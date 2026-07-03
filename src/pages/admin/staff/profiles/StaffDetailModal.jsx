@@ -104,10 +104,34 @@ export default function StaffDetailModal({ staff, onClose, onEdit, canEdit = tru
                 <DetailRow label={t('admin.staff.profiles.labelStaffCode')} value={profile.staffCode} />
                 <DetailRow label={t('admin.staff.profiles.labelSystemRole')} value={roleLabel} />
                 <DetailRow label={t('admin.staff.profiles.labelSpecialty')} value={profile.specialty} />
-                <DetailRow
-                  label={t('admin.staff.profiles.labelCertifications')}
-                  value={profile.certifications?.length ? profile.certifications.join(', ') : null}
-                />
+                {(profile.certificationDocuments?.length > 0 || profile.certifications?.length > 0) && (
+                  <div className="detail-row">
+                    <span className="detail-label">{t('admin.staff.profiles.labelCertifications')}</span>
+                    <span className="detail-value">
+                      {profile.certificationDocuments?.length > 0 ? (
+                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: 4 }}>
+                          {profile.certificationDocuments.map((doc) => (
+                            <a
+                              key={doc.publicId || doc.url}
+                              href={doc.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title={doc.fileName || ''}
+                            >
+                              <img
+                                src={doc.url}
+                                alt={doc.fileName || ''}
+                                style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 6, border: '1px solid #e2e8f0' }}
+                              />
+                            </a>
+                          ))}
+                        </div>
+                      ) : (
+                        profile.certifications.join(', ')
+                      )}
+                    </span>
+                  </div>
+                )}
               </DetailSection>
 
               <DetailSection title={t('admin.staff.profiles.sectionAssignments')}>

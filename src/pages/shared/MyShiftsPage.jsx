@@ -16,6 +16,7 @@ import shiftService from '../../services/shift.service';
 import { useAuth } from '../../hooks/useAuth';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import '../../styles/shared/MyShiftsPage.css';
+import { resolveApiError } from '../../utils/apiMessage';
 
 const statusOptions = ['', 'draft', 'published', 'confirmed', 'completed', 'cancelled'];
 
@@ -105,7 +106,7 @@ export default function MyShiftsPage() {
       setShifts(Array.isArray(items) ? items : []);
     } catch (err) {
       setMessageType('error');
-      setMessage(err?.response?.data?.message || t('myShifts.loadError'));
+      setMessage(resolveApiError(err, t, 'myShifts.loadError'));
     } finally {
       setLoading(false);
     }
@@ -127,7 +128,7 @@ export default function MyShiftsPage() {
       loadShifts();
     } catch (err) {
       setMessageType('error');
-      setMessage(err?.response?.data?.message || t('myShifts.confirmError'));
+      setMessage(resolveApiError(err, t, 'myShifts.confirmError'));
     } finally {
       setConfirming(null);
     }

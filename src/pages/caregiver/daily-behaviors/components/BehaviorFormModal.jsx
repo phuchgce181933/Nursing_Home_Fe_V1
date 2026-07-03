@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import dailyBehaviorService from '../../../../services/dailyBehavior.service';
+import { resolveApiError } from '../../../../utils/apiMessage';
 import { observationCategoryLabel } from '../../../../utils/behaviorLabels';
 import {
   getAbnormalSeverityOptions,
@@ -74,7 +75,7 @@ function BehaviorFormModal({ open, mode, recordId, residents, defaultWorkDate, m
         workDate: wd,
       });
     } catch (e) {
-      setError(e?.response?.data?.message || t(`${c}.detailLoadFailed`));
+      setError(resolveApiError(e, t, `${c}.detailLoadFailed`));
     } finally {
       setLoading(false);
     }
@@ -147,7 +148,7 @@ function BehaviorFormModal({ open, mode, recordId, residents, defaultWorkDate, m
       }
       onSuccess();
     } catch (err) {
-      setError(err?.response?.data?.message || t(`${c}.saveFailed`));
+      setError(resolveApiError(err, t, `${c}.saveFailed`));
     } finally {
       setSaving(false);
     }

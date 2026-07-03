@@ -7,6 +7,7 @@ import ResidentContextBlock from '../../components/resident/ResidentContextBlock
 import useClientPagination from '../../hooks/useClientPagination';
 import useDebouncedSearch from '../../hooks/useDebouncedSearch';
 import caregiverResidentService from '../../services/caregiverResident.service';
+import { resolveApiError } from '../../utils/apiMessage';
 import { formatResidentAreaLine, pickDrugAllergiesList } from '../../utils/residentArea';
 import '../../styles/caregiver/AssignedResidentsPage.css';
 
@@ -66,7 +67,7 @@ function ResidentDetailModal({ residentId, onClose, t, locale }) {
     caregiverResidentService
       .getResident(residentId)
       .then(setResident)
-      .catch((e) => setError(e?.response?.data?.message || t('caregiver.assignedResidents.detailLoadFailed')))
+      .catch((e) => setError(resolveApiError(e, t, 'caregiver.assignedResidents.detailLoadFailed')))
       .finally(() => setLoading(false));
   }, [residentId, t]);
 
@@ -149,7 +150,7 @@ function AssignedResidentsPage() {
       setResidents(Array.isArray(res.data) ? res.data : []);
       setEmptyMessage(res.message || '');
     } catch (e) {
-      setError(e?.response?.data?.message || t('caregiver.assignedResidents.loadFailed'));
+      setError(resolveApiError(e, t, 'caregiver.assignedResidents.loadFailed'));
       setResidents([]);
     } finally {
       setLoading(false);

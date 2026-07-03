@@ -4,6 +4,7 @@ import AdminPageShell from '../../../components/admin/AdminPageShell';
 import ListPagination from '../../../components/ui/ListPagination';
 import useClientPagination from '../../../hooks/useClientPagination';
 import hygieneActivityService from '../../../services/hygieneActivity.service';
+import { resolveApiError } from '../../../utils/apiMessage';
 import { getLocalDateString } from '../../../utils/dateUtils';
 import { formatLocaleDate } from '../../../utils/nutritionLabels';
 import { hygieneActivityLabel } from '../../../utils/hygieneLabels';
@@ -35,7 +36,7 @@ function HygieneActivitiesPage() {
       const res = await hygieneActivityService.listResidents();
       setResidents(Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : []);
     } catch (e) {
-      setListError(e?.response?.data?.message || t('caregiver.hygiene.loadResidentsFailed'));
+      setListError(resolveApiError(e, t, 'caregiver.hygiene.loadResidentsFailed'));
     }
   };
 
@@ -51,7 +52,7 @@ function HygieneActivitiesPage() {
       });
       setRecords(Array.isArray(res?.data) ? res.data : []);
     } catch (e) {
-      setListError(e?.response?.data?.message || t('caregiver.hygiene.loadRecordsFailed'));
+      setListError(resolveApiError(e, t, 'caregiver.hygiene.loadRecordsFailed'));
       setRecords([]);
     } finally {
       setLoading(false);
@@ -91,7 +92,7 @@ function HygieneActivitiesPage() {
       setDeleteModal(null);
       loadRecords();
     } catch (e) {
-      setDeleteError(e?.response?.data?.message || t('common.deleteFailed'));
+      setDeleteError(resolveApiError(e, t, 'common.deleteFailed'));
     } finally {
       setDeleting(false);
     }
