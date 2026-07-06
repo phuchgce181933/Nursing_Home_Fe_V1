@@ -85,7 +85,6 @@ const resources = {
         pharmacyOverview: "Pharmacy Overview",
         pharmacySuppliers: "Suppliers",
         pharmacyStocks: "Stock History",
-        pharmacyDispense: "Dispense",
         pharmacyReports: "Reports",
         contractManagement: "Contract Management",
         billing: "Billing"
@@ -3348,7 +3347,6 @@ const resources = {
         pharmacyOverview: "Tổng quan nhà thuốc",
         pharmacySuppliers: "Nhà cung cấp",
         pharmacyStocks: "Lịch sử nhập",
-        pharmacyDispense: "Cấp phát thuốc",
         pharmacyReports: "Báo cáo",
         contractManagement: "Quản lý hợp đồng",
         billing: "Kế toán"
@@ -6240,7 +6238,6 @@ const resources = {
           activityScheduleDesc: "Lên kế hoạch và điều phối hoạt động cư dân.",
           healthMonitoring: "Chỉ số Sinh tồn",
           healthMonitoringDesc: "Ghi nhận và theo dõi các chỉ số sức khỏe.",
-          medications: "Cấp phát thuốc",
           medicationsDesc: "Quản lý đơn thuốc và các liều dùng."
         },
         noteType: {

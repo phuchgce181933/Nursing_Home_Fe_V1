@@ -128,7 +128,6 @@ export const roleSidebarData = {
     { title: 'sidebar.medication', icon: Pill, path: '/pharmacist/medications' },
     { title: 'sidebar.pharmacySuppliers', icon: Truck, path: '/pharmacist/suppliers' },
     { title: 'sidebar.pharmacyStocks', icon: PackageOpen, path: '/pharmacist/stocks' },
-    { title: 'sidebar.pharmacyDispense', icon: ShieldCheck, path: '/pharmacist/dispense' },
     { title: 'sidebar.pharmacyReports', icon: FileText, path: '/pharmacist/reports' },
   ],
 };

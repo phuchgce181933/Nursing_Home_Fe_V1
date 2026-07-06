@@ -145,6 +145,7 @@
   padding: 18px;
   margin-bottom: 16px;
   box-shadow: 0 12px 24px rgba(15, 23, 42, 0.04);
+  overflow-x: auto;
 }
 
 .pharmacy-card__body p {
@@ -228,26 +229,28 @@
   font-size: 14px;
 }
 
+.pharmacy-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  table-layout: auto;
+}
+
 .pharmacy-table th,
 .pharmacy-table td {
   padding: 12px;
   border-bottom: 1px solid rgba(15, 23, 42, 0.08);
   text-align: left;
-}
-
-.pharmacy-table td.pharmacy-desc {
   white-space: normal;
-  max-width: 320px;
-  word-break: break-word;
-  vertical-align: top;
 }
 
+.pharmacy-table td.pharmacy-desc,
 .pharmacy-table td.pharmacy-supplier {
   white-space: normal;
-  max-width: 220px;
+  max-width: 260px;
   word-break: break-word;
   vertical-align: top;
-  text-align: center;
+  text-align: left;
 }
 
 .pharmacy-table th.pharmacy-supplier-col {
