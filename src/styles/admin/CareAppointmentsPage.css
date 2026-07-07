@@ -380,6 +380,11 @@
   color: #1e293b;
 }
 
+.cap-btn-action--danger:hover {
+  background-color: #fee2e2;
+  color: #b91c1c;
+}
+
 /* Modals styles */
 .cap-modal-backdrop {
   position: fixed;
@@ -492,8 +497,16 @@
   color: #ffffff;
 }
 
+.cap-modal-btn-submit--danger {
+  background-color: #dc2626;
+}
+
 .cap-modal-btn-submit:hover {
   background-color: #2b4b7c;
+}
+
+.cap-modal-btn-submit--danger:hover {
+  background-color: #b91c1c;
 }
 
 /* Animations */

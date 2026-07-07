@@ -1,0 +1,497 @@
+/* ═══════════════════════════════════════════════════
+   DoctorDashboardPage  |  prefix: dd-
+   ═══════════════════════════════════════════════════ */
+
+/* ── Animations ── */
+@keyframes dd-fadeUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes dd-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Utility ── */
+.dd-spin {
+  animation: dd-spin 0.75s linear infinite;
+}
+
+/* ── Page ── */
+.dd-page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding-bottom: 48px;
+  animation: dd-fadeUp 0.4s ease-out;
+}
+
+/* ── Loading screen ── */
+.dd-loading-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  min-height: 400px;
+  color: #64748b;
+  font-size: 14px;
+}
+.dd-loading-screen svg {
+  color: #3b5bdb;
+}
+
+/* ── Header ── */
+.dd-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 22px 28px;
+  background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+  border-radius: 18px;
+  color: #fff;
+  box-shadow: 0 4px 24px rgba(30, 41, 59, 0.18);
+  animation: dd-fadeUp 0.35s ease-out;
+}
+
+.dd-header__left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.dd-header__icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  backdrop-filter: blur(4px);
+}
+.dd-header__icon svg { color: #fff; }
+
+.dd-header__title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #fff;
+  margin: 0 0 4px;
+  letter-spacing: -0.3px;
+}
+.dd-header__title span { color: #93c5fd; }
+
+.dd-header__date {
+  font-size: 13px;
+  color: rgba(255,255,255,0.6);
+  margin: 0;
+  text-transform: capitalize;
+}
+
+.dd-refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 18px;
+  border: 1.5px solid rgba(255,255,255,0.25);
+  border-radius: 10px;
+  background: rgba(255,255,255,0.1);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+  backdrop-filter: blur(4px);
+  white-space: nowrap;
+}
+.dd-refresh-btn:hover:not(:disabled) {
+  background: rgba(255,255,255,0.2);
+  border-color: rgba(255,255,255,0.45);
+}
+.dd-refresh-btn:disabled { opacity: 0.6; cursor: default; }
+
+/* ── KPI Grid ── */
+.dd-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+
+.dd-kpi-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: #fff;
+  border: 1px solid #e8edf4;
+  border-radius: 14px;
+  padding: 18px 16px;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  animation: dd-fadeUp 0.45s ease-out backwards;
+  box-shadow: 0 2px 12px rgba(15, 23, 42, 0.04);
+}
+.dd-kpi-card:nth-child(1) { animation-delay: 0.05s; }
+.dd-kpi-card:nth-child(2) { animation-delay: 0.09s; }
+.dd-kpi-card:nth-child(3) { animation-delay: 0.13s; }
+.dd-kpi-card:nth-child(4) { animation-delay: 0.17s; }
+
+.dd-kpi-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.1);
+}
+
+.dd-kpi-card__icon {
+  width: 50px;
+  height: 50px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.dd-kpi-card__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.dd-kpi-card__label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.dd-kpi-card__value {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  line-height: 1.2;
+}
+
+.dd-kpi-card__sub {
+  font-size: 11px;
+  color: #94a3b8;
+  font-weight: 500;
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dd-kpi-card__arrow {
+  color: #cbd5e1;
+  flex-shrink: 0;
+  transition: transform 0.2s, color 0.2s;
+}
+.dd-kpi-card:hover .dd-kpi-card__arrow {
+  transform: translateX(3px);
+  color: #3b5bdb;
+}
+
+/* ── Shared chart icon ── */
+.dd-chart-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* ── 2-column charts row ── */
+.dd-charts-row-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+/* ── Chart Card ── */
+.dd-chart-card {
+  background: #fff;
+  border: 1px solid #e8edf4;
+  border-radius: 14px;
+  padding: 20px;
+  box-shadow: 0 2px 12px rgba(15, 23, 42, 0.04);
+  animation: dd-fadeUp 0.5s ease-out 0.15s backwards;
+}
+
+.dd-chart-card__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.dd-chart-card__title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0 0 2px;
+}
+
+.dd-chart-card__sub {
+  font-size: 12px;
+  color: #94a3b8;
+  margin: 0;
+  font-weight: 500;
+}
+
+.dd-chart-body {
+  min-height: 230px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dd-empty-chart {
+  color: #94a3b8;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: center;
+  padding: 40px 0;
+}
+
+/* ── Tooltip ── */
+.dd-tooltip {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px 14px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+  font-size: 13px;
+  color: #475569;
+}
+.dd-tooltip__label {
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 6px;
+  font-size: 12px;
+}
+.dd-tooltip__row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 2px 0;
+}
+.dd-tooltip__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ── Bottom row ── */
+.dd-bottom-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+/* ── List Card ── */
+.dd-list-card {
+  background: #fff;
+  border: 1px solid #e8edf4;
+  border-radius: 14px;
+  padding: 20px;
+  box-shadow: 0 2px 12px rgba(15, 23, 42, 0.04);
+  animation: dd-fadeUp 0.5s ease-out 0.25s backwards;
+  display: flex;
+  flex-direction: column;
+}
+
+.dd-list-card__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.dd-list-card__title {
+  flex: 1;
+  font-size: 15px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0;
+}
+
+.dd-see-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #3b5bdb;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: background 0.15s;
+  font-family: inherit;
+  white-space: nowrap;
+}
+.dd-see-all:hover { background: #eef2ff; }
+
+.dd-list-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+/* ── Empty states ── */
+.dd-empty-list {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 32px 0;
+  color: #94a3b8;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: center;
+}
+
+/* ── Appointment item ── */
+.dd-appt-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid #f1f5f9;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.dd-appt-item:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+}
+
+.dd-appt-item__time {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #475569;
+  background: #f1f5f9;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+.dd-appt-item__time svg { color: #94a3b8; }
+
+.dd-appt-item__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dd-appt-item__resident {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dd-appt-item__type {
+  font-size: 11px;
+  color: #64748b;
+}
+
+.dd-status-badge {
+  flex-shrink: 0;
+  padding: 3px 9px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* ── Care note item ── */
+.dd-note-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid #f1f5f9;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.dd-note-item:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+}
+
+.dd-note-item__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.dd-note-item__resident {
+  font-size: 12px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.dd-note-item__content {
+  font-size: 12px;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dd-note-item__date {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+/* ── Responsive ── */
+@media (max-width: 1280px) {
+  .dd-kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 1024px) {
+  .dd-charts-row-2 {
+    grid-template-columns: 1fr;
+  }
+  .dd-bottom-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .dd-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+  .dd-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 18px;
+  }
+  .dd-header__title { font-size: 18px; }
+  .dd-kpi-card__value { font-size: 20px; }
+}

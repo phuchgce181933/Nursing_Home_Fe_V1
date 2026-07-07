@@ -12,12 +12,15 @@ import {
   XCircle,
   Eye,
   Edit,
+  Trash2,
   Loader2,
   ChevronLeft,
   ChevronRight,
   UserCheck,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../../hooks/useAuth';
+import useToast from '../../../hooks/useToast';
 import careAppointmentService from '../../../services/careAppointment.service';
 import staffService from '../../../services/staff.service';
 import residentService from '../../../services/resident.service';
@@ -25,14 +28,33 @@ import admissionService from '../../../services/admission.service';
 import medicalRecordService from '../../../services/medicalRecord.service';
 import '../../../styles/admin/CareAppointmentsPage.css';
 
-const STATUS_OPTIONS = [
-  { value: '', label: 'All Statuses' },
-  { value: 'scheduled', label: 'Scheduled' },
-  { value: 'in_progress', label: 'In Progress' },
-  { value: 'completed', label: 'Completed' },
-  { value: 'cancelled', label: 'Cancelled' },
+const getStatusOptions = (t) => [
+  { value: '', label: t('careAppointments.statusAll') },
+  { value: 'scheduled', label: t('careAppointments.statusScheduled') },
+  { value: 'in_progress', label: t('careAppointments.statusInProgress') },
+  { value: 'completed', label: t('careAppointments.statusCompleted') },
+  { value: 'cancelled', label: t('careAppointments.statusCancelled') },
 ];
 
+// Mirrors STATUS_TRANSITIONS in backend services/careAppointmentService.js —
+// keep in sync so the dropdown never offers a transition the API will reject.
+const STATUS_TRANSITIONS = {
+  scheduled: ['in_progress', 'cancelled'],
+  in_progress: ['completed', 'cancelled'],
+  completed: [],
+  cancelled: [],
+};
+
+const getStatusLabels = (t) => ({
+  scheduled: t('careAppointments.statusLabelScheduled'),
+  in_progress: t('careAppointments.statusLabelInProgress'),
+  completed: t('careAppointments.statusLabelCompleted'),
+  cancelled: t('careAppointments.statusLabelCancelled'),
+});
+
+// Domain values, not UI labels — stored as appointment data (matched by exact
+// string elsewhere, e.g. the "Khám lâm sàng đầu vào" clinical-wizard trigger),
+// so they intentionally stay in Vietnamese regardless of UI language.
 const APPOINTMENT_TYPES = [
   'Khám lâm sàng đầu vào',
   'Khám tổng quát định kỳ',
@@ -73,10 +95,14 @@ const formatTimeRange = (startStr, endStr) => {
 };
 
 export default function CareAppointmentsPage() {
+  const { t } = useTranslation();
   const { user } = useAuth();
+  const { showToast } = useToast();
   const userRole = user?.role || '';
   const isAdminRole = ['admin', 'manager'].includes(userRole);
   const isMedicalRole = ['doctor', 'nurse'].includes(userRole);
+  const STATUS_OPTIONS = getStatusOptions(t);
+  const STATUS_LABELS = getStatusLabels(t);
 
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -137,6 +163,11 @@ export default function CareAppointmentsPage() {
   });
   const [savingAppt, setSavingAppt] = useState(false);
   const [apptFormError, setApptFormError] = useState(null);
+
+  // Delete Appointment Modal state (Admin only)
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletingAppt, setDeletingAppt] = useState(false);
+  const [deleteError, setDeleteError] = useState(null);
 
   // Update Status Modal state (for medical staff)
   const [showStatusModal, setShowStatusModal] = useState(false);
@@ -207,11 +238,11 @@ export default function CareAppointmentsPage() {
 
     } catch (err) {
       console.error('Failed to load care appointments:', err);
-      setError('Could not retrieve care appointments. Please check your credentials or network connection.');
+      setError(t('careAppointments.errorLoadList'));
     } finally {
       setLoading(false);
     }
-  }, [page, limit, appliedFilters, isMedicalRole]);
+  }, [page, limit, appliedFilters, isMedicalRole, t]);
 
   useEffect(() => {
     fetchAppointments();
@@ -282,7 +313,7 @@ export default function CareAppointmentsPage() {
       setAvailableNurses(res.nurses || []);
     } catch (err) {
       console.error('Failed to load available staff for slot:', err);
-      const errMsg = err.response?.data?.message || 'Không thể tải danh sách bác sĩ/y tá trực ca tại khung giờ này.';
+      const errMsg = err.response?.data?.message || t('careAppointments.assignErrorFallback');
       setAssignmentError(errMsg);
     } finally {
       setLoadingAvailableStaff(false);
@@ -313,12 +344,14 @@ export default function CareAppointmentsPage() {
       setShowAssignModal(false);
       setSelectedAppt(null);
       fetchAppointments();
+      showToast(t('careAppointments.assignSuccess'), 'success');
 
     } catch (err) {
       console.error('Failed to save staff assignment:', err);
-      // Grab detailed Vietnamese error message from backend
-      const errMsg = err.response?.data?.message || 'An error occurred during staff assignment.';
+      // Grab detailed error message from backend (may already be localized server-side)
+      const errMsg = err.response?.data?.message || t('careAppointments.assignErrorGeneric');
       setAssignmentError(errMsg);
+      showToast(errMsg, 'error');
     } finally {
       setSavingAssignment(false);
     }
@@ -356,14 +389,30 @@ export default function CareAppointmentsPage() {
   // Handle Save (Create/Edit) Appointment
   const handleSaveAppointment = async (e) => {
     if (e) e.preventDefault();
-    setSavingAppt(true);
     setApptFormError(null);
+
+    const start = new Date(formValues.scheduledStartAt);
+    const end = new Date(formValues.scheduledEndAt);
+    if (end <= start) {
+      setApptFormError(t('careAppointments.endBeforeStartError'));
+      return;
+    }
+    // On create, or when the start time is actually being changed on edit, block past times
+    // client-side too — the backend enforces the same rule (see careAppointmentService.js).
+    const originalStartAt = isEditMode && selectedAppt ? new Date(selectedAppt.scheduledStartAt) : null;
+    const startTimeChanged = !originalStartAt || start.getTime() !== originalStartAt.getTime();
+    if (startTimeChanged && start < new Date()) {
+      setApptFormError(t('careAppointments.pastStartError'));
+      return;
+    }
+
+    setSavingAppt(true);
 
     try {
       const payload = {
         residentId: formValues.residentId,
-        scheduledStartAt: new Date(formValues.scheduledStartAt).toISOString(),
-        scheduledEndAt: new Date(formValues.scheduledEndAt).toISOString(),
+        scheduledStartAt: start.toISOString(),
+        scheduledEndAt: end.toISOString(),
         appointmentType: formValues.appointmentType,
         notes: formValues.notes.trim() || undefined,
       };
@@ -377,20 +426,53 @@ export default function CareAppointmentsPage() {
       setShowCreateModal(false);
       setSelectedAppt(null);
       fetchAppointments();
+      showToast(isEditMode ? t('careAppointments.updateSuccess') : t('careAppointments.createSuccess'), 'success');
 
     } catch (err) {
       console.error('Failed to save appointment:', err);
-      const errMsg = err.response?.data?.message || 'An error occurred while saving the appointment.';
+      const errMsg = err.response?.data?.message || t('careAppointments.saveErrorGeneric');
       setApptFormError(errMsg);
+      showToast(errMsg, 'error');
     } finally {
       setSavingAppt(false);
+    }
+  };
+
+  // Open Delete confirmation modal (Admin only)
+  const handleOpenDelete = (appt) => {
+    setSelectedAppt(appt);
+    setDeleteError(null);
+    setShowDeleteModal(true);
+  };
+
+  // Handle Delete Appointment
+  const handleConfirmDelete = async () => {
+    if (!selectedAppt) return;
+
+    setDeletingAppt(true);
+    setDeleteError(null);
+
+    try {
+      await careAppointmentService.deleteAppointment(selectedAppt._id);
+      setShowDeleteModal(false);
+      setSelectedAppt(null);
+      fetchAppointments();
+      showToast(t('careAppointments.deleteSuccess'), 'success');
+    } catch (err) {
+      console.error('Failed to delete appointment:', err);
+      const errMsg = err.response?.data?.message || t('careAppointments.deleteErrorGeneric');
+      setDeleteError(errMsg);
+      showToast(errMsg, 'error');
+    } finally {
+      setDeletingAppt(false);
     }
   };
 
   // Open Status modal (for medical staff) or launch Clinical Wizard if clinical exam
   const handleOpenStatus = async (appt) => {
     setSelectedAppt(appt);
-    setTargetApptStatus(appt.status);
+    const allowedNext = STATUS_TRANSITIONS[appt.status] || [];
+    setTargetApptStatus(allowedNext[0] || '');
     setStatusError(null);
 
     if (appt.appointmentType === 'Khám lâm sàng đầu vào') {
@@ -443,7 +525,7 @@ export default function CareAppointmentsPage() {
         setShowWizardModal(true);
       } catch (err) {
         console.error('Failed to load admission details for clinical wizard:', err);
-        setStatusError('Không thể tải thông tin hồ sơ nhập viện của cư dân này.');
+        setStatusError(t('careAppointments.admissionLoadError'));
         setShowStatusModal(true);
       } finally {
         setLoadingAdmission(false);
@@ -466,10 +548,12 @@ export default function CareAppointmentsPage() {
       setShowStatusModal(false);
       setSelectedAppt(null);
       fetchAppointments();
+      showToast(t('careAppointments.statusUpdateSuccess'), 'success');
     } catch (err) {
       console.error('Failed to update appointment status:', err);
-      const errMsg = err.response?.data?.message || 'An error occurred while updating status.';
+      const errMsg = err.response?.data?.message || t('careAppointments.statusUpdateErrorGeneric');
       setStatusError(errMsg);
+      showToast(errMsg, 'error');
     } finally {
       setUpdatingStatus(false);
     }
@@ -532,10 +616,12 @@ export default function CareAppointmentsPage() {
       setShowWizardModal(false);
       setSelectedAppt(null);
       fetchAppointments();
+      showToast('Đã lưu hồ sơ khám lâm sàng thành công', 'success');
     } catch (err) {
       console.error('Failed to complete clinical wizard:', err);
       const errMsg = err.response?.data?.message || 'Có lỗi xảy ra trong quá trình lưu hồ sơ khám lâm sàng.';
       setStatusError(errMsg);
+      showToast(errMsg, 'error');
     } finally {
       setUpdatingStatus(false);
     }
@@ -548,23 +634,23 @@ export default function CareAppointmentsPage() {
         <div>
           <h1>
             <Calendar className="text-navy-deep" size={26} />
-            Lịch Hẹn Khám (Appointments)
+            {t('careAppointments.pageTitle')}
           </h1>
           <p>
-            {isAdminRole 
-              ? 'Lập lịch trình khám, điều phối Bác sĩ và Y tá phụ trách khám lâm sàng đầu vào cho người cao tuổi.'
-              : 'Theo dõi, cập nhật trạng thái các lịch khám bệnh và lịch trình của cư dân được phân công.'}
+            {isAdminRole
+              ? t('careAppointments.subtitleAdmin')
+              : t('careAppointments.subtitleStaff')}
           </p>
         </div>
         <div style={{ display: 'flex', gap: '12px' }}>
           <button onClick={fetchAppointments} disabled={loading} className="cap-btn-refresh">
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            Làm mới
+            {t('careAppointments.refresh')}
           </button>
           {isAdminRole && (
             <button onClick={handleOpenCreate} className="cap-btn-primary">
               <Plus size={16} />
-              Tạo Lịch Khám
+              {t('careAppointments.createAppointment')}
             </button>
           )}
         </div>
@@ -577,7 +663,7 @@ export default function CareAppointmentsPage() {
             <Calendar size={22} />
           </div>
           <div>
-            <span className="cap-stat-label">Tổng cuộc hẹn</span>
+            <span className="cap-stat-label">{t('careAppointments.statTotal')}</span>
             <span className="cap-stat-value">{metrics.total}</span>
           </div>
         </div>
@@ -587,7 +673,7 @@ export default function CareAppointmentsPage() {
             <Clock size={22} />
           </div>
           <div>
-            <span className="cap-stat-label">Chờ khám</span>
+            <span className="cap-stat-label">{t('careAppointments.statScheduled')}</span>
             <span className="cap-stat-value">{metrics.scheduled}</span>
           </div>
         </div>
@@ -597,7 +683,7 @@ export default function CareAppointmentsPage() {
             <Activity size={22} />
           </div>
           <div>
-            <span className="cap-stat-label">Đang khám</span>
+            <span className="cap-stat-label">{t('careAppointments.statInProgress')}</span>
             <span className="cap-stat-value">{metrics.inProgress}</span>
           </div>
         </div>
@@ -607,7 +693,7 @@ export default function CareAppointmentsPage() {
             <UserCheck size={22} />
           </div>
           <div>
-            <span className="cap-stat-label">Đã hoàn thành</span>
+            <span className="cap-stat-label">{t('careAppointments.statCompleted')}</span>
             <span className="cap-stat-value">{metrics.completed}</span>
           </div>
         </div>
@@ -623,7 +709,7 @@ export default function CareAppointmentsPage() {
                 <input
                   type="text"
                   className="cap-filter-input"
-                  placeholder="Tìm theo Resident ID..."
+                  placeholder={t('careAppointments.searchPlaceholder')}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
@@ -648,7 +734,7 @@ export default function CareAppointmentsPage() {
           <div className="cap-filter-row-secondary">
             <div className="cap-filter-date-group">
               <span className="cap-date-title">
-                <Calendar size={13} className="text-slate-400" /> Ngày hẹn khám:
+                <Calendar size={13} className="text-slate-400" /> {t('careAppointments.dateRangeLabel')}
               </span>
               <input
                 type="date"
@@ -656,7 +742,7 @@ export default function CareAppointmentsPage() {
                 value={from}
                 onChange={(e) => setFrom(e.target.value)}
               />
-              <span className="text-slate-400 text-xs font-semibold">đến</span>
+              <span className="text-slate-400 text-xs font-semibold">{t('careAppointments.dateRangeTo')}</span>
               <input
                 type="date"
                 className="cap-date-input"
@@ -667,10 +753,10 @@ export default function CareAppointmentsPage() {
 
             <div className="cap-filter-actions">
               <button type="button" onClick={handleResetFilters} className="cap-btn-clear">
-                Xóa Bộ Lọc
+                {t('careAppointments.clearFilters')}
               </button>
               <button type="submit" className="cap-btn-apply">
-                Áp Dụng
+                {t('careAppointments.applyFilters')}
               </button>
             </div>
           </div>
@@ -682,12 +768,12 @@ export default function CareAppointmentsPage() {
         {loading && data.length === 0 ? (
           <div className="p-16 flex flex-col items-center justify-center bg-white" style={{ minHeight: '300px' }}>
             <RefreshCw className="animate-spin text-emerald-sage mb-3" size={32} />
-            <p className="text-slate-500 text-sm">Đang tải lịch hẹn khám...</p>
+            <p className="text-slate-500 text-sm">{t('careAppointments.loadingList')}</p>
           </div>
         ) : error ? (
           <div className="p-10 flex flex-col items-center justify-center text-center bg-white" style={{ minHeight: '300px' }}>
             <AlertCircle className="text-red-500 mb-3" size={36} />
-            <p className="text-slate-800 font-bold mb-1">Đã có lỗi xảy ra</p>
+            <p className="text-slate-800 font-bold mb-1">{t('careAppointments.errorTitle')}</p>
             <p className="text-slate-500 text-sm max-w-md">{error}</p>
           </div>
         ) : data.length === 0 ? (
@@ -695,9 +781,9 @@ export default function CareAppointmentsPage() {
             <div className="bg-slate-50 p-4 rounded-full text-slate-400 mb-3" style={{ width: 'fit-content' }}>
               <Calendar size={30} />
             </div>
-            <p className="text-slate-700 font-bold mb-1">Không tìm thấy lịch hẹn nào</p>
+            <p className="text-slate-700 font-bold mb-1">{t('careAppointments.emptyTitle')}</p>
             <p className="text-slate-400 text-xs max-w-sm">
-              Bạn chưa có lịch hẹn khám nào được lên lịch hoặc khớp với bộ lọc tìm kiếm.
+              {t('careAppointments.emptyHint')}
             </p>
           </div>
         ) : (
@@ -705,13 +791,13 @@ export default function CareAppointmentsPage() {
             <table className="cap-table">
               <thead>
                 <tr>
-                  <th>Elderly Resident</th>
-                  <th>Thời gian khám</th>
-                  <th>Loại khám</th>
-                  <th>Bác sĩ phụ trách</th>
-                  <th>Y tá phụ trách</th>
-                  <th style={{ textAlign: 'center' }}>Trạng thái</th>
-                  <th style={{ textAlign: 'center' }}>Thao tác</th>
+                  <th>{t('careAppointments.colResident')}</th>
+                  <th>{t('careAppointments.colTime')}</th>
+                  <th>{t('careAppointments.colType')}</th>
+                  <th>{t('careAppointments.colDoctor')}</th>
+                  <th>{t('careAppointments.colNurse')}</th>
+                  <th style={{ textAlign: 'center' }}>{t('careAppointments.colStatus')}</th>
+                  <th style={{ textAlign: 'center' }}>{t('careAppointments.colActions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -719,7 +805,7 @@ export default function CareAppointmentsPage() {
                   <tr key={row._id} className="cap-table-row">
                     <td>
                       <div className="cap-resident-info">
-                        <span className="cap-resident-name">{row.residentId?.fullName || 'Người cao tuổi'}</span>
+                        <span className="cap-resident-name">{row.residentId?.fullName || t('careAppointments.unknownResident')}</span>
                         <span className="cap-resident-code">#{row.residentId?.residentCode || row.residentId?._id || 'N/A'}</span>
                       </div>
                     </td>
@@ -735,7 +821,7 @@ export default function CareAppointmentsPage() {
                       {row.appointmentType}
                       {row.appointmentType === 'Khám lâm sàng đầu vào' && (
                         <div style={{ marginTop: '4px', fontSize: '11px', color: '#0f766e' }}>
-                          Khám lâm sàng + Đánh giá điều kiện nhập viện
+                          {t('careAppointments.clinicalExamNote')}
                         </div>
                       )}
                     </td>
@@ -746,7 +832,7 @@ export default function CareAppointmentsPage() {
                           {row.doctorStaffId.userId?.fullName || row.doctorStaffId.fullName}
                         </div>
                       ) : (
-                        <div className="cap-staff-badge is-unassigned">Chưa chỉ định</div>
+                        <div className="cap-staff-badge is-unassigned">{t('careAppointments.unassigned')}</div>
                       )}
                     </td>
                     <td>
@@ -756,12 +842,12 @@ export default function CareAppointmentsPage() {
                           {row.nurseStaffId.userId?.fullName || row.nurseStaffId.fullName}
                         </div>
                       ) : (
-                        <div className="cap-staff-badge is-unassigned">Chưa chỉ định</div>
+                        <div className="cap-staff-badge is-unassigned">{t('careAppointments.unassigned')}</div>
                       )}
                     </td>
                     <td style={{ textAlign: 'center' }}>
                       <span className={`cap-badge-status cap-status-${row.status.replace(/_/g, '-')}`}>
-                        {row.status}
+                        {STATUS_LABELS[row.status] || row.status}
                       </span>
                     </td>
                     <td style={{ textAlign: 'center' }}>
@@ -771,7 +857,7 @@ export default function CareAppointmentsPage() {
                             <button
                               onClick={() => handleOpenAssign(row)}
                               className="cap-btn-action"
-                              title="Chỉ định Bác sĩ & Y tá"
+                              title={t('careAppointments.actionAssign')}
                               disabled={['completed', 'cancelled'].includes(row.status)}
                             >
                               <UserCheck size={14} />
@@ -779,10 +865,18 @@ export default function CareAppointmentsPage() {
                             <button
                               onClick={() => handleOpenEdit(row)}
                               className="cap-btn-action"
-                              title="Chỉnh sửa thời gian"
+                              title={t('careAppointments.actionEdit')}
                               disabled={['completed', 'cancelled'].includes(row.status)}
                             >
                               <Edit size={14} />
+                            </button>
+                            <button
+                              onClick={() => handleOpenDelete(row)}
+                              className="cap-btn-action cap-btn-action--danger"
+                              title={t('careAppointments.actionDelete')}
+                              disabled={['completed', 'cancelled', 'in_progress'].includes(row.status)}
+                            >
+                              <Trash2 size={14} />
                             </button>
                           </>
                         )}
@@ -792,11 +886,11 @@ export default function CareAppointmentsPage() {
                             className="cap-btn-action"
                             title={row.appointmentType === 'Khám lâm sàng đầu vào'
                               ? (row.status === 'completed'
-                                ? 'Xem kết quả khám lâm sàng và đánh giá điều kiện'
-                                : 'Mở wizard khám lâm sàng & đánh giá điều kiện')
+                                ? t('careAppointments.actionViewClinicalResult')
+                                : t('careAppointments.actionOpenWizard'))
                               : (row.status === 'completed'
-                                ? 'Xem kết quả thăm khám'
-                                : 'Cập nhật trạng thái')
+                                ? t('careAppointments.actionViewResult')
+                                : t('careAppointments.actionUpdateStatus'))
                             }
                             disabled={row.status === 'cancelled'}
                           >
@@ -816,9 +910,11 @@ export default function CareAppointmentsPage() {
         {total > 0 && (
           <div className="cap-filter-row-secondary" style={{ padding: '16px 20px', borderTop: '1px solid #e2e8f0' }}>
             <div style={{ fontSize: '13px', color: '#64748b' }}>
-              Hiển thị <span>{(page - 1) * limit + 1}</span> đến{' '}
-              <span>{Math.min(page * limit, total)}</span> trong tổng số{' '}
-              <span>{total}</span> lịch hẹn
+              {t('careAppointments.paginationShowing', {
+                from: (page - 1) * limit + 1,
+                to: Math.min(page * limit, total),
+                total,
+              })}
             </div>
 
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -831,7 +927,7 @@ export default function CareAppointmentsPage() {
                 <ChevronLeft size={14} />
               </button>
               <span style={{ fontSize: '13px', color: '#475569' }}>
-                Trang {page} / {totalPages}
+                {t('careAppointments.paginationPage', { page, totalPages })}
               </span>
               <button
                 disabled={page >= totalPages || loading}
@@ -850,10 +946,9 @@ export default function CareAppointmentsPage() {
       {showAssignModal && selectedAppt && (
         <div className="cap-modal-backdrop" onClick={() => setShowAssignModal(false)}>
           <div className="cap-modal" onClick={(e) => e.stopPropagation()}>
-            <h4 className="cap-modal__title">Chỉ Định Bác Sĩ & Y Tá Phụ Trách</h4>
+            <h4 className="cap-modal__title">{t('careAppointments.assignTitle')}</h4>
             <p className="cap-modal__text">
-              Phân công nhân sự y tế thực hiện khám lâm sàng đầu vào cho người cao tuổi{' '}
-              <strong>{selectedAppt.residentId?.fullName}</strong>.
+              {t('careAppointments.assignText', { name: selectedAppt.residentId?.fullName })}
             </p>
 
             {assignmentError && (
@@ -865,7 +960,7 @@ export default function CareAppointmentsPage() {
 
             <form onSubmit={handleSaveAssignment}>
               <div className="cap-form-group">
-                <label className="cap-form-label">Chọn Bác sĩ phụ trách *</label>
+                <label className="cap-form-label">{t('careAppointments.chooseDoctorLabel')}</label>
                 <select
                   className="cap-filter-select"
                   value={selectedDocId}
@@ -873,18 +968,18 @@ export default function CareAppointmentsPage() {
                   disabled={loadingAvailableStaff}
                 >
                   {loadingAvailableStaff ? (
-                    <option value="">Đang tải danh sách Bác sĩ trực ca...</option>
+                    <option value="">{t('careAppointments.loadingDoctors')}</option>
                   ) : (
                     <>
-                      <option value="">-- Chưa chỉ định Bác sĩ --</option>
+                      <option value="">{t('careAppointments.noDoctorOption')}</option>
                       {availableDoctors.map((doc) => (
                         <option key={doc._id} value={doc._id}>
-                          {doc.fullName} ({doc.specialty || 'Đa khoa'})
+                          {doc.fullName} ({doc.specialty || t('careAppointments.generalPractice')})
                         </option>
                       ))}
                       {selectedAppt.doctorStaffId && !availableDoctors.some(d => d._id === (selectedAppt.doctorStaffId._id || selectedAppt.doctorStaffId)) && (
                         <option key={selectedAppt.doctorStaffId._id || selectedAppt.doctorStaffId} value={selectedAppt.doctorStaffId._id || selectedAppt.doctorStaffId}>
-                          {selectedAppt.doctorStaffId.userId?.fullName || selectedAppt.doctorStaffId.fullName || 'Bác sĩ hiện tại'} (Không trong ca trực)
+                          {selectedAppt.doctorStaffId.userId?.fullName || selectedAppt.doctorStaffId.fullName || t('careAppointments.currentDoctorFallback')} {t('careAppointments.notOnShift')}
                         </option>
                       )}
                     </>
@@ -893,7 +988,7 @@ export default function CareAppointmentsPage() {
               </div>
 
               <div className="cap-form-group">
-                <label className="cap-form-label">Chọn Y tá phụ trách *</label>
+                <label className="cap-form-label">{t('careAppointments.chooseNurseLabel')}</label>
                 <select
                   className="cap-filter-select"
                   value={selectedNurId}
@@ -901,10 +996,10 @@ export default function CareAppointmentsPage() {
                   disabled={loadingAvailableStaff}
                 >
                   {loadingAvailableStaff ? (
-                    <option value="">Đang tải danh sách Y tá trực ca...</option>
+                    <option value="">{t('careAppointments.loadingNurses')}</option>
                   ) : (
                     <>
-                      <option value="">-- Chưa chỉ định Y tá --</option>
+                      <option value="">{t('careAppointments.noNurseOption')}</option>
                       {availableNurses.map((nur) => (
                         <option key={nur._id} value={nur._id}>
                           {nur.fullName}
@@ -912,7 +1007,7 @@ export default function CareAppointmentsPage() {
                       ))}
                       {selectedAppt.nurseStaffId && !availableNurses.some(n => n._id === (selectedAppt.nurseStaffId._id || selectedAppt.nurseStaffId)) && (
                         <option key={selectedAppt.nurseStaffId._id || selectedAppt.nurseStaffId} value={selectedAppt.nurseStaffId._id || selectedAppt.nurseStaffId}>
-                          {selectedAppt.nurseStaffId.userId?.fullName || selectedAppt.nurseStaffId.fullName || 'Y tá hiện tại'} (Không trong ca trực)
+                          {selectedAppt.nurseStaffId.userId?.fullName || selectedAppt.nurseStaffId.fullName || t('careAppointments.currentNurseFallback')} {t('careAppointments.notOnShift')}
                         </option>
                       )}
                     </>
@@ -927,7 +1022,7 @@ export default function CareAppointmentsPage() {
                   className="cap-modal-btn-cancel"
                   disabled={savingAssignment}
                 >
-                  Hủy
+                  {t('careAppointments.cancel')}
                 </button>
                 <button
                   type="submit"
@@ -937,14 +1032,63 @@ export default function CareAppointmentsPage() {
                   {savingAssignment ? (
                     <>
                       <Loader2 className="animate-spin mr-1" size={13} />
-                      Đang phân công...
+                      {t('careAppointments.assigning')}
                     </>
                   ) : (
-                    'Xác nhận Phân Công'
+                    t('careAppointments.confirmAssign')
                   )}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 5: XÁC NHẬN XÓA LỊCH HẸN (DELETE CONFIRMATION) */}
+      {showDeleteModal && selectedAppt && (
+        <div className="cap-modal-backdrop" onClick={() => !deletingAppt && setShowDeleteModal(false)}>
+          <div className="cap-modal" onClick={(e) => e.stopPropagation()}>
+            <h4 className="cap-modal__title">{t('careAppointments.deleteTitle')}</h4>
+            <p className="cap-modal__text">
+              {t('careAppointments.deleteText', {
+                name: selectedAppt.residentId?.fullName,
+                date: formatEnglishDate(selectedAppt.scheduledStartAt),
+                time: formatTimeRange(selectedAppt.scheduledStartAt, selectedAppt.scheduledEndAt),
+              })}
+            </p>
+
+            {deleteError && (
+              <div className="cap-error-banner">
+                <AlertCircle size={16} />
+                <span>{deleteError}</span>
+              </div>
+            )}
+
+            <div className="cap-modal-footer">
+              <button
+                type="button"
+                onClick={() => setShowDeleteModal(false)}
+                className="cap-modal-btn-cancel"
+                disabled={deletingAppt}
+              >
+                {t('careAppointments.cancel')}
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                className="cap-modal-btn-submit cap-modal-btn-submit--danger"
+                disabled={deletingAppt}
+              >
+                {deletingAppt ? (
+                  <>
+                    <Loader2 className="animate-spin mr-1" size={13} />
+                    {t('careAppointments.deleting')}
+                  </>
+                ) : (
+                  t('careAppointments.confirmDelete')
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -954,10 +1098,10 @@ export default function CareAppointmentsPage() {
         <div className="cap-modal-backdrop" onClick={() => setShowCreateModal(false)}>
           <div className="cap-modal" onClick={(e) => e.stopPropagation()}>
             <h4 className="cap-modal__title">
-              {isEditMode ? 'Chỉnh Sửa Lịch Hẹn Khám' : 'Tạo Lịch Hẹn Khám Mới'}
+              {isEditMode ? t('careAppointments.editTitle') : t('careAppointments.createTitleModal')}
             </h4>
             <p className="cap-modal__text">
-              Điền các thông tin cần thiết để lên lịch khám lâm sàng hoặc khám bệnh cho cư dân.
+              {t('careAppointments.formSubtitle')}
             </p>
 
             {apptFormError && (
@@ -969,7 +1113,7 @@ export default function CareAppointmentsPage() {
 
             <form onSubmit={handleSaveAppointment}>
               <div className="cap-form-group">
-                <label className="cap-form-label">Chọn Cư dân (Resident) *</label>
+                <label className="cap-form-label">{t('careAppointments.chooseResidentLabel')}</label>
                 <select
                   className="cap-filter-select"
                   value={formValues.residentId}
@@ -977,7 +1121,7 @@ export default function CareAppointmentsPage() {
                   required
                   disabled={isEditMode}
                 >
-                  <option value="">-- Chọn Cư dân --</option>
+                  <option value="">{t('careAppointments.chooseResidentPlaceholder')}</option>
                   {residentsList.map((res) => (
                     <option key={res._id} value={res._id}>
                       {res.fullName} (#{res.residentCode})
@@ -987,7 +1131,7 @@ export default function CareAppointmentsPage() {
               </div>
 
               <div className="cap-form-group">
-                <label className="cap-form-label">Loại cuộc hẹn *</label>
+                <label className="cap-form-label">{t('careAppointments.appointmentTypeLabel')}</label>
                 <select
                   className="cap-filter-select"
                   value={formValues.appointmentType}
@@ -1003,18 +1147,19 @@ export default function CareAppointmentsPage() {
               </div>
 
               <div className="cap-form-group">
-                <label className="cap-form-label">Thời gian bắt đầu *</label>
+                <label className="cap-form-label">{t('careAppointments.startTimeLabel')}</label>
                 <input
                   type="datetime-local"
                   className="cap-form-input"
                   value={formValues.scheduledStartAt}
                   onChange={(e) => setFormValues(prev => ({ ...prev, scheduledStartAt: e.target.value }))}
+                  min={!isEditMode ? new Date().toISOString().slice(0, 16) : undefined}
                   required
                 />
               </div>
 
               <div className="cap-form-group">
-                <label className="cap-form-label">Thời gian kết thúc *</label>
+                <label className="cap-form-label">{t('careAppointments.endTimeLabel')}</label>
                 <input
                   type="datetime-local"
                   className="cap-form-input"
@@ -1025,11 +1170,11 @@ export default function CareAppointmentsPage() {
               </div>
 
               <div className="cap-form-group">
-                <label className="cap-form-label">Ghi chú (Notes)</label>
+                <label className="cap-form-label">{t('careAppointments.notesLabel')}</label>
                 <textarea
                   className="cap-form-input"
                   style={{ minHeight: '60px', fontFamily: 'inherit' }}
-                  placeholder="Ghi chú về triệu chứng bệnh hoặc phòng khám..."
+                  placeholder={t('careAppointments.notesPlaceholder')}
                   value={formValues.notes}
                   onChange={(e) => setFormValues(prev => ({ ...prev, notes: e.target.value }))}
                 />
@@ -1042,7 +1187,7 @@ export default function CareAppointmentsPage() {
                   className="cap-modal-btn-cancel"
                   disabled={savingAppt}
                 >
-                  Hủy
+                  {t('careAppointments.cancel')}
                 </button>
                 <button
                   type="submit"
@@ -1052,10 +1197,10 @@ export default function CareAppointmentsPage() {
                   {savingAppt ? (
                     <>
                       <Loader2 className="animate-spin mr-1" size={13} />
-                      Đang xử lý...
+                      {t('careAppointments.saving')}
                     </>
                   ) : (
-                    'Lưu Lịch Hẹn'
+                    t('careAppointments.saveAppointment')
                   )}
                 </button>
               </div>
@@ -1068,9 +1213,9 @@ export default function CareAppointmentsPage() {
       {showStatusModal && selectedAppt && (
         <div className="cap-modal-backdrop" onClick={() => setShowStatusModal(false)}>
           <div className="cap-modal" onClick={(e) => e.stopPropagation()}>
-            <h4 className="cap-modal__title">Cập Nhật Trạng Thái Khám</h4>
+            <h4 className="cap-modal__title">{t('careAppointments.statusModalTitle')}</h4>
             <p className="cap-modal__text">
-              Thay đổi trạng thái quá trình khám cho cư dân <strong>{selectedAppt.residentId?.fullName}</strong>.
+              {t('careAppointments.statusModalText', { name: selectedAppt.residentId?.fullName })}
             </p>
 
             {statusError && (
@@ -1082,18 +1227,31 @@ export default function CareAppointmentsPage() {
 
             <form onSubmit={handleUpdateStatus}>
               <div className="cap-form-group">
-                <label className="cap-form-label">Trạng thái hiện tại: {selectedAppt.status}</label>
-                <select
-                  className="cap-filter-select"
-                  value={targetApptStatus}
-                  onChange={(e) => setTargetApptStatus(e.target.value)}
-                  required
-                >
-                  <option value="scheduled">Scheduled (Đã lên lịch)</option>
-                  <option value="in_progress">In Progress (Đang khám)</option>
-                  <option value="completed">Completed (Đã khám xong)</option>
-                  <option value="cancelled">Cancelled (Hủy bỏ)</option>
-                </select>
+                <label className="cap-form-label">
+                  {t('careAppointments.currentStatusLabel', { status: STATUS_LABELS[selectedAppt.status] || selectedAppt.status })}
+                </label>
+                {(() => {
+                  const allowedNext = STATUS_TRANSITIONS[selectedAppt.status] || [];
+                  if (allowedNext.length === 0) {
+                    return (
+                      <p style={{ fontSize: '13px', color: '#94a3b8', fontStyle: 'italic', margin: 0 }}>
+                        {t('careAppointments.terminalStatusNote')}
+                      </p>
+                    );
+                  }
+                  return (
+                    <select
+                      className="cap-filter-select"
+                      value={targetApptStatus}
+                      onChange={(e) => setTargetApptStatus(e.target.value)}
+                      required
+                    >
+                      {allowedNext.map((s) => (
+                        <option key={s} value={s}>{STATUS_LABELS[s]}</option>
+                      ))}
+                    </select>
+                  );
+                })()}
               </div>
 
               <div className="cap-modal-footer">
@@ -1103,22 +1261,24 @@ export default function CareAppointmentsPage() {
                   className="cap-modal-btn-cancel"
                   disabled={updatingStatus}
                 >
-                  Hủy
+                  {t('careAppointments.cancel')}
                 </button>
-                <button
-                  type="submit"
-                  className="cap-modal-btn-submit"
-                  disabled={updatingStatus}
-                >
-                  {updatingStatus ? (
-                    <>
-                      <Loader2 className="animate-spin mr-1" size={13} />
-                      Đang cập nhật...
-                    </>
-                  ) : (
-                    'Cập nhật'
-                  )}
-                </button>
+                {(STATUS_TRANSITIONS[selectedAppt.status] || []).length > 0 && (
+                  <button
+                    type="submit"
+                    className="cap-modal-btn-submit"
+                    disabled={updatingStatus}
+                  >
+                    {updatingStatus ? (
+                      <>
+                        <Loader2 className="animate-spin mr-1" size={13} />
+                        {t('careAppointments.updating')}
+                      </>
+                    ) : (
+                      t('careAppointments.confirmUpdate')
+                    )}
+                  </button>
+                )}
               </div>
             </form>
           </div>

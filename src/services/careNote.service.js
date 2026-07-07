@@ -16,6 +16,10 @@ const getNoteHistory = (residentId, params = {}) =>
 const getNote = (id) =>
   axiosClient.get(`/care-notes/${id}`).then((r) => r.data);
 
+// Edit history (audit trail) of a single care note
+const getNoteAuditHistory = (id) =>
+  axiosClient.get(`/care-notes/${id}/audit-log`).then((r) => r.data?.data || r.data);
+
 const createNote = (payload) =>
   axiosClient.post('/care-notes', payload).then((r) => r.data);
 
@@ -31,6 +35,7 @@ export default {
   getMyNotes,
   getNoteHistory,
   getNote,
+  getNoteAuditHistory,
   createNote,
   updateNote,
   deleteNote,

@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import medicationService from '../../services/medication.service';
+import useToast from '../../hooks/useToast';
 import '../../styles/medications/MedicationPage.css';
 
 /* ── helpers ── */
@@ -198,6 +199,7 @@ function MarkModal({ schedule, action, onConfirm, onClose, saving }) {
    ════════════════════════════════════════ */
 function ScheduleTab() {
   const { t } = useTranslation();
+  const { showToast } = useToast();
   const [date, setDate] = useState(new Date());
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -282,8 +284,14 @@ function ScheduleTab() {
       }
       setMarkModal(null);
       load();
+      showToast(
+        action === 'taken'
+          ? t('medication.markTakenSuccess', 'Đã đánh dấu đã dùng thuốc')
+          : t('medication.markMissedSuccess', 'Đã đánh dấu bỏ lỡ liều thuốc'),
+        'success'
+      );
     } catch (err) {
-      alert(err.response?.data?.message || t('medication.markError'));
+      showToast(err.response?.data?.message || t('medication.markError'), 'error');
     } finally {
       setSaving(false);
     }

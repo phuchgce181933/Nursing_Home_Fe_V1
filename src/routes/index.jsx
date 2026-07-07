@@ -84,6 +84,7 @@ import AdmissionRequestsHistoryPage from '../pages/family/AdmissionRequestsHisto
 import SubmitFacilityTourPage from '../pages/family/SubmitFacilityTourPage';
 import FacilityTourHistoryPage from '../pages/family/FacilityTourHistoryPage';
 import FamilyActivityPage from '../pages/family/ActivityPage';
+import ResidentHealthPage from '../pages/family/ResidentHealthPage';
 import IncidentManagementPage from '../pages/IncidentManagementPage';
 import HealthMonitoringPage from '../pages/shared/HealthMonitoringPage';
 import CareNotesPage from '../pages/shared/CareNotesPage';
@@ -234,6 +235,7 @@ function AppRoutes() {
 
         <Route path="health-monitoring" element={<HealthMonitoringPage />} />
         <Route path="care-notes" element={<CareNotesPage />} />
+        <Route path="appointments" element={<CareAppointmentsPage />} />
 
         <Route path="medications" element={<MedicationPage />} />
         <Route path="my-shifts" element={<MyShiftsPage />} />
@@ -316,7 +318,7 @@ function AppRoutes() {
         <Route path="admission-requests" element={<AdmissionRequestsHistoryPage />} />
         <Route path="facility-tours" element={<FacilityTourHistoryPage />} />
         <Route path="activities" element={<FamilyActivityPage />} />
-        <Route path="resident" element={<PlaceholderPage title="Hồ sơ người thân" />} />
+        <Route path="resident" element={<ResidentHealthPage />} />
         <Route path="notifications" element={<NotificationsPage role="family" />} />
         <Route path="messages" element={<MessagesPage />} />
       </Route>

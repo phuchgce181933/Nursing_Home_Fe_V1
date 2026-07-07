@@ -103,6 +103,7 @@ export const roleSidebarData = {
     { title: 'sidebar.myShifts', icon: Calendar, path: '/nurse/my-shifts' },
     { title: 'sidebar.careTasks', icon: ClipboardList, path: '/nurse/care-tasks' },
     { title: 'sidebar.activitySchedule', icon: Calendar, path: '/nurse/activity-schedule' },
+    { title: 'sidebar.appointments', icon: Calendar, path: '/nurse/appointments' },
     { title: 'sidebar.careNotes', icon: Activity, path: '/nurse/care-notes' },
     { title: 'sidebar.healthMonitoring', icon: HeartPulse, path: '/nurse/health-monitoring' },
     { title: 'sidebar.mealPlans', icon: Soup, path: '/nurse/meal-plans' },

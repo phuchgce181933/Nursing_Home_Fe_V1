@@ -33,11 +33,24 @@
 }
 
 .home-logo__img {
-  width: 38px;
-  height: 38px;
+  width: 46px;
+  height: 46px;
   object-fit: contain;
   border-radius: 50%;
-  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
+  background: linear-gradient(160deg, #eef2ff 0%, #ffffff 60%);
+  box-shadow:
+    0 0 0 2px #ffffff,
+    0 0 0 3px rgba(27, 54, 93, 0.16),
+    0 8px 18px rgba(15, 23, 42, 0.14);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.home-header__brand:hover .home-logo__img {
+  transform: scale(1.06);
+  box-shadow:
+    0 0 0 2px #ffffff,
+    0 0 0 3px rgba(29, 78, 216, 0.32),
+    0 10px 22px rgba(15, 23, 42, 0.18);
 }
 
 .home-nav {
@@ -75,6 +88,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
+  white-space: nowrap;
   padding: 14px 24px;
   background: #1d4ed8;
   color: #ffffff;
@@ -356,6 +371,27 @@
 
   .testimonial-grid {
     grid-template-columns: repeat(2, minmax(240px, 1fr));
+  }
+}
+
+@media (max-width: 1180px) {
+  .home-header {
+    flex-wrap: wrap;
+  }
+
+  .home-header__brand {
+    order: 1;
+  }
+
+  .home-header__button {
+    order: 2;
+  }
+
+  .home-nav {
+    order: 3;
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-start;
   }
 }
 
