@@ -15,10 +15,75 @@ import {
   Loader2,
   User,
   Tag,
+  Save,
+  CheckCircle2,
 } from 'lucide-react';
 import activityService from '../../services/activity.service';
 import residentService from '../../services/resident.service';
 import '../../styles/nurse/ActivitySchedulePage.css';
+
+const formatDurationLabel = (durationMinutes) => {
+  const totalMinutes = Number(durationMinutes);
+  if (!Number.isFinite(totalMinutes) || totalMinutes <= 0) return '';
+
+  const totalDays = Math.floor(totalMinutes / (24 * 60));
+  const remainingMinutes = totalMinutes % (24 * 60);
+  const hours = Math.floor(remainingMinutes / 60);
+  const minutes = remainingMinutes % 60;
+
+  const parts = [];
+  if (totalDays > 0) parts.push(`${totalDays} ngày`);
+  if (hours > 0) parts.push(`${hours}h`);
+  if (minutes > 0) parts.push(`${minutes}p`);
+
+  return parts.join(' ');
+};
+
+const formatActivityDateRange = (activity) => {
+  const startDate = new Date(activity?.startAt || activity?.scheduledAt);
+  const endDate = new Date(activity?.endAt || activity?.startAt || activity?.scheduledAt);
+
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return '-';
+
+  const sameDay = startDate.toDateString() === endDate.toDateString();
+  if (sameDay) {
+    return `${startDate.toLocaleString('vi-VN')}`;
+  }
+
+  return `${startDate.toLocaleString('vi-VN')} → ${endDate.toLocaleString('vi-VN')}`;
+};
+
+const isActivityOnDate = (activity, date) => {
+  const startDate = new Date(activity?.startAt || activity?.scheduledAt);
+  const endDate = new Date(activity?.endAt || activity?.startAt || activity?.scheduledAt);
+
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+    return false;
+  }
+
+  const targetDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const startDay = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+  const endDay = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+
+  return targetDay >= startDay && targetDay <= endDay;
+};
+
+const canRecordAttendance = (activity) => {
+  const status = String(activity?.status || '').trim().toLowerCase();
+  if (status === 'draft' || status === 'cancelled' || status === 'completed') {
+    return false;
+  }
+
+  const startDate = new Date(activity?.startAt || activity?.scheduledAt);
+  const endDate = new Date(activity?.endAt || activity?.startAt || activity?.scheduledAt);
+
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+    return false;
+  }
+
+  const now = new Date();
+  return now >= startDate && now <= endDate;
+};
 
 /* ------------------------------------------------------------------ */
 /*  Status helpers                                                     */
@@ -26,7 +91,6 @@ import '../../styles/nurse/ActivitySchedulePage.css';
 const getStatusOptions = (t) => [
   { value: '', label: t('activitySchedule.status.all') },
   { value: 'scheduled', label: t('activitySchedule.status.scheduled') },
-  { value: 'ongoing', label: t('activitySchedule.status.ongoing') },
   { value: 'completed', label: t('activitySchedule.status.completed') },
   { value: 'cancelled', label: t('activitySchedule.status.cancelled') },
 ];
@@ -56,6 +120,8 @@ export default function ActivitySchedulePage() {
   const [viewMode, setViewMode] = useState('list');
   const [selectedActivity, setSelectedActivity] = useState(null);
   const [residents, setResidents] = useState({});
+  const [savingRecord, setSavingRecord] = useState(false);
+  const [recordMessage, setRecordMessage] = useState('');
 
   /* ---- fetch ---- */
   const fetchActivities = useCallback(async () => {
@@ -98,6 +164,41 @@ export default function ActivitySchedulePage() {
 
   useEffect(() => { fetchActivities(); }, [fetchActivities]);
 
+  const buildAttendanceFormFromActivity = (activity) => {
+    if (!activity) {
+      return {
+        participantResultNotes: '',
+        attendanceRecords: [],
+        participationRecords: [],
+      };
+    }
+
+    const existingAttendance = (activity.attendanceRecords || []).reduce((acc, record) => {
+      acc[record.residentId] = record;
+      return acc;
+    }, {});
+    const existingParticipation = (activity.participationRecords || []).reduce((acc, record) => {
+      acc[record.residentId] = record;
+      return acc;
+    }, {});
+
+    const participantIds = activity.participantResidentIds || [];
+    return {
+      participantResultNotes: activity.participantResultNotes || '',
+      attendanceRecords: participantIds.map((residentId) => ({
+        residentId,
+        status: existingAttendance[residentId]?.status || 'present',
+        note: existingAttendance[residentId]?.note || '',
+      })),
+      participationRecords: participantIds.map((residentId) => ({
+        residentId,
+        participationLevel: existingParticipation[residentId]?.participationLevel || 'active',
+        comment: existingParticipation[residentId]?.comment || '',
+        incident: existingParticipation[residentId]?.incident || '',
+      })),
+    };
+  };
+
   /* ---- month nav ---- */
   const handlePrevMonth = () =>
     setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1));
@@ -112,10 +213,7 @@ export default function ActivitySchedulePage() {
     return Array.from({ length: count }, (_, i) => new Date(year, month, i + 1));
   };
 
-  const getActivitiesForDate = (date) =>
-    activities.filter(
-      (a) => new Date(a.scheduledAt).toDateString() === date.toDateString(),
-    );
+  const getActivitiesForDate = (date) => activities.filter((activity) => isActivityOnDate(activity, date));
 
   /* ================================================================ */
   /*  List view                                                        */
@@ -156,11 +254,7 @@ export default function ActivitySchedulePage() {
               >
                 <td className="as-table-title">{activity.title}</td>
                 <td>{activity.category || '-'}</td>
-                <td>
-                  {activity.scheduledAt
-                    ? new Date(activity.scheduledAt).toLocaleString('vi-VN')
-                    : '-'}
-                </td>
+                <td>{formatActivityDateRange(activity)}</td>
                 <td>{activity.location || '-'}</td>
                 <td>
                   <span className={`as-status-badge as-status-badge--${activity.status || 'draft'}`}>
@@ -241,6 +335,61 @@ export default function ActivitySchedulePage() {
   const DetailDrawer = () => {
     if (!selectedActivity) return null;
     const a = selectedActivity;
+    const attendanceAllowed = canRecordAttendance(a);
+    const [draft, setDraft] = useState(() => buildAttendanceFormFromActivity(a));
+
+    useEffect(() => {
+      setDraft(buildAttendanceFormFromActivity(a));
+    }, [a?._id]);
+
+    const updateDraft = (updater) => {
+      setDraft((prev) => updater(prev));
+    };
+
+    const handleAttendanceChange = (residentId, field, value) => {
+      updateDraft((prev) => ({
+        ...prev,
+        attendanceRecords: prev.attendanceRecords.map((record) =>
+          record.residentId === residentId ? { ...record, [field]: value } : record,
+        ),
+      }));
+    };
+
+    const handleParticipationChange = (residentId, field, value) => {
+      updateDraft((prev) => ({
+        ...prev,
+        participationRecords: prev.participationRecords.map((record) =>
+          record.residentId === residentId ? { ...record, [field]: value } : record,
+        ),
+      }));
+    };
+
+    const handleSaveRecord = async () => {
+      if (!a) return;
+      if (!canRecordAttendance(a)) {
+        setRecordMessage('Chỉ có thể điểm danh khi hoạt động đã được lên lịch và đang diễn ra.');
+        return;
+      }
+
+      try {
+        setSavingRecord(true);
+        setRecordMessage('');
+        const result = await activityService.recordParticipationResult(a._id, {
+          participantResultNotes: draft.participantResultNotes.trim(),
+          status: a.status === 'scheduled' ? 'completed' : a.status,
+          attendanceRecords: draft.attendanceRecords,
+          participationRecords: draft.participationRecords,
+        });
+        setSelectedActivity((prev) => (prev && prev._id === result?._id ? { ...prev, ...result } : result));
+        setDraft(buildAttendanceFormFromActivity(result || a));
+        setRecordMessage('Đã lưu điểm danh và ghi nhận tham gia cho hoạt động.');
+      } catch (err) {
+        console.error('Save activity attendance failed:', err);
+        setRecordMessage(err.response?.data?.message || 'Không thể lưu dữ liệu.');
+      } finally {
+        setSavingRecord(false);
+      }
+    };
 
     return (
       <div className="as-drawer-overlay" onClick={() => setSelectedActivity(null)}>
@@ -269,10 +418,18 @@ export default function ActivitySchedulePage() {
             <div className="as-detail-row">
               <Calendar size={16} />
               <span className="as-detail-label">{t('activitySchedule.detail.dateTime')}</span>
-              <span className="as-detail-value">
-                {a.scheduledAt ? new Date(a.scheduledAt).toLocaleString('vi-VN') : '-'}
-              </span>
+              <span className="as-detail-value">{formatActivityDateRange(a)}</span>
             </div>
+
+            {a.endAt && (
+              <div className="as-detail-row">
+                <Clock size={16} />
+                <span className="as-detail-label">Thời gian kết thúc</span>
+                <span className="as-detail-value">
+                  {new Date(a.endAt || a.startAt || a.scheduledAt).toLocaleString('vi-VN')}
+                </span>
+              </div>
+            )}
 
             {a.location && (
               <div className="as-detail-row">
@@ -286,7 +443,7 @@ export default function ActivitySchedulePage() {
               <div className="as-detail-row">
                 <Clock size={16} />
                 <span className="as-detail-label">{t('activitySchedule.detail.duration')}</span>
-                <span className="as-detail-value">{t('activitySchedule.minutes', { count: a.durationMinutes })}</span>
+                <span className="as-detail-value">{formatDurationLabel(a.durationMinutes)}</span>
               </div>
             )}
 
@@ -330,6 +487,109 @@ export default function ActivitySchedulePage() {
                 </div>
               </div>
             )}
+
+            <div className="as-record-section">
+              <div className="as-record-header">
+                <h3>Điểm danh & ghi nhận tham gia</h3>
+                <button type="button" className="as-save-record-btn" onClick={handleSaveRecord} disabled={savingRecord || !attendanceAllowed}>
+                  {savingRecord ? <Loader2 size={14} className="as-spin-icon" /> : <Save size={14} />}
+                  {savingRecord ? 'Đang lưu...' : 'Lưu'}
+                </button>
+              </div>
+
+              {recordMessage && (
+                <div className={`as-record-message ${recordMessage.includes('Không thể') ? 'as-record-message--error' : ''}`}>
+                  {recordMessage.includes('Không thể') ? <X size={14} /> : <CheckCircle2 size={14} />}
+                  {recordMessage}
+                </div>
+              )}
+
+              {!attendanceAllowed && (
+                <div className="as-record-message as-record-message--error">
+                  <X size={14} />
+                  Chỉ có thể điểm danh khi hoạt động đã được lên lịch và đang diễn ra.
+                </div>
+              )}
+
+              <label className="as-record-label">Nhận xét chung</label>
+              <textarea
+                className="as-record-textarea"
+                value={draft.participantResultNotes}
+                onChange={(e) => updateDraft((prev) => ({ ...prev, participantResultNotes: e.target.value }))}
+                placeholder="Nhập nhận xét chung về hoạt động..."
+                disabled={!attendanceAllowed}
+              />
+
+              {draft.attendanceRecords.map((record) => {
+                const resident = residents[record.residentId];
+                return (
+                  <div key={record.residentId} className="as-resident-record-card">
+                    <div className="as-resident-record-title">
+                      <User size={14} />
+                      <span>{resident?.fullName || record.residentId}</span>
+                    </div>
+
+                    <div className="as-resident-record-grid">
+                      <div>
+                        <label className="as-record-label">Điểm danh</label>
+                        <select
+                          className="as-record-select"
+                          value={record.status}
+                          onChange={(e) => handleAttendanceChange(record.residentId, 'status', e.target.value)}
+                          disabled={!attendanceAllowed}
+                        >
+                          <option value="present">Có mặt</option>
+                          <option value="absent">Vắng mặt</option>
+                          <option value="late">Muộn</option>
+                          <option value="left_early">Về sớm</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="as-record-label">Mức độ tham gia</label>
+                        <select
+                          className="as-record-select"
+                          value={draft.participationRecords.find((item) => item.residentId === record.residentId)?.participationLevel || 'active'}
+                          onChange={(e) => handleParticipationChange(record.residentId, 'participationLevel', e.target.value)}
+                          disabled={!attendanceAllowed}
+                        >
+                          <option value="active">Tích cực</option>
+                          <option value="partial">Một phần</option>
+                          <option value="passive">Thụ động</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <label className="as-record-label">Nhận xét</label>
+                    <textarea
+                      className="as-record-textarea"
+                      value={draft.participationRecords.find((item) => item.residentId === record.residentId)?.comment || ''}
+                      onChange={(e) => handleParticipationChange(record.residentId, 'comment', e.target.value)}
+                      placeholder="Nhập nhận xét..."
+                      disabled={!attendanceAllowed}
+                    />
+
+                    <label className="as-record-label">Sự cố</label>
+                    <textarea
+                      className="as-record-textarea"
+                      value={draft.participationRecords.find((item) => item.residentId === record.residentId)?.incident || ''}
+                      onChange={(e) => handleParticipationChange(record.residentId, 'incident', e.target.value)}
+                      placeholder="Nếu có, ghi rõ sự cố..."
+                      disabled={!attendanceAllowed}
+                    />
+
+                    <label className="as-record-label">Ghi chú điểm danh</label>
+                    <textarea
+                      className="as-record-textarea"
+                      value={record.note || ''}
+                      onChange={(e) => handleAttendanceChange(record.residentId, 'note', e.target.value)}
+                      placeholder="Ghi chú thêm về điểm danh..."
+                      disabled={!attendanceAllowed}
+                    />
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
           {/* Footer */}

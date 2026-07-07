@@ -1,8 +1,26 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Calendar, MapPin, Clock, Users, Search, RefreshCw, UserCheck } from 'lucide-react';
+import { Calendar, MapPin, Clock, Users, Search, RefreshCw, UserCheck, Eye, X } from 'lucide-react';
 import activityService from '../../services/activity.service';
 import residentService from '../../services/resident.service';
 import '../../styles/admin/AdminAdmissionRequestsPage.css';
+import '../../styles/family/FamilyActivityPage.css';
+
+const formatDurationLabel = (durationMinutes) => {
+  const totalMinutes = Number(durationMinutes);
+  if (!Number.isFinite(totalMinutes) || totalMinutes <= 0) return '';
+
+  const totalDays = Math.floor(totalMinutes / (24 * 60));
+  const remainingMinutes = totalMinutes % (24 * 60);
+  const hours = Math.floor(remainingMinutes / 60);
+  const minutes = remainingMinutes % 60;
+
+  const parts = [];
+  if (totalDays > 0) parts.push(`${totalDays} ngày`);
+  if (hours > 0) parts.push(`${hours}h`);
+  if (minutes > 0) parts.push(`${minutes}p`);
+
+  return parts.join(' ');
+};
 
 export default function FamilyActivityPage() {
   const [activities, setActivities] = useState([]);
@@ -19,6 +37,7 @@ export default function FamilyActivityPage() {
   const [familyResidents, setFamilyResidents] = useState([]);
   const [selectedResident, setSelectedResident] = useState(null);
   const [registering, setRegistering] = useState(false);
+  const [selectedActivityId, setSelectedActivityId] = useState(null);
 
   const fetchActivities = useCallback(async () => {
     try {
@@ -88,6 +107,32 @@ export default function FamilyActivityPage() {
     } finally {
       setRegistering(false);
     }
+  };
+
+  const getSelectedActivity = () => {
+    return activities.find((a) => a._id === selectedActivityId);
+  };
+
+  const formatActivityDateTime = (activity) => {
+    const startDate = new Date(activity.startAt || activity.scheduledAt);
+    const endDate = activity.endAt ? new Date(activity.endAt) : startDate;
+    
+    if (startDate.toDateString() === endDate.toDateString()) {
+      return `${startDate.toLocaleDateString('vi-VN')} ${startDate.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} → ${endDate.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}`;
+    } else {
+      return `${startDate.toLocaleDateString('vi-VN')} ${startDate.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} → ${endDate.toLocaleDateString('vi-VN')} ${endDate.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}`;
+    }
+  };
+
+  const getStatusLabel = (status) => {
+    const statusMap = {
+      'draft': 'Nháp',
+      'scheduled': 'Sắp diễn ra',
+      'ongoing': 'Đang diễn ra',
+      'completed': 'Đã hoàn thành',
+      'cancelled': 'Đã hủy'
+    };
+    return statusMap[status] || status;
   };
 
   const isRegistered = (activityId, residentId) => {
@@ -234,7 +279,7 @@ export default function FamilyActivityPage() {
                     {activity.durationMinutes && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
                         <Clock size={14} />
-                        <span>{activity.durationMinutes} phút</span>
+                        <span>{formatDurationLabel(activity.durationMinutes)}</span>
                       </div>
                     )}
 
@@ -254,24 +299,140 @@ export default function FamilyActivityPage() {
                     <strong>Trạng thái:</strong> <span style={{ textTransform: 'capitalize' }}>{activity.status}</span>
                   </div>
 
-                  <button
-                    type="button"
-                    className="adm-btn-refresh"
+                  <div style={{ display: 'flex', gap: '8px', marginTop: 'auto' }}>
+                    <button
+                      type="button"
+                      className="adm-btn-refresh"
+                      onClick={() => setSelectedActivityId(activity._id)}
+                      title="Xem chi tiết"
+                      style={{ flex: 1 }}
+                    >
+                      <Eye size={14} /> Xem chi tiết
+                    </button>
+                    <button
+                      type="button"
+                      className="adm-btn-refresh"
                       disabled={!selectedResident || isResidentRegistered || registering || activity.status === 'cancelled' || activity.status === 'completed'}
                       onClick={() => handleRegisterResident(activity._id)}
                       style={{
-                        marginTop: 'auto',
+                        flex: 1,
                         opacity: !selectedResident || isResidentRegistered || registering || activity.status === 'cancelled' || activity.status === 'completed' ? 0.5 : 1,
                         cursor: !selectedResident || isResidentRegistered || registering || activity.status === 'cancelled' || activity.status === 'completed' ? 'not-allowed' : 'pointer'
                       }}
                     >
                       <UserCheck size={14} />
                       {isResidentRegistered ? 'Đã đăng ký' : activity.status === 'completed' ? 'Không thể đăng ký' : 'Đăng ký'}
-                  </button>
+                    </button>
+                  </div>
                 </div>
               );
             })}
           </div>
+
+          {/* ─── Activity Detail Modal ─── */}
+          {selectedActivityId && (
+            <div style={{
+              position: 'fixed',
+              inset: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              zIndex: 1000
+            }}>
+              <div className="family-activity-modal" style={{
+                width: '500px',
+                height: '100%',
+                backgroundColor: '#fff',
+                boxShadow: '-2px 0 8px rgba(0,0,0,0.1)',
+                display: 'flex',
+                flexDirection: 'column',
+              }}>
+                {/* Header */}
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '16px 20px',
+                  borderBottom: '1px solid #e2e8f0',
+                }}>
+                  <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 700 }}>Chi tiết hoạt động</h2>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedActivityId(null)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+
+                {/* Content */}
+                <div className="family-activity-modal-content" style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
+                  {getSelectedActivity() && (() => {
+                    const activity = getSelectedActivity();
+                    return (
+                      <>
+                        {/* Title and Status */}
+                        <div style={{ marginBottom: '20px' }}>
+                          <h3 style={{ margin: '0 0 8px 0', fontSize: '20px', fontWeight: 700 }}>
+                            {activity.title}
+                          </h3>
+                          <span style={{
+                            display: 'inline-block',
+                            padding: '4px 12px',
+                            backgroundColor: activity.status === 'completed' ? '#dcfce7' : activity.status === 'cancelled' ? '#fee2e2' : '#dbeafe',
+                            color: activity.status === 'completed' ? '#166534' : activity.status === 'cancelled' ? '#b91c1c' : '#0c4a6e',
+                            borderRadius: '6px',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                          }}>
+                            {getStatusLabel(activity.status)}
+                          </span>
+                        </div>
+
+                        {/* Description */}
+                        {activity.description && (
+                          <div style={{ marginBottom: '16px' }}>
+                            <label style={{ display: 'block', fontWeight: 600, marginBottom: '4px', fontSize: '14px' }}>Mô tả</label>
+                            <p style={{ margin: 0, color: '#475569', fontSize: '14px', lineHeight: 1.5 }}>{activity.description}</p>
+                          </div>
+                        )}
+
+                        {/* Category */}
+                        {activity.category && (
+                          <div style={{ marginBottom: '16px' }}>
+                            <label style={{ display: 'block', fontWeight: 600, marginBottom: '4px', fontSize: '14px' }}>Danh mục</label>
+                            <p style={{ margin: 0, color: '#475569', fontSize: '14px' }}>{activity.category}</p>
+                          </div>
+                        )}
+
+                        {/* Date Range */}
+                        <div style={{ marginBottom: '16px' }}>
+                          <label style={{ display: 'block', fontWeight: 600, marginBottom: '4px', fontSize: '14px' }}>Thời gian</label>
+                          <p style={{ margin: 0, color: '#475569', fontSize: '14px' }}>{formatActivityDateTime(activity)}</p>
+                        </div>
+
+                        {/* Duration */}
+                        {activity.durationMinutes && (
+                          <div style={{ marginBottom: '16px' }}>
+                            <label style={{ display: 'block', fontWeight: 600, marginBottom: '4px', fontSize: '14px' }}>Thời lượng</label>
+                            <p style={{ margin: 0, color: '#475569', fontSize: '14px' }}>{formatDurationLabel(activity.durationMinutes)}</p>
+                          </div>
+                        )}
+
+                        {/* Location */}
+                        {activity.location && (
+                          <div style={{ marginBottom: '16px' }}>
+                            <label style={{ display: 'block', fontWeight: 600, marginBottom: '4px', fontSize: '14px' }}>Địa điểm</label>
+                            <p style={{ margin: 0, color: '#475569', fontSize: '14px' }}>{activity.location}</p>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="adm-header" style={{ marginTop: '18px', justifyContent: 'space-between' }}>
             <span>

@@ -1,0 +1,41 @@
+/* Family Activity Page - Detail Modal Scrollbar */
+.family-activity-modal-content {
+  /* Scrollbar styling for Chrome, Edge, Safari */
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f1f5f9;
+}
+
+.family-activity-modal-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.family-activity-modal-content::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+.family-activity-modal-content::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+  border: 2px solid #f1f5f9;
+}
+
+.family-activity-modal-content::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Smooth animations */
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.family-activity-modal {
+  animation: slideInRight 0.3s ease-out;
+}

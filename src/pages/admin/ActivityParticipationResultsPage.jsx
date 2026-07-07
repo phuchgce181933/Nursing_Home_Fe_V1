@@ -19,12 +19,45 @@ export default function ActivityParticipationResultsPage() {
 
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState({
-    participantResultNotes: '',
-    status: 'completed'
+    attendanceRecords: [],
+    participationRecords: [],
   });
   const [formError, setFormError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [residents, setResidents] = useState({});
+
+  const buildAttendanceDraftFromActivity = useCallback((activity) => {
+    if (!activity) {
+      return {
+        attendanceRecords: [],
+        participationRecords: [],
+      };
+    }
+
+    const existingAttendance = (activity.attendanceRecords || []).reduce((acc, record) => {
+      acc[record.residentId] = record;
+      return acc;
+    }, {});
+    const existingParticipation = (activity.participationRecords || []).reduce((acc, record) => {
+      acc[record.residentId] = record;
+      return acc;
+    }, {});
+
+    const participantIds = activity.participantResidentIds || [];
+    return {
+      attendanceRecords: participantIds.map((residentId) => ({
+        residentId,
+        status: existingAttendance[residentId]?.status || 'present',
+        note: existingAttendance[residentId]?.note || '',
+      })),
+      participationRecords: participantIds.map((residentId) => ({
+        residentId,
+        participationLevel: existingParticipation[residentId]?.participationLevel || 'active',
+        comment: existingParticipation[residentId]?.comment || '',
+        incident: existingParticipation[residentId]?.incident || '',
+      })),
+    };
+  }, []);
 
   const fetchActivities = useCallback(async () => {
     try {
@@ -84,20 +117,35 @@ export default function ActivityParticipationResultsPage() {
     setAppliedFilters({ search: '', status: 'completed' });
   };
 
+  const updateAttendanceRecord = (residentId, field, value) => {
+    setForm((prev) => ({
+      ...prev,
+      attendanceRecords: prev.attendanceRecords.map((record) =>
+        record.residentId === residentId ? { ...record, [field]: value } : record,
+      ),
+    }));
+  };
+
+  const updateParticipationRecord = (residentId, field, value) => {
+    setForm((prev) => ({
+      ...prev,
+      participationRecords: prev.participationRecords.map((record) =>
+        record.residentId === residentId ? { ...record, [field]: value } : record,
+      ),
+    }));
+  };
+
   const handleEdit = (activity) => {
     setEditingId(activity._id);
-    setForm({
-      participantResultNotes: activity.participantResultNotes || '',
-      status: activity.status || 'completed'
-    });
+    setForm(buildAttendanceDraftFromActivity(activity));
     setFormError(null);
   };
 
   const handleCancel = () => {
     setEditingId(null);
     setForm({
-      participantResultNotes: '',
-      status: 'completed'
+      attendanceRecords: [],
+      participationRecords: [],
     });
     setFormError(null);
   };
@@ -106,18 +154,13 @@ export default function ActivityParticipationResultsPage() {
     if (e) e.preventDefault();
     setFormError(null);
 
-    if (!form.participantResultNotes.trim()) {
-      setFormError('Vui lòng nhập kết quả tham gia');
-      return;
-    }
-
     try {
       setSubmitting(true);
       await activityService.recordParticipationResult(editingId, {
-        participantResultNotes: form.participantResultNotes.trim(),
-        status: form.status
+        attendanceRecords: form.attendanceRecords,
+        participationRecords: form.participationRecords,
       });
-      
+
       handleCancel();
       fetchActivities();
       alert('Đã lưu kết quả tham gia thành công!');
@@ -190,7 +233,7 @@ export default function ActivityParticipationResultsPage() {
                 <th>Tiêu đề hoạt động</th>
                 <th>Ngày diễn ra</th>
                 <th>Người tham gia</th>
-                <th>Kết quả</th>
+                <th>Có mặt và vắng</th>
                 <th>Trạng thái</th>
                 <th>Hành động</th>
               </tr>
@@ -219,7 +262,15 @@ export default function ActivityParticipationResultsPage() {
                       {activity.participantResidentIds?.length || 0}
                     </td>
                     <td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {activity.participantResultNotes || '---'}
+                      {activity.attendanceRecords?.length > 0 ? (
+                        (() => {
+                          const presentCount = activity.attendanceRecords.filter((record) => record.status !== 'absent').length;
+                          const absentCount = activity.attendanceRecords.filter((record) => record.status === 'absent').length;
+                          return `Có mặt: ${presentCount}, Vắng: ${absentCount}`;
+                        })()
+                      ) : (
+                        '---'
+                      )}
                     </td>
                     <td>
                       <span style={{
@@ -253,79 +304,101 @@ export default function ActivityParticipationResultsPage() {
       </div>
 
       {editingId && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000
-        }}>
-          <div style={{
-            backgroundColor: 'white',
-            borderRadius: '12px',
-            padding: '24px',
-            maxWidth: '600px',
-            width: '90%',
-            boxShadow: '0 20px 25px rgba(0, 0, 0, 0.15)'
-          }}>
-            <h2 style={{ marginTop: 0 }}>Ghi nhận kết quả tham gia</h2>
-            
-            <form onSubmit={handleSubmit}>
-              <div style={{ marginBottom: '16px' }}>
-                <label className="text-sm font-semibold">Kết quả tham gia</label>
-                <textarea
-                  rows="6"
-                  className="adm-filter-input"
-                  style={{ resize: 'vertical' }}
-                  placeholder="Nhập kết quả tham gia (ví dụ: Hoạt động diễn ra tốt, cư dân rất vui vẻ...)"
-                  value={form.participantResultNotes}
-                  onChange={(e) => setForm({ ...form, participantResultNotes: e.target.value })}
-                />
-              </div>
+        <div className="adm-modal-overlay">
+          <div className="adm-modal">
+            <div className="adm-modal-header">
+              <h2>Ghi nhận</h2>
+              <button type="button" className="adm-btn-refresh" onClick={handleCancel} style={{ whiteSpace: 'nowrap' }}>
+                Đóng
+              </button>
+            </div>
 
-              <div style={{ marginBottom: '16px' }}>
-                <label className="text-sm font-semibold">Trạng thái</label>
-                <select
-                  className="adm-filter-select"
-                  value={form.status}
-                  onChange={(e) => setForm({ ...form, status: e.target.value })}
-                >
-                  <option value="completed">Đã hoàn thành</option>
-                  <option value="ongoing">Đang diễn ra</option>
-                  <option value="cancelled">Đã huỷ</option>
-                </select>
-              </div>
+            <form onSubmit={handleSubmit} className="adm-modal-body">
+              {form.attendanceRecords.length > 0 && (
+                <div className="adm-modal-section">
+                  <label className="text-sm font-semibold">Ghi nhận từng cư dân</label>
+                  {form.attendanceRecords.map((record) => {
+                    const resident = residents[record.residentId];
+                    const participation = form.participationRecords.find((item) => item.residentId === record.residentId) || { participationLevel: 'active', comment: '', incident: '' };
 
-              {formError && (
-                <div style={{ color: '#b91c1c', marginBottom: '16px' }}>
-                  {formError}
+                    return (
+                      <div key={record.residentId} className="adm-modal-card">
+                        <div className="adm-modal-card-title">
+                          {resident?.fullName || record.residentId}
+                        </div>
+
+                        <div className="adm-modal-grid">
+                          <div className="adm-modal-field">
+                            <label className="text-sm font-semibold">Điểm danh</label>
+                            <select
+                              className="adm-filter-select"
+                              value={record.status}
+                              onChange={(e) => updateAttendanceRecord(record.residentId, 'status', e.target.value)}
+                            >
+                              <option value="present">Có mặt</option>
+                              <option value="absent">Vắng mặt</option>
+                              <option value="late">Muộn</option>
+                              <option value="left_early">Về sớm</option>
+                            </select>
+                          </div>
+
+                          <div className="adm-modal-field">
+                            <label className="text-sm font-semibold">Mức độ tham gia</label>
+                            <select
+                              className="adm-filter-select"
+                              value={participation.participationLevel}
+                              onChange={(e) => updateParticipationRecord(record.residentId, 'participationLevel', e.target.value)}
+                            >
+                              <option value="active">Tích cực</option>
+                              <option value="partial">Một phần</option>
+                              <option value="passive">Thụ động</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <div className="adm-modal-field">
+                          <label className="text-sm font-semibold">Nhận xét</label>
+                          <textarea
+                            rows="2"
+                            className="adm-filter-input"
+                            value={participation.comment}
+                            onChange={(e) => updateParticipationRecord(record.residentId, 'comment', e.target.value)}
+                            placeholder="Nhận xét cho cư dân này..."
+                          />
+                        </div>
+
+                        <div className="adm-modal-field">
+                          <label className="text-sm font-semibold">Sự cố</label>
+                          <textarea
+                            rows="2"
+                            className="adm-filter-input"
+                            value={participation.incident}
+                            onChange={(e) => updateParticipationRecord(record.residentId, 'incident', e.target.value)}
+                            placeholder="Nếu có, ghi rõ sự cố..."
+                          />
+                        </div>
+
+                        <div className="adm-modal-field">
+                          <label className="text-sm font-semibold">Ghi chú điểm danh</label>
+                          <textarea
+                            rows="2"
+                            className="adm-filter-input"
+                            value={record.note || ''}
+                            onChange={(e) => updateAttendanceRecord(record.residentId, 'note', e.target.value)}
+                            placeholder="Ghi chú thêm..."
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
 
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <button
-                  type="button"
-                  className="adm-btn-refresh"
-                  onClick={handleCancel}
-                  disabled={submitting}
-                  style={{ flex: 1 }}
-                >
-                  Huỷ
-                </button>
-                <button
-                  type="submit"
-                  className="adm-btn-refresh"
-                  disabled={submitting}
-                  style={{ flex: 1 }}
-                >
-                  {submitting ? 'Đang lưu...' : 'Lưu kết quả'}
-                </button>
-              </div>
+              {formError && (
+                <div className="adm-form-message">
+                  {formError}
+                </div>
+              )}
             </form>
           </div>
         </div>

@@ -158,6 +158,143 @@
   margin-bottom: 16px;
 }
 
+.adm-activity-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.adm-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.adm-form-field-full {
+  grid-column: 1 / -1;
+}
+
+.adm-form-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.adm-form-message {
+  color: #b91c1c;
+  font-size: 14px;
+}
+
+.adm-participant-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.adm-participant-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background-color: #e2e8f0;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  color: #334155;
+}
+
+.adm-participant-chip-muted {
+  background-color: #f1f5f9;
+  color: #475569;
+}
+
+.adm-participant-picker {
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 8px;
+  background-color: #ffffff;
+}
+
+.adm-participant-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border-radius: 10px;
+  cursor: pointer;
+  margin-bottom: 4px;
+  border-left: 3px solid transparent;
+}
+
+.adm-participant-option.selected {
+  background-color: #eff6ff;
+}
+
+.adm-participant-option.abnormal {
+  background-color: #fef2f2;
+  border-left-color: #ef4444;
+}
+
+.adm-abnormal-badge {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: #ef4444;
+  font-weight: 600;
+}
+
+.adm-empty-state {
+  padding: 12px;
+  color: #64748b;
+}
+
+.adm-warning-box {
+  margin-top: 12px;
+  padding: 12px;
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  color: #991b1b;
+}
+
+.adm-warning-box svg {
+  color: #ef4444;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.adm-warning-list {
+  margin-top: 6px;
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+.adm-activity-form-grid .adm-filter-input,
+.adm-activity-form-grid .adm-filter-select {
+  padding-left: 14px;
+}
+
+@media (max-width: 768px) {
+  .adm-activity-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .adm-form-field-full {
+    grid-column: auto;
+  }
+}
+
 .adm-filter-group {
   display: flex;
   flex-direction: column;
@@ -370,6 +507,93 @@
     color: #0f172a;
     line-height: 1.5;
     word-break: break-word;
+  }
+
+  .adm-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(15, 23, 42, 0.5);
+    backdrop-filter: blur(4px);
+  }
+
+  .adm-modal {
+    width: min(100%, 900px);
+    max-height: 92vh;
+    overflow-y: auto;
+    background: #ffffff;
+    border-radius: 24px;
+    box-shadow: 0 32px 80px rgba(15, 23, 42, 0.18);
+    border: 1px solid rgba(226, 232, 240, 0.75);
+    padding: 24px;
+    animation: admModalUp 0.28s ease-out;
+  }
+
+  .adm-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+  }
+
+  .adm-modal-header h2 {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 800;
+    color: #1b365d;
+  }
+
+  .adm-modal-body {
+    display: grid;
+    gap: 18px;
+  }
+
+  .adm-modal-section {
+    display: grid;
+    gap: 12px;
+  }
+
+  .adm-modal-card {
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 18px;
+    background: #f8fafc;
+    display: grid;
+    gap: 14px;
+  }
+
+  .adm-modal-card-title {
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 8px;
+  }
+
+  .adm-modal-grid {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .adm-modal-field {
+    display: grid;
+    gap: 8px;
+  }
+
+  .adm-modal-actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .adm-modal-actions button {
+    flex: 1;
+    min-width: 140px;
   }
 
 .adm-btn-clear:hover {
