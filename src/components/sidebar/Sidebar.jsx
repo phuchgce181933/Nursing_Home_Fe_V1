@@ -5,12 +5,17 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ChevronDown, LogOut } from 'lucide-react';
 import { sidebarData } from './sidebarData';
 import { useAuth } from '../../hooks/useAuth';
+import useUnreadConversations from '../../hooks/useUnreadConversations';
+
+const isMessagesPath = (path) => !!path && path.endsWith('/messages');
 
 function Sidebar({ items = sidebarData }) {
   const { t, i18n } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
   const { logout } = useAuth();
+  const hasMessagesNav = items.some((item) => isMessagesPath(item.path));
+  const unreadConversations = useUnreadConversations(hasMessagesNav);
 
   const handleLogout = () => {
     logout();
@@ -45,7 +50,7 @@ function Sidebar({ items = sidebarData }) {
       <div className="sidebar__header">
         <div className="sidebar__logo-section">
           <img
-            src="https://res.cloudinary.com/dhcrddnss/image/upload/v1780035528/Logo_vi%E1%BB%87n_d%C6%B0%E1%BB%A1ng_l%C3%A3o_An_Nhi%C3%AAn_lrmocn.png"
+            src="https://res.cloudinary.com/dhcrddnss/image/upload/c_crop,x_385,y_150,w_1250,h_1250,q_auto,f_auto/v1780035528/Logo_vi%E1%BB%87n_d%C6%B0%E1%BB%A1ng_l%C3%A3o_An_Nhi%C3%AAn_lrmocn.png"
             alt={t('app.logo')}
             className="sidebar__logo-img"
           />
@@ -83,6 +88,9 @@ function Sidebar({ items = sidebarData }) {
               >
                 <item.icon size={20} className="sidebar__icon" />
                 <span className="sidebar__text">{t(item.title)}</span>
+                {isMessagesPath(item.path) && unreadConversations > 0 && (
+                  <span className="sidebar__badge">{unreadConversations > 9 ? '9+' : unreadConversations}</span>
+                )}
               </NavLink>
             ) : (
               <SidebarGroup

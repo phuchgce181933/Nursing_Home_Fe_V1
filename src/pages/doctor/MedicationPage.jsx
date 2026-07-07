@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import medicationService from '../../services/medication.service';
 import residentService from '../../services/resident.service';
 import { useAuth } from '../../hooks/useAuth';
+import useToast from '../../hooks/useToast';
 import '../../styles/medications/MedicationPage.css';
 
 /* ── helpers ── */
@@ -28,7 +29,14 @@ const maxValidUntil = () => {
   return localDateStr(d);
 };
 
-const ROUTES = ['oral', 'injection', 'topical', 'inhaled'];
+// startDate ("YYYY-MM-DD") + duration (days) -> endDate ("YYYY-MM-DD").
+// Matches the backend's own endDate = startDate + duration validation exactly.
+const addDaysStr = (dateStr, days) => {
+  if (!dateStr || !days) return '';
+  const d = new Date(`${dateStr}T00:00:00`);
+  d.setDate(d.getDate() + Number(days));
+  return localDateStr(d);
+};
 
 const AVATAR_COLORS = ['#3b5bdb', '#e64980', '#0ca678', '#f76707', '#7048e8', '#1098ad', '#d6336c', '#5c7cfa'];
 const getAvatarColor = (name) => {
@@ -44,19 +52,23 @@ const getInitials = (name) => {
 };
 const MISSED_REASONS = ['refused', 'asleep', 'vomiting', 'hospitalized', 'other'];
 
-// Units chỉ hợp lệ với đường uống (oral)
-const ORAL_ONLY_UNITS = ['viên', 'viên nén', 'viên nhộng', 'viên nang', 'tablet', 'capsule', 'pill', 'lozenge'];
-
-const getUnitRouteWarning = (unit, route) => {
-  if (!unit || !route) return null;
-  const u = unit.trim().toLowerCase();
-  const isOralOnly = ORAL_ONLY_UNITS.some((o) => u === o || u.startsWith(o));
-  if (isOralOnly && route !== 'oral') return { unit: unit.trim(), route };
+// Live (as-you-type) dosage validation — mirrors the backend's specific messages.
+const getDosageError = (dosage, t) => {
+  if (dosage === '' || dosage === null || dosage === undefined) return null;
+  const n = Number(dosage);
+  if (Number.isNaN(n)) return t('medication.dosageNotNumber');
+  if (n < 0) return t('medication.dosageNegative');
+  if (n === 0) return t('medication.dosageZero');
   return null;
 };
 
 /* statuses uppercase from BE */
 const RX_STATUS_KEYS = { ACTIVE: 'statusActive', COMPLETED: 'statusCompleted', CANCELLED: 'statusCancelled' };
+// COMPLETED is a whole-prescription outcome the system derives automatically once every
+// medication item is done (see backend maybeCompletePrescriptionItem) — a doctor editing
+// one item's tab must not be able to manually force it, since that would incorrectly mark
+// every other still-active medication on the same prescription as completed too.
+const MANUAL_RX_STATUS_KEYS = { ACTIVE: 'statusActive', CANCELLED: 'statusCancelled' };
 const SCHED_STATUS_KEYS = {
   PENDING: 'schedPending', TAKEN: 'schedTaken', LATE_TAKEN: 'schedLateTaken',
   MISSED: 'schedMissed', SKIPPED: 'schedSkipped', OVERDUE: 'schedOverdue',
@@ -69,6 +81,33 @@ function StatusBadge({ status, type }) {
   const label = keyMap[status] ? t(`medication.${keyMap[status]}`) : status;
   return (
     <span className={`med-badge med-badge--${status.toLowerCase()}`}>{label}</span>
+  );
+}
+
+// Whole calendar days between today and validUntil (can be negative if already past).
+const daysUntil = (validUntil) => {
+  if (!validUntil) return null;
+  const today = new Date(`${todayStr()}T00:00:00`);
+  const end = new Date(`${localDateStr(new Date(validUntil))}T00:00:00`);
+  return Math.round((end - today) / (24 * 60 * 60 * 1000));
+};
+
+// For an ACTIVE prescription, show remaining days instead of a static "in use" label —
+// COMPLETED/CANCELLED still fall back to the plain StatusBadge.
+function RxStatusCell({ prescription }) {
+  const { t } = useTranslation();
+  if (prescription.status !== 'ACTIVE') {
+    return <StatusBadge status={prescription.status} type="rx" />;
+  }
+  const days = daysUntil(prescription.validUntil);
+  if (days === null) return <StatusBadge status="ACTIVE" type="rx" />;
+  if (days < 0) return <span className="med-badge med-badge--missed">{t('medication.rxExpired')}</span>;
+  if (days === 0) return <span className="med-badge med-badge--overdue">{t('medication.rxExpiresToday')}</span>;
+  const urgent = days <= 7;
+  return (
+    <span className={`med-badge ${urgent ? 'med-badge--overdue' : 'med-badge--active'}`}>
+      {t('medication.rxDaysLeft', { count: days })}
+    </span>
   );
 }
 
@@ -205,7 +244,7 @@ function HealthWarningPanel({ residentId }) {
 }
 
 /* ── Medication Autocomplete ── */
-function MedicationAutocomplete({ value, onSelect, placeholder }) {
+function MedicationAutocomplete({ value, onSelect, placeholder, excludeIds = [] }) {
   const [query, setQuery] = useState(value || '');
   const [results, setResults] = useState([]);
   const [open, setOpen] = useState(false);
@@ -240,7 +279,7 @@ function MedicationAutocomplete({ value, onSelect, placeholder }) {
           // chỉ giữ thuốc có NAME bắt đầu bằng query (prefix match)
           const q = val.trim().toLowerCase();
           const filtered = arr.filter((m) =>
-            (m.name || '').toLowerCase().startsWith(q)
+            (m.name || '').toLowerCase().startsWith(q) && !excludeIds.includes(m._id)
           ).slice(0, 10);
           setResults(filtered);
           setOpen(filtered.length > 0);
@@ -306,8 +345,8 @@ function buildTimesForFrequency(freq) {
 }
 
 /* ── Single prescription item form card ── */
-function ItemRow({ item, idx, onChange, onRemove, t, canRemove }) {
-  const unitRouteWarn = getUnitRouteWarning(item.unit, item.route);
+function ItemRow({ item, idx, onChange, onRemove, t, canRemove, errors = {}, excludeIds = [], isDuplicate = false }) {
+  const dosageError = getDosageError(item.dosage, t);
 
   const handleFrequencyChange = (e) => {
     const f = parseInt(e.target.value, 10);
@@ -349,57 +388,53 @@ function ItemRow({ item, idx, onChange, onRemove, t, canRemove }) {
             <MedicationAutocomplete
               value={item.medicationName}
               placeholder={t('medication.medicationNamePlaceholder')}
+              excludeIds={excludeIds}
               onSelect={({ name, med }) => {
                 const updates = { ...item, medicationName: name };
                 if (med) {
                   updates.medicationId = med._id;
-                  if (!item.unit && med.unit) updates.unit = med.unit;
+                  // Unit always tracks the selected medication — never user-editable.
+                  updates.unit = med.unit || '';
                 } else {
                   updates.medicationId = '';
+                  updates.unit = '';
                 }
                 onChange(idx, updates);
               }}
             />
+            {(errors[`item_${idx}_name`] || isDuplicate) && (
+              <span className="cpf-error">{errors[`item_${idx}_name`] || t('medication.duplicateMedication')}</span>
+            )}
           </div>
           <div className="cpf-field">
             <label className="cpf-label">{t('medication.dosage')}</label>
             <input
               type="number"
-              className="cpf-input"
+              className={`cpf-input${dosageError ? ' cpf-input--err' : ''}`}
               value={item.dosage}
               onChange={(e) => onChange(idx, { ...item, dosage: e.target.value })}
               placeholder={t('medication.dosagePlaceholder')}
               min="0"
             />
+            {dosageError && <span className="cpf-error">{dosageError}</span>}
           </div>
         </div>
 
-        <div className="cpf-row-4">
+        <div className="cpf-row-3">
           <div className="cpf-field">
             <label className="cpf-label">{t('medication.unit')}</label>
             <input
-              className="cpf-input"
+              className="cpf-input edit-input--readonly"
               value={item.unit}
-              onChange={(e) => onChange(idx, { ...item, unit: e.target.value })}
+              readOnly
               placeholder={t('medication.unitPlaceholder')}
             />
+            <small className="cpf-hint">{t('medication.unitAutoHint')}</small>
           </div>
           <div className="cpf-field">
             <label className="cpf-label">{t('medication.frequencyLabel')}</label>
             <select className="cpf-input" value={item.frequency} onChange={handleFrequencyChange}>
               {[1, 2, 3, 4].map((n) => <option key={n} value={n}>{FREQ_LABELS[n] || `${n}×`}</option>)}
-            </select>
-          </div>
-          <div className="cpf-field">
-            <label className="cpf-label">{t('medication.route')}</label>
-            <select
-              className="cpf-input"
-              value={item.route}
-              onChange={(e) => onChange(idx, { ...item, route: e.target.value })}
-            >
-              {ROUTES.map((r) => (
-                <option key={r} value={r}>{t(`medication.route${r.charAt(0).toUpperCase() + r.slice(1)}`)}</option>
-              ))}
             </select>
           </div>
           <div className="cpf-field">
@@ -412,18 +447,9 @@ function ItemRow({ item, idx, onChange, onRemove, t, canRemove }) {
               min="1"
               placeholder="7"
             />
+            <small className="cpf-hint">{t('medication.durationAutoScheduleHint')}</small>
           </div>
         </div>
-
-        {unitRouteWarn && (
-          <div className="med-unit-route-warn">
-            <span>⚠️</span>
-            {t('medication.unitRouteWarning', {
-              unit: unitRouteWarn.unit,
-              route: t(`medication.route${unitRouteWarn.route.charAt(0).toUpperCase() + unitRouteWarn.route.slice(1)}`),
-            })}
-          </div>
-        )}
 
         <div className="cpf-field">
           <label className="cpf-label">{t('medication.instructions')}</label>
@@ -471,23 +497,51 @@ function CreatePrescriptionModal({ residents, onSave, onClose }) {
 
   const selectedResident = residents.find((r) => r._id === form.residentId);
 
+  // Live (as-you-type) duplicate detection — medicationIds used by more than one item.
+  const duplicateMedicationIds = useMemo(() => {
+    const counts = new Map();
+    form.items.forEach((it) => {
+      if (!it.medicationId) return;
+      counts.set(it.medicationId, (counts.get(it.medicationId) || 0) + 1);
+    });
+    return new Set([...counts.entries()].filter(([, n]) => n > 1).map(([id]) => id));
+  }, [form.items]);
+
   const validate = () => {
     const errs = {};
     if (!form.residentId) errs.residentId = t('medication.resident');
     if (!form.diagnosisNote || form.diagnosisNote.trim().length < 10)
       errs.diagnosisNote = t('medication.diagnosisNoteHint');
+    const today = todayStr();
     if (!form.validUntil) errs.validUntil = t('medication.validUntil');
+    else if (form.validUntil < today) errs.validUntil = t('medication.validUntilPast');
+    else if (form.validUntil > maxValidUntil()) errs.validUntil = t('medication.validUntilTooFar');
+
+    const seenMedicationIds = new Set();
+
     form.items.forEach((item, i) => {
       if (!item.medicationName.trim()) errs[`item_${i}_name`] = t('medication.medicationName');
       if (!item.medicationId) errs[`item_${i}_name`] = t('medication.selectFromList');
-      if (!item.dosage) errs[`item_${i}_dosage`] = t('medication.dosage');
-      const warn = getUnitRouteWarning(item.unit, item.route);
-      if (warn) {
-        errs[`item_${i}_unitroute`] = t('medication.unitRouteWarning', {
-          unit: warn.unit,
-          route: t(`medication.route${warn.route.charAt(0).toUpperCase() + warn.route.slice(1)}`),
-        });
+
+      if (item.medicationId) {
+        if (seenMedicationIds.has(item.medicationId)) {
+          errs[`item_${i}_duplicate`] = t('medication.duplicateMedication');
+        }
+        seenMedicationIds.add(item.medicationId);
       }
+
+      if (item.dosage === '' || item.dosage === null || item.dosage === undefined) {
+        errs[`item_${i}_dosage`] = t('medication.dosageRequired');
+      } else {
+        const dosageNum = Number(item.dosage);
+        if (Number.isNaN(dosageNum)) errs[`item_${i}_dosage`] = t('medication.dosageNotNumber');
+        else if (dosageNum < 0) errs[`item_${i}_dosage`] = t('medication.dosageNegative');
+        else if (dosageNum === 0) errs[`item_${i}_dosage`] = t('medication.dosageZero');
+      }
+
+      if (!item.startDate) errs[`item_${i}_startDate`] = t('medication.startDateRequired');
+      else if (item.startDate < today) errs[`item_${i}_startDate`] = t('medication.startDatePast');
+      else if (form.validUntil && item.startDate > form.validUntil) errs[`item_${i}_startDate`] = t('medication.startDateAfterValidUntil');
     });
     setErrors(errs);
     return Object.keys(errs).length === 0;
@@ -528,6 +582,9 @@ function CreatePrescriptionModal({ residents, onSave, onClose }) {
           route: item.route,
           duration: item.duration ? parseInt(item.duration, 10) : undefined,
           startDate: item.startDate || undefined,
+          // Compute endDate from startDate + duration so the dosing schedule is
+          // generated right away — no separate "Đặt lịch" step needed afterwards.
+          endDate: item.duration ? addDaysStr(item.startDate, item.duration) : undefined,
         })),
       });
     } finally {
@@ -614,22 +671,47 @@ function CreatePrescriptionModal({ residents, onSave, onClose }) {
                       value={form.validUntil}
                       min={todayStr()}
                       max={maxValidUntil()}
-                      onChange={(e) => setForm((p) => ({ ...p, validUntil: e.target.value }))}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setForm((p) => ({ ...p, validUntil: v }));
+                        let err;
+                        if (!v) err = t('medication.validUntil');
+                        else if (v < todayStr()) err = t('medication.validUntilPast');
+                        else if (v > maxValidUntil()) err = t('medication.validUntilTooFar');
+                        setErrors((p) => {
+                          const sd = form.items[0]?.startDate;
+                          let startDateErr = p.item_0_startDate;
+                          if (sd) {
+                            if (sd < todayStr()) startDateErr = t('medication.startDatePast');
+                            else if (v && sd > v) startDateErr = t('medication.startDateAfterValidUntil');
+                            else startDateErr = undefined;
+                          }
+                          return { ...p, validUntil: err, item_0_startDate: startDateErr };
+                        });
+                      }}
                     />
                     <small className="cpf-hint">{t('medication.validUntilHint')}</small>
                     {errors.validUntil && <span className="cpf-error">{errors.validUntil}</span>}
                   </div>
                   <div className="cpf-field">
-                    <label className="cpf-label">{t('medication.startDate')}</label>
+                    <label className="cpf-label">{t('medication.startDate')} <span className="cpf-req">*</span></label>
                     <input
                       type="date"
-                      className="cpf-input"
+                      className={`cpf-input${errors.item_0_startDate ? ' cpf-input--err' : ''}`}
                       value={form.items[0]?.startDate || ''}
+                      min={todayStr()}
+                      max={form.validUntil || undefined}
                       onChange={(e) => {
                         const sd = e.target.value;
                         setForm((p) => ({ ...p, items: p.items.map((it) => ({ ...it, startDate: sd })) }));
+                        let err;
+                        if (!sd) err = t('medication.startDateRequired');
+                        else if (sd < todayStr()) err = t('medication.startDatePast');
+                        else if (form.validUntil && sd > form.validUntil) err = t('medication.startDateAfterValidUntil');
+                        setErrors((p) => ({ ...p, item_0_startDate: err }));
                       }}
                     />
+                    {errors.item_0_startDate && <span className="cpf-error">{errors.item_0_startDate}</span>}
                   </div>
                 </div>
               </div>
@@ -647,7 +729,18 @@ function CreatePrescriptionModal({ residents, onSave, onClose }) {
                 <p className="cpf-section__desc">{t('medication.sectionMedicationsDesc')}</p>
 
                 {form.items.map((item, idx) => (
-                  <ItemRow key={idx} item={item} idx={idx} onChange={handleItemChange} onRemove={handleRemoveItem} t={t} canRemove={form.items.length > 1} />
+                  <ItemRow
+                    key={idx}
+                    item={item}
+                    idx={idx}
+                    onChange={handleItemChange}
+                    onRemove={handleRemoveItem}
+                    t={t}
+                    canRemove={form.items.length > 1}
+                    errors={errors}
+                    excludeIds={form.items.filter((_, i) => i !== idx).map((it) => it.medicationId).filter(Boolean)}
+                    isDuplicate={item.medicationId && duplicateMedicationIds.has(item.medicationId)}
+                  />
                 ))}
 
                 <button type="button" className="cpf-add-btn" onClick={handleAddItem}>
@@ -875,13 +968,17 @@ function HistoryModal({ prescription, onClose }) {
   useEffect(() => {
     const residentId = prescription.residentId?._id || prescription.residentId;
     medicationService
-      .getHistory({ residentId })
+      .getHistory({ residentId, prescriptionId: prescription._id })
       .then((res) => setData(res?.data || res))
       .catch(() => setData(null))
       .finally(() => setLoading(false));
   }, [prescription]);
 
   const resident = prescription.residentId;
+  const prescriptionMedNames = useMemo(
+    () => [...new Set((prescription.items || []).map((it) => it.medicationName).filter(Boolean))].join(', '),
+    [prescription]
+  );
   const summary = data?.summary || {};
   const records = data?.records || [];
 
@@ -906,7 +1003,10 @@ function HistoryModal({ prescription, onClose }) {
             </div>
             <div>
               <h2 className="cpf-drawer__title">{t('medication.historyTitle')}</h2>
-              <p className="cpf-drawer__subtitle">{resident?.fullName} — {resident?.residentCode}</p>
+              <p className="cpf-drawer__subtitle">
+                {resident?.fullName} — {resident?.residentCode}
+                {prescriptionMedNames && <> · {prescriptionMedNames}</>}
+              </p>
             </div>
           </div>
           <button className="cpf-drawer__close" onClick={onClose}>
@@ -924,6 +1024,48 @@ function HistoryModal({ prescription, onClose }) {
             <div className="med-empty-state"><span>{t('medication.noData')}</span></div>
           ) : (
             <>
+              {/* Summary stats */}
+              <div className="mh-bottom-stats">
+                <div className="mh-stat-card mh-stat-card--compliance">
+                  <div className="mh-stat-card__icon" style={{ background: '#dcfce7', color: '#16a34a' }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" />
+                    </svg>
+                  </div>
+                  <div className="mh-stat-card__content">
+                    <span className="mh-stat-card__label">{t('medication.complianceRate')}</span>
+                    <span className="mh-stat-card__value" style={{ color: data.lowCompliance ? '#dc2626' : '#16a34a' }}>
+                      {summary.complianceRate != null ? `${summary.complianceRate.toFixed(1)}%` : '—'}
+                    </span>
+                    {data.lowCompliance && <span className="mh-stat-card__sub" style={{ color: '#dc2626' }}>{t('medication.lowCompliance')}</span>}
+                  </div>
+                </div>
+                <div className="mh-stat-card">
+                  <div className="mh-stat-card__icon" style={{ background: '#fee2e2', color: '#dc2626' }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" />
+                    </svg>
+                  </div>
+                  <div className="mh-stat-card__content">
+                    <span className="mh-stat-card__label">{t('medication.missed')}</span>
+                    <span className="mh-stat-card__value">{summary.missed ?? 0}</span>
+                    {summary.missed > 0 && <span className="mh-stat-card__sub" style={{ color: '#dc2626' }}>{t('medication.needsAttention')}</span>}
+                  </div>
+                </div>
+                <div className="mh-stat-card">
+                  <div className="mh-stat-card__icon" style={{ background: '#dbeafe', color: '#2563eb' }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
+                    </svg>
+                  </div>
+                  <div className="mh-stat-card__content">
+                    <span className="mh-stat-card__label">{t('medication.totalDoses')}</span>
+                    <span className="mh-stat-card__value">{summary.total ?? 0}</span>
+                    <span className="mh-stat-card__sub">{t('medication.taken')}: {(summary.taken || 0) + (summary.lateTaken || 0)}</span>
+                  </div>
+                </div>
+              </div>
+
               {/* Filters */}
               <div className="mh-filters">
                 <div className="med-filter-bar__search-wrap" style={{ flex: 1 }}>
@@ -990,48 +1132,6 @@ function HistoryModal({ prescription, onClose }) {
                   </tbody>
                 </table>
               </div>
-
-              {/* Bottom stats */}
-              <div className="mh-bottom-stats">
-                <div className="mh-stat-card mh-stat-card--compliance">
-                  <div className="mh-stat-card__icon" style={{ background: '#dcfce7', color: '#16a34a' }}>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" />
-                    </svg>
-                  </div>
-                  <div className="mh-stat-card__content">
-                    <span className="mh-stat-card__label">{t('medication.complianceRate')}</span>
-                    <span className="mh-stat-card__value" style={{ color: data.lowCompliance ? '#dc2626' : '#16a34a' }}>
-                      {summary.complianceRate != null ? `${summary.complianceRate.toFixed(1)}%` : '—'}
-                    </span>
-                    {data.lowCompliance && <span className="mh-stat-card__sub" style={{ color: '#dc2626' }}>{t('medication.lowCompliance')}</span>}
-                  </div>
-                </div>
-                <div className="mh-stat-card">
-                  <div className="mh-stat-card__icon" style={{ background: '#fee2e2', color: '#dc2626' }}>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" />
-                    </svg>
-                  </div>
-                  <div className="mh-stat-card__content">
-                    <span className="mh-stat-card__label">{t('medication.missed')}</span>
-                    <span className="mh-stat-card__value">{summary.missed ?? 0}</span>
-                    {summary.missed > 0 && <span className="mh-stat-card__sub" style={{ color: '#dc2626' }}>{t('medication.needsAttention')}</span>}
-                  </div>
-                </div>
-                <div className="mh-stat-card">
-                  <div className="mh-stat-card__icon" style={{ background: '#dbeafe', color: '#2563eb' }}>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
-                    </svg>
-                  </div>
-                  <div className="mh-stat-card__content">
-                    <span className="mh-stat-card__label">{t('medication.totalDoses')}</span>
-                    <span className="mh-stat-card__value">{summary.total ?? 0}</span>
-                    <span className="mh-stat-card__sub">{t('medication.taken')}: {(summary.taken || 0) + (summary.lateTaken || 0)}</span>
-                  </div>
-                </div>
-              </div>
             </>
           )}
         </div>
@@ -1043,16 +1143,23 @@ function HistoryModal({ prescription, onClose }) {
 /* ── Edit Prescription Modal ── */
 function EditPrescriptionModal({ prescription, onSave, onClose }) {
   const { t } = useTranslation();
+  const { user } = useAuth();
+  const isDoctor = user?.role === 'doctor';
   const [items, setItems] = useState(
     (prescription.items || []).map((it) => ({
       _id: it._id,
+      medicationId: it.medicationId?._id || it.medicationId,
       medicationName: it.medicationName || '',
       dosage: it.dosage || '',
       unit: it.unit || '',
       frequency: it.frequency || 1,
       route: it.route || 'oral',
+      duration: it.duration,
+      startDate: it.startDate ? it.startDate.slice(0, 10) : '',
+      endDate: it.endDate ? it.endDate.slice(0, 10) : '',
       times: it.times?.length ? [...it.times] : [],
       instructions: it.instructions || '',
+      isActive: it.isActive !== false,
     }))
   );
   const [status, setStatus] = useState(prescription.status || 'ACTIVE');
@@ -1074,19 +1181,34 @@ function EditPrescriptionModal({ prescription, onSave, onClose }) {
     }));
   };
 
+  const handleDiscontinue = () => {
+    if (!isDoctor) return;
+    if (!window.confirm(t('medication.discontinueConfirm', { name: current.medicationName }))) return;
+    setItems((prev) => prev.map((it, i) => (i === activeIdx ? { ...it, isActive: false } : it)));
+  };
+
   const resident = prescription.residentId;
 
   const handleSubmit = async () => {
     setSaving(true);
     try {
-      await onSave(prescription._id, {
-        status,
-        items: items.map((it) => ({
-          _id: it._id,
-          times: it.times,
-          instructions: it.instructions,
-        })),
-      });
+      // This modal only ever touches times/instructions (+ status/discontinue for
+      // doctors) — dosage, frequency, route, and dates aren't editable here, so we
+      // must not echo them back. Re-sending an item's original (often past) startDate
+      // trips the backend's "startDate cannot be in the past" check on every edit.
+      const payload = isDoctor
+        ? {
+          status,
+          items: items.map((it) => (
+            it.isActive === false
+              ? { _id: it._id, isActive: false }
+              : { _id: it._id, times: it.times, instructions: it.instructions }
+          )),
+        }
+        : {
+          items: items.map((it) => ({ _id: it._id, times: it.times, instructions: it.instructions })),
+        };
+      await onSave(prescription._id, payload);
     } finally {
       setSaving(false);
     }
@@ -1134,9 +1256,11 @@ function EditPrescriptionModal({ prescription, onSave, onClose }) {
                   key={it._id}
                   className={`sched-med-tab ${activeIdx === idx ? 'sched-med-tab--active' : ''}`}
                   onClick={() => setActiveIdx(idx)}
+                  style={it.isActive === false ? { opacity: 0.55, textDecoration: 'line-through' } : undefined}
                 >
                   <span className="sched-med-tab__dot" />
                   {it.medicationName}
+                  {it.isActive === false && <em style={{ marginLeft: 4, fontStyle: 'normal', fontSize: 11 }}>({t('medication.discontinuedLabel')})</em>}
                 </button>
               ))}
             </div>
@@ -1154,6 +1278,29 @@ function EditPrescriptionModal({ prescription, onSave, onClose }) {
             </div>
           </div>
 
+          {current.isActive === false ? (
+            <div className="edit-notice">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
+              </svg>
+              <div>
+                <strong>{t('medication.discontinuedLabel')}</strong>
+                <p>{t('medication.discontinuedNotice')}</p>
+              </div>
+            </div>
+          ) : (
+            isDoctor && (
+              <button
+                type="button"
+                className="cpf-btn cpf-btn--ghost"
+                style={{ color: '#b91c1c', borderColor: '#fca5a5', marginBottom: 12 }}
+                onClick={handleDiscontinue}
+              >
+                {t('medication.discontinueMedication')}
+              </button>
+            )
+          )}
+
           {/* Editable: instructions */}
           <div className="cpf-field">
             <label className="cpf-label">
@@ -1169,12 +1316,13 @@ function EditPrescriptionModal({ prescription, onSave, onClose }) {
               onChange={(e) => handleChange('instructions', e.target.value)}
               placeholder={t('medication.instructionsPlaceholder')}
               style={{ resize: 'vertical' }}
+              disabled={current.isActive === false}
             />
             <small className="cpf-hint">{t('medication.editInstructionsHint')}</small>
           </div>
 
           {/* Editable: times */}
-          {current.times.length > 0 && (
+          {current.isActive !== false && current.times.length > 0 && (
             <div className="cpf-field">
               <label className="cpf-label">{t('medication.times')}</label>
               <div className="sched-times">
@@ -1192,12 +1340,23 @@ function EditPrescriptionModal({ prescription, onSave, onClose }) {
 
           {/* Status */}
           <div className="cpf-field">
-            <label className="cpf-label">{t('medication.colStatus')}</label>
-            <select className="cpf-input" value={status} onChange={(e) => setStatus(e.target.value)}>
-              {Object.keys(RX_STATUS_KEYS).map((k) => (
-                <option key={k} value={k}>{t(`medication.${RX_STATUS_KEYS[k]}`)}</option>
-              ))}
-            </select>
+            <label className="cpf-label">
+              {t('medication.colStatus')}
+              {isDoctor && items.length > 1 && (
+                <span className="cpf-hint" style={{ marginLeft: 6, fontWeight: 400 }}>
+                  ({t('medication.statusAppliesWholeRx')})
+                </span>
+              )}
+            </label>
+            {isDoctor ? (
+              <select className="cpf-input" value={status} onChange={(e) => setStatus(e.target.value)}>
+                {Object.keys(MANUAL_RX_STATUS_KEYS).map((k) => (
+                  <option key={k} value={k}>{t(`medication.${MANUAL_RX_STATUS_KEYS[k]}`)}</option>
+                ))}
+              </select>
+            ) : (
+              <input className="cpf-input edit-input--readonly" value={t(`medication.${RX_STATUS_KEYS[status]}`)} readOnly />
+            )}
           </div>
 
           {/* Info notice */}
@@ -1207,7 +1366,7 @@ function EditPrescriptionModal({ prescription, onSave, onClose }) {
             </svg>
             <div>
               <strong>{t('medication.editNoticeTitle')}</strong>
-              <p>{t('medication.editNoticeDesc')}</p>
+              <p>{isDoctor ? t('medication.editNoticeDescDoctor') : t('medication.editNoticeDescNurse')}</p>
             </div>
           </div>
         </div>
@@ -1316,19 +1475,18 @@ function PrescriptionsTab({ prescriptions, residents, loading, selectedResidentI
                     <th>{t('medication.colResident')}</th>
                     <th>{t('medication.colMedication')}</th>
                     <th>{t('medication.colDosage')}</th>
-                    <th>{t('medication.route')}</th>
                     <th>{t('medication.colStatus')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.length === 0 ? (
                     <tr>
-                      <td colSpan={5}>
+                      <td colSpan={4}>
                         <div className="med-empty-state">
                           <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" />
                           </svg>
-                          <span>{selectedResidentId ? t('medication.noData') : t('medication.selectResidentHint')}</span>
+                          <span>{residents.length ? t('medication.noData') : t('medication.selectResidentHint')}</span>
                         </div>
                       </td>
                     </tr>
@@ -1359,21 +1517,17 @@ function PrescriptionsTab({ prescriptions, residents, loading, selectedResidentI
                               <span className="med-dosage">{firstItem?.dosage || '—'}</span>
                               {firstItem?.unit && <span className="med-resident-cell__code">{firstItem.unit}</span>}
                             </td>
-                            <td>
-                              {firstItem?.route && <span className="med-route-badge">{t(`medication.route${firstItem.route.charAt(0).toUpperCase() + firstItem.route.slice(1)}`)}</span>}
-                            </td>
-                            <td><StatusBadge status={p.status} type="rx" /></td>
+                            <td><RxStatusCell prescription={p} /></td>
                           </tr>
                           {isOpen && (p.items || []).length > 0 && (
                             <tr>
-                              <td colSpan={5} style={{ padding: 0 }}>
+                              <td colSpan={4} style={{ padding: 0 }}>
                                 <div className="med-rx-card__detail">
                                   <table className="med-table med-table--nested">
                                     <thead>
                                       <tr>
                                         <th>{t('medication.medicationName')}</th>
                                         <th>{t('medication.dosage')}</th>
-                                        <th>{t('medication.route')}</th>
                                         <th>{t('medication.frequencyLabel')}</th>
                                         <th>{t('medication.times')}</th>
                                         <th>{t('medication.startDate')}</th>
@@ -1384,7 +1538,6 @@ function PrescriptionsTab({ prescriptions, residents, loading, selectedResidentI
                                         <tr key={it._id}>
                                           <td><span className="med-drug-name">{it.medicationName}</span></td>
                                           <td>{it.dosage} {it.unit || ''}</td>
-                                          <td><span className="med-route-badge">{t(`medication.route${it.route ? it.route.charAt(0).toUpperCase() + it.route.slice(1) : ''}`) || '—'}</span></td>
                                           <td>{it.frequency}×/{t('medication.day')}</td>
                                           <td>
                                             <div className="med-time-chips">
@@ -1487,6 +1640,7 @@ function DailyTab() {
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState('');
+  const [search, setSearch] = useState('');
 
   const dateStr = localDateStr(date);
 
@@ -1510,24 +1664,30 @@ function DailyTab() {
     setDate(d);
   };
 
-  const rows = useMemo(() => {
-    const flat = [];
-    groups.forEach((group) => {
-      const residentName = group.residentName || group.residentId?.fullName || '—';
-      const room = group.room || '';
-      (group.schedules || []).forEach((s) => {
-        if (!statusFilter || s.status === statusFilter) {
-          flat.push({
-            ...s,
-            _scheduleId: s.id || s._id,
-            _residentName: residentName,
-            _room: room,
-          });
-        }
-      });
-    });
-    return flat.sort((a, b) => new Date(a.scheduledTime) - new Date(b.scheduledTime));
-  }, [groups, statusFilter]);
+  const goToday = () => setDate(new Date());
+  const isToday = dateStr === todayStr();
+
+  // Group rows by resident so a doctor can scan one patient's full day at a glance,
+  // instead of hunting through one long list sorted only by time.
+  const residentGroups = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return groups
+      .map((group) => {
+        const residentName = group.residentName || group.residentId?.fullName || '—';
+        const schedules = (group.schedules || [])
+          .filter((s) => !statusFilter || s.status === statusFilter)
+          .sort((a, b) => new Date(a.scheduledTime) - new Date(b.scheduledTime));
+        return {
+          key: group.residentId || residentName,
+          residentName,
+          room: group.room || '',
+          hasOverdue: schedules.some((s) => s.status === 'OVERDUE'),
+          schedules,
+        };
+      })
+      .filter((g) => g.schedules.length > 0 && (!q || g.residentName.toLowerCase().includes(q)))
+      .sort((a, b) => a.residentName.localeCompare(b.residentName));
+  }, [groups, statusFilter, search]);
 
   const counts = useMemo(() => {
     const all = groups.flatMap((g) => g.schedules || []);
@@ -1541,10 +1701,23 @@ function DailyTab() {
 
   return (
     <div className="med-tab-content">
-      <div className="med-date-nav">
-        <button className="med-date-nav__btn" onClick={() => shiftDate(-1)}>&#8249;</button>
-        <span className="med-date-nav__label">{fmtDayLabel(date)}</span>
-        <button className="med-date-nav__btn" onClick={() => shiftDate(1)}>&#8250;</button>
+      <div className="med-date-nav-row">
+        <div className="med-date-nav">
+          <button className="med-date-nav__btn" onClick={() => shiftDate(-1)} title={t('medication.previousDay')}>&#8249;</button>
+          <span className="med-date-nav__label">{fmtDayLabel(date)}</span>
+          <button className="med-date-nav__btn" onClick={() => shiftDate(1)} title={t('medication.nextDay')}>&#8250;</button>
+        </div>
+        <div className="med-date-nav__tools">
+          {!isToday && (
+            <button className="cpf-btn cpf-btn--ghost" onClick={goToday}>{t('medication.today')}</button>
+          )}
+          <input
+            type="date"
+            className="med-filter-bar__select"
+            value={dateStr}
+            onChange={(e) => e.target.value && setDate(new Date(`${e.target.value}T00:00:00`))}
+          />
+        </div>
       </div>
 
       <div className="med-stats">
@@ -1561,8 +1734,20 @@ function DailyTab() {
         ))}
       </div>
 
-      <div className="med-filter">
-        <select className="med-filter__select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+      <div className="med-card__header-actions" style={{ padding: '0' }}>
+        <div className="med-filter-bar__search-wrap" style={{ minWidth: 220 }}>
+          <svg className="med-filter-bar__search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          <input
+            className="med-filter-bar__search"
+            type="text"
+            placeholder={t('medication.searchPlaceholder')}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <select className="med-filter-bar__select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
           <option value="">{t('medication.allStatuses')}</option>
           {Object.keys(SCHED_STATUS_KEYS).map((k) => (
             <option key={k} value={k}>{t(`medication.${SCHED_STATUS_KEYS[k]}`)}</option>
@@ -1572,52 +1757,56 @@ function DailyTab() {
 
       {loading ? (
         <p className="med-empty">{t('medication.loading')}</p>
+      ) : residentGroups.length === 0 ? (
+        <p className="med-empty">{t('medication.noDataForDate')}</p>
       ) : (
-        <div className="med-table-wrap">
-          <table className="med-table">
-            <thead>
-              <tr>
-                <th>{t('medication.colTime')}</th>
-                <th>{t('medication.colResident')}</th>
-                <th>{t('medication.colMedication')}</th>
-                <th>{t('medication.colDosage')}</th>
-                <th>{t('medication.colStatus')}</th>
-                <th>{t('medication.colActualTime')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.length === 0 ? (
-                <tr><td colSpan={6} className="med-empty">{t('medication.noDataForDate')}</td></tr>
-              ) : (
-                rows.map((s) => (
-                  <tr key={s._scheduleId}>
-                    <td><span className="med-time-badge">{fmtTime(s.scheduledTime)}</span></td>
-                    <td>
-                      <div className="med-resident-cell">
-                        <div className="med-resident-cell__avatar" style={{ background: getAvatarColor(s._residentName) }}>
-                          {getInitials(s._residentName)}
-                        </div>
-                        <div className="med-resident-cell__info">
-                          <div className="med-resident-cell__name">{s._residentName}</div>
-                          {s._room && <div className="med-resident-cell__code">{s._room}</div>}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="med-drug__name">{s.medicationName}</td>
-                    <td>{s.dosage}</td>
-                    <td>
-                      <StatusBadge status={s.status} type="sched" />
-                    </td>
-                    <td>
-                      {s.actualTimeTaken
-                        ? `${t('medication.atTime')} ${fmtTime(s.actualTimeTaken)}`
-                        : '—'}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+        <div className="med-daily-groups">
+          {residentGroups.map((group) => (
+            <div key={group.key} className="med-card">
+              <div className="med-card__header">
+                <div className="med-resident-cell">
+                  <div className="med-resident-cell__avatar" style={{ background: getAvatarColor(group.residentName) }}>
+                    {getInitials(group.residentName)}
+                  </div>
+                  <div className="med-resident-cell__info">
+                    <div className="med-resident-cell__name">{group.residentName}</div>
+                    {group.room && <div className="med-resident-cell__code">{group.room}</div>}
+                  </div>
+                </div>
+                <span className={`med-badge ${group.hasOverdue ? 'med-badge--overdue' : 'med-badge--pending'}`}>
+                  {group.schedules.length} {t('medication.items')}
+                </span>
+              </div>
+              <div className="med-table-wrap" style={{ border: 'none', boxShadow: 'none' }}>
+                <table className="med-table med-table--nested">
+                  <thead>
+                    <tr>
+                      <th>{t('medication.colTime')}</th>
+                      <th>{t('medication.colMedication')}</th>
+                      <th>{t('medication.colDosage')}</th>
+                      <th>{t('medication.colStatus')}</th>
+                      <th>{t('medication.colActualTime')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {group.schedules.map((s) => (
+                      <tr key={s.id || s._id} className={s.status === 'OVERDUE' ? 'med-row--overdue' : ''}>
+                        <td><span className="med-time-badge">{fmtTime(s.scheduledTime)}</span></td>
+                        <td className="med-drug__name">{s.medicationName}</td>
+                        <td>{s.dosage}</td>
+                        <td><StatusBadge status={s.status} type="sched" /></td>
+                        <td>
+                          {s.actualTimeTaken
+                            ? `${t('medication.atTime')} ${fmtTime(s.actualTimeTaken)}`
+                            : '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -1630,6 +1819,7 @@ function DailyTab() {
 function DoctorMedicationPage() {
   const { t } = useTranslation();
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState('prescriptions');
   const [residents, setResidents] = useState([]);        // assigned residents only
   const [selectedResidentId, setSelectedResidentId] = useState('');
@@ -1657,12 +1847,11 @@ function DoctorMedicationPage() {
       .catch(() => setResidents([]));
   }, [assignedIds]);
 
-  // Load prescriptions khi chọn cư dân
+  // Load prescriptions — cho 1 cư dân, hoặc tất cả cư dân được giao nếu resId rỗng
   const loadPrescriptions = useCallback((resId) => {
-    if (!resId) { setPrescriptions([]); return; }
     setLoadingRx(true);
     medicationService
-      .listPrescriptions({ residentId: resId, limit: 100 })
+      .listPrescriptions({ residentId: resId || undefined, limit: 100 })
       .then((res) => {
         const arr = Array.isArray(res) ? res : (res?.data || []);
         setPrescriptions(arr);
@@ -1671,11 +1860,14 @@ function DoctorMedicationPage() {
       .finally(() => setLoadingRx(false));
   }, []);
 
-  // Tự động chọn cư dân đầu tiên nếu chỉ có 1
+  // Load lần đầu khi có danh sách cư dân — mặc định "Tất cả cư dân"
   useEffect(() => {
+    if (!residents.length) { setPrescriptions([]); return; }
     if (residents.length === 1 && !selectedResidentId) {
       setSelectedResidentId(residents[0]._id);
       loadPrescriptions(residents[0]._id);
+    } else if (!selectedResidentId) {
+      loadPrescriptions('');
     }
   }, [residents, selectedResidentId, loadPrescriptions]);
 
@@ -1692,8 +1884,9 @@ function DoctorMedicationPage() {
       closeModal();
       loadPrescriptions(payload.residentId);
       if (!selectedResidentId) setSelectedResidentId(payload.residentId);
+      showToast(t('medication.createSuccess', 'Đã tạo đơn thuốc thành công'), 'success');
     } catch (err) {
-      alert(err.response?.data?.message || t('medication.createError'));
+      showToast(err.response?.data?.message || t('medication.createError'), 'error');
       throw err;
     }
   };
@@ -1702,9 +1895,10 @@ function DoctorMedicationPage() {
     try {
       await medicationService.updatePrescription(id, payload);
       closeModal();
-      if (selectedResidentId) loadPrescriptions(selectedResidentId);
+      loadPrescriptions(selectedResidentId);
+      showToast(t('medication.updateSuccess', 'Đã cập nhật đơn thuốc thành công'), 'success');
     } catch (err) {
-      alert(err.response?.data?.message || t('medication.updateError'));
+      showToast(err.response?.data?.message || t('medication.updateError'), 'error');
       throw err;
     }
   };
@@ -1713,9 +1907,10 @@ function DoctorMedicationPage() {
     try {
       await medicationService.setMedicationSchedule(payload);
       closeModal();
-      if (selectedResidentId) loadPrescriptions(selectedResidentId);
+      loadPrescriptions(selectedResidentId);
+      showToast(t('medication.scheduleSuccess', 'Đã cập nhật lịch dùng thuốc thành công'), 'success');
     } catch (err) {
-      alert(err.response?.data?.message || t('medication.scheduleError'));
+      showToast(err.response?.data?.message || t('medication.scheduleError'), 'error');
       throw err;
     }
   };

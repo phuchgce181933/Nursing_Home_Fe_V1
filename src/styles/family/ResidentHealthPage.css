@@ -1,0 +1,577 @@
+/* ═══════════════════════════════════════════════════
+   ResidentHealthPage  |  prefix: rhp-
+   ═══════════════════════════════════════════════════ */
+
+@keyframes rhp-spin {
+  to { transform: rotate(360deg); }
+}
+.rhp-spin { animation: rhp-spin 0.75s linear infinite; }
+
+.rhp-page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding-bottom: 40px;
+}
+
+.rhp-loading,
+.rhp-error-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 300px;
+  color: #64748b;
+  font-size: 14px;
+  text-align: center;
+}
+.rhp-error-screen svg { color: #ef4444; }
+
+.rhp-header__title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0 0 4px;
+}
+.rhp-header__sub {
+  font-size: 13px;
+  color: #64748b;
+  margin: 0;
+}
+
+/* ── Resident selector ── */
+.rhp-resident-selector {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.rhp-resident-chip {
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.rhp-resident-chip:hover { border-color: #93c5fd; }
+.rhp-resident-chip--active {
+  background: #1b365d;
+  border-color: #1b365d;
+  color: #fff;
+}
+
+/* ── Care notes type filter ── */
+.rhp-type-filter {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.rhp-type-chip {
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.rhp-type-chip:hover { border-color: #93c5fd; }
+.rhp-type-chip--active {
+  background: #1b365d;
+  border-color: #1b365d;
+  color: #fff;
+}
+
+.rhp-resident-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  border-radius: 12px;
+  padding: 12px 16px;
+}
+.rhp-resident-banner__name {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1e293b;
+}
+.rhp-resident-banner__code {
+  font-size: 12px;
+  color: #64748b;
+}
+
+/* ── Tabs ── */
+.rhp-tabs {
+  display: flex;
+  gap: 6px;
+  border-bottom: 1px solid #e2e8f0;
+  overflow-x: auto;
+}
+.rhp-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 16px;
+  border: none;
+  background: none;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border-bottom: 2.5px solid transparent;
+  white-space: nowrap;
+  font-family: inherit;
+  transition: color 0.15s, border-color 0.15s;
+}
+.rhp-tab:hover { color: #1e293b; }
+.rhp-tab--active {
+  color: #1b365d;
+  border-bottom-color: #1b365d;
+}
+
+.rhp-tab-content {
+  background: #fff;
+  border: 1px solid #e8edf4;
+  border-radius: 14px;
+  padding: 20px;
+  min-height: 300px;
+}
+
+/* ── Shared tab states ── */
+.rhp-tab-loading,
+.rhp-tab-error,
+.rhp-tab-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 200px;
+  color: #94a3b8;
+  font-size: 13px;
+  text-align: center;
+}
+.rhp-tab-error { color: #ef4444; }
+
+.rhp-badge {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  background: #f1f5f9;
+  color: #475569;
+}
+.rhp-badge--warning {
+  background: #fef2f2;
+  color: #b91c1c;
+  margin-left: 8px;
+}
+.rhp-badge--success { background: #ecfdf5; color: #047857; }
+.rhp-badge--danger { background: #fef2f2; color: #b91c1c; }
+.rhp-badge--info { background: #eff6ff; color: #1d4ed8; }
+
+/* ── Medication tabs ── */
+.rhp-med-compliance {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.rhp-med-stat-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px 14px;
+  text-align: center;
+}
+.rhp-med-stat-card__value {
+  display: block;
+  font-size: 22px;
+  font-weight: 800;
+  color: #0f172a;
+}
+.rhp-med-stat-card__label {
+  display: block;
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 2px;
+}
+.rhp-med-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  margin-bottom: 8px;
+}
+.rhp-med-item__name {
+  font-weight: 700;
+  color: #0f172a;
+}
+.rhp-med-item__meta {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+/* ── Vitals tab ── */
+.rhp-vitals__measured-at {
+  font-size: 13px;
+  color: #64748b;
+  margin: 0 0 16px;
+}
+.rhp-vitals-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.rhp-vital-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #f1f5f9;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+.rhp-vital-card__icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: #eef2ff;
+  color: #3b5bdb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.rhp-vital-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.rhp-vital-card__label {
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.rhp-vital-card__value {
+  font-size: 18px;
+  font-weight: 800;
+  color: #1e293b;
+}
+.rhp-vital-card__unit {
+  font-size: 11px;
+  font-weight: 500;
+  color: #94a3b8;
+}
+.rhp-vitals__summary {
+  margin-top: 16px;
+  padding: 12px 14px;
+  background: #f8fafc;
+  border-left: 3px solid #64748b;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #334155;
+}
+
+/* ── History tab ── */
+.rhp-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 8px 12px;
+  margin-bottom: 16px;
+  color: #94a3b8;
+}
+.rhp-search-bar input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 13px;
+  font-family: inherit;
+  color: #1e293b;
+}
+.rhp-search-bar button {
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: none;
+  background: #1b365d;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.rhp-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.rhp-history-item {
+  padding: 12px 14px;
+  border: 1px solid #f1f5f9;
+  border-radius: 10px;
+}
+.rhp-history-item--clickable {
+  cursor: pointer;
+}
+.rhp-history-item--clickable:hover {
+  border-color: #bfdbfe;
+  background: #f8fafc;
+}
+.rhp-history-item--open {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+.rhp-history-item__chevron {
+  margin-left: auto;
+  flex-shrink: 0;
+  color: #94a3b8;
+  transition: transform 0.15s ease;
+}
+.rhp-history-item--open .rhp-history-item__chevron {
+  transform: rotate(180deg);
+}
+.rhp-history-item__detail {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  cursor: default;
+}
+.rhp-history-item__head {
+  display: flex;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.rhp-history-item__date {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1e293b;
+}
+.rhp-history-item__vitals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  font-size: 12px;
+  color: #64748b;
+}
+.rhp-history-item__summary {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: #475569;
+  font-style: italic;
+}
+
+.rhp-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 16px;
+  font-size: 12px;
+  color: #64748b;
+}
+.rhp-pagination button {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.rhp-pagination button:disabled { opacity: 0.4; cursor: default; }
+
+/* ── Date picker bar ── */
+.rhp-date-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  color: #475569;
+  font-weight: 600;
+}
+.rhp-date-bar input {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  font-family: inherit;
+  font-size: 13px;
+}
+
+/* ── Daily activities tab ── */
+.rhp-daily-sections {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.rhp-daily-section__title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0 0 8px;
+}
+.rhp-daily-section__empty {
+  font-size: 12px;
+  color: #94a3b8;
+  margin: 0;
+}
+.rhp-daily-section__list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.rhp-daily-item {
+  background: #f8fafc;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.rhp-daily-item--open {
+  background: #eff6ff;
+}
+.rhp-daily-item__summary {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+}
+.rhp-daily-item__summary-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.rhp-daily-item__title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #1e293b;
+}
+.rhp-daily-item__meta {
+  font-size: 11px;
+  color: #64748b;
+}
+.rhp-daily-item__chevron {
+  flex-shrink: 0;
+  color: #94a3b8;
+  transition: transform 0.15s ease;
+}
+.rhp-daily-item--open .rhp-daily-item__chevron {
+  transform: rotate(180deg);
+}
+.rhp-daily-item__detail {
+  padding: 2px 10px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* ── Detail row (shared: daily activities / care schedule / care notes) ── */
+.rhp-detail-row {
+  display: flex;
+  gap: 6px;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.rhp-detail-row__label {
+  color: #64748b;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.rhp-detail-row__value {
+  color: #1e293b;
+}
+
+/* ── Care schedule tab ── */
+.rhp-schedule-day {
+  margin-bottom: 18px;
+}
+.rhp-schedule-day__title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0 0 8px;
+}
+.rhp-schedule-entries {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.rhp-schedule-entry-wrap {
+  border: 1px solid #f1f5f9;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.rhp-schedule-entry-wrap--open {
+  border-color: #bfdbfe;
+}
+.rhp-schedule-entry {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+}
+.rhp-schedule-entry__time {
+  font-weight: 700;
+  color: #1b365d;
+  min-width: 50px;
+}
+.rhp-schedule-entry__task {
+  flex: 1;
+  color: #334155;
+}
+.rhp-schedule-entry__chevron {
+  flex-shrink: 0;
+  color: #94a3b8;
+  transition: transform 0.15s ease;
+}
+.rhp-schedule-entry-wrap--open .rhp-schedule-entry__chevron {
+  transform: rotate(180deg);
+}
+.rhp-schedule-entry__detail {
+  padding: 0 12px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+@media (max-width: 768px) {
+  .rhp-vitals-grid { grid-template-columns: 1fr 1fr; }
+  .rhp-daily-sections { grid-template-columns: 1fr; }
+}

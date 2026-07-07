@@ -32,55 +32,156 @@
   line-height: 1.7;
 }
 
-.family-dashboard-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 20px;
-  width: 100%;
-}
-
-@media (max-width: 980px) {
-  .family-dashboard-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-.family-dashboard-card {
-  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
-  border: 1px solid #e2e8f0;
-  border-radius: 18px;
-  box-shadow: 0 16px 34px rgba(15, 23, 42, 0.06);
-  padding: 24px;
+/* ── Resident list toolbar (search) ── */
+.family-resident-toolbar {
   display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  min-height: 320px;
-  width: 100%;
-}
-
-.family-dashboard-card:hover {
-  transform: translateY(-1px);
-  transition: transform 0.2s ease;
-}
-
-.card-header {
-  display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: 16px;
-  align-items: flex-start;
-  margin-bottom: 18px;
+  flex-wrap: wrap;
 }
 
-.card-header h2 {
-  font-size: 20px;
+.family-resident-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 240px;
+  max-width: 420px;
+  padding: 10px 14px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  color: #94a3b8;
+}
+
+.family-resident-search input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 14px;
+  font-family: inherit;
+  color: #1e293b;
+  background: transparent;
+}
+
+.family-resident-count {
+  font-size: 13px;
+  color: #64748b;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* ── Resident list (accordion rows) ── */
+.family-resident-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.family-resident-row {
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
+  overflow: hidden;
+}
+
+.family-resident-row--open {
+  border-color: #bfdbfe;
+  box-shadow: 0 16px 34px rgba(15, 23, 42, 0.08);
+}
+
+.family-resident-row__header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+}
+
+.family-resident-avatar {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(37, 99, 235, 0.12);
+  color: #1d4ed8;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.family-resident-row__identity {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 160px;
+}
+
+.family-resident-row__name {
+  font-size: 16px;
   font-weight: 700;
   color: #0f172a;
 }
 
-.card-header .text-muted {
+.family-resident-row__code {
+  font-size: 12px;
   color: #6b7280;
+}
+
+.family-resident-row__package {
+  flex: 1;
+  font-size: 14px;
+  color: #334155;
+  min-width: 140px;
+}
+
+.family-resident-row__invoice-count {
   font-size: 13px;
-  margin-top: 8px;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.family-resident-row__chevron {
+  flex-shrink: 0;
+  color: #94a3b8;
+  transition: transform 0.2s ease;
+}
+
+.family-resident-row--open .family-resident-row__chevron {
+  transform: rotate(180deg);
+}
+
+.family-resident-row__body {
+  padding: 0 20px 20px;
+  display: grid;
+  gap: 14px;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 16px;
+}
+
+.family-resident-row__actions {
+  margin-top: 4px;
+}
+
+@media (max-width: 760px) {
+  .family-resident-row__header {
+    flex-wrap: wrap;
+  }
+  .family-resident-row__package,
+  .family-resident-row__invoice-count {
+    flex-basis: 100%;
+    margin-left: 56px;
+  }
 }
 
 .status-pill {
@@ -106,13 +207,6 @@
 .status-empty {
   background: rgba(100, 116, 139, 0.12);
   color: #475569;
-}
-
-.card-body {
-  display: grid;
-  gap: 14px;
-  flex-grow: 1;
-  grid-auto-rows: max-content;
 }
 
 .info-row {
@@ -165,8 +259,123 @@
   font-weight: 600;
 }
 
-.card-actions {
-  margin-top: 18px;
+/* ── Invoice groups + rows (nested accordion) ── */
+.family-invoice-group {
+  border-top: 1px solid #e2e8f0;
+  padding-top: 12px;
+}
+
+.family-invoice-group__title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748b;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.family-invoice-row {
+  margin-bottom: 8px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  overflow: hidden;
+}
+
+.family-invoice-group--medication .family-invoice-row {
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
+.family-invoice-group--other .family-invoice-row {
+  background: #fffaf0;
+  border-color: #f1e7d6;
+}
+
+.family-invoice-row__summary {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+}
+
+.family-invoice-row__number {
+  font-size: 12px;
+  font-family: monospace;
+  color: #334155;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.family-invoice-row__due {
+  font-size: 13px;
+  color: #475569;
+  white-space: nowrap;
+}
+
+.family-invoice-row__status {
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.family-invoice-row__status.is-paid { color: #16a34a; }
+.family-invoice-row__status.is-due { color: #dc2626; }
+
+.family-invoice-row__total {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+  white-space: nowrap;
+}
+
+.family-invoice-row__chevron {
+  flex-shrink: 0;
+  color: #94a3b8;
+  transition: transform 0.2s ease;
+}
+
+.family-invoice-row--open .family-invoice-row__chevron {
+  transform: rotate(180deg);
+}
+
+.family-invoice-row__detail {
+  padding: 0 12px 12px;
+}
+
+.family-invoice-row__grand-total {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #cbd5e1;
+  font-weight: bold;
+  color: #1e40af;
+}
+
+.family-invoice-row__grand-total--medication {
+  border-top-color: #fecaca;
+  color: #dc2626;
+}
+
+.family-invoice-row__grand-total--other {
+  border-top-color: #e6d8c3;
+  color: #92400e;
+}
+
+@media (max-width: 600px) {
+  .family-invoice-row__summary {
+    flex-wrap: wrap;
+  }
 }
 
 .button {

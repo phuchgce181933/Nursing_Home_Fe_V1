@@ -5,9 +5,12 @@
    ================================================================ */
 
 /* -- Animations -- */
+/* Opacity-only: a translateY here shifts hit-test coordinates of interactive
+   elements (e.g. buttons in .med-page__header) for ~400ms after mount, which
+   can cause a fast/real click to land at a stale position and miss its target. */
 @keyframes medFadeIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 @keyframes medCardEntrance {
@@ -516,6 +519,39 @@
 .med-table--nested td {
   padding: 10px 16px;
   font-size: 13px;
+}
+
+.med-row--overdue {
+  background: #fff1f2;
+}
+
+.med-row--overdue:hover {
+  background: #ffe4e6;
+}
+
+/* -- Daily schedule: date nav row + resident groups -- */
+.med-date-nav-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.med-date-nav__tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.med-date-nav__tools .med-filter-bar__select {
+  width: auto;
+}
+
+.med-daily-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 /* -- Cell styles -- */
@@ -1983,7 +2019,7 @@
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 14px;
-  margin-top: 20px;
+  margin-bottom: 20px;
 }
 
 .mh-stat-card {

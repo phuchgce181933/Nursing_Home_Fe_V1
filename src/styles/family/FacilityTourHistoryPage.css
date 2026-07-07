@@ -6,7 +6,10 @@
   display: flex;
   flex-direction: column;
   gap: 28px;
-  animation: arh-fade-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+  /* No "both" fill-mode: a lingering non-"none" transform after this entrance
+     animation ends creates a new containing block for any position:fixed modal
+     nested in this page, breaking its viewport-relative centering. */
+  animation: arh-fade-in 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @keyframes arh-fade-in {

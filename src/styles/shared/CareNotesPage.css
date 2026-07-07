@@ -15,6 +15,14 @@
   from { opacity: 0; transform: scale(0.92) translateY(14px); }
   to   { opacity: 1; transform: scale(1) translateY(0); }
 }
+/* For elements centered via `transform: translate(-50%, -50%)` — a keyframe's `transform`
+   fully replaces the element's own declared transform while (and, with fill-mode, after)
+   the animation runs, so the centering offset must be baked into every keyframe here too,
+   otherwise the box snaps to the top-left of the 50%/50% point instead of being centered. */
+@keyframes cnScaleInCentered {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.92) translateY(14px); }
+  to   { opacity: 1; transform: translate(-50%, -50%) scale(1) translateY(0); }
+}
 @keyframes cnOverlayIn {
   from { opacity: 0; }
   to   { opacity: 1; }
@@ -57,7 +65,10 @@
   display: flex;
   flex-direction: column;
   gap: 20px;
-  animation: cnFadeIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  /* No "both"/"forwards" fill-mode: a lingering non-"none" transform after the
+     animation ends would create a new containing block for position:fixed modals
+     inside this page, breaking their viewport-relative centering (see AdminLayout.css). */
+  animation: cnFadeIn 0.5s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* ── Header ── */
@@ -566,9 +577,9 @@
 /* ── Stats Bar ── */
 .cn-stats {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 14px;
-  animation: cnSlideUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.15s both;
+  animation: cnSlideUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.15s backwards;
 }
 .cn-stat-card {
   display: flex;
@@ -593,9 +604,10 @@
   justify-content: center;
   flex-shrink: 0;
 }
-.cn-stat-card__icon--notes    { background: #eff6ff; color: #3b5bdb; }
-.cn-stat-card__icon--urgent   { background: #fef2f2; color: #dc2626; }
-.cn-stat-card__icon--complete { background: #ecfdf5; color: #16a34a; }
+.cn-stat-card__icon--notes     { background: #eff6ff; color: #3b5bdb; }
+.cn-stat-card__icon--urgent    { background: #fef2f2; color: #dc2626; }
+.cn-stat-card__icon--important { background: #fff7ed; color: #ea580c; }
+.cn-stat-card__icon--complete  { background: #ecfdf5; color: #16a34a; }
 .cn-stat-card__value {
   font-size: 22px;
   font-weight: 800;
@@ -686,11 +698,27 @@
   height: auto;
   max-height: 90vh;
   border-radius: 20px;
-  animation: cnScaleIn 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: cnScaleInCentered 0.35s cubic-bezier(0.22, 1, 0.36, 1);
   box-shadow: 0 24px 60px rgba(15, 23, 42, 0.22);
 }
 
 .cn-modal--lg { max-width: 580px; }
+
+/* Centered popup dialog (used for Create/Edit Note) — appears in the middle of the
+   page instead of sliding in as a full-height side drawer; body scrolls internally
+   when the form content (e.g. health metadata) is taller than the viewport allows. */
+.cn-modal--popup {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 92%;
+  height: auto;
+  max-height: 88vh;
+  border-radius: 20px;
+  animation: cnScaleInCentered 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.22);
+}
 
 .cn-modal__header {
   display: flex;
@@ -1005,45 +1033,147 @@ textarea.cn-form-input {
   gap: 8px;
 }
 
-/* ── History modal ── */
-.cn-history-filter {
+/* ── Note edit-history (audit trail) modal ── */
+.cn-audit-timeline {
   display: flex;
-  gap: 10px;
-  align-items: center;
-  flex-wrap: wrap;
-  margin-bottom: 16px;
+  flex-direction: column;
+  gap: 12px;
 }
-.cn-history-table-wrap {
-  overflow-x: auto;
-  border-radius: 10px;
+.cn-audit-entry {
   border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 14px 16px;
 }
-.cn-history-table {
-  width: 100%;
-  border-collapse: collapse;
+.cn-audit-entry__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.cn-audit-entry__actor {
   font-size: 13px;
+  font-weight: 700;
+  color: #1e293b;
 }
-.cn-history-table th {
-  padding: 10px 12px;
-  background: #f8fafc;
-  border-bottom: 1px solid #e2e8f0;
-  font-size: 11px;
-  font-weight: 800;
-  color: #475569;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  text-align: left;
+.cn-audit-entry__time {
+  font-size: 12px;
+  color: #94a3b8;
+  margin-left: auto;
 }
-.cn-history-table td {
-  padding: 10px 12px;
-  border-bottom: 1px solid #f1f5f9;
+.cn-audit-entry__body {
+  font-size: 13px;
   color: #334155;
 }
-.cn-history-table tbody tr:last-child td { border-bottom: none; }
-.cn-history-table tbody tr {
-  transition: background 0.15s;
+.cn-audit-entry__body--muted {
+  color: #94a3b8;
+  font-style: italic;
 }
-.cn-history-table tbody tr:hover { background: #f8fbff; }
+.cn-audit-entry__changes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cn-audit-change {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 13px;
+}
+.cn-audit-change__label {
+  font-weight: 700;
+  color: #475569;
+}
+.cn-audit-change__before {
+  color: #b91c1c;
+  text-decoration: line-through;
+}
+.cn-audit-change__arrow {
+  color: #94a3b8;
+}
+.cn-audit-change__after {
+  color: #15803d;
+  font-weight: 600;
+}
+.cn-audit-change__generic {
+  color: #64748b;
+  font-style: italic;
+}
+.cn-badge--audit-create { background: #ecfdf5; color: #15803d; border: 1px solid #a7f3d0; }
+.cn-badge--audit-update { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+
+/* Full before/after snapshot panels within an audit entry */
+.cn-audit-entry__snapshots {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 10px;
+}
+.cn-audit-snapshot-col__title {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #94a3b8;
+  margin-bottom: 6px;
+}
+.cn-audit-snapshot {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 12px;
+}
+.cn-audit-snapshot__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.cn-audit-snapshot__content {
+  color: #1e293b;
+  margin-bottom: 8px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.cn-audit-snapshot__meta .cn-view-row {
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+.cn-audit-snapshot__empty {
+  color: #94a3b8;
+  font-style: italic;
+  padding: 10px 12px;
+}
+
+/* Highlights exactly the fields that differ between the before/after snapshots,
+   so an unchanged field (e.g. record time) reads as "confirmed unchanged" rather
+   than looking like a bug just because both columns show the same value. */
+.cn-view-row--changed {
+  background: #fffbeb;
+  border-radius: 6px;
+  padding: 2px 6px;
+  margin: 0 -6px 4px;
+}
+.cn-view-row--changed .cn-view-label,
+.cn-view-row--changed .cn-view-value {
+  color: #b45309;
+  font-weight: 800;
+}
+.cn-audit-snapshot__content--changed {
+  background: #fffbeb;
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-weight: 600;
+  color: #b45309;
+}
+.cn-badge--changed {
+  box-shadow: 0 0 0 2px #f59e0b;
+}
+
+@media (max-width: 640px) {
+  .cn-audit-entry__snapshots { grid-template-columns: 1fr; }
+}
 
 /* ── Edited label ── */
 .cn-edited-label {

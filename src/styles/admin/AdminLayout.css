@@ -21,7 +21,12 @@
   border-radius: 16px;
   box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
   padding: 28px;
-  animation: panelFadeIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+  /* fill-mode intentionally NOT "both"/"forwards" — a lingering non-"none" `transform`
+     (even the identity matrix left by translateY(0)) creates a new containing block for
+     all position:fixed descendants, which breaks every modal on every page nested in
+     this panel (they end up positioned against this panel's full scroll height instead
+     of the viewport). Once the entrance animation finishes, transform must revert to none. */
+  animation: panelFadeIn 0.4s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 @keyframes panelFadeIn {

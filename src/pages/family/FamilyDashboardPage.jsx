@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AlertTriangle, CheckCircle, CreditCard, Package, Users, Wallet, PlusCircle, Bell } from 'lucide-react';
+import { AlertTriangle, CheckCircle, CreditCard, Package, Users, Wallet, PlusCircle, Bell, Search, ChevronDown } from 'lucide-react';
 import notificationsService from '../../services/notifications.service';
 import '../../styles/family/NotificationPage.css';
 import { useNavigate } from 'react-router-dom';
@@ -29,6 +29,25 @@ const getPackagePriceLabel = (resident) => {
   return `${formatMoney(monthlyPrice)} / tháng`;
 };
 
+const getInitials = (name) => {
+  if (!name) return '?';
+  const parts = name.trim().split(/\s+/);
+  return parts[parts.length - 1]?.[0]?.toUpperCase() || '?';
+};
+
+const INVOICE_STATUS_LABELS = {
+  PAID: 'Đã thanh toán',
+  PARTIALLY_PAID: 'Thanh toán một phần',
+};
+
+const getInvoiceStatusLabel = (status) => INVOICE_STATUS_LABELS[status] || 'Chưa thanh toán';
+
+const INVOICE_GROUPS = [
+  { key: 'service', label: 'Hóa đơn dịch vụ', icon: '📋', theme: 'service', match: (inv) => inv.type === 'SERVICE' || !inv.type },
+  { key: 'medication', label: 'Hóa đơn thuốc', icon: '💊', theme: 'medication', match: (inv) => inv.type === 'MEDICATION' },
+  { key: 'other', label: 'Hóa đơn khác', icon: '🧾', theme: 'other', match: (inv) => inv.type && inv.type !== 'SERVICE' && inv.type !== 'MEDICATION' },
+];
+
 function FamilyDashboardPage() {
   const [residents, setResidents] = useState([]);
   const [invoicesList, setInvoicesList] = useState({});
@@ -56,7 +75,28 @@ function FamilyDashboardPage() {
   const [showBellPanel, setShowBellPanel] = useState(false);
   const [bellItems, setBellItems] = useState([]);
   const [bellTab, setBellTab] = useState('all');
+  const [residentSearch, setResidentSearch] = useState('');
+  const [expandedResidentIds, setExpandedResidentIds] = useState(new Set());
+  const [expandedInvoiceIds, setExpandedInvoiceIds] = useState(new Set());
   const navigate = useNavigate();
+
+  const toggleResident = (residentId) => {
+    setExpandedResidentIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(residentId)) next.delete(residentId);
+      else next.add(residentId);
+      return next;
+    });
+  };
+
+  const toggleInvoice = (invoiceId) => {
+    setExpandedInvoiceIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(invoiceId)) next.delete(invoiceId);
+      else next.add(invoiceId);
+      return next;
+    });
+  };
 
   useEffect(() => {
     const loadResidents = async () => {
@@ -377,6 +417,14 @@ function FamilyDashboardPage() {
     }
   };
 
+  const residentSearchQuery = residentSearch.trim().toLowerCase();
+  const filteredResidents = residentSearchQuery
+    ? residents.filter((resident) =>
+        (resident.fullName || '').toLowerCase().includes(residentSearchQuery) ||
+        (resident.residentCode || '').toLowerCase().includes(residentSearchQuery)
+      )
+    : residents;
+
   return (
     <div className="page-family-dashboard">
       <header className="page-header">
@@ -529,299 +577,50 @@ function FamilyDashboardPage() {
         </div>
       )}
 
-      <div className="family-dashboard-grid">
-        {residents.map((resident) => {
+      {residents.length > 0 && (
+        <div className="family-resident-toolbar">
+          <div className="family-resident-search">
+            <Search size={16} />
+            <input
+              type="text"
+              placeholder="Tìm theo tên hoặc mã cư dân..."
+              value={residentSearch}
+              onChange={(event) => setResidentSearch(event.target.value)}
+            />
+          </div>
+          <span className="family-resident-count">{filteredResidents.length}/{residents.length} cư dân</span>
+        </div>
+      )}
+
+      <div className="family-resident-list">
+        {filteredResidents.length === 0 && !loading && residents.length > 0 && (
+          <div className="alert alert-info">
+            <Users size={18} /> Không tìm thấy cư dân phù hợp với từ khóa tìm kiếm.
+          </div>
+        )}
+        {filteredResidents.map((resident) => {
           const invoices = invoicesList[resident._id] || [];
           const hasServicePackage = Boolean(resident.servicePackage);
-          
-          // Separate invoices by type
-          const serviceInvoices = invoices.filter(inv => inv.type === 'SERVICE' || !inv.type);
-          const medicationInvoices = invoices.filter(inv => inv.type === 'MEDICATION');
-          const otherInvoices = invoices.filter(inv => inv.type && inv.type !== 'SERVICE' && inv.type !== 'MEDICATION');
-          
-          // Get latest unpaid invoice (for primary action button)
-          const latestUnpaidInvoice = invoices.find(inv => inv.status !== 'PAID');
           const latestInvoice = invoices[0] || null;
 
           return (
-            <article key={resident._id} className="family-dashboard-card">
-              <div className="card-header">
-                <div>
-                  <h2>{resident.fullName || resident.residentCode || 'Cư dân'}</h2>
-                  <p className="text-muted">Mã: {resident.residentCode || 'N/A'}</p>
-                </div>
-                <div className="status-pill">
-                  {latestInvoice ? (
-                    latestInvoice.status === 'PAID' ? (
-                      <span className="status-paid"><CheckCircle size={16} /> Đã thanh toán</span>
-                    ) : (
-                      <span className="status-due"><CreditCard size={16} /> Chưa thanh toán</span>
-                    )
-                  ) : (
-                    <span className="status-empty"><Package size={16} /> Chưa có hóa đơn</span>
-                  )}
-                </div>
-              </div>
-
-              <div className="card-body">
-                <div className="info-row">
-                  <strong>Gói dịch vụ:</strong>
-                  <span style={{ fontSize: '14px' }}>{resident.servicePackage || 'Chưa đăng ký gói dịch vụ'}</span>
-                </div>
-                {resident.servicePackage && getPackagePriceLabel(resident) && (
-                  <div className="info-row">
-                    <strong>Giá gói dịch vụ:</strong>
-                    <span style={{ fontSize: '14px' }}>{getPackagePriceLabel(resident)}</span>
-                  </div>
-                )}
-                <div className="info-row">
-                  <strong>Tổng số hóa đơn:</strong>
-                  <span style={{ fontSize: '14px' }}>{invoices.length}</span>
-                </div>
-
-                {/* SERVICE INVOICES */}
-                {serviceInvoices.length > 0 && (
-                  <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #e2e8f0' }}>
-                    <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#64748b', marginBottom: '8px', textTransform: 'uppercase' }}>
-                      📋 Hóa đơn dịch vụ
-                    </div>
-                    {serviceInvoices.map((invoice, idx) => {
-                      const invoiceStatus = invoice?.status?.toString().toUpperCase?.();
-                      const invoiceTotalAmount = invoice?.totalAmount ?? invoice?.total ?? 0;
-                      return (
-                        <div key={invoice._id || idx} style={{ marginBottom: '12px', padding: '10px', backgroundColor: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                          <div className="info-row" style={{ marginBottom: '6px' }}>
-                            <strong>Số hóa đơn:</strong>
-                            <span style={{ fontSize: '12px', fontFamily: 'monospace' }}>{invoice.invoiceNumber}</span>
-                          </div>
-                          <div className="info-row" style={{ marginBottom: '6px' }}>
-                            <strong>Ngày đến hạn:</strong>
-                            <span>{new Date(invoice.dueDate).toLocaleDateString('vi-VN')}</span>
-                          </div>
-                          <div className="info-row" style={{ marginBottom: '6px' }}>
-                            <strong>Trạng thái:</strong>
-                            <span style={{ color: invoiceStatus === 'PAID' ? '#16a34a' : '#dc2626', fontWeight: 'bold' }}>
-                              {invoiceStatus === 'PAID' ? 'Đã thanh toán' : invoiceStatus === 'PARTIALLY_PAID' ? 'Thanh toán một phần' : 'Chưa thanh toán'}
-                            </span>
-                          </div>
-                          {(invoice.careServiceCost > 0 || invoice.roomCost > 0) && (
-                            <div className="info-row" style={{ marginBottom: '6px', fontSize: '13px' }}>
-                              <strong>Phí dịch vụ chăm sóc:</strong>
-                              <span>{formatMoney(invoice.careServiceCost)}</span>
-                            </div>
-                          )}
-                          {invoice.roomCost > 0 && (
-                            <div className="info-row" style={{ marginBottom: '6px', fontSize: '13px' }}>
-                              <strong>Phí xét nghiệm:</strong>
-                              <span>{formatMoney(invoice.roomCost)}</span>
-                            </div>
-                          )}
-                          {invoice.otherCost > 0 && (
-                            <div className="info-row" style={{ marginBottom: '6px', fontSize: '13px' }}>
-                              <strong>Chi phí khác:</strong>
-                              <span>{formatMoney(invoice.otherCost)}</span>
-                            </div>
-                          )}
-                          {invoice.items && invoice.items.length > 0 && (
-                            <div style={{ marginTop: '8px', marginBottom: 6 }}>
-                              <div style={{ fontSize: 12, color: '#475569', marginBottom: 6 }}>Chi tiết khoản phí:</div>
-                              {invoice.items.map((it, i) => (
-                                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '4px 0' }}>
-                                  <div style={{ color: '#0f172a' }}>{it.description || it.name || 'Khoản phí'}</div>
-                                  <div style={{ fontWeight: 700, color: '#0f172a' }}>{formatMoney(it.amount)}</div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                          <div className="info-row" style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #cbd5e1', fontWeight: 'bold', color: '#1e40af' }}>
-                            <strong>Tổng:</strong>
-                            <span>{formatMoney(invoiceTotalAmount)}</span>
-                          </div>
-                          {invoiceStatus !== 'PAID' && (
-                            <div style={{ marginTop: '8px', display: 'flex', gap: '8px' }}>
-                              <button
-                                type="button"
-                                className="button button-primary"
-                                onClick={() => handleOpenCheckout(resident._id, invoice._id)}
-                              >
-                                Thanh toán
-                              </button>
-                              <button
-                                type="button"
-                                className="button button-secondary"
-                                onClick={() => handlePayWithWallet(resident._id, invoice._id, invoiceTotalAmount)}
-                                disabled={isWalletPaymentProcessing || walletLoading}
-                              >
-                                {isWalletPaymentProcessing ? 'Đang...' : 'Thanh toán bằng ví'}
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* MEDICATION INVOICES */}
-                {medicationInvoices.length > 0 && (
-                  <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #e2e8f0' }}>
-                    <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#64748b', marginBottom: '8px', textTransform: 'uppercase' }}>
-                      💊 Hóa đơn thuốc
-                    </div>
-                    {medicationInvoices.map((invoice, idx) => {
-                      const invoiceStatus = invoice?.status?.toString().toUpperCase?.();
-                      const invoiceTotalAmount = invoice?.totalAmount ?? invoice?.total ?? 0;
-                      return (
-                        <div key={invoice._id || idx} style={{ marginBottom: '12px', padding: '10px', backgroundColor: '#fef2f2', borderRadius: '6px', border: '1px solid #fecaca' }}>
-                          <div className="info-row" style={{ marginBottom: '6px' }}>
-                            <strong>Số hóa đơn:</strong>
-                            <span style={{ fontSize: '12px', fontFamily: 'monospace' }}>{invoice.invoiceNumber}</span>
-                          </div>
-                          <div className="info-row" style={{ marginBottom: '6px' }}>
-                            <strong>Ngày đến hạn:</strong>
-                            <span>{new Date(invoice.dueDate).toLocaleDateString('vi-VN')}</span>
-                          </div>
-                          <div className="info-row" style={{ marginBottom: '6px' }}>
-                            <strong>Trạng thái:</strong>
-                            <span style={{ color: invoiceStatus === 'PAID' ? '#16a34a' : '#dc2626', fontWeight: 'bold' }}>
-                              {invoiceStatus === 'PAID' ? 'Đã thanh toán' : invoiceStatus === 'PARTIALLY_PAID' ? 'Thanh toán một phần' : 'Chưa thanh toán'}
-                            </span>
-                          </div>
-                          {invoice.medicationCost > 0 && (
-                            <div className="info-row" style={{ marginBottom: '6px', fontSize: '13px' }}>
-                              <strong>Phí thuốc:</strong>
-                              <span>{formatMoney(invoice.medicationCost)}</span>
-                            </div>
-                          )}
-                          {invoice.otherCost > 0 && (
-                            <div className="info-row" style={{ marginBottom: '6px', fontSize: '13px' }}>
-                              <strong>Chi phí khác:</strong>
-                              <span>{formatMoney(invoice.otherCost)}</span>
-                            </div>
-                          )}
-                          <div className="info-row" style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #fecaca', fontWeight: 'bold', color: '#dc2626' }}>
-                            <strong>Tổng:</strong>
-                            <span>{formatMoney(invoiceTotalAmount)}</span>
-                          </div>
-                          {invoiceStatus !== 'PAID' && (
-                            <div style={{ marginTop: '8px', display: 'flex', gap: '8px' }}>
-                              <button
-                                type="button"
-                                className="button button-primary"
-                                onClick={() => handleOpenCheckout(resident._id, invoice._id)}
-                              >
-                                Thanh toán
-                              </button>
-                              <button
-                                type="button"
-                                className="button button-secondary"
-                                onClick={() => handlePayWithWallet(resident._id, invoice._id, invoiceTotalAmount)}
-                                disabled={isWalletPaymentProcessing || walletLoading}
-                              >
-                                {isWalletPaymentProcessing ? 'Đang...' : 'Thanh toán bằng ví'}
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* OTHER INVOICES */}
-                {otherInvoices.length > 0 && (
-                  <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #e2e8f0' }}>
-                    <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#64748b', marginBottom: '8px', textTransform: 'uppercase' }}>
-                      🧾 Hóa đơn khác
-                    </div>
-                    {otherInvoices.map((invoice, idx) => {
-                      const invoiceStatus = invoice?.status?.toString().toUpperCase?.();
-                      const invoiceTotalAmount = invoice?.totalAmount ?? invoice?.total ?? 0;
-                      return (
-                        <div key={invoice._id || idx} style={{ marginBottom: '12px', padding: '10px', backgroundColor: '#fffaf0', borderRadius: '6px', border: '1px solid #f1e7d6' }}>
-                          <div className="info-row" style={{ marginBottom: '6px' }}>
-                            <strong>Số hóa đơn:</strong>
-                            <span style={{ fontSize: '12px', fontFamily: 'monospace' }}>{invoice.invoiceNumber}</span>
-                          </div>
-                          <div className="info-row" style={{ marginBottom: '6px' }}>
-                            <strong>Ngày đến hạn:</strong>
-                            <span>{invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString('vi-VN') : '-'}</span>
-                          </div>
-                          <div className="info-row" style={{ marginBottom: '6px' }}>
-                            <strong>Trạng thái:</strong>
-                            <span style={{ color: invoiceStatus === 'PAID' ? '#16a34a' : '#dc2626', fontWeight: 'bold' }}>
-                              {invoiceStatus === 'PAID' ? 'Đã thanh toán' : invoiceStatus === 'PARTIALLY_PAID' ? 'Thanh toán một phần' : 'Chưa thanh toán'}
-                            </span>
-                          </div>
-                          {invoice.items && invoice.items.length > 0 && (
-                            <div style={{ marginTop: '8px', marginBottom: 6 }}>
-                              <div style={{ fontSize: 12, color: '#475569', marginBottom: 6 }}>Chi tiết khoản phí:</div>
-                              {invoice.items.map((it, i) => (
-                                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '4px 0' }}>
-                                  <div style={{ color: '#0f172a' }}>{it.description || it.name || 'Khoản phí'}</div>
-                                  <div style={{ fontWeight: 700, color: '#0f172a' }}>{formatMoney(it.amount)}</div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                          <div className="info-row" style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #e6d8c3', fontWeight: 'bold', color: '#92400e' }}>
-                            <strong>Tổng:</strong>
-                            <span>{formatMoney(invoiceTotalAmount)}</span>
-                          </div>
-                          {invoiceStatus !== 'PAID' && (
-                            <div style={{ marginTop: '8px', display: 'flex', gap: '8px' }}>
-                              <button
-                                type="button"
-                                className="button button-primary"
-                                onClick={() => handleOpenCheckout(resident._id, invoice._id)}
-                              >
-                                Thanh toán
-                              </button>
-                              <button
-                                type="button"
-                                className="button button-secondary"
-                                onClick={() => handlePayWithWallet(resident._id, invoice._id, invoiceTotalAmount)}
-                                disabled={isWalletPaymentProcessing || walletLoading}
-                              >
-                                {isWalletPaymentProcessing ? 'Đang...' : 'Thanh toán bằng ví'}
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {invoices.length === 0 && (
-                  <div className="info-row">
-                    <strong>Trạng thái hóa đơn:</strong>
-                    <span>Chưa có hóa đơn</span>
-                  </div>
-                )}
-              </div>
-
-              <div className="card-actions">
-                {latestInvoice && latestInvoice.status === 'PAID' ? (
-                  <button type="button" className="button button-secondary" disabled>
-                    Đã thanh toán hết
-                  </button>
-                ) : hasServicePackage && PACKAGE_PRICES[resident.servicePackage] ? (
-                  <button
-                    type="button"
-                    className="button button-primary"
-                    onClick={() => handleCreateInvoice(resident)}
-                    disabled={creatingInvoiceFor === resident._id}
-                  >
-                    {creatingInvoiceFor === resident._id ? 'Đang tạo hóa đơn...' : 'Tạo hóa đơn'}
-                  </button>
-                ) : (
-                  <button type="button" className="button button-secondary" disabled>
-                    {hasServicePackage ? 'Chưa có thông tin giá gói' : 'Chưa có khoản phí'}
-                  </button>
-                )}
-              </div>
-            </article>
+            <ResidentListItem
+              key={resident._id}
+              resident={resident}
+              invoices={invoices}
+              latestInvoice={latestInvoice}
+              hasServicePackage={hasServicePackage}
+              isExpanded={expandedResidentIds.has(resident._id)}
+              onToggle={() => toggleResident(resident._id)}
+              expandedInvoiceIds={expandedInvoiceIds}
+              onToggleInvoice={toggleInvoice}
+              onOpenCheckout={handleOpenCheckout}
+              onPayWithWallet={handlePayWithWallet}
+              onCreateInvoice={handleCreateInvoice}
+              creatingInvoiceFor={creatingInvoiceFor}
+              isWalletPaymentProcessing={isWalletPaymentProcessing}
+              walletLoading={walletLoading}
+            />
           );
         })}
       </div>
@@ -854,6 +653,212 @@ function FamilyDashboardPage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ══════════════════════ Resident list row (accordion) ══════════════════════ */
+
+function ResidentListItem({
+  resident, invoices, latestInvoice, hasServicePackage,
+  isExpanded, onToggle, expandedInvoiceIds, onToggleInvoice,
+  onOpenCheckout, onPayWithWallet, onCreateInvoice,
+  creatingInvoiceFor, isWalletPaymentProcessing, walletLoading,
+}) {
+  const unpaidCount = invoices.filter((inv) => inv.status !== 'PAID').length;
+
+  return (
+    <article className={`family-resident-row ${isExpanded ? 'family-resident-row--open' : ''}`}>
+      <button type="button" className="family-resident-row__header" onClick={onToggle}>
+        <span className="family-resident-avatar">{getInitials(resident.fullName)}</span>
+        <span className="family-resident-row__identity">
+          <span className="family-resident-row__name">{resident.fullName || resident.residentCode || 'Cư dân'}</span>
+          <span className="family-resident-row__code">Mã: {resident.residentCode || 'N/A'}</span>
+        </span>
+        <span className="family-resident-row__package">
+          {resident.servicePackage || 'Chưa đăng ký gói dịch vụ'}
+        </span>
+        <span className="family-resident-row__invoice-count">
+          {invoices.length} hóa đơn{unpaidCount > 0 ? ` · ${unpaidCount} chưa thanh toán` : ''}
+        </span>
+        <span className="status-pill">
+          {latestInvoice ? (
+            latestInvoice.status === 'PAID' ? (
+              <span className="status-paid"><CheckCircle size={16} /> Đã thanh toán</span>
+            ) : (
+              <span className="status-due"><CreditCard size={16} /> Chưa thanh toán</span>
+            )
+          ) : (
+            <span className="status-empty"><Package size={16} /> Chưa có hóa đơn</span>
+          )}
+        </span>
+        <ChevronDown size={18} className="family-resident-row__chevron" />
+      </button>
+
+      {isExpanded && (
+        <div className="family-resident-row__body">
+          {resident.servicePackage && getPackagePriceLabel(resident) && (
+            <div className="info-row">
+              <strong>Giá gói dịch vụ:</strong>
+              <span style={{ fontSize: '14px' }}>{getPackagePriceLabel(resident)}</span>
+            </div>
+          )}
+
+          {invoices.length === 0 ? (
+            <div className="info-row">
+              <strong>Trạng thái hóa đơn:</strong>
+              <span>Chưa có hóa đơn</span>
+            </div>
+          ) : (
+            INVOICE_GROUPS.map((group) => {
+              const groupInvoices = invoices.filter(group.match);
+              if (groupInvoices.length === 0) return null;
+              return (
+                <InvoiceGroup
+                  key={group.key}
+                  group={group}
+                  invoices={groupInvoices}
+                  resident={resident}
+                  expandedInvoiceIds={expandedInvoiceIds}
+                  onToggleInvoice={onToggleInvoice}
+                  onOpenCheckout={onOpenCheckout}
+                  onPayWithWallet={onPayWithWallet}
+                  isWalletPaymentProcessing={isWalletPaymentProcessing}
+                  walletLoading={walletLoading}
+                />
+              );
+            })
+          )}
+
+          <div className="family-resident-row__actions">
+            {latestInvoice && latestInvoice.status === 'PAID' ? (
+              <button type="button" className="button button-secondary" disabled>
+                Đã thanh toán hết
+              </button>
+            ) : hasServicePackage && PACKAGE_PRICES[resident.servicePackage] ? (
+              <button
+                type="button"
+                className="button button-primary"
+                onClick={() => onCreateInvoice(resident)}
+                disabled={creatingInvoiceFor === resident._id}
+              >
+                {creatingInvoiceFor === resident._id ? 'Đang tạo hóa đơn...' : 'Tạo hóa đơn'}
+              </button>
+            ) : (
+              <button type="button" className="button button-secondary" disabled>
+                {hasServicePackage ? 'Chưa có thông tin giá gói' : 'Chưa có khoản phí'}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </article>
+  );
+}
+
+/* ══════════════════════ Invoice group + row (nested accordion) ══════════════════════ */
+
+function InvoiceGroup({ group, invoices, resident, expandedInvoiceIds, onToggleInvoice, onOpenCheckout, onPayWithWallet, isWalletPaymentProcessing, walletLoading }) {
+  return (
+    <div className={`family-invoice-group family-invoice-group--${group.theme}`}>
+      <div className="family-invoice-group__title">{group.icon} {group.label}</div>
+      {invoices.map((invoice, idx) => (
+        <InvoiceRow
+          key={invoice._id || idx}
+          invoice={invoice}
+          theme={group.theme}
+          resident={resident}
+          isExpanded={expandedInvoiceIds.has(invoice._id)}
+          onToggle={() => onToggleInvoice(invoice._id)}
+          onOpenCheckout={onOpenCheckout}
+          onPayWithWallet={onPayWithWallet}
+          isWalletPaymentProcessing={isWalletPaymentProcessing}
+          walletLoading={walletLoading}
+        />
+      ))}
+    </div>
+  );
+}
+
+const INVOICE_COST_FIELDS_BY_THEME = {
+  service: [
+    { key: 'careServiceCost', label: 'Phí dịch vụ chăm sóc', showIf: (inv) => inv.careServiceCost > 0 || inv.roomCost > 0 },
+    { key: 'roomCost', label: 'Phí xét nghiệm' },
+    { key: 'otherCost', label: 'Chi phí khác' },
+  ],
+  medication: [
+    { key: 'medicationCost', label: 'Phí thuốc' },
+    { key: 'otherCost', label: 'Chi phí khác' },
+  ],
+  other: [],
+};
+
+function InvoiceRow({ invoice, theme, resident, isExpanded, onToggle, onOpenCheckout, onPayWithWallet, isWalletPaymentProcessing, walletLoading }) {
+  const invoiceStatus = invoice?.status?.toString().toUpperCase?.();
+  const invoiceTotalAmount = invoice?.totalAmount ?? invoice?.total ?? 0;
+  const isPaid = invoiceStatus === 'PAID';
+  const costFields = INVOICE_COST_FIELDS_BY_THEME[theme] || [];
+
+  return (
+    <div className={`family-invoice-row ${isExpanded ? 'family-invoice-row--open' : ''}`}>
+      <button type="button" className="family-invoice-row__summary" onClick={onToggle}>
+        <span className="family-invoice-row__number">{invoice.invoiceNumber}</span>
+        <span className="family-invoice-row__due">
+          {invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString('vi-VN') : '-'}
+        </span>
+        <span className={`family-invoice-row__status ${isPaid ? 'is-paid' : 'is-due'}`}>
+          {getInvoiceStatusLabel(invoiceStatus)}
+        </span>
+        <span className="family-invoice-row__total">{formatMoney(invoiceTotalAmount)}</span>
+        <ChevronDown size={16} className="family-invoice-row__chevron" />
+      </button>
+
+      {isExpanded && (
+        <div className="family-invoice-row__detail">
+          {costFields.map((field) => (
+            (field.showIf ? field.showIf(invoice) : invoice[field.key] > 0) && (
+              <div className="info-row" key={field.key} style={{ marginBottom: '6px', fontSize: '13px' }}>
+                <strong>{field.label}:</strong>
+                <span>{formatMoney(invoice[field.key])}</span>
+              </div>
+            )
+          ))}
+          {invoice.items && invoice.items.length > 0 && (
+            <div style={{ marginTop: '8px', marginBottom: 6 }}>
+              <div style={{ fontSize: 12, color: '#475569', marginBottom: 6 }}>Chi tiết khoản phí:</div>
+              {invoice.items.map((it, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '4px 0' }}>
+                  <div style={{ color: '#0f172a' }}>{it.description || it.name || 'Khoản phí'}</div>
+                  <div style={{ fontWeight: 700, color: '#0f172a' }}>{formatMoney(it.amount)}</div>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className={`family-invoice-row__grand-total family-invoice-row__grand-total--${theme}`}>
+            <strong>Tổng:</strong>
+            <span>{formatMoney(invoiceTotalAmount)}</span>
+          </div>
+          {!isPaid && (
+            <div style={{ marginTop: '8px', display: 'flex', gap: '8px' }}>
+              <button
+                type="button"
+                className="button button-primary"
+                onClick={() => onOpenCheckout(resident._id, invoice._id)}
+              >
+                Thanh toán
+              </button>
+              <button
+                type="button"
+                className="button button-secondary"
+                onClick={() => onPayWithWallet(resident._id, invoice._id, invoiceTotalAmount)}
+                disabled={isWalletPaymentProcessing || walletLoading}
+              >
+                {isWalletPaymentProcessing ? 'Đang...' : 'Thanh toán bằng ví'}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

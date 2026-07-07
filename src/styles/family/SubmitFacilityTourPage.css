@@ -9,7 +9,10 @@
   max-width: 860px;
   margin: 0 auto;
   padding: 32px 20px 60px;
-  animation: sftp-slide-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  /* No "forwards" fill-mode: a lingering non-"none" transform after this entrance
+     animation ends creates a new containing block for any position:fixed modal
+     nested in this page, breaking its viewport-relative centering. */
+  animation: sftp-slide-in 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @keyframes sftp-slide-in {
