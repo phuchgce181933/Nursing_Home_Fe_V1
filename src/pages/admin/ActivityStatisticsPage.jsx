@@ -4,7 +4,13 @@ import activityService from '../../services/activity.service';
 import '../../styles/admin/AdminAdmissionRequestsPage.css';
 
 export default function ActivityStatisticsPage() {
-  const [stats, setStats] = useState(null);
+  const [stats, setStats] = useState({
+    totalActivities: 0,
+    totalParticipants: 0,
+    statusCounts: {},
+    categoryCounts: {},
+    participationRate: 0,
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [timeRange, setTimeRange] = useState('month');
@@ -180,10 +186,6 @@ export default function ActivityStatisticsPage() {
         <div style={{ textAlign: 'center', padding: '40px' }}>
           Đang tải dữ liệu...
         </div>
-      ) : error ? (
-        <div style={{ color: '#b91c1c', padding: '20px', backgroundColor: '#fee2e2', borderRadius: '8px' }}>
-          {error}
-        </div>
       ) : (
         <>
           <div style={{
@@ -203,6 +205,13 @@ export default function ActivityStatisticsPage() {
               label="Tổng người tham gia"
               value={stats?.totalParticipants || 0}
               color="#10b981"
+            />
+            <StatBox
+              icon={PieChartIcon}
+              label="Tỷ lệ tham gia"
+              value={`${stats?.participationRate || 0}%`}
+              color="#8b5cf6"
+              subtext="so với danh sách dự kiến"
             />
             <StatBox
               icon={TrendingUp}

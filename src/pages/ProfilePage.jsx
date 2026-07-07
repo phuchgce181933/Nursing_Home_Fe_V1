@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Mail, Phone, Shield, BadgeCheck, UserCircle, Pencil,
   User, Contact, Lock, Clock, Calendar, Briefcase,
@@ -29,6 +29,8 @@ const initialPasswordForm = {
   newPassword: '',
   confirmPassword: '',
 };
+
+const PASSWORD_POLICY_REGEX = /^(?=.*[A-Z])(?=.*[^A-Za-z0-9]).{8,}$/;
 
 function getGenderDisplay(value, t) {
   if (!value) return '—';
@@ -66,6 +68,10 @@ function ProfilePage() {
   const [otpCode, setOtpCode] = useState('');
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
   const [otpError, setOtpError] = useState('');
+  const [spamBlocked, setSpamBlocked] = useState(false);
+  const [otpCooldowns, setOtpCooldowns] = useState({ email: 0, phone: 0 });
+  const spamGuardRef = useRef(false);
+  const otpRequestStateRef = useRef({ email: { attempts: 0, nextAllowedAt: 0 }, phone: { attempts: 0, nextAllowedAt: 0 } });
 
   useEffect(() => {
     if (user) {
@@ -87,8 +93,46 @@ function ProfilePage() {
     navigate('/login');
   };
 
+  const startProtectedAction = () => {
+    if (spamGuardRef.current) {
+      setMessageType('error');
+      setMessage(t('profile.pleaseWait', { defaultValue: 'Vui lòng đợi một chút trước khi thử lại.' }));
+      return false;
+    }
+    spamGuardRef.current = true;
+    setSpamBlocked(true);
+    window.setTimeout(() => {
+      spamGuardRef.current = false;
+      setSpamBlocked(false);
+    }, 2500);
+    return true;
+  };
+
+  const canRequestOtp = (type) => {
+    const state = otpRequestStateRef.current[type];
+    const now = Date.now();
+    if (state.nextAllowedAt && now < state.nextAllowedAt) {
+      const secondsLeft = Math.max(1, Math.ceil((state.nextAllowedAt - now) / 1000));
+      setMessageType('error');
+      setMessage(t('profile.otpCooldown', { seconds: secondsLeft, defaultValue: `Vui lòng đợi ${secondsLeft} giây trước khi gửi lại OTP.` }));
+      return false;
+    }
+    return true;
+  };
+
+  const reserveOtpRequest = (type) => {
+    const state = otpRequestStateRef.current[type];
+    const now = Date.now();
+    const delaySeconds = state.attempts === 0 ? 0 : Math.min(300, 30 * 2 ** Math.max(0, state.attempts - 1));
+    state.attempts += 1;
+    state.nextAllowedAt = delaySeconds > 0 ? now + delaySeconds * 1000 : 0;
+    setOtpCooldowns(prev => ({ ...prev, [type]: delaySeconds }));
+    return true;
+  };
+
   const handleProfileSubmit = async (event) => {
     event.preventDefault();
+    if (!startProtectedAction()) return;
     setIsSaving(true);
     setMessage('');
     try {
@@ -96,9 +140,20 @@ function ProfilePage() {
       const normalizedOldEmail = user?.email ? String(user.email).trim().toLowerCase() : '';
       const normalizedNewPhone = profileForm.phone ? String(profileForm.phone).trim() : '';
       const normalizedOldPhone = user?.phone ? String(user.phone).trim() : '';
-      const bothEmailAndPhoneChanged = normalizedNewEmail && normalizedNewEmail !== normalizedOldEmail && normalizedNewPhone && normalizedNewPhone !== normalizedOldPhone;
+      const needsEmailChange = Boolean(normalizedNewEmail && normalizedNewEmail !== normalizedOldEmail);
+      const needsPhoneChange = Boolean(normalizedNewPhone && normalizedNewPhone !== normalizedOldPhone);
+      const bothEmailAndPhoneChanged = needsEmailChange && needsPhoneChange;
+
+      if (needsEmailChange && !canRequestOtp('email')) {
+        return;
+      }
+      if (needsPhoneChange && !canRequestOtp('phone')) {
+        return;
+      }
 
       if (bothEmailAndPhoneChanged) {
+        reserveOtpRequest('email');
+        reserveOtpRequest('phone');
         const emailResp = await authService.requestEmailChangeOtp({ email: profileForm.email });
         const phoneResp = await authService.requestPhoneChangeOtp({ phone: normalizedNewPhone });
         setPendingEmailChange(true);
@@ -113,7 +168,8 @@ function ProfilePage() {
         setOtpCode('');
         setOtpError('');
         setOtpModalVisible(true);
-      } else if (normalizedNewEmail && normalizedNewEmail !== normalizedOldEmail) {
+      } else if (needsEmailChange) {
+        reserveOtpRequest('email');
         const resp = await authService.requestEmailChangeOtp({ email: profileForm.email });
         setPendingEmailChange(true);
         setOtpContext('email');
@@ -124,7 +180,8 @@ function ProfilePage() {
         setOtpCode('');
         setOtpError('');
         setOtpModalVisible(true);
-      } else if (normalizedNewPhone && normalizedNewPhone !== normalizedOldPhone) {
+      } else if (needsPhoneChange) {
+        reserveOtpRequest('phone');
         const nextPhone = normalizedNewPhone;
         const resp = await authService.requestPhoneChangeOtp({ phone: nextPhone });
         setPendingPhoneChange(true);
@@ -162,7 +219,7 @@ function ProfilePage() {
   };
 
   const handleVerifyOtp = async () => {
-    if (!otpId) return;
+    if (!otpId || !startProtectedAction()) return;
     setIsVerifyingOtp(true);
     setOtpError('');
     try {
@@ -214,6 +271,14 @@ function ProfilePage() {
 
   const handlePasswordSubmit = async (event) => {
     event.preventDefault();
+    if (!startProtectedAction()) return;
+
+    if (!PASSWORD_POLICY_REGEX.test(passwordForm.newPassword)) {
+      setMessageType('error');
+      setMessage(t('profile.passwordRequirements', { defaultValue: 'Mật khẩu phải có ít nhất 8 ký tự, gồm chữ hoa và ký tự đặc biệt.' }));
+      return;
+    }
+
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
       setMessageType('error');
       setMessage(t('profile.passwordMismatch'));
@@ -358,7 +423,7 @@ function ProfilePage() {
                     <button type="button" className="ap-btn ap-btn--outline" onClick={() => setEditing(false)}>
                       {t('common.cancel')}
                     </button>
-                    <button type="submit" className="ap-btn ap-btn--primary" disabled={isSaving}>
+                    <button type="submit" className="ap-btn ap-btn--primary" disabled={isSaving || spamBlocked}>
                       {isSaving ? t('profile.saving') : t('profile.saveProfile')}
                     </button>
                   </div>
@@ -426,7 +491,7 @@ function ProfilePage() {
                   <button type="button" className="ap-btn ap-btn--outline" onClick={() => navigate('/forgot-password')}>
                     {t('profile.forgotPassword')}
                   </button>
-                  <button type="submit" className="ap-btn ap-btn--primary" disabled={isSaving}>
+                  <button type="submit" className="ap-btn ap-btn--primary" disabled={isSaving || spamBlocked}>
                     {isSaving ? t('profile.processing') : t('profile.changePasswordButton')}
                   </button>
                 </div>

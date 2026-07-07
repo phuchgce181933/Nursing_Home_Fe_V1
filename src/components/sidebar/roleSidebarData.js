@@ -118,6 +118,7 @@ export const roleSidebarData = {
     { title: 'sidebar.familyDashboard', icon: LayoutDashboard, path: '/family/dashboard' },
     { title: 'sidebar.admissionHistory', icon: History, path: '/family/admission-requests' },
     { title: 'sidebar.facilityTourHistory', icon: Calendar, path: '/family/facility-tours' },
+    { title: 'sidebar.activities', icon: Activity, path: '/family/activities' },
     { title: 'sidebar.residentInfo', icon: Users, path: '/family/resident' },
     { title: 'sidebar.notifications', icon: Bell, path: '/family/notifications' },
     { title: 'sidebar.messages', icon: MessageSquare, path: '/family/messages' },

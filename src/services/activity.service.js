@@ -25,6 +25,17 @@ const deleteActivity = async (activityId) => {
   return response.data;
 };
 
+const bulkDeleteActivities = async (params = {}) => {
+  const response = await axiosClient.delete('/admin/activities/bulk', { params });
+  return response.data;
+};
+
+const bulkUpdateActivityStatus = async (payload = {}) => {
+  const { status, ...filters } = payload;
+  const response = await axiosClient.patch('/admin/activities/bulk/status', { status }, { params: filters });
+  return response.data;
+};
+
 const updateActivityStatus = async (activityId, status) => {
   const response = await axiosClient.patch(`/admin/activities/${activityId}/status`, { status });
   return response.data;
@@ -61,6 +72,8 @@ export default {
   getActivityById,
   updateActivity,
   deleteActivity,
+  bulkDeleteActivities,
+  bulkUpdateActivityStatus,
   updateActivityStatus,
   setParticipantList,
   registerResident,
