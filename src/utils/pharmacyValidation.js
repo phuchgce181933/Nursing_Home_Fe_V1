@@ -1,5 +1,17 @@
 const trim = (value) => String(value || '').trim();
 
+const normalize = (value) => trim(value).toLowerCase();
+
+const findEntityByIdOrName = (items, value, key = 'name') => {
+  const v = String(value || '').trim();
+  if (!v) return null;
+  return (
+    items.find((item) => String(item?._id) === v) ||
+    items.find((item) => normalize(item?.[key]) === normalize(v)) ||
+    null
+  );
+};
+
 export const validateMedicationForm = (form) => {
   if (!trim(form.name)) {
     return { valid: false, message: 'Tên thuốc là bắt buộc.' };
@@ -49,10 +61,10 @@ export const validateSupplierForm = (form, suppliers = [], currentSupplierId = n
 
   const contactName = trim(form.contactName);
   if (!contactName) {
-    return { valid: false, message: 'Người liên hệ là bắt buộc.' };
+    return { valid: false, message: 'Tên người liên hệ là bắt buộc.' };
   }
   if (!/^[A-Za-zÀ-ỹ\s]+$/u.test(contactName)) {
-    return { valid: false, message: 'Người liên hệ chỉ được chứa chữ cái và khoảng trắng.' };
+    return { valid: false, message: 'Tên người liên hệ chỉ được chứa chữ cái và khoảng trắng.' };
   }
 
   const phone = trim(form.phone);
@@ -119,7 +131,7 @@ const isValidDate = (value) => {
   return !Number.isNaN(date.getTime());
 };
 
-export const validateStockForm = (form) => {
+export const validateStockForm = (form, medications = [], suppliers = []) => {
   if (!trim(form.medicationId)) {
     return { valid: false, message: 'Thuốc là bắt buộc.' };
   }
@@ -164,6 +176,26 @@ export const validateStockForm = (form) => {
   }
   if (receivedTime && expiryTime <= receivedTime + 30 * 24 * 60 * 60 * 1000) {
     return { valid: false, message: 'Ngày hết hạn phải lớn hơn 30 ngày kể từ ngày nhập thuốc.' };
+  }
+  
+  const medication = findEntityByIdOrName(medications, form.medicationId, 'name');
+  const supplier = findEntityByIdOrName(suppliers, form.supplierId, 'name');
+  if (!medication) {
+    return { valid: false, message: 'Thuốc không hợp lệ.' };
+  }
+  if (medication.isActive === false) {
+    return { valid: false, message: 'Không thể nhập thuốc đã ngừng hoạt động.' };
+  }
+  if (!supplier) {
+    return { valid: false, message: 'Nhà cung cấp không hợp lệ.' };
+  }
+  if (supplier.isActive === false) {
+    return { valid: false, message: 'Không thể nhập thuốc với nhà cung cấp đã ngừng hoạt động.' };
+  }
+  const medicationManufacturer = normalize(medication.manufacturer);
+  const supplierName = normalize(supplier.name);
+  if (medicationManufacturer && supplierName && medicationManufacturer !== supplierName) {
+    return { valid: false, message: 'Nhà cung cấp chưa có loại thuốc này, vui lòng tạo thuốc trước khi nhập.' };
   }
 
   return { valid: true };
