@@ -1,22 +1,12 @@
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ALL_STAFF_ROLE_OPTIONS } from '../../../../constants/rolePolicy';
+import { staffDateOfBirthValidationKey, validateStaffDateOfBirth } from '../../../../utils/staffAgeValidation';
 
 // Mirror backend validators
 const PHONE_REGEX = /^(\+84|0)[0-9]{8,10}$/;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,30}$/;
-
-const validateDateOfBirth = (dob, t) => {
-  if (!dob) return null;
-  const d = new Date(dob);
-  if (Number.isNaN(d.getTime())) return t('admin.staff.profiles.validation.dateOfBirthInvalid');
-  if (d > new Date()) return t('admin.staff.profiles.validation.dateOfBirthInvalid');
-  const minAge = new Date();
-  minAge.setFullYear(minAge.getFullYear() - 18);
-  if (d > minAge) return t('admin.staff.profiles.validation.dateOfBirthMinAge');
-  return null;
-};
 
 const validate = (form, t) => {
   const errs = {};
@@ -44,8 +34,8 @@ const validate = (form, t) => {
     errs.username = v('usernameInvalid');
   }
 
-  const dobError = validateDateOfBirth(form.dateOfBirth, t);
-  if (dobError) errs.dateOfBirth = dobError;
+  const dobErrorKey = validateStaffDateOfBirth(form.dateOfBirth, { role: form.role, gender: form.gender });
+  if (dobErrorKey) errs.dateOfBirth = staffDateOfBirthValidationKey(dobErrorKey, t);
 
   return errs;
 };

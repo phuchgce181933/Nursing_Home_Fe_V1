@@ -167,6 +167,16 @@ export const apiErrorsVi = {
   RESIDENT_STATUS_INVALID: 'Trạng thái cư dân không hợp lệ',
   RESIDENT_BED_OCCUPIED: 'Giường đã có người',
   RESIDENT_TRANSFER_INVALID: 'Không thể chuyển cư dân',
+  RESIDENT_TRANSFER_NOT_ADMITTED: 'Chỉ có thể chuyển cư dân đang admitted',
+  RESIDENT_TRANSFER_NO_ROOM: 'Cư dân chưa được gán phòng/giường',
+  RESIDENT_TRANSFER_FLOOR_NOT_FOUND: 'Không tìm thấy tầng đích',
+  RESIDENT_TRANSFER_ROOM_NOT_FOUND: 'Không tìm thấy phòng đích',
+  RESIDENT_TRANSFER_ROOM_CLOSED: 'Phòng đích đang đóng',
+  RESIDENT_TRANSFER_ROOM_FULL: 'Phòng đích đã đầy',
+  RESIDENT_TRANSFER_BED_NOT_FOUND: 'Không tìm thấy giường đích',
+  RESIDENT_TRANSFER_BED_MISMATCH: 'Giường đích không thuộc phòng đã chọn',
+  RESIDENT_TRANSFER_BED_UNAVAILABLE: 'Giường đích không còn trống',
+  RESIDENT_TRANSFER_SAME_BED: 'Cư dân đang ở giường này',
 
   INTERNAL_ERROR: 'Đã xảy ra lỗi hệ thống',
 };
