@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import authService from '../../services/auth.service';
 import { resolveApiError } from '../../utils/apiMessage';
+import { staffDateOfBirthValidationKey, validateStaffDateOfBirth } from '../../utils/staffAgeValidation';
 
 const initialCreateForm = {
   fullName: '',
@@ -45,6 +46,7 @@ function AdminAccountsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('success');
+  const [createFieldErrors, setCreateFieldErrors] = useState({});
 
   const loadAccounts = async (page = 1) => {
     setLoading(true);
@@ -99,6 +101,19 @@ function AdminAccountsPage() {
     event.preventDefault();
     setSubmitting(true);
     setMessage('');
+    setCreateFieldErrors({});
+
+    const dobErrorKey = validateStaffDateOfBirth(createForm.dateOfBirth, {
+      role: createForm.role,
+      gender: createForm.gender,
+    });
+    if (dobErrorKey) {
+      setCreateFieldErrors({
+        dateOfBirth: staffDateOfBirthValidationKey(dobErrorKey, t),
+      });
+      setSubmitting(false);
+      return;
+    }
 
     try {
       const payload = {
@@ -293,8 +308,20 @@ function AdminAccountsPage() {
                   className="profile-form__input"
                   type="date"
                   value={createForm.dateOfBirth}
-                  onChange={(event) => setCreateForm((current) => ({ ...current, dateOfBirth: event.target.value }))}
+                  onChange={(event) => {
+                    setCreateForm((current) => ({ ...current, dateOfBirth: event.target.value }));
+                    if (createFieldErrors.dateOfBirth) {
+                      setCreateFieldErrors((current) => {
+                        const next = { ...current };
+                        delete next.dateOfBirth;
+                        return next;
+                      });
+                    }
+                  }}
                 />
+                {createFieldErrors.dateOfBirth && (
+                  <span style={{ color: '#dc2626', fontSize: '0.85rem' }}>{createFieldErrors.dateOfBirth}</span>
+                )}
               </label>
 
               <label className="profile-form__field">

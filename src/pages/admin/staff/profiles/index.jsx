@@ -20,6 +20,7 @@ import StaffBanModal from './StaffBanModal';
 import StaffCreateModal from './StaffCreateModal';
 import { staffToEditForm } from '../../../../utils/staffFormSnapshot';
 import { resolveApiError } from '../../../../utils/apiMessage';
+import { staffDateOfBirthValidationKey, validateStaffDateOfBirth } from '../../../../utils/staffAgeValidation';
 import './profiles.css';
 
 const emptyEditForm = {
@@ -153,6 +154,17 @@ export default function StaffManagementPage() {
 
   const handleSaveEdit = async () => {
     if (!editForm.fullName.trim()) { setEditError(t('admin.staff.profiles.fullNameRequired')); return; }
+
+    const effectiveRole = editForm.role !== editStaff.role ? editForm.role : editStaff.role;
+    const dobErrorKey = validateStaffDateOfBirth(editForm.dateOfBirth, {
+      role: effectiveRole,
+      gender: editForm.gender,
+    });
+    if (dobErrorKey) {
+      setEditError(staffDateOfBirthValidationKey(dobErrorKey, t));
+      return;
+    }
+
     try {
       const profileBody = {
         fullName: editForm.fullName,

@@ -167,6 +167,16 @@ export const apiErrorsEn = {
   RESIDENT_STATUS_INVALID: 'Invalid resident status',
   RESIDENT_BED_OCCUPIED: 'Bed is already occupied',
   RESIDENT_TRANSFER_INVALID: 'Cannot transfer resident',
+  RESIDENT_TRANSFER_NOT_ADMITTED: 'Only admitted residents can be transferred',
+  RESIDENT_TRANSFER_NO_ROOM: 'Resident is not currently assigned to a room/bed',
+  RESIDENT_TRANSFER_FLOOR_NOT_FOUND: 'Floor not found',
+  RESIDENT_TRANSFER_ROOM_NOT_FOUND: 'Target room not found',
+  RESIDENT_TRANSFER_ROOM_CLOSED: 'Target room is closed',
+  RESIDENT_TRANSFER_ROOM_FULL: 'Target room is full',
+  RESIDENT_TRANSFER_BED_NOT_FOUND: 'Target bed not found',
+  RESIDENT_TRANSFER_BED_MISMATCH: 'Target bed does not belong to the selected room',
+  RESIDENT_TRANSFER_BED_UNAVAILABLE: 'Target bed is not available',
+  RESIDENT_TRANSFER_SAME_BED: 'Resident is already on this bed',
 
   INTERNAL_ERROR: 'An internal error occurred',
 };

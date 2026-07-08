@@ -504,31 +504,25 @@ export default function ResidentsByAreaPage() {
               <th>{t('admin.residents.common.colCode')}</th>
               <th>{t('admin.residents.common.colFullName')}</th>
               <th>{t('admin.residents.byArea.colArea')}</th>
-              <th>{t('admin.residents.byArea.colAllergies')}</th>
               <th>{t('admin.residents.common.colStatus')}</th>
               <th>{t('admin.residents.common.colActions')}</th>
             </tr>
           </thead>
           <tbody>
             {listLoading && (
-              <tr><td colSpan={6} className="resident-page__empty">{t('common.loading')}</td></tr>
+              <tr><td colSpan={5} className="resident-page__empty">{t('common.loading')}</td></tr>
             )}
             {!listLoading && !buildingId && (
-              <tr><td colSpan={6} className="resident-page__empty">{t('admin.residents.common.selectBuildingToView')}</td></tr>
+              <tr><td colSpan={5} className="resident-page__empty">{t('admin.residents.common.selectBuildingToView')}</td></tr>
             )}
             {!listLoading && buildingId && residents.length === 0 && (
-              <tr><td colSpan={6} className="resident-page__empty">{t('admin.residents.common.noResidentsInArea')}</td></tr>
+              <tr><td colSpan={5} className="resident-page__empty">{t('admin.residents.common.noResidentsInArea')}</td></tr>
             )}
             {!listLoading && residents.map((r) => (
               <tr key={r._id} className="resident-page__table-row">
                 <td style={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>{r.residentCode}</td>
                 <td style={{ fontWeight: 600 }}>{r.fullName}</td>
                 <td>{formatResidentAreaLine(r, t) || '—'}</td>
-                <td>
-                  {r.hasDrugAllergiesRecord
-                    ? t('admin.residents.byArea.allergyRecorded', { count: r.drugAllergiesCount ?? pickDrugAllergiesList(r).length ?? 0 })
-                    : t('admin.residents.byArea.allergyNotRecorded')}
-                </td>
                 <td>
                   <span className={`residency-badge residency-badge--${r.residencyStatus || 'default'}`}>
                     {getResidencyLabel(t, r.residencyStatus)}
