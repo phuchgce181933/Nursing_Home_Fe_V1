@@ -31,6 +31,7 @@ export const roleSidebarData = {
     { title: 'sidebar.careTasks', icon: ClipboardList, path: '/doctor/care-tasks' },
     { title: 'sidebar.appointments', icon: Calendar, path: '/doctor/appointments' },
     { title: 'sidebar.healthMonitoring', icon: HeartPulse, path: '/doctor/health-monitoring' },
+    { title: 'sidebar.drugAllergies', icon: Pill, path: '/doctor/residents/drug-allergies' },
     { title: 'sidebar.medication', icon: Pill, path: '/doctor/medications' },
     { title: 'sidebar.admissionRequests', icon: ClipboardList, path: '/doctor/admission-requests' },
     { title: 'sidebar.servicePackages', icon: HeartPulse, path: '/doctor/service-packages' },

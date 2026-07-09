@@ -5,7 +5,7 @@ import { usePortalPrefix } from '../../../../hooks/usePortalPrefix';
 import facilityService from '../../../../services/facility.service';
 import residentService, { RESIDENT_TRANSFER_ROUTE_HINT } from '../../../../services/resident.service';
 import { formatStaffAreasSyncedSummary } from '../../../../utils/staffAreasSynced';
-import { resolveApiError } from '../../../../utils/apiMessage';
+import { resolveApiError, resolveApiSuccess } from '../../../../utils/apiMessage';
 import { FaEye, FaPen } from 'react-icons/fa';
 import AdminPageShell from '../../../../components/admin/AdminPageShell';
 import ListPagination from '../../../../components/ui/ListPagination';
@@ -45,10 +45,9 @@ const formatDateLocale = (value, language) => {
 
 const resolveTargetsInfo = (targetsData, t) => {
   if (!targetsData || (targetsData.targets || []).length > 0) return '';
-  if (targetsData.messageKey === 'RESIDENT_TRANSFER_NO_TARGETS') {
-    return t('admin.residents.transfer.noAvailableBeds');
-  }
-  return targetsData.message || t('admin.residents.transfer.noAvailableBeds');
+  const translated = resolveApiSuccess(targetsData, t, 'admin.residents.transfer.noAvailableBeds');
+  if (translated) return translated;
+  return t('admin.residents.transfer.noAvailableBeds');
 };
 
 function DetailRow({ label, value }) {
@@ -143,7 +142,7 @@ export default function TransferResidentPage() {
       setTotal(res.total ?? 0);
       setTotalPages(res.totalPages ?? 1);
     } catch (e) {
-      setListError(e.response?.data?.message || t('admin.residents.transfer.loadFailed'));
+      setListError(resolveApiError(e, t, 'admin.residents.transfer.loadFailed'));
       setResidents([]);
     } finally {
       if (!silent) setListLoading(false);
@@ -291,7 +290,7 @@ export default function TransferResidentPage() {
       const data = await residentService.getResidentDetail(resident._id);
       setViewDetail(data.resident);
     } catch (e) {
-      setViewError(e.response?.data?.message || e.message || t('admin.residents.transfer.loadDetailFailed'));
+      setViewError(resolveApiError(e, t, 'admin.residents.transfer.loadDetailFailed'));
     } finally {
       setViewLoading(false);
     }
@@ -347,7 +346,7 @@ export default function TransferResidentPage() {
         targetRoomId,
         targetBedId,
       });
-      setPanelMsg(res.message || t('admin.residents.transfer.transferSuccess'));
+      setPanelMsg(resolveApiSuccess(res, t, 'admin.residents.transfer.transferSuccess'));
 
       const synced = res.staffAreasSynced;
       const summary = formatStaffAreasSyncedSummary(synced, {
