@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Search, RefreshCw, Users, Phone } from 'lucide-react';
 import residentService from '../../../../services/resident.service';
 import { formatLeaveDate } from '../../../../utils/leaveUtils';
+import { resolveApiError } from '../../../../utils/apiMessage';
 import { FaEye } from 'react-icons/fa';
 import AdminPageShell from '../../../../components/admin/AdminPageShell';
 import ListPagination from '../../../../components/ui/ListPagination';
@@ -19,6 +20,20 @@ const emptyContact = () => ({
   address: '',
   isPrimary: false,
 });
+
+const contactIdentityKey = (contact) => {
+  const name = String(contact?.fullName || '').trim().toLowerCase();
+  const phone = String(contact?.phone || '').replace(/\D/g, '');
+  return `${name}|${phone}`;
+};
+
+const findDuplicateContact = (payload, existingContacts, excludeContactId) => {
+  const key = contactIdentityKey(payload);
+  return (existingContacts || []).find((c) => {
+    if (excludeContactId && c._id === excludeContactId) return false;
+    return contactIdentityKey(c) === key;
+  });
+};
 
 function formatRoom(room, t) {
   if (!room) return '—';
@@ -207,6 +222,19 @@ export default function FamilyManagementPage() {
   const handleSaveContact = async (payload) => {
     setContactSaving(true);
     setContactError('');
+    const excludeId =
+      contactModal?.mode === 'edit' && contactModal.contact?._id ? contactModal.contact._id : null;
+    const duplicate = findDuplicateContact(payload, contacts, excludeId);
+    if (duplicate) {
+      setContactError(
+        t('apiErrors.RESIDENT_EMERGENCY_CONTACT_DUPLICATE', {
+          fullName: payload.fullName,
+          phone: payload.phone,
+        })
+      );
+      setContactSaving(false);
+      return;
+    }
     try {
       if (contactModal?.mode === 'edit' && contactModal.contact?._id) {
         await residentService.updateEmergencyContact(
@@ -222,7 +250,7 @@ export default function FamilyManagementPage() {
       setContactModal(null);
       await refreshAfterContactChange();
     } catch (e) {
-      setContactError(e.response?.data?.message || t('admin.residents.common.saveFailed'));
+      setContactError(resolveApiError(e, t, 'admin.residents.common.saveFailed'));
     } finally {
       setContactSaving(false);
     }

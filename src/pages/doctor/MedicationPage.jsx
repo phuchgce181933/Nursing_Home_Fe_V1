@@ -176,7 +176,7 @@ function HealthWarningPanel({ residentId }) {
     <div className="med-health-panel">
       <div className="med-health-panel__title">{t('medication.healthProfile')}</div>
 
-      {/* Dị ứng thuốc — đỏ, ưu tiên cao nhất */}
+      {/* Dị ứng — đỏ, ưu tiên cao nhất */}
       {allergies.length > 0 && (
         <div className="med-health-section med-health-section--danger">
           <div className="med-health-section__head">

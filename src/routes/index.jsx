@@ -78,6 +78,7 @@ import MealIntakeNotesPage from '../pages/caregiver/meal-intake/MealIntakeNotesP
 import ActivitySchedulePage from '../pages/nurse/ActivitySchedulePage';
 
 import DoctorMedicationPage from '../pages/doctor/MedicationPage';
+import DoctorDrugAllergiesPage from '../pages/doctor/residents/drug-allergies';
 import FamilyDashboardPage from '../pages/family/FamilyDashboardPage';
 import SubmitAdmissionPage from '../pages/family/SubmitAdmissionPage';
 import AdmissionRequestsHistoryPage from '../pages/family/AdmissionRequestsHistoryPage';
@@ -207,6 +208,7 @@ function AppRoutes() {
         <Route path="appointments" element={<CareAppointmentsPage />} />
         <Route path="patients" element={<PlaceholderPage title="Danh sách bệnh nhân" />} />
         <Route path="health-monitoring" element={<HealthMonitoringPage />} />
+        <Route path="residents/drug-allergies" element={<DoctorDrugAllergiesPage />} />
         <Route path="medications" element={<DoctorMedicationPage />} />
         <Route path="care-notes" element={<CareNotesPage />} />
         <Route path="my-shifts" element={<MyShiftsPage />} />
