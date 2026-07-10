@@ -21,17 +21,27 @@ const emptyContact = () => ({
   isPrimary: false,
 });
 
-const contactIdentityKey = (contact) => {
-  const name = String(contact?.fullName || '').trim().toLowerCase();
-  const phone = String(contact?.phone || '').replace(/\D/g, '');
-  return `${name}|${phone}`;
+const contactPhoneKey = (contact) => String(contact?.phone || '').replace(/\D/g, '');
+
+const contactEmailKey = (contact) => {
+  const email = String(contact?.email || '').trim().toLowerCase();
+  return email || null;
 };
 
 const findDuplicateContact = (payload, existingContacts, excludeContactId) => {
-  const key = contactIdentityKey(payload);
+  const key = contactPhoneKey(payload);
   return (existingContacts || []).find((c) => {
     if (excludeContactId && c._id === excludeContactId) return false;
-    return contactIdentityKey(c) === key;
+    return contactPhoneKey(c) === key;
+  });
+};
+
+const findDuplicateContactByEmail = (payload, existingContacts, excludeContactId) => {
+  const key = contactEmailKey(payload);
+  if (!key) return null;
+  return (existingContacts || []).find((c) => {
+    if (excludeContactId && c._id === excludeContactId) return false;
+    return contactEmailKey(c) === key;
   });
 };
 
@@ -228,8 +238,19 @@ export default function FamilyManagementPage() {
     if (duplicate) {
       setContactError(
         t('apiErrors.RESIDENT_EMERGENCY_CONTACT_DUPLICATE', {
-          fullName: payload.fullName,
+          fullName: duplicate.fullName,
           phone: payload.phone,
+        })
+      );
+      setContactSaving(false);
+      return;
+    }
+    const duplicateEmail = findDuplicateContactByEmail(payload, contacts, excludeId);
+    if (duplicateEmail) {
+      setContactError(
+        t('apiErrors.RESIDENT_EMERGENCY_CONTACT_EMAIL_DUPLICATE', {
+          fullName: duplicateEmail.fullName,
+          email: payload.email,
         })
       );
       setContactSaving(false);

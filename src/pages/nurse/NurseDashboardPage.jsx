@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Users, Pill, ClipboardCheck, AlertTriangle,
-  Clock, Utensils, RefreshCw, Loader2,
+  Clock, RefreshCw, Loader2,
   ChevronRight, Calendar, TrendingUp,
   Activity, CheckCircle2, AlertCircle,
   Heart, Stethoscope,
@@ -15,7 +15,6 @@ import {
 import medicationService from '../../services/medication.service';
 import incidentService from '../../services/incident.service';
 import shiftService from '../../services/shift.service';
-import nutritionReportService from '../../services/nutritionReport.service';
 import careTaskService from '../../services/careTask.service';
 import useAuth from '../../hooks/useAuth';
 import '../../styles/nurse/NurseDashboardPage.css';
@@ -116,8 +115,9 @@ export default function NurseDashboardPage() {
   const [recentIncidents, setRecentIncidents] = useState([]);
   const [myShifts, setMyShifts] = useState([]);
   const [medStats, setMedStats] = useState(null);
-  const [nutritionSummary, setNutritionSummary] = useState(null);
   const [todayTasks, setTodayTasks] = useState([]);
+
+  const assignedResidentCount = user?.staffProfile?.assignedResidentIds?.length ?? 0;
 
   const fetchAll = async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -139,15 +139,13 @@ export default function NurseDashboardPage() {
       incidentService.listIncidents({ status: 'open', limit: 5 }),
       // My upcoming shifts — backend: data[]
       shiftService.getMyShifts({ fromDate: todayISO, toDate }),
-      // Nutrition summary — nurse-only, returns totalAdmittedResidents etc.
-      nutritionReportService.getSummary(),
       // Today's care tasks
       careTaskService.listCareTasks({ workDate: todayISO }),
       // Today's medication schedule
       medicationService.getDailySchedule({ date: todayISO }),
     ]);
 
-    const [allIncR, recentIncR, shiftsR, nutritionR, tasksR, medR] = results;
+    const [allIncR, recentIncR, shiftsR, tasksR, medR] = results;
 
     // incidents: backend returns { items: [...], total, page, limit, totalPages }
     if (allIncR.status === 'fulfilled') {
@@ -171,9 +169,6 @@ export default function NurseDashboardPage() {
       const arr = Array.isArray(d) ? d : (Array.isArray(d?.data) ? d.data : []);
       setMyShifts(arr);
     }
-
-    // nutritionSummary.totalAdmittedResidents — assigned residents for this nurse
-    if (nutritionR.status === 'fulfilled') setNutritionSummary(nutritionR.value);
 
     if (tasksR.status === 'fulfilled') {
       const d = tasksR.value;
@@ -312,8 +307,8 @@ export default function NurseDashboardPage() {
         <KpiCard
           icon={Users} color="#3b5bdb" bg="#eef2ff"
           label="Bệnh nhân phụ trách"
-          value={nutritionSummary?.totalAdmittedResidents ?? 0}
-          sub={`${nutritionSummary?.residentsWithMealPlan ?? 0} có kế hoạch dinh dưỡng`}
+          value={assignedResidentCount}
+          sub="Cư dân được phân công"
           onClick={() => navigate('/nurse/meal-plans')}
         />
         <KpiCard
@@ -345,13 +340,6 @@ export default function NurseDashboardPage() {
             ? `${todayShifts[0].shiftTemplate?.name || todayShifts[0].templateName || 'Ca làm việc'}`
             : 'Không có ca hôm nay'}
           onClick={() => navigate('/my-shifts')}
-        />
-        <KpiCard
-          icon={Utensils} color="#0891b2" bg="#e0f2fe"
-          label="Ghi chú bữa ăn"
-          value={nutritionSummary?.totalMealNotes ?? '—'}
-          sub={`${nutritionSummary?.residentsWithSpecialDiet ?? 0} bệnh nhân chế độ đặc biệt`}
-          onClick={() => navigate('/nurse/nutrition-reports')}
         />
       </div>
 
