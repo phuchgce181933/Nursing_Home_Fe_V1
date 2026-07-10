@@ -84,6 +84,8 @@ const parseFamilyIds = (value) => splitList(value).filter(Boolean);
 
 const buildContactsPayload = (contacts) => {
   const payload = [];
+  const seenPhones = new Map();
+  const seenEmails = new Map();
 
   for (const contact of contacts) {
     const fullName = String(contact.fullName || '').trim();
@@ -97,6 +99,20 @@ const buildContactsPayload = (contacts) => {
 
     if (!fullName || !relationship || !phone) {
       return { error: 'Mỗi liên hệ khẩn cấp phải có họ tên, quan hệ và số điện thoại.' };
+    }
+
+    const phoneKey = phone.replace(/\D/g, '');
+    if (seenPhones.has(phoneKey)) {
+      return { error: `Không thể có hai thân nhân cùng số điện thoại ${phone}.` };
+    }
+    seenPhones.set(phoneKey, fullName);
+
+    const emailKey = email.toLowerCase();
+    if (emailKey) {
+      if (seenEmails.has(emailKey)) {
+        return { error: `Không thể có hai thân nhân cùng email ${email}.` };
+      }
+      seenEmails.set(emailKey, fullName);
     }
 
     payload.push({
