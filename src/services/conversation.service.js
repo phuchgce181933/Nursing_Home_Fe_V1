@@ -1,13 +1,8 @@
 import axiosClient from '../api/axiosClient';
 
-const resolvePrefix = () => {
-  const seg = (window.location.pathname || '').split('/').filter(Boolean)[0] || '';
-  return seg ? `/${seg}` : '';
-};
-
-const base = () => `${resolvePrefix()}/conversations`;
+const base = () => '/conversations';
 // public guest endpoints are mounted under /api/family/conversations (no auth needed)
-const publicGuestBase = () => `/family/conversations`;
+const publicGuestBase = () => '/family/conversations';
 
 const createConversation = async (payload) => {
   const response = await axiosClient.post(`${base()}`, payload);

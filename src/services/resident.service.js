@@ -8,7 +8,7 @@ const createResident = async (body) => {
 };
 
 const getResidentList = async (params = {}) => {
-  const response = await axiosClient.get('/admin/residents', { params });
+  const response = await axiosClient.get('/residents', { params });
   return response.data;
 };
 

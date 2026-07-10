@@ -264,6 +264,8 @@ function AppRoutes() {
         <Route path="hygiene-activities" element={<HygieneActivitiesPage />} />
         <Route path="daily-behaviors" element={<DailyBehaviorsPage />} />
         <Route path="diet-plans" element={<DietPlansPage />} />
+        <Route path="rehabilitation-schedule" element={<RehabilitationSchedulePage />} />
+        <Route path="incidents" element={<IncidentManagementPage />} />
       </Route>
 
       <Route
