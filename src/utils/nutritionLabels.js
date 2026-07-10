@@ -9,6 +9,12 @@ function resolveLocale(language) {
   return lang?.startsWith('vi') ? 'vi-VN' : 'en-US';
 }
 
+export const careStageLabel = (v, t) => {
+  const tt = resolveT(t);
+  if (!v) return '—';
+  return tt(`common.careStage.${v}`, { defaultValue: v });
+};
+
 export const mealTypeLabel = (v, t) => {
   const tt = resolveT(t);
   if (!v) return '—';

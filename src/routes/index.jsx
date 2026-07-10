@@ -64,7 +64,6 @@ import NurseProfile from '../pages/nurse/NurseProfile';
 import MedicationPage from '../pages/nurse/MedicationPage';
 
 import MealPlansPage from '../pages/nurse/MealPlansPage';
-import NutritionReportsPage from '../pages/nurse/NutritionReportsPage';
 import CaregiverDashboardPage from '../pages/caregiver/CaregiverDashboardPage';
 import CaregiverProfile from '../pages/caregiver/CaregiverProfile';
 import AssignedResidentsPage from '../pages/caregiver/AssignedResidentsPage';
@@ -72,12 +71,12 @@ import DailyCareSchedulePage from '../pages/caregiver/daily-care-schedule/DailyC
 import HygieneActivitiesPage from '../pages/caregiver/hygiene-activities/HygieneActivitiesPage';
 import DailyBehaviorsPage from '../pages/caregiver/daily-behaviors/DailyBehaviorsPage';
 import DietPlansPage from '../pages/caregiver/diet-plans/DietPlansPage';
-import RehabilitationSchedulePage from '../pages/caregiver/rehabilitation-schedule/RehabilitationSchedulePage';
 import MealIntakeNotesPage from '../pages/caregiver/meal-intake/MealIntakeNotesPage';
 
 import ActivitySchedulePage from '../pages/nurse/ActivitySchedulePage';
 
 import DoctorMedicationPage from '../pages/doctor/MedicationPage';
+import DoctorDrugAllergiesPage from '../pages/doctor/residents/drug-allergies';
 import FamilyDashboardPage from '../pages/family/FamilyDashboardPage';
 import SubmitAdmissionPage from '../pages/family/SubmitAdmissionPage';
 import AdmissionRequestsHistoryPage from '../pages/family/AdmissionRequestsHistoryPage';
@@ -207,6 +206,7 @@ function AppRoutes() {
         <Route path="appointments" element={<CareAppointmentsPage />} />
         <Route path="patients" element={<PlaceholderPage title="Danh sách bệnh nhân" />} />
         <Route path="health-monitoring" element={<HealthMonitoringPage />} />
+        <Route path="residents/drug-allergies" element={<DoctorDrugAllergiesPage />} />
         <Route path="medications" element={<DoctorMedicationPage />} />
         <Route path="care-notes" element={<CareNotesPage />} />
         <Route path="my-shifts" element={<MyShiftsPage />} />
@@ -231,7 +231,6 @@ function AppRoutes() {
         <Route path="service-packages" element={<ServicePackagesPage />} />
 
         <Route path="meal-plans" element={<MealPlansPage />} />
-        <Route path="nutrition-reports" element={<NutritionReportsPage />} />
 
         <Route path="health-monitoring" element={<HealthMonitoringPage />} />
         <Route path="care-notes" element={<CareNotesPage />} />
