@@ -73,6 +73,69 @@
   color: #b91c1c;
 }
 
+.assigned-residents-page__activity-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.assigned-residents-page__activity-pill {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.assigned-residents-page__activity-empty {
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+.assigned-residents-page__secondary-button {
+  width: fit-content;
+}
+
+.assigned-residents-page__row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.assigned-residents-page__activity-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.assigned-residents-page__activity-item {
+  padding: 10px 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+
+.assigned-residents-page__activity-title {
+  font-weight: 600;
+  color: #0f172a;
+  margin-bottom: 4px;
+}
+
+.assigned-residents-page__activity-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  color: #475569;
+  font-size: 0.9rem;
+}
+
 .assigned-residents-page__modal-overlay {
   position: fixed;
   inset: 0;
@@ -92,6 +155,10 @@
   border-radius: 20px;
   border: 1px solid #dbe3ee;
   box-shadow: 0 26px 52px rgba(15, 23, 42, 0.28);
+}
+
+.assigned-residents-page__modal--wide {
+  width: min(640px, 100%);
 }
 
 .assigned-residents-page__modal-header {
@@ -152,6 +219,12 @@
 
 .assigned-residents-page__meta-block strong {
   color: #1e293b;
+}
+
+.assigned-residents-page__modal-subtitle {
+  margin: 0 0 12px;
+  color: #475569;
+  font-size: 0.95rem;
 }
 
 @media (max-width: 768px) {

@@ -809,6 +809,13 @@ const resources = {
           mealIntakeLink: "Meal intake notes",
           allergiesDrug: "Drugs",
           allergiesOther: "Other",
+          activityScheduleLabel: "Activity schedule",
+          activityBadge: "Has {{count}} scheduled",
+          viewActivitySchedule: "View schedule",
+          noScheduledActivities: "No scheduled activities",
+          activityModalTitle: "Upcoming activities",
+          activityModalSubtitle: "Scheduled activities for {{name}}",
+          activityDefault: "Activity",
           loadFailed: "Failed to load resident list",
           detailLoadFailed: "Failed to load resident details"
         },
@@ -2751,6 +2758,8 @@ const resources = {
         subtitle: "Track, report, and resolve incidents related to residents and staff.",
         exportCsv: "Export CSV",
         createIncident: "Report Incident",
+        assignHandlers: "Assign Handlers",
+        noStaff: "No staff available.",
         stat: {
           total: "Total Incidents",
           open: "Open",
@@ -2775,6 +2784,7 @@ const resources = {
           location: "Location",
           resident: "Related Resident",
           noResident: "-- No related resident --",
+          noResidents: "No residents found.",
           assignedStaff: "Assigned Staff",
           description: "Incident Description",
           cancel: "Cancel",
@@ -2800,12 +2810,15 @@ const resources = {
           loadOptionsFailed: "Failed to load options",
           createFailed: "Failed to report incident",
           updateStatusFailed: "Failed to update status",
-          exportFailed: "Failed to export CSV"
+          exportFailed: "Failed to export CSV",
+          selectHandlers: "Please select at least one handler.",
+          assignHandlersFailed: "Failed to assign handlers"
         },
         success: {
           created: "Incident reported successfully",
           statusUpdated: "Status updated successfully",
-          exportStarted: "CSV export started"
+          exportStarted: "CSV export started",
+          handlersAssigned: "Handlers assigned successfully"
         }
       },
       healthMonitoring: {
@@ -4226,6 +4239,13 @@ const resources = {
           mealIntakeLink: "Ghi nhận bữa ăn",
           allergiesDrug: "Thuốc",
           allergiesOther: "Khác",
+          activityScheduleLabel: "Lịch hoạt động",
+          activityBadge: "Có {{count}} lịch",
+          viewActivitySchedule: "Xem lịch",
+          noScheduledActivities: "Không có lịch hoạt động",
+          activityModalTitle: "Lịch hoạt động sắp tới",
+          activityModalSubtitle: "Lịch hoạt động của {{name}}",
+          activityDefault: "Hoạt động",
           loadFailed: "Không tải được danh sách cư dân",
           detailLoadFailed: "Không tải được thông tin cư dân"
         },
@@ -6123,6 +6143,8 @@ const resources = {
         subtitle: "Theo dõi, báo cáo và giải quyết các sự cố liên quan đến cư dân và nhân viên.",
         exportCsv: "Xuất CSV",
         createIncident: "Khai báo sự cố",
+        assignHandlers: "Chỉ định người xử lý",
+        noStaff: "Không có nhân viên phù hợp.",
         stat: {
           total: "Tổng sự cố",
           open: "Chưa xử lý",
@@ -6147,7 +6169,13 @@ const resources = {
           location: "Địa điểm",
           resident: "Cư dân liên quan",
           noResident: "-- Không có cư dân liên quan --",
+          noResidents: "Không có cư dân nào.",
           assignedStaff: "Nhân viên xử lý",
+          searchStaff: "Tìm nhân viên",
+          filterResidentAreaAll: "Tất cả khu vực cư dân",
+          searchResident: "Tìm cư dân",
+          filterAreaAll: "Tất cả khu vực",
+          noStaff: "Không có nhân viên phù hợp",
           description: "Mô tả sự cố",
           cancel: "Hủy bỏ",
           saving: "Đang lưu..."
@@ -6167,17 +6195,26 @@ const resources = {
         unnamedResident: "Cư dân chưa đặt tên",
         unnamedStaff: "Nhân viên chưa đặt tên",
         loadingPage: "Đang tải trang sự cố...",
+        viewDetail: "Xem chi tiết",
+        reporter: "Người báo cáo",
+        reporterRole: "Vai trò người báo cáo",
+        detail: {
+          title: "Chi tiết sự cố"
+        },
         error: {
           loadFailed: "Không tải được danh sách sự cố",
           loadOptionsFailed: "Không tải được danh sách tùy chọn",
           createFailed: "Không thể tạo sự cố",
           updateStatusFailed: "Không thể cập nhật trạng thái",
-          exportFailed: "Không thể xuất CSV"
+          exportFailed: "Không thể xuất CSV",
+          selectHandlers: "Vui lòng chọn ít nhất một người xử lý.",
+          assignHandlersFailed: "Không thể chỉ định người xử lý"
         },
         success: {
           created: "Báo cáo sự cố thành công",
           statusUpdated: "Cập nhật trạng thái thành công",
-          exportStarted: "Bắt đầu xuất dữ liệu"
+          exportStarted: "Bắt đầu xuất dữ liệu",
+          handlersAssigned: "Chỉ định người xử lý thành công"
         }
       },
       healthMonitoring: {

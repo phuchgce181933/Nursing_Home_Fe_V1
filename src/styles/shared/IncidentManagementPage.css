@@ -358,17 +358,20 @@
 }
 .ic-drawer {
   position: fixed;
-  top: 0;
-  right: 0;
-  width: 520px;
-  max-width: 92vw;
-  height: 100vh;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(760px, calc(100vw - 48px));
+  max-width: 760px;
+  max-height: calc(100vh - 48px);
   background: #fff;
   z-index: 1001;
   display: flex;
   flex-direction: column;
   animation: ic-drawerSlide 0.3s cubic-bezier(0.22, 0.61, 0.36, 1);
-  box-shadow: -8px 0 30px rgba(0,0,0,0.12);
+  box-shadow: 0 20px 48px rgba(0,0,0,0.14);
+  border-radius: 20px;
+  overflow: hidden;
 }
 .ic-drawer__header {
   display: flex;
@@ -438,13 +441,80 @@
 }
 .ic-field__input:focus,
 .ic-field__select:focus,
-.ic-field__textarea:focus {
+.ic-field__textarea:focus,
+.ic-multi-select-search:focus {
   border-color: #3b5bdb;
   box-shadow: 0 0 0 3px rgba(59,91,219,0.12);
 }
 .ic-field__textarea {
   resize: vertical;
   min-height: 100px;
+}
+
+.ic-field--multi-select {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ic-multi-select-filters {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+.ic-multi-select-search {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  font-family: inherit;
+  outline: none;
+  background: #fff;
+}
+.ic-multi-select-list {
+  max-height: 240px;
+  min-height: 120px;
+  overflow-y: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #f8fafc;
+  padding: 8px;
+}
+.ic-multi-select-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  color: #1e293b;
+}
+.ic-multi-select-item:hover {
+  background: rgba(59,91,219,0.08);
+}
+.ic-multi-select-item input {
+  margin-top: 4px;
+  width: 18px;
+  height: 18px;
+  accent-color: #3b5bdb;
+}
+.ic-multi-select-item__label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.95rem;
+  line-height: 1.3;
+  white-space: normal;
+}
+.ic-multi-select-item__name {
+  font-weight: 600;
+}
+.ic-multi-select-empty {
+  padding: 18px;
+  text-align: center;
+  color: #64748b;
+  font-size: 0.9rem;
 }
 
 /* ── Empty state ────────────────────────────────────────────── */

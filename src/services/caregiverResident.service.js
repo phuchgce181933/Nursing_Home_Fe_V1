@@ -12,9 +12,17 @@ const listResidents = (params = {}) =>
 
 const getResident = (id) => axiosClient.get(`${BASE}/${id}`).then(unwrap);
 
+const listResidentActivities = (params = {}) =>
+  axiosClient.get(`${BASE}/activities`, { params }).then((r) => ({
+    data: r.data?.data ?? [],
+    total: r.data?.total ?? 0,
+    message: r.data?.message,
+  }));
+
 const caregiverResidentService = {
   listResidents,
   getResident,
+  listResidentActivities,
 };
 
 export default caregiverResidentService;

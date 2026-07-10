@@ -96,6 +96,11 @@ export const roleSidebarData = {
       icon: Brain,
       path: '/caregiver/daily-behaviors',
     },
+    {
+      title: 'sidebar.incidents',
+      icon: FileText,
+      path: '/caregiver/incidents',
+    },
   ],
   nurse: [
     { title: 'sidebar.nurseDashboard', icon: LayoutDashboard, path: '/nurse/dashboard' },
