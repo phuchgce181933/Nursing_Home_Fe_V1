@@ -126,6 +126,11 @@ const formatAdmissionReason = (reason) => {
   return reason;
 };
 
+const cleanCancellationReason = (reason) => {
+  if (!reason) return '';
+  return reason.replace(/^\[Admin rejected\]\s*/i, '').replace(/^\[Doctor evaluation\]\s*/i, '');
+};
+
 const getCalendarDay = (dateStr) => {
   if (!dateStr) return '';
   try {
@@ -1160,7 +1165,7 @@ export default function AdmissionDetailDrawer({
                         Ngày hủy: {formatEnglishDate(admission.cancelledAt || admission.updatedAt)}
                       </p>
                       <p className="arh-timeline__desc">
-                        "Lý do: {admission.cancellationReason || admission.rejectionReason || 'Hủy theo yêu cầu'}"
+                        "Lý do: {cleanCancellationReason(admission.cancellationReason || admission.rejectionReason || 'Hủy theo yêu cầu')}"
                       </p>
                     </div>
                   )}
@@ -1209,7 +1214,12 @@ export default function AdmissionDetailDrawer({
                   <img
                     alt="Ảnh người yêu cầu"
                     className="arh-detail-card__avatar"
-                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuCJXACrUfkBY9FzZgqaYWlbX2_62AvB8l3uq1FtPvHQLPXjrGi_pCx100ZMjqgFsjpLnyALy7cQ5HakNfzB6W_5g45qDwYQEw1vHmVH5smWEcdKtoEiRARx_wst369IQZWNEsbxfaQiR7N8bZ8CdZpY4zVsLhpqnZGHYN0qm0QbBarwa-WWJ7keBArDnMmO3hrwY_wqVVkmiqKVtfEhifVie9Jn2HWA4tbPhuGX_x4lUz6m_HgraTM9IbraKGLNxKx4xcqhALN9SqZE"
+                    src={admission.familyAccount?.avatarUrl || `data:image/svg+xml;utf8,${encodeURIComponent(`
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%2394a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                        <circle cx="12" cy="7" r="4" />
+                      </svg>
+                    `)}`}
                   />
                   <div className="arh-detail-card__info">
                     <h4 className="arh-detail-card__name">

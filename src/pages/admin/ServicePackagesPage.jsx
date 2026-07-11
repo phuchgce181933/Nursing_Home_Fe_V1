@@ -733,9 +733,9 @@ export default function ServicePackagesPage() {
       {showCreateModal && (
         <div className="arh-modal-backdrop" onClick={() => setShowCreateModal(false)}>
           <div className="arh-modal" style={{ maxWidth: '600px' }} onClick={(e) => e.stopPropagation()}>
-            <h4 className="arh-modal__title">Create Care Plan Package</h4>
+            <h4 className="arh-modal__title">Tạo Gói Dịch Vụ Chăm Sóc Mới</h4>
             <p className="arh-modal__text">
-              Create a new specialized healthcare service package for active admissions.
+              Lập một gói dịch vụ chăm sóc y tế chuyên biệt mới để áp dụng khi cư dân nhập viện.
             </p>
 
             <form onSubmit={handleCreatePackage}>
@@ -747,13 +747,13 @@ export default function ServicePackagesPage() {
 
               <div className="mb-3">
                 <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
-                  Package Name *
+                  Tên Gói Dịch Vụ *
                 </label>
                 <input
                   type="text"
                   className="adm-filter-input"
                   style={{ paddingLeft: '14px' }}
-                  placeholder="e.g. Standard Clinical Care Plan"
+                  placeholder="Ví dụ: Gói chăm sóc phục hồi chức năng tiêu chuẩn"
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
                   required
@@ -763,22 +763,22 @@ export default function ServicePackagesPage() {
               <div className="grid grid-cols-2 gap-3 mb-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
-                    Tier Level
+                    Cấp Độ Gói
                   </label>
                   <select
                     className="adm-filter-select"
                     value={formTier}
                     onChange={(e) => setFormTier(e.target.value)}
                   >
-                    <option value="basic">Basic Level</option>
-                    <option value="standard">Standard Level</option>
-                    <option value="premium">Premium Level</option>
-                    <option value="vip">VIP Level</option>
+                    <option value="basic">Cơ bản</option>
+                    <option value="standard">Tiêu chuẩn</option>
+                    <option value="premium">Cao cấp</option>
+                    <option value="vip">VIP</option>
                   </select>
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
-                    Price / Month (VND)
+                    Đơn Giá / Tháng (VND)
                   </label>
                   <input
                     type="number"
@@ -792,12 +792,12 @@ export default function ServicePackagesPage() {
 
               <div className="mb-3">
                 <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
-                  Description
+                  Mô Tả Chi Tiết
                 </label>
                 <textarea
                   className="arh-modal__textarea"
                   style={{ minHeight: '60px' }}
-                  placeholder="Summarize care features, target health requirements..."
+                  placeholder="Tóm tắt các đặc điểm chăm sóc nổi bật, đối tượng sức khỏe phù hợp..."
                   value={formDescription}
                   onChange={(e) => setFormDescription(e.target.value)}
                 />
@@ -805,12 +805,12 @@ export default function ServicePackagesPage() {
 
               <div className="mb-5">
                 <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
-                  Included Services (One per line)
+                  Dịch Vụ Đi Kèm (Mỗi dòng một dịch vụ)
                 </label>
                 <textarea
                   className="arh-modal__textarea"
                   style={{ minHeight: '120px', fontFamily: 'monospace' }}
-                  placeholder="e.g.&#10;Specialized Geriatric Assessment&#10;Geriatric Nurse Support 24/7&#10;Clinical Medication Administration"
+                  placeholder="Ví dụ:&#10;Đánh giá y tế chuyên sâu định kỳ&#10;Điều dưỡng trực hỗ trợ 24/7&#10;Quản lý cấp phát thuốc lâm sàng"
                   value={formServices}
                   onChange={(e) => setFormServices(e.target.value)}
                 />
@@ -827,7 +827,7 @@ export default function ServicePackagesPage() {
                   }}
                   disabled={submitting}
                 >
-                  Cancel
+                  Hủy bỏ
                 </button>
                 <button
                   type="submit"
@@ -836,7 +836,7 @@ export default function ServicePackagesPage() {
                   disabled={submitting}
                 >
                   {submitting && <Loader2 className="animate-spin mr-1" size={13} />}
-                  Create Plan
+                  Tạo Gói Dịch Vụ
                 </button>
               </div>
             </form>

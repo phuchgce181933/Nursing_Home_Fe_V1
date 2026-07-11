@@ -325,6 +325,12 @@ export default function CareAppointmentsPage() {
     if (e) e.preventDefault();
     if (!selectedAppt) return;
     
+    if (!selectedDocId || !selectedNurId) {
+      setAssignmentError("Yêu cầu chỉ định bắt buộc phải đủ cả bác sĩ và y tá.");
+      showToast("Yêu cầu chỉ định bắt buộc phải đủ cả bác sĩ và y tá.", 'error');
+      return;
+    }
+
     setSavingAssignment(true);
     setAssignmentError(null);
 
@@ -470,6 +476,19 @@ export default function CareAppointmentsPage() {
 
   // Open Status modal (for medical staff) or launch Clinical Wizard if clinical exam
   const handleOpenStatus = async (appt) => {
+    if (appt.status !== 'completed') {
+      const apptDate = new Date(appt.scheduledStartAt);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const apptDateOnly = new Date(apptDate);
+      apptDateOnly.setHours(0, 0, 0, 0);
+
+      if (apptDateOnly > today) {
+        showToast('Chưa tới ngày hẹn khám, không thể thực hiện khám!', 'error');
+        return;
+      }
+    }
+
     setSelectedAppt(appt);
     const allowedNext = STATUS_TRANSITIONS[appt.status] || [];
     setTargetApptStatus(allowedNext[0] || '');
@@ -559,10 +578,64 @@ export default function CareAppointmentsPage() {
     }
   };
 
+  const validateStep2 = () => {
+    const { heightCm, weightKg, temperatureCelsius, bloodPressureSystolic, bloodPressureDiastolic, pulse, oxygenSaturation, bloodSugar } = wizardValues;
+
+    if (!heightCm) return 'Chiều cao là bắt buộc.';
+    const h = parseFloat(heightCm);
+    if (isNaN(h) || h <= 0 || h > 300) return 'Chiều cao phải là số dương hợp lệ.';
+
+    if (!weightKg) return 'Cân nặng là bắt buộc.';
+    const w = parseFloat(weightKg);
+    if (isNaN(w) || w <= 0 || w > 500) return 'Cân nặng phải là số dương hợp lệ.';
+
+    if (!temperatureCelsius) return 'Nhiệt độ cơ thể là bắt buộc.';
+    const t = parseFloat(temperatureCelsius);
+    if (isNaN(t) || t < 30 || t > 45) return 'Nhiệt độ cơ thể phải nằm trong khoảng 30°C đến 45°C.';
+
+    if (bloodPressureSystolic || bloodPressureDiastolic) {
+      if (!bloodPressureSystolic || !bloodPressureDiastolic) {
+        return 'Vui lòng nhập đầy đủ cả chỉ số huyết áp tối đa (Systolic) và tối thiểu (Diastolic).';
+      }
+      const sys = parseInt(bloodPressureSystolic, 10);
+      const dia = parseInt(bloodPressureDiastolic, 10);
+      if (isNaN(sys) || sys <= 0 || sys > 300 || isNaN(dia) || dia <= 0 || dia > 300) {
+        return 'Chỉ số huyết áp phải là số dương hợp lệ.';
+      }
+      if (sys <= dia) {
+        return 'Huyết áp tối đa phải lớn hơn huyết áp tối thiểu.';
+      }
+    }
+
+    if (pulse) {
+      const p = parseInt(pulse, 10);
+      if (isNaN(p) || p <= 0 || p > 300) return 'Nhịp tim phải là số dương hợp lệ.';
+    }
+
+    if (oxygenSaturation) {
+      const spo2 = parseInt(oxygenSaturation, 10);
+      if (isNaN(spo2) || spo2 < 0 || spo2 > 100) return 'Chỉ số SpO₂ phải từ 0% đến 100%.';
+    }
+
+    if (bloodSugar) {
+      const bs = parseFloat(bloodSugar);
+      if (isNaN(bs) || bs <= 0 || bs > 1000) return 'Chỉ số đường huyết phải là số dương hợp lệ.';
+    }
+
+    return null;
+  };
+
   // Handle clinical wizard form submission (vital signs + consultation + eligibility assessment)
   const handleWizardSubmit = async (e) => {
     if (e) e.preventDefault();
     if (!selectedAppt) return;
+
+    const valErr = validateStep2();
+    if (valErr) {
+      setStatusError(valErr);
+      setWizardStep(2);
+      return;
+    }
 
     setUpdatingStatus(true);
     setStatusError(null);
@@ -1112,23 +1185,24 @@ export default function CareAppointmentsPage() {
             )}
 
             <form onSubmit={handleSaveAppointment}>
-              <div className="cap-form-group">
-                <label className="cap-form-label">{t('careAppointments.chooseResidentLabel')}</label>
-                <select
-                  className="cap-filter-select"
-                  value={formValues.residentId}
-                  onChange={(e) => setFormValues(prev => ({ ...prev, residentId: e.target.value }))}
-                  required
-                  disabled={isEditMode}
-                >
-                  <option value="">{t('careAppointments.chooseResidentPlaceholder')}</option>
-                  {residentsList.map((res) => (
-                    <option key={res._id} value={res._id}>
-                      {res.fullName} (#{res.residentCode})
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {!isEditMode && (
+                <div className="cap-form-group">
+                  <label className="cap-form-label">{t('careAppointments.chooseResidentLabel')}</label>
+                  <select
+                    className="cap-filter-select"
+                    value={formValues.residentId}
+                    onChange={(e) => setFormValues(prev => ({ ...prev, residentId: e.target.value }))}
+                    required
+                  >
+                    <option value="">{t('careAppointments.chooseResidentPlaceholder')}</option>
+                    {residentsList.map((res) => (
+                      <option key={res._id} value={res._id}>
+                        {res.fullName} (#{res.residentCode})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div className="cap-form-group">
                 <label className="cap-form-label">{t('careAppointments.appointmentTypeLabel')}</label>
@@ -1548,7 +1622,19 @@ export default function CareAppointmentsPage() {
                     <button type="button" className="cap-modal-btn-cancel" onClick={() => setWizardStep(1)}>
                       Quay lại
                     </button>
-                    <button type="button" className="cap-modal-btn-submit" onClick={() => setWizardStep(3)}>
+                    <button
+                      type="button"
+                      className="cap-modal-btn-submit"
+                      onClick={() => {
+                        const err = validateStep2();
+                        if (err) {
+                          setStatusError(err);
+                        } else {
+                          setStatusError(null);
+                          setWizardStep(3);
+                        }
+                      }}
+                    >
                       Tiếp tục: Đánh giá nhập viện
                     </button>
                   </div>
