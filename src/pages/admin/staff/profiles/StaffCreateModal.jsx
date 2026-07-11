@@ -4,8 +4,9 @@ import { Eye, EyeOff } from 'lucide-react';
 import { ALL_STAFF_ROLE_OPTIONS } from '../../../../constants/rolePolicy';
 import { staffDateOfBirthValidationKey, validateStaffDateOfBirth } from '../../../../utils/staffAgeValidation';
 
+import { validatePhoneFormat } from '../../../../utils/phoneValidation';
+
 // Mirror backend validators
-const PHONE_REGEX = /^(\+84|0)[0-9]{8,10}$/;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,30}$/;
 
@@ -27,7 +28,7 @@ const validate = (form, t) => {
 
   if (!form.role) errs.role = v('roleRequired');
 
-  if (form.phone && !PHONE_REGEX.test(form.phone.trim())) {
+  if (validatePhoneFormat(form.phone)) {
     errs.phone = v('phoneInvalid');
   }
 
