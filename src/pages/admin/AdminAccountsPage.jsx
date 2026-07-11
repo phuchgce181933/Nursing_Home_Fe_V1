@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import authService from '../../services/auth.service';
 import { resolveApiError } from '../../utils/apiMessage';
 import { staffDateOfBirthValidationKey, validateStaffDateOfBirth } from '../../utils/staffAgeValidation';
+import { validatePhoneFormat } from '../../utils/phoneValidation';
 
 const initialCreateForm = {
   fullName: '',
@@ -115,6 +116,14 @@ function AdminAccountsPage() {
       return;
     }
 
+    if (validatePhoneFormat(createForm.phone)) {
+      setCreateFieldErrors({
+        phone: t('admin.staff.profiles.validation.phoneInvalid'),
+      });
+      setSubmitting(false);
+      return;
+    }
+
     try {
       const payload = {
         ...createForm,
@@ -153,6 +162,12 @@ function AdminAccountsPage() {
   const handleEditSubmit = async (event) => {
     event.preventDefault();
     if (!editUser) return;
+
+    if (validatePhoneFormat(editForm.phone)) {
+      setMessageType('error');
+      setMessage(t('admin.staff.profiles.validation.phoneInvalid'));
+      return;
+    }
 
     setSubmitting(true);
     setMessage('');
@@ -284,8 +299,20 @@ function AdminAccountsPage() {
                 <input
                   className="profile-form__input"
                   value={createForm.phone}
-                  onChange={(event) => setCreateForm((current) => ({ ...current, phone: event.target.value }))}
+                  onChange={(event) => {
+                    setCreateForm((current) => ({ ...current, phone: event.target.value }));
+                    if (createFieldErrors.phone) {
+                      setCreateFieldErrors((current) => {
+                        const next = { ...current };
+                        delete next.phone;
+                        return next;
+                      });
+                    }
+                  }}
                 />
+                {createFieldErrors.phone && (
+                  <span style={{ color: '#dc2626', fontSize: '0.85rem' }}>{createFieldErrors.phone}</span>
+                )}
               </label>
 
               <label className="profile-form__field">
