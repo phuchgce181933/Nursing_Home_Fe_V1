@@ -765,8 +765,12 @@ export default function HealthMonitoringPage() {
   // ── Biểu đồ ──
   const [chartMetric, setChartMetric] = useState('bloodPressureSystolic');
 
-  // ── Tab ──
   const [activeTab, setActiveTab] = useState('history');
+
+  useEffect(() => {
+    setFormError(null);
+    setFormSuccess(false);
+  }, [activeTab]);
 
   // ── Stats tổng hợp ──
   const stats = useMemo(() => {

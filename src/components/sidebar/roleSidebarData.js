@@ -19,6 +19,7 @@ import {
   Droplets,
   Brain,
   Apple,
+  Dumbbell,
 } from 'lucide-react';
 
 export const roleSidebarData = {
@@ -78,6 +79,11 @@ export const roleSidebarData = {
       title: 'sidebar.dietPlans',
       icon: Apple,
       path: '/caregiver/diet-plans',
+    },
+    {
+      title: 'sidebar.rehabSchedule',
+      icon: Dumbbell,
+      path: '/caregiver/rehabilitation-schedule',
     },
     {
       title: 'sidebar.hygieneActivities',

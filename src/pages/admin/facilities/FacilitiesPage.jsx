@@ -2421,11 +2421,12 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                 <div className="fac-form-group">
                   <label>{t('facilities.fieldRoomNumber')}</label>
                   <input
-                    type="text"
+                    type="number"
                     className="fac-form-control"
                     placeholder={t('facilities.placeholderRoomNumber')}
                     value={formRoomNumber}
                     onChange={(e) => setFormRoomNumber(e.target.value)}
+                    min="1"
                     required
                   />
                 </div>
@@ -2499,10 +2500,11 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                 <div className="fac-form-group">
                   <label>{t('facilities.fieldRoomNumber')}</label>
                   <input
-                    type="text"
+                    type="number"
                     className="fac-form-control"
                     value={formRoomNumber}
                     onChange={(e) => setFormRoomNumber(e.target.value)}
+                    min="1"
                     required
                   />
                 </div>

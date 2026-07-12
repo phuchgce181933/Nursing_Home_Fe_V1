@@ -128,7 +128,11 @@ const formatAdmissionReason = (reason) => {
 
 const cleanCancellationReason = (reason) => {
   if (!reason) return '';
-  return reason.replace(/^\[Admin rejected\]\s*/i, '').replace(/^\[Doctor evaluation\]\s*/i, '');
+  return reason
+    .replace(/^\[Admin reject(?:ed)?\]\s*/i, '')
+    .replace(/^\[Doctor evaluation\]\s*/i, '')
+    .replace(/^\[Cancelled by admin\]\s*/i, '')
+    .trim();
 };
 
 const getCalendarDay = (dateStr) => {
@@ -1225,9 +1229,11 @@ export default function AdmissionDetailDrawer({
                     <h4 className="arh-detail-card__name">
                       {admission.familyAccount?.fullName || admission.requestedByName || 'Người thân'}
                     </h4>
-                    <p className="arh-detail-item__value" style={{ marginTop: '4px', fontSize: '12.5px', color: '#475569', fontWeight: '500' }}>
-                      {formatRelationship(admission.applicant?.relationshipToRequester)} • {admission.requestedByPhone || admission.familyAccount?.phone || 'N/A'}
-                    </p>
+                    <div style={{ marginTop: '6px', fontSize: '12.5px', color: '#475569', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                      <div><strong>Quan hệ:</strong> {formatRelationship(admission.applicant?.relationshipToRequester)}</div>
+                      <div><strong>SĐT liên hệ (trong đơn):</strong> {admission.requestedByPhone || 'N/A'}</div>
+                      <div><strong>SĐT tài khoản gia đình:</strong> {admission.familyAccount?.phone || 'N/A'}</div>
+                    </div>
                     {isAdmin && admission.familyAccount && (
                       <div className="text-[11.5px] text-slate-500 mt-2 font-medium bg-white/70 p-2 rounded border border-slate-100 flex flex-col gap-0.5">
                         <div><strong>Tên đăng nhập:</strong> {admission.familyAccount.username || 'N/A'}</div>
@@ -1243,11 +1249,30 @@ export default function AdmissionDetailDrawer({
                 <h5 className="arh-drawer__section-title">
                   <Heart size={16} /> THÔNG TIN NGƯỜI CAO TUỔI
                 </h5>
-                <div className="arh-detail-grid">
-                  <div className="arh-detail-item">
-                    <p className="arh-detail-item__label">Họ và tên</p>
-                    <p className="arh-detail-item__value" style={{ fontWeight: 'bold' }}>{admission.applicant?.fullName || 'N/A'}</p>
+                
+                <div className="arh-detail-card__profile" style={{ background: 'rgba(239, 244, 255, 0.4)', border: '1px solid rgba(27, 54, 93, 0.05)', padding: '14px', borderRadius: '12px', display: 'flex', gap: '16px', alignItems: 'center', marginBottom: '16px' }}>
+                  <img
+                    alt="Ảnh người cao tuổi"
+                    className="arh-detail-card__avatar"
+                    style={{ width: '64px', height: '64px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #fff', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}
+                    src={admission.applicant?.avatarUrl || `data:image/svg+xml;utf8,${encodeURIComponent(`
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%2394a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                        <circle cx="12" cy="7" r="4" />
+                      </svg>
+                    `)}`}
+                  />
+                  <div>
+                    <h4 className="arh-detail-card__name" style={{ fontWeight: 'bold', fontSize: '15px', color: '#1e293b' }}>
+                      {admission.applicant?.fullName || 'N/A'}
+                    </h4>
+                    <p style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
+                      Người cao tuổi cần nhập viện
+                    </p>
                   </div>
+                </div>
+
+                <div className="arh-detail-grid">
                   <div className="arh-detail-item">
                     <p className="arh-detail-item__label">Ngày sinh</p>
                     <p className="arh-detail-item__value">{formatEnglishDate(admission.applicant?.dateOfBirth)}</p>
@@ -1261,6 +1286,10 @@ export default function AdmissionDetailDrawer({
                     <p className="arh-detail-item__value">
                       {formatGender(admission.applicant?.gender)}
                     </p>
+                  </div>
+                  <div className="arh-detail-item">
+                    <p className="arh-detail-item__label">Số điện thoại</p>
+                    <p className="arh-detail-item__value" style={{ fontWeight: '500' }}>{admission.applicant?.phone || 'N/A'}</p>
                   </div>
                   <div className="arh-detail-item" style={{ gridColumn: 'span 2' }}>
                     <p className="arh-detail-item__label">Địa chỉ hiện tại</p>

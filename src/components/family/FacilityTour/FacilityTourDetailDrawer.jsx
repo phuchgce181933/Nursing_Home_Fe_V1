@@ -32,7 +32,11 @@ const formatViDate = (dateStr) => {
 
 const cleanCancellationReason = (reason) => {
   if (!reason) return '';
-  return reason.replace(/^\[Admin rejected\]\s*/i, '').replace(/^\[Doctor evaluation\]\s*/i, '');
+  return reason
+    .replace(/^\[Admin reject(?:ed)?\]\s*/i, '')
+    .replace(/^\[Doctor evaluation\]\s*/i, '')
+    .replace(/^\[Cancelled by admin\]\s*/i, '')
+    .trim();
 };
 
 const getStatusTheme = (status) => {
