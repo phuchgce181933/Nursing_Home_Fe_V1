@@ -1,0 +1,400 @@
+/* AdminDishesPage — dish catalog management */
+
+.adish-page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 24px;
+  max-width: 1400px;
+  margin: 0 auto;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: #334155;
+  animation: adish-fadeIn 0.35s ease;
+}
+
+@keyframes adish-fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Header banner ── */
+.adish-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+  padding: 22px 28px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #1b365d 0%, #2d4a7c 55%, #3b5bdb 100%);
+  color: #ffffff;
+  box-shadow: 0 10px 28px rgba(27, 54, 93, 0.22);
+}
+
+.adish-header__text h1 {
+  margin: 0;
+  font-size: 1.55rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.adish-header__text p {
+  margin: 8px 0 0;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.82);
+  max-width: 520px;
+  line-height: 1.5;
+}
+
+.adish-header__actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.adish-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 18px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  white-space: nowrap;
+}
+
+.adish-btn--primary {
+  background: #ffffff;
+  color: #1b365d;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.adish-btn--primary:hover {
+  background: #f0f4ff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+}
+
+.adish-btn--ghost {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+}
+
+.adish-btn--ghost:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.45);
+}
+
+/* ── Alerts ── */
+.adish-alert {
+  padding: 13px 16px;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.adish-alert--error {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+.adish-alert--success {
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+
+/* ── Toolbar (search + filter) ── */
+.adish-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.adish-search {
+  position: relative;
+  flex: 1;
+  min-width: 220px;
+}
+
+.adish-search svg {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #94a3b8;
+  pointer-events: none;
+}
+
+.adish-search input {
+  width: 100%;
+  padding: 11px 14px 11px 42px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #1e293b;
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.adish-search input::placeholder {
+  color: #94a3b8;
+}
+
+.adish-search input:focus {
+  border-color: #3b5bdb;
+  box-shadow: 0 0 0 3px rgba(59, 91, 219, 0.12);
+}
+
+.adish-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #475569;
+  cursor: pointer;
+  user-select: none;
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1.5px solid #e2e8f0;
+  background: #ffffff;
+  transition: border-color 0.18s ease, background 0.18s ease;
+  white-space: nowrap;
+}
+
+.adish-checkbox:hover {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+
+.adish-checkbox input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  accent-color: #3b5bdb;
+  cursor: pointer;
+}
+
+/* ── Loading ── */
+.adish-loading {
+  text-align: center;
+  padding: 48px 20px;
+  color: #64748b;
+  font-size: 0.95rem;
+}
+
+/* ── Table card ── */
+.adish-table-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+}
+
+.adish-table-wrapper {
+  overflow-x: auto;
+}
+
+.adish-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 700px;
+}
+
+.adish-table th {
+  padding: 14px 18px;
+  text-align: left;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #64748b;
+  background: #f8fafc;
+  border-bottom: 1.5px solid #e2e8f0;
+}
+
+.adish-table td {
+  padding: 15px 18px;
+  font-size: 0.9rem;
+  color: #334155;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+}
+
+.adish-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.adish-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+.adish-table__name {
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.adish-table__kcal {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: #3b5bdb;
+}
+
+.adish-table__ingredients {
+  color: #64748b;
+  font-size: 0.85rem;
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.adish-table__empty {
+  text-align: center;
+  padding: 48px 20px !important;
+  color: #94a3b8;
+  font-size: 0.95rem;
+}
+
+/* ── Status badges ── */
+.adish-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.adish-badge--active {
+  background: #dcfce7;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+}
+
+.adish-badge--inactive {
+  background: #f1f5f9;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+}
+
+.adish-badge::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* ── Action buttons ── */
+.adish-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.adish-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 9px;
+  background: #ffffff;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.adish-icon-btn:hover {
+  border-color: #3b5bdb;
+  color: #3b5bdb;
+  background: #eff6ff;
+}
+
+.adish-icon-btn--danger:hover {
+  border-color: #ef4444;
+  color: #ef4444;
+  background: #fef2f2;
+}
+
+/* ── Modal overrides (uses adm-modal from AdminCommon) ── */
+.adish-modal-alerts {
+  padding: 0 20px 12px;
+}
+
+.adish-modal-close {
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: #64748b;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 8px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.adish-modal-close:hover {
+  background: #f1f5f9;
+  color: #1e293b;
+}
+
+.adish-form-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+  color: #374151;
+  cursor: pointer;
+}
+
+.adish-form-checkbox input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  accent-color: #3b5bdb;
+}
+
+/* ── Responsive ── */
+@media (max-width: 640px) {
+  .adish-page {
+    padding: 16px;
+  }
+
+  .adish-header {
+    padding: 18px 20px;
+  }
+
+  .adish-header__actions {
+    width: 100%;
+  }
+
+  .adish-btn {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .adish-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .adish-checkbox {
+    justify-content: center;
+  }
+}

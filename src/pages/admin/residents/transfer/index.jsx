@@ -200,12 +200,14 @@ export default function TransferResidentPage() {
 
   const handleBuildingChange = (nextBuildingId) => {
     setBuildingId(nextBuildingId);
+    setTargetsData(null);
     clearTargetSelections();
     setSubmitError('');
   };
 
   const handleFloorChange = (nextFloorId) => {
     setFloorId(nextFloorId);
+    setTargetsData(null);
     clearTargetSelections();
     setSubmitError('');
   };
