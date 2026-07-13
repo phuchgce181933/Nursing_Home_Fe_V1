@@ -765,8 +765,12 @@ export default function HealthMonitoringPage() {
   // ── Biểu đồ ──
   const [chartMetric, setChartMetric] = useState('bloodPressureSystolic');
 
-  // ── Tab ──
   const [activeTab, setActiveTab] = useState('history');
+
+  useEffect(() => {
+    setFormError(null);
+    setFormSuccess(false);
+  }, [activeTab]);
 
   // ── Stats tổng hợp ──
   const stats = useMemo(() => {
@@ -882,12 +886,65 @@ export default function HealthMonitoringPage() {
   };
 
   // ─── Submit form nhập chỉ số ───
+  const validateVitalsForm = () => {
+    const { bloodPressureSystolic, bloodPressureDiastolic, pulse, temperatureCelsius, oxygenSaturation, bloodSugar, weightKg, heightCm } = form;
+
+    if (bloodPressureSystolic !== '') {
+      const bps = parseInt(bloodPressureSystolic, 10);
+      if (isNaN(bps) || bps < 0 || bps > 300) return 'Huyết áp tâm thu phải là số dương hợp lệ (từ 0 đến 300).';
+    }
+    if (bloodPressureDiastolic !== '') {
+      const bpd = parseInt(bloodPressureDiastolic, 10);
+      if (isNaN(bpd) || bpd < 0 || bpd > 300) return 'Huyết áp tâm trương phải là số dương hợp lệ (từ 0 đến 300).';
+    }
+    if (bloodPressureSystolic !== '' && bloodPressureDiastolic !== '') {
+      if (parseInt(bloodPressureSystolic, 10) <= parseInt(bloodPressureDiastolic, 10)) {
+        return 'Huyết áp tâm thu phải lớn hơn huyết áp tâm trương.';
+      }
+    }
+    if (pulse !== '') {
+      const p = parseInt(pulse, 10);
+      if (isNaN(p) || p < 0 || p > 300) return 'Nhịp tim phải là số dương hợp lệ.';
+    }
+    if (temperatureCelsius !== '') {
+      const t = parseFloat(temperatureCelsius);
+      if (isNaN(t) || t < 30 || t > 45) return 'Nhiệt độ cơ thể phải từ 30°C đến 45°C.';
+    }
+    if (oxygenSaturation !== '') {
+      const spo2 = parseInt(oxygenSaturation, 10);
+      if (isNaN(spo2) || spo2 < 0 || spo2 > 100) return 'SpO₂ phải từ 0% đến 100%.';
+    }
+    if (bloodSugar !== '') {
+      const bs = parseFloat(bloodSugar);
+      if (isNaN(bs) || bs < 0 || bs > 1000) return 'Đường huyết phải là số dương hợp lệ.';
+    }
+    if (weightKg !== '') {
+      const w = parseFloat(weightKg);
+      if (isNaN(w) || w < 0 || w > 500) return 'Cân nặng phải là số dương hợp lệ.';
+    }
+    if (heightCm !== '') {
+      const h = parseFloat(heightCm);
+      if (isNaN(h) || h < 0 || h > 300) return 'Chiều cao phải là số dương hợp lệ.';
+    }
+    return null;
+  };
+
   const handleSubmitVitals = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     if (!selectedResident) return;
+
     setFormSaving(true);
     setFormError(null);
     setFormSuccess(false);
+
+    // Validate inputs client-side
+    const validationErrorMsg = validateVitalsForm();
+    if (validationErrorMsg) {
+      setFormError(validationErrorMsg);
+      setFormSaving(false);
+      return;
+    }
+
     try {
       const body = {};
       if (form.bloodPressureSystolic !== '') body.bloodPressureSystolic  = parseInt(form.bloodPressureSystolic, 10);
@@ -950,6 +1007,19 @@ export default function HealthMonitoringPage() {
         body.consentToPayment = true;
       } else {
         console.log('[HealthMonitoring] No services selected');
+      }
+
+      // Check if at least one vital sign or check-up detail has been entered
+      const hasAnyData = [
+        form.bloodPressureSystolic, form.bloodPressureDiastolic, form.pulse,
+        form.temperatureCelsius, form.oxygenSaturation, form.bloodSugar,
+        form.weightKg, form.heightCm, form.bloodType, form.summary
+      ].some(v => v !== '') || peHasData || labHasData || urHasData || ecgHasData || imgHasData || cogHasData || funcHasData || nutHasData || services.length > 0;
+
+      if (!hasAnyData) {
+        setFormError('Vui lòng nhập ít nhất một chỉ số sức khỏe hoặc kết quả khám lâm sàng.');
+        setFormSaving(false);
+        return;
       }
 
       console.log('[HealthMonitoring] Saving vital signs with body:', body);

@@ -291,12 +291,9 @@ export default function MyShiftsPage() {
 
               {group.shifts.map((shift, idx) => {
                 const d = parseWorkDate(shift.workDate);
-                const isSplitShift = shift.shiftTemplateId?.isFlexibleTime || shift.shiftTemplateId?.shiftCode === 'SPLIT';
-                const templateName = isSplitShift
-                  ? (shift.name || shift.shiftTemplateId?.name || shift.templateName || t('myShifts.defaultShiftName'))
-                  : (shift.shiftTemplateId?.name || shift.templateName || shift.name || t('myShifts.defaultShiftName'));
-                const startTime = shift.startTime || shift.shiftTemplateId?.startTime;
-                const endTime = shift.endTime || shift.shiftTemplateId?.endTime;
+                const templateName = shift.shiftTemplateId?.name || shift.templateName || t('myShifts.defaultShiftName');
+                const startTime = shift.shiftTemplateId?.startTime || shift.startTime;
+                const endTime = shift.shiftTemplateId?.endTime || shift.endTime;
 
                 return (
                   <div
