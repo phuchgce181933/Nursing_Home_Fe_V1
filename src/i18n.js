@@ -87,7 +87,9 @@ const resources = {
         pharmacyStocks: "Stock History",
         pharmacyReports: "Reports",
         contractManagement: "Contract Management",
-        billing: "Billing"
+        billing: "Billing",
+        mySchedule: "My Schedule",
+        residentAppointments: "Appointment Schedule"
       },
       login: {
         email: "Email",
@@ -3578,7 +3580,9 @@ const resources = {
         pharmacyStocks: "Lịch sử nhập",
         pharmacyReports: "Báo cáo",
         contractManagement: "Quản lý hợp đồng",
-        billing: "Kế toán"
+        billing: "Kế toán",
+        mySchedule: "Lịch khám của tôi",
+        residentAppointments: "Lịch khám người thân"
       },
       login: {
         email: "Email",

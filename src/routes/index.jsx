@@ -59,6 +59,7 @@ import AdminClinicalServicesPage from '../pages/admin/AdminClinicalServicesPage'
 import AdminMedicalChargesPage from '../pages/admin/AdminMedicalChargesPage';
 import DoctorDashboardPage from '../pages/doctor/DoctorDashboardPage';
 import DoctorProfile from '../pages/doctor/DoctorProfile';
+import DoctorSchedulePage from '../pages/doctor/DoctorSchedulePage';
 import NurseDashboardPage from '../pages/nurse/NurseDashboardPage';
 import NurseProfile from '../pages/nurse/NurseProfile';
 import MedicationPage from '../pages/nurse/MedicationPage';
@@ -84,6 +85,7 @@ import SubmitFacilityTourPage from '../pages/family/SubmitFacilityTourPage';
 import FacilityTourHistoryPage from '../pages/family/FacilityTourHistoryPage';
 import FamilyActivityPage from '../pages/family/ActivityPage';
 import ResidentHealthPage from '../pages/family/ResidentHealthPage';
+import FamilyAppointmentsPage from '../pages/family/FamilyAppointmentsPage';
 import IncidentManagementPage from '../pages/IncidentManagementPage';
 import HealthMonitoringPage from '../pages/shared/HealthMonitoringPage';
 import CareNotesPage from '../pages/shared/CareNotesPage';
@@ -204,6 +206,7 @@ function AppRoutes() {
         <Route path="admission-requests" element={<AdminAdmissionRequestsPage />} />
         <Route path="service-packages" element={<ServicePackagesPage />} />
         <Route path="appointments" element={<CareAppointmentsPage />} />
+        <Route path="schedule" element={<DoctorSchedulePage />} />
         <Route path="patients" element={<PlaceholderPage title="Danh sách bệnh nhân" />} />
         <Route path="health-monitoring" element={<HealthMonitoringPage />} />
         <Route path="residents/drug-allergies" element={<DoctorDrugAllergiesPage />} />
@@ -319,6 +322,7 @@ function AppRoutes() {
         <Route path="facility-tours" element={<FacilityTourHistoryPage />} />
         <Route path="activities" element={<FamilyActivityPage />} />
         <Route path="resident" element={<ResidentHealthPage />} />
+        <Route path="appointments" element={<FamilyAppointmentsPage />} />
         <Route path="notifications" element={<NotificationsPage role="family" />} />
         <Route path="messages" element={<MessagesPage />} />
       </Route>

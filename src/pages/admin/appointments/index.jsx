@@ -412,6 +412,39 @@ export default function CareAppointmentsPage() {
       return;
     }
 
+    // ── Validate thêm cho loại "Khám lâm sàng đầu vào" (mirror BE constraints) ──
+    if (formValues.appointmentType === 'Khám lâm sàng đầu vào') {
+      // 1. Start phải diễn ra trong vòng 24h kể từ hiện tại
+      const limit24h = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      if (start > limit24h) {
+        setApptFormError('Lịch khám lâm sàng đầu vào phải diễn ra trong vòng 24 giờ kể từ thời điểm hiện tại.');
+        return;
+      }
+
+      // 2. Start và End phải cùng ngày
+      const startDateStr = start.toLocaleDateString('vi-VN');
+      const endDateStr = end.toLocaleDateString('vi-VN');
+      if (startDateStr !== endDateStr) {
+        setApptFormError('Ngày bắt đầu và ngày kết thúc của lịch khám phải là cùng một ngày.');
+        return;
+      }
+
+      // 3. Giờ bắt đầu và kết thúc phải trong khoảng 08:00 – 16:00
+      const startHour = start.getHours();
+      const startMin = start.getMinutes();
+      const endHour = end.getHours();
+      const endMin = end.getMinutes();
+
+      if (startHour < 8 || startHour > 16 || (startHour === 16 && startMin > 0)) {
+        setApptFormError('Thời gian bắt đầu khám phải nằm trong khoảng từ 08:00 đến 16:00.');
+        return;
+      }
+      if (endHour < 8 || endHour > 16 || (endHour === 16 && endMin > 0)) {
+        setApptFormError('Thời gian kết thúc khám phải nằm trong khoảng từ 08:00 đến 16:00.');
+        return;
+      }
+    }
+
     setSavingAppt(true);
 
     try {
@@ -1228,8 +1261,18 @@ export default function CareAppointmentsPage() {
                   value={formValues.scheduledStartAt}
                   onChange={(e) => setFormValues(prev => ({ ...prev, scheduledStartAt: e.target.value }))}
                   min={!isEditMode ? new Date().toISOString().slice(0, 16) : undefined}
+                  max={
+                    formValues.appointmentType === 'Khám lâm sàng đầu vào'
+                      ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 16)
+                      : undefined
+                  }
                   required
                 />
+                {formValues.appointmentType === 'Khám lâm sàng đầu vào' && (
+                  <small style={{ color: '#64748b', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                    ⏰ Khám lâm sàng đầu vào: giờ bắt đầu phải trong khoảng 08:00 – 16:00, và phải diễn ra trong vòng 24 giờ tới.
+                  </small>
+                )}
               </div>
 
               <div className="cap-form-group">
@@ -1239,8 +1282,14 @@ export default function CareAppointmentsPage() {
                   className="cap-form-input"
                   value={formValues.scheduledEndAt}
                   onChange={(e) => setFormValues(prev => ({ ...prev, scheduledEndAt: e.target.value }))}
+                  min={formValues.scheduledStartAt || (!isEditMode ? new Date().toISOString().slice(0, 16) : undefined)}
                   required
                 />
+                {formValues.appointmentType === 'Khám lâm sàng đầu vào' && (
+                  <small style={{ color: '#64748b', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                    ⏰ Giờ kết thúc phải trong khoảng 08:00 – 16:00 và cùng ngày với giờ bắt đầu.
+                  </small>
+                )}
               </div>
 
               <div className="cap-form-group">
