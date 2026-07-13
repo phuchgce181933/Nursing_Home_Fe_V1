@@ -280,6 +280,7 @@ export default function SubmitFacilityTourPage() {
                 onChange={(e) => setField('contactPhone', e.target.value)}
                 onBlur={() => handleBlur('contactPhone')}
                 disabled={submitting}
+                maxLength={12}
               />
             </div>
             {errors.contactPhone && touched.contactPhone && (
