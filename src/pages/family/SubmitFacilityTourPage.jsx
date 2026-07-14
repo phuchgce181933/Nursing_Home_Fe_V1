@@ -50,11 +50,14 @@ export default function SubmitFacilityTourPage() {
       case 'contactName':
         if (!val) return 'Tên liên hệ là bắt buộc';
         if (val.length < 2 || val.length > 50) return 'Tên phải từ 2 đến 50 ký tự';
+        if (!/^[a-zA-ZÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚĂĐĨŨƠàáâãèéêìíòóôõùúăđĩũơƯĂÂÊÔƠƯưăâêôơưẠ-ỹ\s]+$/.test(val))
+          return 'Tên liên hệ chỉ được chứa chữ cái và khoảng trắng';
         return null;
 
       case 'contactPhone':
         if (!val) return 'Số điện thoại là bắt buộc';
-        if (!/^[0-9+\s-]{8,15}$/.test(val)) return 'Định dạng số điện thoại không hợp lệ';
+        if (!/^(0|\+84)(3|5|7|8|9)\d{8}$/.test(val))
+          return 'Số điện thoại không hợp lệ (di động 10 chữ số bắt đầu bằng 03, 05, 07, 08 hoặc 09).';
         return null;
 
       case 'contactEmail':
@@ -277,6 +280,7 @@ export default function SubmitFacilityTourPage() {
                 onChange={(e) => setField('contactPhone', e.target.value)}
                 onBlur={() => handleBlur('contactPhone')}
                 disabled={submitting}
+                maxLength={12}
               />
             </div>
             {errors.contactPhone && touched.contactPhone && (

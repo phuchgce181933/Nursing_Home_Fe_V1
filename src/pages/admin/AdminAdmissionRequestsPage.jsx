@@ -454,6 +454,11 @@ export default function AdminAdmissionRequestsPage() {
                         {row.applicant?.gender === 'male' ? t('admin.admissionRequests.male', 'MALE') : row.applicant?.gender === 'female' ? t('admin.admissionRequests.female', 'FEMALE') : row.applicant?.gender || 'N/A'}
                         {row.applicant?.dateOfBirth ? ` • ${new Date().getFullYear() - new Date(row.applicant.dateOfBirth).getFullYear()} ${t('admin.admissionRequests.yearsOld', 'years old')}` : ''}
                       </div>
+                      {row.requestedByPhone && (
+                        <div className="text-xs text-slate-500 mt-0.5">
+                          SĐT: {row.requestedByPhone}
+                        </div>
+                      )}
                     </td>
                     <td>
                       <div className="cell-contact-name">
@@ -465,7 +470,7 @@ export default function AdminAdmissionRequestsPage() {
                         )}
                       </div>
                       <div className="cell-contact-phone">
-                        {row.requestedByPhone || row.familyAccount?.phone || 'N/A'}
+                        {row.familyAccount?.phone || 'N/A'}
                       </div>
                     </td>
                     <td style={{ fontWeight: '500', color: '#475569' }}>

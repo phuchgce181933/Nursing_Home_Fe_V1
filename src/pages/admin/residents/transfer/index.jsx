@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { usePortalPrefix } from '../../../../hooks/usePortalPrefix';
 import facilityService from '../../../../services/facility.service';
 import residentService, { RESIDENT_TRANSFER_ROUTE_HINT } from '../../../../services/resident.service';
 import { formatStaffAreasSyncedSummary } from '../../../../utils/staffAreasSynced';
+import { resolveApiError, resolveApiSuccess } from '../../../../utils/apiMessage';
 import { FaEye, FaPen } from 'react-icons/fa';
 import AdminPageShell from '../../../../components/admin/AdminPageShell';
 import ListPagination from '../../../../components/ui/ListPagination';
@@ -40,6 +41,13 @@ const formatDateLocale = (value, language) => {
   if (Number.isNaN(d.getTime())) return '—';
   const locale = language?.startsWith('vi') ? 'vi-VN' : 'en-US';
   return d.toLocaleDateString(locale);
+};
+
+const resolveTargetsInfo = (targetsData, t) => {
+  if (!targetsData || (targetsData.targets || []).length > 0) return '';
+  const translated = resolveApiSuccess(targetsData, t, 'admin.residents.transfer.noAvailableBeds');
+  if (translated) return translated;
+  return t('admin.residents.transfer.noAvailableBeds');
 };
 
 function DetailRow({ label, value }) {
@@ -90,10 +98,16 @@ export default function TransferResidentPage() {
   const [selectedId, setSelectedId] = useState(null);
   const [targetsData, setTargetsData] = useState(null);
   const [targetLoading, setTargetLoading] = useState(false);
-  const [targetError, setTargetError] = useState('');
+  const [loadError, setLoadError] = useState('');
+  const [submitError, setSubmitError] = useState('');
 
   const [targetRoomId, setTargetRoomId] = useState('');
   const [targetBedId, setTargetBedId] = useState('');
+  const floorIdRef = useRef(floorId);
+  const selectedIdRef = useRef(selectedId);
+  const pendingAutoFloorRef = useRef(false);
+  floorIdRef.current = floorId;
+  selectedIdRef.current = selectedId;
   const [saving, setSaving] = useState(false);
   const [panelMsg, setPanelMsg] = useState('');
   const [staffSyncNotice, setStaffSyncNotice] = useState(null);
@@ -128,7 +142,7 @@ export default function TransferResidentPage() {
       setTotal(res.total ?? 0);
       setTotalPages(res.totalPages ?? 1);
     } catch (e) {
-      setListError(e.response?.data?.message || t('admin.residents.transfer.loadFailed'));
+      setListError(resolveApiError(e, t, 'admin.residents.transfer.loadFailed'));
       setResidents([]);
     } finally {
       if (!silent) setListLoading(false);
@@ -179,25 +193,75 @@ export default function TransferResidentPage() {
     }
   }, [floorsInBuilding, floorId]);
 
+  const clearTargetSelections = () => {
+    setTargetRoomId('');
+    setTargetBedId('');
+  };
+
+  const handleBuildingChange = (nextBuildingId) => {
+    setBuildingId(nextBuildingId);
+    clearTargetSelections();
+    setSubmitError('');
+  };
+
+  const handleFloorChange = (nextFloorId) => {
+    setFloorId(nextFloorId);
+    clearTargetSelections();
+    setSubmitError('');
+  };
+
   const loadTargets = useCallback(async () => {
     if (!selectedId || !floorId) {
       setTargetsData(null);
       return;
     }
+    const requestFloorId = floorId;
+    const requestSelectedId = selectedId;
     setTargetLoading(true);
-    setTargetError('');
+    setLoadError('');
     try {
-      const data = await residentService.getTransferTargets(selectedId, { floorId });
+      const data = await residentService.getTransferTargets(requestSelectedId, { floorId: requestFloorId });
+      if (
+        requestFloorId !== floorIdRef.current ||
+        requestSelectedId !== selectedIdRef.current
+      ) {
+        return;
+      }
+
+      if (pendingAutoFloorRef.current) {
+        const currentFloorId = data.currentAssignment?.floor?._id || data.currentAssignment?.floor;
+        const currentBuildingId = data.currentAssignment?.building?._id || data.currentAssignment?.building;
+        pendingAutoFloorRef.current = false;
+        if (currentBuildingId) {
+          setBuildingId(String(currentBuildingId));
+        }
+        if (currentFloorId && String(currentFloorId) !== String(requestFloorId)) {
+          setFloorId(String(currentFloorId));
+          return;
+        }
+      }
+
       setTargetsData(data);
-      setTargetRoomId('');
-      setTargetBedId('');
+      clearTargetSelections();
     } catch (e) {
+      if (
+        requestFloorId !== floorIdRef.current ||
+        requestSelectedId !== selectedIdRef.current
+      ) {
+        return;
+      }
       const status = e?.response?.status;
-      setTargetError(e.response?.data?.message || t('admin.residents.transfer.loadTargetFailed'));
+      setLoadError(resolveApiError(e, t, 'admin.residents.transfer.loadTargetFailed'));
       setTargetsData(null);
+      clearTargetSelections();
       if (status === 404 || status === 400) setShowRouteHint(true);
     } finally {
-      setTargetLoading(false);
+      if (
+        requestFloorId === floorIdRef.current &&
+        requestSelectedId === selectedIdRef.current
+      ) {
+        setTargetLoading(false);
+      }
     }
   }, [selectedId, floorId, t]);
 
@@ -226,7 +290,7 @@ export default function TransferResidentPage() {
       const data = await residentService.getResidentDetail(resident._id);
       setViewDetail(data.resident);
     } catch (e) {
-      setViewError(e.response?.data?.message || e.message || t('admin.residents.transfer.loadDetailFailed'));
+      setViewError(resolveApiError(e, t, 'admin.residents.transfer.loadDetailFailed'));
     } finally {
       setViewLoading(false);
     }
@@ -238,28 +302,51 @@ export default function TransferResidentPage() {
     setViewError('');
   };
 
+  const targetsInfo = useMemo(
+    () => resolveTargetsInfo(targetsData, t),
+    [targetsData, t]
+  );
+
   const openEditPopup = (resident) => {
     setSelectedId(resident._id);
     clearTransferFeedback();
-    setTargetError('');
+    setLoadError('');
+    setSubmitError('');
+    setTargetsData(null);
+    clearTargetSelections();
+    pendingAutoFloorRef.current = true;
     setEditPopup(true);
   };
+
+  const closeEditPopup = () => {
+    setEditPopup(false);
+    setLoadError('');
+    setSubmitError('');
+    setTargetsData(null);
+    clearTargetSelections();
+    pendingAutoFloorRef.current = false;
+  };
+
+  const currentBedLabel = useMemo(() => {
+    const bed = targetsData?.currentAssignment?.bed;
+    return bedText(bed);
+  }, [targetsData]);
 
   const handleTransfer = async (e) => {
     e.preventDefault();
     if (!targetRoomId || !targetBedId) {
-      setTargetError(t('admin.residents.transfer.selectTargetRequired'));
+      setSubmitError(t('admin.residents.transfer.selectTargetRequired'));
       return;
     }
     setSaving(true);
-    setTargetError('');
+    setSubmitError('');
     clearTransferFeedback();
     try {
       const res = await residentService.transferResidentToRoom(selectedId, {
         targetRoomId,
         targetBedId,
       });
-      setPanelMsg(res.message || t('admin.residents.transfer.transferSuccess'));
+      setPanelMsg(resolveApiSuccess(res, t, 'admin.residents.transfer.transferSuccess'));
 
       const synced = res.staffAreasSynced;
       const summary = formatStaffAreasSyncedSummary(synced, {
@@ -277,7 +364,7 @@ export default function TransferResidentPage() {
       await refreshAfterTransfer();
     } catch (e) {
       const status = e?.response?.status;
-      setTargetError(e.response?.data?.message || t('admin.residents.transfer.transferFailed'));
+      setSubmitError(resolveApiError(e, t, 'admin.residents.transfer.transferFailed'));
       if (status === 404 || status === 400) setShowRouteHint(true);
     } finally {
       setSaving(false);
@@ -440,13 +527,13 @@ export default function TransferResidentPage() {
         </div>
       )}
       {editPopup && (
-        <div className="modal-overlay" onClick={() => setEditPopup(false)}>
+        <div className="modal-overlay" onClick={closeEditPopup}>
           <div className="modal modal--wide" onClick={(e) => e.stopPropagation()}>
             <h2 className="modal__title">{t('admin.residents.transfer.modalTitle')}</h2>
             <div className="form-grid">
               <div className="form-group">
                 <label>{t('admin.residents.transfer.targetBuilding')}</label>
-                <select value={buildingId} onChange={(e) => setBuildingId(e.target.value)}>
+                <select value={buildingId} onChange={(e) => handleBuildingChange(e.target.value)}>
                   {buildings.map((b) => (
                     <option key={b._id} value={b._id}>
                       {b.name || b.code}
@@ -456,7 +543,7 @@ export default function TransferResidentPage() {
               </div>
               <div className="form-group">
                 <label>{t('admin.residents.transfer.targetFloor')}</label>
-                <select value={floorId} onChange={(e) => setFloorId(e.target.value)}>
+                <select value={floorId} onChange={(e) => handleFloorChange(e.target.value)}>
                   {floorsInBuilding.map((f) => (
                     <option key={f._id} value={f._id}>
                       {f.name || `${t('admin.residents.common.floor')} ${f.floorNumber}`}
@@ -465,88 +552,104 @@ export default function TransferResidentPage() {
                 </select>
               </div>
             </div>
-            {targetLoading ? (
+
+            <div className="transfer-card">
+              <h3>{t('admin.residents.transfer.currentLocation')}</h3>
+              <div className="transfer-detail-grid">
+                <LocationBlock assignment={targetsData?.currentAssignment} t={t} />
+              </div>
+              {currentBedLabel !== '—' && (
+                <p className="transfer-page__hint-box" style={{ marginTop: 12, marginBottom: 0 }}>
+                  {t('admin.residents.transfer.currentBedHiddenNote', { bed: currentBedLabel })}
+                </p>
+              )}
+            </div>
+
+            {loadError && <p className="form-error">{loadError}</p>}
+            {targetLoading && (
               <div className="empty-state">{t('admin.residents.transfer.loadingRooms')}</div>
-            ) : targetError ? (
-              <div className="empty-state">{targetError}</div>
-            ) : (
-              <>
-                <div className="transfer-card">
-                  <h3>{t('admin.residents.transfer.currentLocation')}</h3>
-                  <div className="transfer-detail-grid">
-                    <LocationBlock assignment={targetsData?.currentAssignment} t={t} />
+            )}
+
+            {!targetLoading && (
+              <form onSubmit={handleTransfer}>
+                {targetsInfo && (
+                  <p className="transfer-page__hint-box" style={{ marginBottom: 12 }}>
+                    {targetsInfo}
+                  </p>
+                )}
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label>{t('admin.residents.transfer.colTargetRoom')}</label>
+                    <select
+                      value={targetRoomId}
+                      onChange={(e) => {
+                        setTargetRoomId(e.target.value);
+                        setTargetBedId('');
+                        setSubmitError('');
+                      }}
+                      disabled={!(targetsData?.targets || []).length}
+                    >
+                      <option value="">{t('admin.residents.transfer.selectRoom')}</option>
+                      {(targetsData?.targets || []).map((room) => (
+                        <option key={room._id} value={room._id}>
+                          {t('admin.residents.transfer.roomOption', {
+                            number: room.roomNumber,
+                            count: room.availableBeds.length,
+                          })}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>{t('admin.residents.transfer.targetBed')}</label>
+                    <select
+                      value={targetBedId}
+                      onChange={(e) => {
+                        setTargetBedId(e.target.value);
+                        setSubmitError('');
+                      }}
+                      disabled={!(targetsData?.targets || []).length}
+                    >
+                      <option value="">{t('admin.residents.transfer.selectBed')}</option>
+                      {(selectedRoom?.availableBeds || []).map((bed) => (
+                        <option key={bed._id} value={bed._id}>
+                          {bed.bedCode} {bed.bedType ? `(${bed.bedType})` : ''}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
-                <form onSubmit={handleTransfer}>
-                  {(targetsData?.targets || []).length === 0 && (
-                    <p className="form-error" style={{ marginBottom: 12 }}>
-                      {targetsData?.message || t('admin.residents.transfer.noAvailableBeds')}
+                {submitError && <p className="form-error">{submitError}</p>}
+                {panelMsg && <p className="form-success">{panelMsg}</p>}
+                {staffSyncNotice && (
+                  <div className="transfer-staff-sync" role="status">
+                    <p className="transfer-staff-sync__title">{staffSyncNotice.title}</p>
+                    <ul className="transfer-staff-sync__list">
+                      {staffSyncNotice.lines.map((line) => (
+                        <li key={line}>{line}</li>
+                      ))}
+                    </ul>
+                    <Link className="transfer-staff-sync__link" to={assignmentsPath}>
+                      {t('admin.residents.transfer.viewStaffAssignment')}
+                    </Link>
+                  </div>
+                )}
+                {staffSyncEmptyNote && !staffSyncNotice && (
+                  <div className="transfer-staff-sync" role="status">
+                    <p className="transfer-staff-sync__muted">
+                      {t('admin.residents.transfer.noStaffSync')}
                     </p>
-                  )}
-                  <div className="form-grid">
-                    <div className="form-group">
-                      <label>{t('admin.residents.transfer.colTargetRoom')}</label>
-                      <select
-                        value={targetRoomId}
-                        onChange={(e) => {
-                          setTargetRoomId(e.target.value);
-                          setTargetBedId('');
-                        }}
-                      >
-                        <option value="">{t('admin.residents.transfer.selectRoom')}</option>
-                        {(targetsData?.targets || []).map((room) => (
-                          <option key={room._id} value={room._id}>
-                            {t('admin.residents.transfer.roomOption', {
-                              number: room.roomNumber,
-                              count: room.availableBeds.length,
-                            })}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="form-group">
-                      <label>{t('admin.residents.transfer.targetBed')}</label>
-                      <select value={targetBedId} onChange={(e) => setTargetBedId(e.target.value)}>
-                        <option value="">{t('admin.residents.transfer.selectBed')}</option>
-                        {(selectedRoom?.availableBeds || []).map((bed) => (
-                          <option key={bed._id} value={bed._id}>
-                            {bed.bedCode} {bed.bedType ? `(${bed.bedType})` : ''}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
                   </div>
-                  {panelMsg && <p className="form-success">{panelMsg}</p>}
-                  {staffSyncNotice && (
-                    <div className="transfer-staff-sync" role="status">
-                      <p className="transfer-staff-sync__title">{staffSyncNotice.title}</p>
-                      <ul className="transfer-staff-sync__list">
-                        {staffSyncNotice.lines.map((line) => (
-                          <li key={line}>{line}</li>
-                        ))}
-                      </ul>
-                      <Link className="transfer-staff-sync__link" to={assignmentsPath}>
-                        {t('admin.residents.transfer.viewStaffAssignment')}
-                      </Link>
-                    </div>
-                  )}
-                  {staffSyncEmptyNote && !staffSyncNotice && (
-                    <div className="transfer-staff-sync" role="status">
-                      <p className="transfer-staff-sync__muted">
-                        {t('admin.residents.transfer.noStaffSync')}
-                      </p>
-                    </div>
-                  )}
-                  <div className="modal__actions">
-                    <button type="button" className="btn-cancel" onClick={() => setEditPopup(false)}>
-                      {t('admin.residents.common.close')}
-                    </button>
-                    <button type="submit" className="btn-save" disabled={saving || !(targetsData?.targets || []).length}>
-                      {saving ? t('admin.residents.transfer.transferring') : t('admin.residents.transfer.confirmTransfer')}
-                    </button>
-                  </div>
-                </form>
-              </>
+                )}
+                <div className="modal__actions">
+                  <button type="button" className="btn-cancel" onClick={closeEditPopup}>
+                    {t('admin.residents.common.close')}
+                  </button>
+                  <button type="submit" className="btn-save" disabled={saving || !(targetsData?.targets || []).length}>
+                    {saving ? t('admin.residents.transfer.transferring') : t('admin.residents.transfer.confirmTransfer')}
+                  </button>
+                </div>
+              </form>
             )}
           </div>
         </div>

@@ -5,6 +5,7 @@ import mealTimeScheduleService from '../../services/mealTimeSchedule.service';
 import specialDietService from '../../services/specialDiet.service';
 import { getLocalDateString } from '../../utils/dateUtils';
 import {
+  careStageLabel,
   dietTypeLabel,
   formatLocaleDate,
   mealTypeLabel,
@@ -367,7 +368,7 @@ function MealPlanTab() {
               <select value={careStage} onChange={(e) => setCareStage(e.target.value)}>
                 <option value="">{t(`${TAB}.selectOption`)}</option>
                 {careStages.map((s) => (
-                  <option key={s} value={s}>{s}</option>
+                  <option key={s} value={s}>{careStageLabel(s, t)}</option>
                 ))}
               </select>
             </div>
@@ -472,7 +473,7 @@ function MealPlanTab() {
               {plans.map((d) => (
                 <tr key={d._id}>
                   <td>{d.title || '—'}</td>
-                  <td>{d.careStage || '—'}</td>
+                  <td>{careStageLabel(d.careStage, t) || '—'}</td>
                   <td>{formatLocaleDate((d.workDate || '').slice(0, 10), i18n.language)}</td>
                   <td>{planStatusLabel(d.status, t)}</td>
                   <td>
@@ -520,7 +521,7 @@ function MealPlanTab() {
             {!detailLoading && detailPlan && (
               <div className="mp-modal-body">
                 <p className="mp-modal-meta">
-                  <strong>{t(`${TAB}.detailTitle`)}:</strong> {detailPlan.title || '—'} · <strong>{t(`${TAB}.detailDate`)}:</strong> {formatLocaleDate((detailPlan.workDate || '').slice(0, 10), i18n.language)} · <strong>{t(`${TAB}.detailStage`)}:</strong> {detailPlan.careStage || '—'}
+                  <strong>{t(`${TAB}.detailTitle`)}:</strong> {detailPlan.title || '—'} · <strong>{t(`${TAB}.detailDate`)}:</strong> {formatLocaleDate((detailPlan.workDate || '').slice(0, 10), i18n.language)} · <strong>{t(`${TAB}.detailStage`)}:</strong> {careStageLabel(detailPlan.careStage, t) || '—'}
                 </p>
                 <table className="mp-table mp-detail-table">
                   <thead>
@@ -1422,16 +1423,16 @@ export default function MealPlansPage() {
 
   return (
     <div className="page card mp-page">
-      <h1 className="mp-page__title">{t(`${MP}.pageTitle`)}</h1>
+      <h1 className="mp-page__title">{t(`${MP}.title`)}</h1>
       <div className="mp-tabs">
         <button className={`mp-tab-btn ${tab === 'schedule' ? 'mp-tab-btn--active' : ''}`} onClick={() => setTab('schedule')}>
           {t(`${MP}.tabSchedule`)}
         </button>
         <button className={`mp-tab-btn ${tab === 'meal' ? 'mp-tab-btn--active' : ''}`} onClick={() => setTab('meal')}>
-          {t(`${MP}.tabMealPlan`)}
+          {t(`${MP}.tabMealPlans`)}
         </button>
         <button className={`mp-tab-btn ${tab === 'special' ? 'mp-tab-btn--active' : ''}`} onClick={() => setTab('special')}>
-          {t(`${MP}.tabSpecialDiet`)}
+          {t(`${MP}.tabSpecialDiets`)}
         </button>
       </div>
 

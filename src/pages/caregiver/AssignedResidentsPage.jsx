@@ -55,6 +55,60 @@ function ResidentWarning({ resident, t }) {
   );
 }
 
+function formatActivityTime(value, locale) {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleString(locale, { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+function ActivityScheduleModal({ resident, activities, onClose, t, locale }) {
+  if (!resident) return null;
+
+  return (
+    <div className="assigned-residents-page__modal-overlay" onClick={onClose}>
+      <div
+        className="assigned-residents-page__modal assigned-residents-page__modal--wide"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+      >
+        <div className="assigned-residents-page__modal-header">
+          <h3 className="assigned-residents-page__modal-title">
+            {t('caregiver.assignedResidents.activityModalTitle')}
+          </h3>
+          <button type="button" className="assigned-residents-page__modal-close" onClick={onClose}>
+            ×
+          </button>
+        </div>
+        <div className="assigned-residents-page__modal-body">
+          <p className="assigned-residents-page__modal-subtitle">
+            {t('caregiver.assignedResidents.activityModalSubtitle', {
+              name: resident.fullName || resident.residentCode || resident._id,
+            })}
+          </p>
+          {!activities.length && <p className="assigned-residents-page__activity-empty">{t('caregiver.assignedResidents.noScheduledActivities')}</p>}
+          {activities.length > 0 && (
+            <ul className="assigned-residents-page__activity-list">
+              {activities.map((activity) => (
+                <li key={activity._id} className="assigned-residents-page__activity-item">
+                  <div className="assigned-residents-page__activity-title">
+                    {activity.title || t('caregiver.assignedResidents.activityDefault')}
+                  </div>
+                  <div className="assigned-residents-page__activity-meta">
+                    <span>{formatActivityTime(activity.scheduledAt || activity.startAt, locale)}</span>
+                    {activity.location ? <span>· {activity.location}</span> : null}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ResidentDetailModal({ residentId, onClose, t, locale }) {
   const [loading, setLoading] = useState(true);
   const [resident, setResident] = useState(null);
@@ -131,6 +185,9 @@ function AssignedResidentsPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [detailId, setDetailId] = useState(null);
+  const [activityByResident, setActivityByResident] = useState({});
+  const [activityModalResident, setActivityModalResident] = useState(null);
+  const [activityModalActivities, setActivityModalActivities] = useState([]);
 
   const {
     paginatedItems: paginatedResidents,
@@ -140,22 +197,50 @@ function AssignedResidentsPage() {
     total,
   } = useClientPagination(residents);
 
+  const buildActivityMap = useCallback((activities = []) => {
+    return (activities || []).reduce((acc, activity) => {
+      const residentIds = Array.isArray(activity.participantResidentIds) ? activity.participantResidentIds : [];
+      residentIds.forEach((residentId) => {
+        const key = String(residentId);
+        if (!acc[key]) acc[key] = [];
+        acc[key].push(activity);
+      });
+      return acc;
+    }, {});
+  }, []);
+
   const loadResidents = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const res = await caregiverResidentService.listResidents({
-        search: debouncedSearch || undefined,
-      });
-      setResidents(Array.isArray(res.data) ? res.data : []);
-      setEmptyMessage(res.message || '');
+      const [residentsResult, activitiesResult] = await Promise.allSettled([
+        caregiverResidentService.listResidents({
+          search: debouncedSearch || undefined,
+        }),
+        caregiverResidentService.listResidentActivities({ status: 'scheduled', limit: 100 }),
+      ]);
+
+      if (residentsResult.status === 'fulfilled') {
+        const res = residentsResult.value;
+        setResidents(Array.isArray(res.data) ? res.data : []);
+        setEmptyMessage(res.message || '');
+      } else {
+        throw residentsResult.reason;
+      }
+
+      if (activitiesResult.status === 'fulfilled') {
+        setActivityByResident(buildActivityMap(activitiesResult.value?.data || []));
+      } else {
+        setActivityByResident({});
+      }
     } catch (e) {
       setError(resolveApiError(e, t, 'caregiver.assignedResidents.loadFailed'));
       setResidents([]);
+      setActivityByResident({});
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, t]);
+  }, [buildActivityMap, debouncedSearch, t]);
 
   useEffect(() => {
     loadResidents();
@@ -211,6 +296,7 @@ function AssignedResidentsPage() {
               <th>{t('common.colFullName')}</th>
               <th>{t('common.colGender')}</th>
               <th>{t('common.colArea')}</th>
+              <th>{t('caregiver.assignedResidents.activityScheduleLabel')}</th>
               <th>{t('common.colAllergies')}</th>
               <th>{t('common.colConditions')}</th>
               <th>{t('common.colAdmittedAt')}</th>
@@ -227,7 +313,7 @@ function AssignedResidentsPage() {
             )}
             {!loading && residents.length === 0 && (
               <tr>
-                <td colSpan={8} className="empty-state">
+                <td colSpan={9} className="empty-state">
                   {debouncedSearch
                     ? t('caregiver.assignedResidents.emptyFiltered')
                     : t('caregiver.assignedResidents.emptyList')}
@@ -238,25 +324,52 @@ function AssignedResidentsPage() {
               paginatedResidents.map((row) => {
                 const allergies = formatAllergies(row, t);
                 const hasAllergy = allergies !== '—';
+                const residentActivities = activityByResident[String(row._id)] || [];
+                const hasActivities = residentActivities.length > 0;
                 return (
                   <tr key={row._id}>
                     <td>{row.residentCode || '—'}</td>
                     <td>{row.fullName || '—'}</td>
                     <td>{t(`common.gender.${row.gender}`, { defaultValue: row.gender || '—' })}</td>
                     <td>{formatResidentAreaLine(row, t) || '—'}</td>
+                    <td>
+                      {hasActivities ? (
+                        <div className="assigned-residents-page__activity-cell">
+                          <span className="assigned-residents-page__activity-pill">
+                            {t('caregiver.assignedResidents.activityBadge', { count: residentActivities.length })}
+                          </span>
+                          <button
+                            type="button"
+                            className="resident-page__button resident-page__button--ghost assigned-residents-page__secondary-button"
+                            onClick={() => {
+                              setActivityModalResident(row);
+                              setActivityModalActivities(residentActivities);
+                            }}
+                          >
+                            {t('caregiver.assignedResidents.viewActivitySchedule')}
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="assigned-residents-page__activity-empty">
+                          {t('caregiver.assignedResidents.noScheduledActivities')}
+                        </span>
+                      )}
+                    </td>
                     <td className={hasAllergy ? 'assigned-residents-page__allergy-tags' : undefined}>
                       {allergies}
                     </td>
                     <td>{formatConditions(row)}</td>
                     <td>{formatAdmittedAt(row.admittedAt)}</td>
                     <td>
-                      <button
-                        type="button"
-                        className="resident-page__button resident-page__button--ghost"
-                        onClick={() => setDetailId(row._id)}
-                      >
-                        {t('common.view')}
-                      </button>
+                      <div className="assigned-residents-page__row-actions">
+                        <button
+                          type="button"
+                          className="resident-page__button resident-page__button--ghost"
+                          onClick={() => setDetailId(row._id)}
+                        >
+                          {t('common.view')}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -283,6 +396,19 @@ function AssignedResidentsPage() {
         <ResidentDetailModal
           residentId={detailId}
           onClose={() => setDetailId(null)}
+          t={t}
+          locale={locale}
+        />
+      )}
+
+      {activityModalResident && (
+        <ActivityScheduleModal
+          resident={activityModalResident}
+          activities={activityModalActivities}
+          onClose={() => {
+            setActivityModalResident(null);
+            setActivityModalActivities([]);
+          }}
           t={t}
           locale={locale}
         />

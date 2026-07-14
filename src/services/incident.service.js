@@ -25,10 +25,16 @@ const exportIncidents = async (params = {}) => {
   return response.data;
 };
 
+const assignHandlers = async (id, payload) => {
+  const response = await axiosClient.patch(`/incidents/${id}/handlers`, payload);
+  return response.data;
+};
+
 export default {
   listIncidents,
   getIncident,
   createIncident,
   updateIncidentStatus,
+  assignHandlers,
   exportIncidents,
 };

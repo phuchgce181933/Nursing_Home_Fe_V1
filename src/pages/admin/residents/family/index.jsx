@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Search, RefreshCw, Users, Phone } from 'lucide-react';
 import residentService from '../../../../services/resident.service';
 import { formatLeaveDate } from '../../../../utils/leaveUtils';
+import { resolveApiError } from '../../../../utils/apiMessage';
 import { FaEye } from 'react-icons/fa';
 import AdminPageShell from '../../../../components/admin/AdminPageShell';
 import ListPagination from '../../../../components/ui/ListPagination';
@@ -19,6 +20,30 @@ const emptyContact = () => ({
   address: '',
   isPrimary: false,
 });
+
+const contactPhoneKey = (contact) => String(contact?.phone || '').replace(/\D/g, '');
+
+const contactEmailKey = (contact) => {
+  const email = String(contact?.email || '').trim().toLowerCase();
+  return email || null;
+};
+
+const findDuplicateContact = (payload, existingContacts, excludeContactId) => {
+  const key = contactPhoneKey(payload);
+  return (existingContacts || []).find((c) => {
+    if (excludeContactId && c._id === excludeContactId) return false;
+    return contactPhoneKey(c) === key;
+  });
+};
+
+const findDuplicateContactByEmail = (payload, existingContacts, excludeContactId) => {
+  const key = contactEmailKey(payload);
+  if (!key) return null;
+  return (existingContacts || []).find((c) => {
+    if (excludeContactId && c._id === excludeContactId) return false;
+    return contactEmailKey(c) === key;
+  });
+};
 
 function formatRoom(room, t) {
   if (!room) return '—';
@@ -207,6 +232,30 @@ export default function FamilyManagementPage() {
   const handleSaveContact = async (payload) => {
     setContactSaving(true);
     setContactError('');
+    const excludeId =
+      contactModal?.mode === 'edit' && contactModal.contact?._id ? contactModal.contact._id : null;
+    const duplicate = findDuplicateContact(payload, contacts, excludeId);
+    if (duplicate) {
+      setContactError(
+        t('apiErrors.RESIDENT_EMERGENCY_CONTACT_DUPLICATE', {
+          fullName: duplicate.fullName,
+          phone: payload.phone,
+        })
+      );
+      setContactSaving(false);
+      return;
+    }
+    const duplicateEmail = findDuplicateContactByEmail(payload, contacts, excludeId);
+    if (duplicateEmail) {
+      setContactError(
+        t('apiErrors.RESIDENT_EMERGENCY_CONTACT_EMAIL_DUPLICATE', {
+          fullName: duplicateEmail.fullName,
+          email: payload.email,
+        })
+      );
+      setContactSaving(false);
+      return;
+    }
     try {
       if (contactModal?.mode === 'edit' && contactModal.contact?._id) {
         await residentService.updateEmergencyContact(
@@ -222,7 +271,7 @@ export default function FamilyManagementPage() {
       setContactModal(null);
       await refreshAfterContactChange();
     } catch (e) {
-      setContactError(e.response?.data?.message || t('admin.residents.common.saveFailed'));
+      setContactError(resolveApiError(e, t, 'admin.residents.common.saveFailed'));
     } finally {
       setContactSaving(false);
     }

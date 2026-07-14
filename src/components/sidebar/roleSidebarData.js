@@ -16,11 +16,11 @@ import {
   Truck,
   ShieldCheck,
   Soup,
-  BarChart3,
   Droplets,
   Brain,
   Apple,
   Dumbbell,
+  CalendarDays,
 } from 'lucide-react';
 
 export const roleSidebarData = {
@@ -30,7 +30,9 @@ export const roleSidebarData = {
     { title: 'sidebar.myShifts', icon: Calendar, path: '/doctor/my-shifts' },
     { title: 'sidebar.careTasks', icon: ClipboardList, path: '/doctor/care-tasks' },
     { title: 'sidebar.appointments', icon: Calendar, path: '/doctor/appointments' },
+    { title: 'sidebar.mySchedule', icon: CalendarDays, path: '/doctor/schedule' },
     { title: 'sidebar.healthMonitoring', icon: HeartPulse, path: '/doctor/health-monitoring' },
+    { title: 'sidebar.drugAllergies', icon: Pill, path: '/doctor/residents/drug-allergies' },
     { title: 'sidebar.medication', icon: Pill, path: '/doctor/medications' },
     { title: 'sidebar.admissionRequests', icon: ClipboardList, path: '/doctor/admission-requests' },
     { title: 'sidebar.servicePackages', icon: HeartPulse, path: '/doctor/service-packages' },
@@ -47,7 +49,7 @@ export const roleSidebarData = {
       path: '/caregiver/dashboard',
     },
     {
-      title: 'Hồ sơ cá nhân',
+      title: 'sidebar.myProfile',
       icon: UserCircle,
       path: '/caregiver/profile',
     },
@@ -97,6 +99,11 @@ export const roleSidebarData = {
       icon: Brain,
       path: '/caregiver/daily-behaviors',
     },
+    {
+      title: 'sidebar.incidents',
+      icon: FileText,
+      path: '/caregiver/incidents',
+    },
   ],
 
   nurse: [
@@ -109,7 +116,6 @@ export const roleSidebarData = {
     { title: 'sidebar.careNotes', icon: Activity, path: '/nurse/care-notes' },
     { title: 'sidebar.healthMonitoring', icon: HeartPulse, path: '/nurse/health-monitoring' },
     { title: 'sidebar.mealPlans', icon: Soup, path: '/nurse/meal-plans' },
-    { title: 'sidebar.nutritionReports', icon: BarChart3, path: '/nurse/nutrition-reports' },
     { title: 'sidebar.medication', icon: Pill, path: '/nurse/medications' },
     { title: 'sidebar.admissionRequests', icon: ClipboardList, path: '/nurse/admission-requests' },
     { title: 'sidebar.servicePackages', icon: HeartPulse, path: '/nurse/service-packages' },
@@ -123,6 +129,7 @@ export const roleSidebarData = {
     { title: 'sidebar.familyDashboard', icon: LayoutDashboard, path: '/family/dashboard' },
     { title: 'sidebar.admissionHistory', icon: History, path: '/family/admission-requests' },
     { title: 'sidebar.facilityTourHistory', icon: Calendar, path: '/family/facility-tours' },
+    { title: 'sidebar.residentAppointments', icon: CalendarDays, path: '/family/appointments' },
     { title: 'sidebar.activities', icon: Activity, path: '/family/activities' },
     { title: 'sidebar.residentInfo', icon: Users, path: '/family/resident' },
     { title: 'sidebar.notifications', icon: Bell, path: '/family/notifications' },

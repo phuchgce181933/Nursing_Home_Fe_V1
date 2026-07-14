@@ -1,22 +1,13 @@
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Eye, EyeOff } from 'lucide-react';
 import { ALL_STAFF_ROLE_OPTIONS } from '../../../../constants/rolePolicy';
+import { staffDateOfBirthValidationKey, validateStaffDateOfBirth } from '../../../../utils/staffAgeValidation';
 
 // Mirror backend validators
 const PHONE_REGEX = /^(\+84|0)[0-9]{8,10}$/;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,30}$/;
-
-const validateDateOfBirth = (dob, t) => {
-  if (!dob) return null;
-  const d = new Date(dob);
-  if (Number.isNaN(d.getTime())) return t('admin.staff.profiles.validation.dateOfBirthInvalid');
-  if (d > new Date()) return t('admin.staff.profiles.validation.dateOfBirthInvalid');
-  const minAge = new Date();
-  minAge.setFullYear(minAge.getFullYear() - 18);
-  if (d > minAge) return t('admin.staff.profiles.validation.dateOfBirthMinAge');
-  return null;
-};
 
 const validate = (form, t) => {
   const errs = {};
@@ -44,8 +35,8 @@ const validate = (form, t) => {
     errs.username = v('usernameInvalid');
   }
 
-  const dobError = validateDateOfBirth(form.dateOfBirth, t);
-  if (dobError) errs.dateOfBirth = dobError;
+  const dobErrorKey = validateStaffDateOfBirth(form.dateOfBirth, { role: form.role, gender: form.gender });
+  if (dobErrorKey) errs.dateOfBirth = staffDateOfBirthValidationKey(dobErrorKey, t);
 
   return errs;
 };
@@ -68,6 +59,7 @@ export default function StaffCreateModal({
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState(null);
   const [certificationFiles, setCertificationFiles] = useState([]);
+  const [showPassword, setShowPassword] = useState(false);
   const fileRef = useRef();
   const certFileRef = useRef();
 
@@ -150,7 +142,27 @@ export default function StaffCreateModal({
         <div className="form-section-title">{t('admin.staff.profiles.sectionLogin')}</div>
         <div className="form-grid">
           {field(t('admin.staff.profiles.labelEmailRequired'), 'email', { placeholder: t('admin.staff.profiles.placeholderEmail'), type: 'email' })}
-          {field(t('admin.staff.profiles.labelPasswordRequired'), 'password', { placeholder: t('admin.staff.profiles.placeholderPassword'), type: 'password' })}
+          <div className="form-group">
+            <label>{t('admin.staff.profiles.labelPasswordRequired')}</label>
+            <div className="form-group__password-wrap">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                className="form-group__password-input"
+                value={form.password}
+                onChange={(e) => set('password', e.target.value)}
+                placeholder={t('admin.staff.profiles.placeholderPassword')}
+              />
+              <button
+                type="button"
+                className="form-group__password-toggle"
+                onClick={() => setShowPassword((prev) => !prev)}
+                aria-label={showPassword ? t('admin.staff.profiles.hidePassword') : t('admin.staff.profiles.showPassword')}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+            {errors.password && <span className="field-error">{errors.password}</span>}
+          </div>
           {field(t('admin.staff.profiles.labelUsername'), 'username', { placeholder: t('admin.staff.profiles.placeholderUsername') })}
         </div>
 

@@ -443,6 +443,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
     e.preventDefault();
     if (!formFloorBuildingId) return setFormError('Vui lòng chọn tòa nhà');
     if (!formFloorNumber) return setFormError('Số tầng là bắt buộc');
+    if (Number(formFloorNumber) <= 0) return setFormError('Số tầng phải lớn hơn 0');
 
     try {
       setSubmitting(true);
@@ -467,6 +468,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
     e.preventDefault();
     if (!selectedFloor?._id) return;
     if (!formFloorNumber) return setFormError('Số tầng là bắt buộc');
+    if (Number(formFloorNumber) <= 0) return setFormError('Số tầng phải lớn hơn 0');
 
     try {
       setSubmitting(true);
@@ -523,6 +525,9 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
     if (!formRoomBuildingId) return setFormError('Vui lòng chọn tòa nhà');
     if (!formRoomFloorId) return setFormError('Vui lòng chọn tầng');
     if (!formRoomNumber.trim()) return setFormError('Số phòng là bắt buộc');
+    if (formRoomNumber.trim().startsWith('-') || (!isNaN(formRoomNumber.trim()) && Number(formRoomNumber.trim()) <= 0)) {
+      return setFormError('Số phòng phải lớn hơn 0');
+    }
     if (formRoomCapacity < 1) return setFormError('Sức chứa phải từ 1 trở lên');
 
     try {
@@ -577,6 +582,9 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
     e.preventDefault();
     if (!selectedRoom?._id) return;
     if (!formRoomNumber.trim()) return setFormError('Số phòng là bắt buộc');
+    if (formRoomNumber.trim().startsWith('-') || (!isNaN(formRoomNumber.trim()) && Number(formRoomNumber.trim()) <= 0)) {
+      return setFormError('Số phòng phải lớn hơn 0');
+    }
     if (formRoomCapacity < 1) return setFormError('Sức chứa phải từ 1 trở lên');
 
     try {
@@ -630,7 +638,19 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
   // Bed CRUD Handlers (Branch 3)
   // ----------------------------------------------------
   const handleOpenCreateBed = () => {
-    setFormBedCode('');
+    const currentRoom = rooms.find(r => r._id === selectedRoomId);
+    let autoBedCode = '';
+    if (currentRoom) {
+      const roomPrefix = currentRoom.roomNumber;
+      let nextIndex = 1;
+      autoBedCode = `${roomPrefix}-G${String(nextIndex).padStart(2, '0')}`;
+      const existingCodes = beds.map(b => b.bedCode.toLowerCase().trim());
+      while (existingCodes.includes(autoBedCode.toLowerCase())) {
+        nextIndex++;
+        autoBedCode = `${roomPrefix}-G${String(nextIndex).padStart(2, '0')}`;
+      }
+    }
+    setFormBedCode(autoBedCode);
     setFormBedType('normal');
     setFormBedCondition('good');
     setFormBedStatus('available');
@@ -736,7 +756,8 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
   // Equipment CRUD Handlers (Branch 4)
   // ----------------------------------------------------
   const handleOpenCreateEq = () => {
-    setFormEqCode('');
+    const randNum = Math.floor(100000 + Math.random() * 900000);
+    setFormEqCode(`EQ-${randNum}`);
     setFormEqName('');
     setFormEqCategory('');
     setFormEqStatus('available');
@@ -777,6 +798,17 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
     e.preventDefault();
     if (!formEqCode.trim()) return setFormError('Mã thiết bị là bắt buộc');
     if (!formEqName.trim()) return setFormError('Tên thiết bị là bắt buộc');
+    if (formEqCategory.trim().startsWith('-') || (!isNaN(formEqCategory.trim()) && Number(formEqCategory.trim()) < 0)) {
+      return setFormError('Danh mục không được là số âm');
+    }
+    if (formEqMaintenanceDueAt) {
+      const selectedDate = new Date(formEqMaintenanceDueAt + 'T00:00:00');
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (selectedDate < today) {
+        return setFormError('Hạn bảo trì không được ở trong quá khứ');
+      }
+    }
 
     try {
       setSubmitting(true);
@@ -812,6 +844,17 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
     if (!selectedEq?._id) return;
     if (!formEqCode.trim()) return setFormError('Mã thiết bị là bắt buộc');
     if (!formEqName.trim()) return setFormError('Tên thiết bị là bắt buộc');
+    if (formEqCategory.trim().startsWith('-') || (!isNaN(formEqCategory.trim()) && Number(formEqCategory.trim()) < 0)) {
+      return setFormError('Danh mục không được là số âm');
+    }
+    if (formEqMaintenanceDueAt) {
+      const selectedDate = new Date(formEqMaintenanceDueAt + 'T00:00:00');
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (selectedDate < today) {
+        return setFormError('Hạn bảo trì không được ở trong quá khứ');
+      }
+    }
 
     try {
       setSubmitting(true);
@@ -2181,6 +2224,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                     placeholder={t('facilities.placeholderFloorNumber')}
                     value={formFloorNumber}
                     onChange={(e) => setFormFloorNumber(e.target.value)}
+                    min="1"
                     required
                   />
                 </div>
@@ -2242,6 +2286,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                     className="fac-form-control"
                     value={formFloorNumber}
                     onChange={(e) => setFormFloorNumber(e.target.value)}
+                    min="1"
                     required
                   />
                 </div>
@@ -2376,11 +2421,12 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                 <div className="fac-form-group">
                   <label>{t('facilities.fieldRoomNumber')}</label>
                   <input
-                    type="text"
+                    type="number"
                     className="fac-form-control"
                     placeholder={t('facilities.placeholderRoomNumber')}
                     value={formRoomNumber}
                     onChange={(e) => setFormRoomNumber(e.target.value)}
+                    min="1"
                     required
                   />
                 </div>
@@ -2454,10 +2500,11 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                 <div className="fac-form-group">
                   <label>{t('facilities.fieldRoomNumber')}</label>
                   <input
-                    type="text"
+                    type="number"
                     className="fac-form-control"
                     value={formRoomNumber}
                     onChange={(e) => setFormRoomNumber(e.target.value)}
+                    min="1"
                     required
                   />
                 </div>
@@ -2582,7 +2629,32 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                   </div>
                 )}
                 <div className="fac-form-group">
-                  <label>{t('facilities.fieldBedCode')}</label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                    <label>{t('facilities.fieldBedCode')} *</label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const currentRoom = rooms.find(r => r._id === selectedRoomId);
+                        if (currentRoom) {
+                          const roomPrefix = currentRoom.roomNumber;
+                          let nextIndex = 1;
+                          let code = `${roomPrefix}-G${String(nextIndex).padStart(2, '0')}`;
+                          const existingCodes = beds.map(b => b.bedCode.toLowerCase().trim());
+                          while (existingCodes.includes(code.toLowerCase())) {
+                            nextIndex++;
+                            code = `${roomPrefix}-G${String(nextIndex).padStart(2, '0')}`;
+                          }
+                          setFormBedCode(code);
+                        } else {
+                          alert('Vui lòng chọn phòng trước');
+                        }
+                      }}
+                      className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                      style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 0 }}
+                    >
+                      Tự động tạo mã
+                    </button>
+                  </div>
                   <input
                     type="text"
                     className="fac-form-control"
@@ -2789,7 +2861,20 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                 )}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="fac-form-group">
-                    <label>{t('facilities.fieldEquipCode')}</label>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                      <label>{t('facilities.fieldEquipCode')} *</label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const randNum = Math.floor(100000 + Math.random() * 900000);
+                          setFormEqCode(`EQ-${randNum}`);
+                        }}
+                        className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                        style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 0 }}
+                      >
+                        Tự động tạo mã
+                      </button>
+                    </div>
                     <input
                       type="text"
                       className="fac-form-control"
@@ -2830,6 +2915,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                       className="fac-form-control"
                       value={formEqMaintenanceDueAt}
                       onChange={(e) => setFormEqMaintenanceDueAt(e.target.value)}
+                      min={new Date().toISOString().split('T')[0]}
                     />
                   </div>
                 </div>
@@ -3022,6 +3108,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                       className="fac-form-control"
                       value={formEqMaintenanceDueAt}
                       onChange={(e) => setFormEqMaintenanceDueAt(e.target.value)}
+                      min={new Date().toISOString().split('T')[0]}
                     />
                   </div>
                 </div>

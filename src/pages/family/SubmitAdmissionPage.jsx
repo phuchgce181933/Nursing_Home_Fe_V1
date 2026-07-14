@@ -137,6 +137,14 @@ export default function SubmitAdmissionPage() {
         if (!val) return 'Mối quan hệ là bắt buộc';
         return null;
 
+      case 'phone':
+        if (val) {
+          if (!/^(0|\+84)(3|5|7|8|9)\d{8}$/.test(val)) {
+            return 'Số điện thoại không hợp lệ (di động 10 chữ số).';
+          }
+        }
+        return null;
+
       case 'healthCondition':
         if (!val) return 'Tóm tắt sức khỏe hiện tại là bắt buộc';
         if (val.length < 10 || val.length > 500) return 'Tóm tắt sức khỏe phải từ 10 đến 500 ký tự';
@@ -303,6 +311,8 @@ export default function SubmitAdmissionPage() {
           allergies:               formData.allergies || [],
           chronicConditions:       formData.chronicConditions || [],
           initialHealthCondition:  formData.healthCondition || undefined,
+          phone:                   formData.phone || undefined,
+          avatarUrl:               formData.avatarUrl || undefined,
         },
         preferredAdmissionDate: formData.preferredDate || undefined,
         reasonForAdmission:     formData.admissionReason || undefined,

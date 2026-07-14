@@ -374,12 +374,15 @@ export default function ActivitySchedulePage() {
       try {
         setSavingRecord(true);
         setRecordMessage('');
-        const result = await activityService.recordParticipationResult(a._id, {
+        const payload = {
           participantResultNotes: draft.participantResultNotes.trim(),
-          status: a.status === 'scheduled' ? 'completed' : a.status,
           attendanceRecords: draft.attendanceRecords,
           participationRecords: draft.participationRecords,
-        });
+        };
+        if (a.status === 'scheduled') {
+          payload.status = 'completed';
+        }
+        const result = await activityService.recordParticipationResult(a._id, payload);
         setSelectedActivity((prev) => (prev && prev._id === result?._id ? { ...prev, ...result } : result));
         setDraft(buildAttendanceFormFromActivity(result || a));
         setRecordMessage('Đã lưu điểm danh và ghi nhận tham gia cho hoạt động.');

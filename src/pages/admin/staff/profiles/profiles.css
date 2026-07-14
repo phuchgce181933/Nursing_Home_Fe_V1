@@ -295,6 +295,34 @@
   box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
 }
 
+.staff-profile-modal .form-group__password-wrap {
+  position: relative;
+}
+
+.staff-profile-modal .form-group__password-input {
+  width: 100%;
+  padding-right: 42px;
+}
+
+.staff-profile-modal .form-group__password-toggle {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: none;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+}
+
+.staff-profile-modal .form-group__password-toggle:hover {
+  color: #0f766e;
+}
+
 .staff-profile-modal .form-section-title {
   font-size: 11px;
   font-weight: 700;
