@@ -16,7 +16,6 @@ import residentService from '../../../services/resident.service';
 import { useAuth } from '../../../hooks/useAuth';
 import '../../../styles/admin/ResidentPage.css';
 import { resolveApiError } from '../../../utils/apiMessage';
-import { validatePhoneFormat } from '../../../utils/phoneValidation';
 
 const GENDERS = [
   { value: '', label: 'Tất cả giới tính' },
@@ -100,10 +99,6 @@ const buildContactsPayload = (contacts) => {
 
     if (!fullName || !relationship || !phone) {
       return { error: 'Mỗi liên hệ khẩn cấp phải có họ tên, quan hệ và số điện thoại.' };
-    }
-
-    if (validatePhoneFormat(phone)) {
-      return { error: 'Số điện thoại phải gồm đúng 10 số và bắt đầu bằng 0 (VD: 0912345678).' };
     }
 
     const phoneKey = phone.replace(/\D/g, '');

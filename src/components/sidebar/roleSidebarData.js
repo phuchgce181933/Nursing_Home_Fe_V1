@@ -19,6 +19,8 @@ import {
   Droplets,
   Brain,
   Apple,
+  Dumbbell,
+  CalendarDays,
 } from 'lucide-react';
 
 export const roleSidebarData = {
@@ -28,6 +30,7 @@ export const roleSidebarData = {
     { title: 'sidebar.myShifts', icon: Calendar, path: '/doctor/my-shifts' },
     { title: 'sidebar.careTasks', icon: ClipboardList, path: '/doctor/care-tasks' },
     { title: 'sidebar.appointments', icon: Calendar, path: '/doctor/appointments' },
+    { title: 'sidebar.mySchedule', icon: CalendarDays, path: '/doctor/schedule' },
     { title: 'sidebar.healthMonitoring', icon: HeartPulse, path: '/doctor/health-monitoring' },
     { title: 'sidebar.assignedResidents', icon: Users, path: '/doctor/assigned-residents' },
     { title: 'sidebar.drugAllergies', icon: Pill, path: '/doctor/residents/drug-allergies' },
@@ -81,6 +84,11 @@ export const roleSidebarData = {
       path: '/caregiver/diet-plans',
     },
     {
+      title: 'sidebar.rehabSchedule',
+      icon: Dumbbell,
+      path: '/caregiver/rehabilitation-schedule',
+    },
+    {
       title: 'sidebar.hygieneActivities',
 
       icon: Droplets,
@@ -119,6 +127,7 @@ export const roleSidebarData = {
     { title: 'sidebar.familyDashboard', icon: LayoutDashboard, path: '/family/dashboard' },
     { title: 'sidebar.admissionHistory', icon: History, path: '/family/admission-requests' },
     { title: 'sidebar.facilityTourHistory', icon: Calendar, path: '/family/facility-tours' },
+    { title: 'sidebar.residentAppointments', icon: CalendarDays, path: '/family/appointments' },
     { title: 'sidebar.activities', icon: Activity, path: '/family/activities' },
     { title: 'sidebar.residentInfo', icon: Users, path: '/family/resident' },
     { title: 'sidebar.notifications', icon: Bell, path: '/family/notifications' },

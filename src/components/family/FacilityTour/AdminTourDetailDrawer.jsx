@@ -31,6 +31,15 @@ const formatViDate = (dateStr) => {
   }
 };
 
+const cleanCancellationReason = (reason) => {
+  if (!reason) return '';
+  return reason
+    .replace(/^\[Admin reject(?:ed)?\]\s*/i, '')
+    .replace(/^\[Doctor evaluation\]\s*/i, '')
+    .replace(/^\[Cancelled by admin\]\s*/i, '')
+    .trim();
+};
+
 const getStatusTheme = (status) => {
   switch (status) {
     case 'pending':
@@ -406,7 +415,7 @@ export default function AdminTourDetailDrawer({ isOpen, onClose, tourId, onActio
                           {tour.rejectionReason ? 'Bị từ chối bởi nhân viên' : 'Đã huỷ bởi gia đình'}
                         </div>
                         <p className="ftd-cancellation-card__text text-red-700 italic mt-1 font-medium" style={{ fontSize: '12.5px' }}>
-                          "{tour.cancellationReason || tour.rejectionReason}"
+                          "{cleanCancellationReason(tour.cancellationReason || tour.rejectionReason)}"
                         </p>
                         <div className="text-[11px] text-red-500 mt-2">
                           Ngày: {formatViDate(tour.cancelledAt || tour.rejectedAt)}

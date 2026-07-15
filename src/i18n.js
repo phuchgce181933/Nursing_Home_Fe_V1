@@ -89,7 +89,9 @@ const resources = {
         pharmacyStocks: "Stock History",
         pharmacyReports: "Reports",
         contractManagement: "Contract Management",
-        billing: "Billing"
+        billing: "Billing",
+        mySchedule: "My Schedule",
+        residentAppointments: "Appointment Schedule"
       },
       login: {
         email: "Email",
@@ -1888,7 +1890,6 @@ const resources = {
             fullName: "Full name",
             relationship: "Relationship",
             phone: "Phone",
-            phoneInvalid: "Phone number must be exactly 10 digits starting with 0 (e.g. 0912345678)",
             email: "Email",
             address: "Address",
             contactAdded: "Emergency contact added.",
@@ -2219,7 +2220,7 @@ const resources = {
               passwordLetter: "Password must contain at least 1 letter",
               passwordDigit: "Password must contain at least 1 number",
               roleRequired: "Please select a role",
-              phoneInvalid: "Phone number must be exactly 10 digits starting with 0 (e.g. 0912345678)",
+              phoneInvalid: "Invalid phone number (e.g. 0912345678 or +84912345678)",
               phoneDuplicate: "Phone number is already in use",
               dateOfBirthInvalid: "Invalid date of birth",
               dateOfBirthMinAge: "Staff must be at least 18 years old",
@@ -3689,7 +3690,9 @@ const resources = {
         pharmacyStocks: "Lịch sử nhập",
         pharmacyReports: "Báo cáo",
         contractManagement: "Quản lý hợp đồng",
-        billing: "Kế toán"
+        billing: "Kế toán",
+        mySchedule: "Lịch khám của tôi",
+        residentAppointments: "Lịch khám người thân"
       },
       login: {
         email: "Email",
@@ -5446,7 +5449,6 @@ const resources = {
             fullName: "Họ tên",
             relationship: "Quan hệ",
             phone: "Số điện thoại",
-            phoneInvalid: "Số điện thoại phải gồm đúng 10 số và bắt đầu bằng 0 (VD: 0912345678)",
             email: "Email",
             address: "Địa chỉ",
             contactAdded: "Đã thêm liên hệ khẩn cấp.",
@@ -5777,7 +5779,7 @@ const resources = {
               passwordLetter: "Mật khẩu phải chứa ít nhất 1 chữ cái",
               passwordDigit: "Mật khẩu phải chứa ít nhất 1 chữ số",
               roleRequired: "Vui lòng chọn vai trò",
-              phoneInvalid: "Số điện thoại phải gồm đúng 10 số và bắt đầu bằng 0 (VD: 0912345678)",
+              phoneInvalid: "Số điện thoại không hợp lệ (VD: 0912345678 hoặc +84912345678)",
               phoneDuplicate: "Số điện thoại đã được sử dụng",
               dateOfBirthInvalid: "Ngày sinh không hợp lệ",
               dateOfBirthMinAge: "Nhân viên phải đủ 18 tuổi",
