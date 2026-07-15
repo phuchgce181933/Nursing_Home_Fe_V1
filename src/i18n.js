@@ -16,6 +16,8 @@ const resources = {
       sidebar: {
         clinical: "Clinical",
         clinicalServices: "Clinical Services",
+        nutrition: "Nutrition",
+        dishes: "Dish Catalog",
         ecg: "ECG / Electrocardiogram",
         imaging: "Imaging & Radiology",
         assessments: "Assessments",
@@ -487,6 +489,32 @@ const resources = {
             skipped: "Skip"
           }
         },
+        assignedResidents: {
+          title: "Assigned Residents",
+          subtitle: "Residents assigned to you. View details for allergies, conditions, and care information.",
+          searchLabel: "Search by name or code",
+          searchPlaceholder: "Enter name or resident code...",
+          emptyFiltered: "No matching residents found",
+          emptyList: "No residents in your assignment list",
+          detailTitle: "Resident details",
+          detailSubtitle: "Full resident information",
+          backToList: "Back to list",
+          viewDetail: "View details",
+          hasMedicalAlerts: "Medical alerts",
+          drugAllergies: "Allergies",
+          otherAllergies: "Other allergies",
+          chronicConditions: "Chronic conditions",
+          bloodType: "Blood type",
+          initialHealth: "Initial condition",
+          admittedAt: "Admission date",
+          allergiesDrug: "Drugs",
+          allergiesOther: "Other",
+          activityScheduleLabel: "Activity schedule",
+          noScheduledActivities: "No scheduled activities",
+          activityDefault: "Activity",
+          loadFailed: "Failed to load resident list",
+          detailLoadFailed: "Failed to load resident details"
+        },
         residents: {
           common: {
             search: "Search",
@@ -561,6 +589,32 @@ const resources = {
             skipped: "Skip"
           }
         },
+        assignedResidents: {
+          title: "Assigned Residents",
+          subtitle: "Residents assigned to you. View details for allergies, conditions, and care information.",
+          searchLabel: "Search by name or code",
+          searchPlaceholder: "Enter name or resident code...",
+          emptyFiltered: "No matching residents found",
+          emptyList: "No residents in your assignment list",
+          detailTitle: "Resident details",
+          detailSubtitle: "Full resident information",
+          backToList: "Back to list",
+          viewDetail: "View details",
+          hasMedicalAlerts: "Medical alerts",
+          drugAllergies: "Allergies",
+          otherAllergies: "Other allergies",
+          chronicConditions: "Chronic conditions",
+          bloodType: "Blood type",
+          initialHealth: "Initial condition",
+          admittedAt: "Admission date",
+          allergiesDrug: "Drugs",
+          allergiesOther: "Other",
+          activityScheduleLabel: "Activity schedule",
+          noScheduledActivities: "No scheduled activities",
+          activityDefault: "Activity",
+          loadFailed: "Failed to load resident list",
+          detailLoadFailed: "Failed to load resident details"
+        },
         mealPlans: {
           title: "Meal Planning",
           tabSchedule: "Schedule Meal Times",
@@ -571,9 +625,11 @@ const resources = {
           tabSpecialDietsShort: "Special Diets",
           sourceTemplate: "Template",
           sourceManual: "Manual",
+          sourceCatalog: "Catalog",
           sourcePattern: "Template pattern",
           yesterday: "Yesterday",
           tomorrow: "Tomorrow",
+          in7Days: "+7 days",
           saveDraft: "Save Draft",
           updateDraft: "Update Draft",
           reset: "Reset",
@@ -651,6 +707,11 @@ const resources = {
             emptyDetailMeals: 'Schedule has no meal details yet',
             duplicateMealType: 'A resident cannot have the same meal type twice in this plan.',
             duplicateMealTime: 'A resident cannot have two meals at the same time ({{time}}) in this plan.',
+            selectDish: '— Select dish —',
+            customDish: 'Enter custom dish...',
+            dishOption: '{{name}} — {{calories}} kcal',
+            noDishCatalog: 'No dishes in catalog — contact Admin or enter manually.',
+            dishUnavailable: 'Catalog dish no longer available (showing saved name)',
 
           },
           specialTab: {
@@ -887,7 +948,11 @@ const resources = {
           activityModalSubtitle: "Scheduled activities for {{name}}",
           activityDefault: "Activity",
           loadFailed: "Failed to load resident list",
-          detailLoadFailed: "Failed to load resident details"
+          detailLoadFailed: "Failed to load resident details",
+          viewDetail: "View details",
+          backToList: "Back to list",
+          detailSubtitle: "Full resident information",
+          hasMedicalAlerts: "Medical alerts"
         },
         dailyCareSchedule: {
           title: "Daily Care Schedule",
@@ -1370,6 +1435,41 @@ const resources = {
         errorLoadFailed: "Could not load facility data. Please try again."
       },
       admin: {
+        dishes: {
+          title: "Dish Catalog",
+          subtitle: "Manage dish names and calories for nurses to use when creating meal plans.",
+          addDish: "Add dish",
+          searchPlaceholder: "Search dish name...",
+          statTotal: "Total dishes",
+          statActive: "Active",
+          statInactive: "Inactive",
+          showInactive: "Show inactive dishes",
+          colName: "Dish name",
+          colCalories: "Calories (kcal)",
+          colIngredients: "Ingredients",
+          empty: "No dishes yet",
+          createTitle: "Add new dish",
+          editTitle: "Edit dish",
+          fieldName: "Dish name",
+          fieldCalories: "Calories",
+          fieldIngredients: "Ingredients",
+          ingredientsPlaceholder: "Comma-separated, e.g. oats, milk",
+          fieldActive: "Active",
+          statusActive: "Active",
+          statusInactive: "Inactive",
+          nameRequired: "Please enter a dish name.",
+          nameInvalid: "Dish name cannot contain numbers or special characters.",
+          caloriesInvalid: "Calories must be a non-negative whole number.",
+          ingredientsInvalid: "Ingredients cannot contain special characters.",
+          createSuccess: "Dish created successfully.",
+          updateSuccess: "Dish updated successfully.",
+          deleteSuccess: "Dish deleted successfully.",
+          deactivateSuccess: "Dish deactivated because it is used in meal plans.",
+          confirmDelete: "Are you sure you want to delete/deactivate this dish?",
+          loadFailed: "Failed to load dish catalog.",
+          saveFailed: "Failed to save dish.",
+          deleteFailed: "Failed to delete dish.",
+        },
         admissionRequests: {
           title: "Admission Requests",
           subtitle: "Review, evaluate, approve, and track family admission requests for elderly residents.",
@@ -2562,10 +2662,12 @@ const resources = {
             colFrom: "From",
             colTo: "To",
             colDays: "Days",
+            colPeriod: "Leave period",
             colReason: "Reason",
             colReplacement: "Replacement",
             colSubmitted: "Submitted",
             colReviewNote: "Review note / Rejection reason",
+            viewDetail: "View details",
             emptyList: "No leave requests",
             approve: "Approve",
             reject: "Reject",
@@ -2606,6 +2708,12 @@ const resources = {
               shiftsReassigned: "Transferred {{count}} work shifts.",
               tasksReassigned: "Transferred {{count}} care tasks.",
               shiftFallback: "Shift"
+            },
+            detail: {
+              title: "Leave request details",
+              subtitle: "Full information and approval actions",
+              backToList: "Back to list",
+              actionsTitle: "Review actions"
             }
           }
         }
@@ -3510,6 +3618,8 @@ const resources = {
       sidebar: {
         clinical: "Lâm sàng",
         clinicalServices: "Danh mục dịch vụ lâm sàng",
+        nutrition: "Dinh dưỡng",
+        dishes: "Danh mục món ăn",
         ecg: "ECG / Điện tâm đồ",
         imaging: "Hình ảnh & Chẩn đoán hình ảnh",
         assessments: "Đánh giá lâm sàng",
@@ -3982,6 +4092,32 @@ const resources = {
             skipped: "Bỏ qua"
           }
         },
+        assignedResidents: {
+          title: "Cư dân phụ trách",
+          subtitle: "Danh sách cư dân được phân công cho bạn. Xem chi tiết để biết dị ứng, bệnh nền và thông tin chăm sóc.",
+          searchLabel: "Tìm theo tên hoặc mã",
+          searchPlaceholder: "Nhập tên hoặc mã cư dân...",
+          emptyFiltered: "Không tìm thấy cư dân phù hợp",
+          emptyList: "Chưa có cư dân trong danh sách phụ trách",
+          detailTitle: "Chi tiết cư dân",
+          detailSubtitle: "Thông tin đầy đủ về cư dân",
+          backToList: "Quay lại danh sách",
+          viewDetail: "Chi tiết",
+          hasMedicalAlerts: "Có cảnh báo y tế",
+          drugAllergies: "Dị ứng",
+          otherAllergies: "Dị ứng khác",
+          chronicConditions: "Bệnh nền",
+          bloodType: "Nhóm máu",
+          initialHealth: "Tình trạng ban đầu",
+          admittedAt: "Ngày nhập viện",
+          allergiesDrug: "Thuốc",
+          allergiesOther: "Khác",
+          activityScheduleLabel: "Lịch hoạt động",
+          noScheduledActivities: "Không có lịch hoạt động",
+          activityDefault: "Hoạt động",
+          loadFailed: "Không tải được danh sách cư dân",
+          detailLoadFailed: "Không tải được thông tin cư dân"
+        },
         residents: {
           common: {
             search: "Tìm kiếm",
@@ -4056,6 +4192,32 @@ const resources = {
             skipped: "Bỏ qua"
           }
         },
+        assignedResidents: {
+          title: "Cư dân phụ trách",
+          subtitle: "Danh sách cư dân được phân công cho bạn. Xem chi tiết để biết dị ứng, bệnh nền và thông tin chăm sóc.",
+          searchLabel: "Tìm theo tên hoặc mã",
+          searchPlaceholder: "Nhập tên hoặc mã cư dân...",
+          emptyFiltered: "Không tìm thấy cư dân phù hợp",
+          emptyList: "Chưa có cư dân trong danh sách phụ trách",
+          detailTitle: "Chi tiết cư dân",
+          detailSubtitle: "Thông tin đầy đủ về cư dân",
+          backToList: "Quay lại danh sách",
+          viewDetail: "Chi tiết",
+          hasMedicalAlerts: "Có cảnh báo y tế",
+          drugAllergies: "Dị ứng",
+          otherAllergies: "Dị ứng khác",
+          chronicConditions: "Bệnh nền",
+          bloodType: "Nhóm máu",
+          initialHealth: "Tình trạng ban đầu",
+          admittedAt: "Ngày nhập viện",
+          allergiesDrug: "Thuốc",
+          allergiesOther: "Khác",
+          activityScheduleLabel: "Lịch hoạt động",
+          noScheduledActivities: "Không có lịch hoạt động",
+          activityDefault: "Hoạt động",
+          loadFailed: "Không tải được danh sách cư dân",
+          detailLoadFailed: "Không tải được thông tin cư dân"
+        },
         mealPlans: {
           title: "Kế hoạch bữa ăn",
           tabSchedule: "Lịch giờ ăn",
@@ -4066,9 +4228,11 @@ const resources = {
           tabSpecialDietsShort: "Chế độ đặc biệt",
           sourceTemplate: "Template",
           sourceManual: "Thủ công",
+          sourceCatalog: "Danh mục",
           sourcePattern: "Mẫu",
           yesterday: "Hôm qua",
           tomorrow: "Ngày mai",
+          in7Days: "+7 ngày",
           saveDraft: "Lưu bản nháp",
           updateDraft: "Cập nhật bản nháp",
           reset: "Làm mới",
@@ -4146,6 +4310,11 @@ const resources = {
             emptyDetailMeals: 'Lịch chưa có chi tiết món ăn',
             duplicateMealType: 'Mỗi cư dân chỉ được có một bữa cùng loại (sáng/trưa/tối) trong thực đơn này.',
             duplicateMealTime: 'Mỗi cư dân không thể có hai bữa cùng giờ {{time}} trong thực đơn này.',
+            selectDish: '— Chọn món —',
+            customDish: 'Nhập món khác...',
+            dishOption: '{{name}} — {{calories}} kcal',
+            noDishCatalog: 'Chưa có món trong danh mục — liên hệ Admin hoặc nhập tay.',
+            dishUnavailable: 'Món danh mục không còn khả dụng (hiển thị tên đã lưu)',
           
           },
           specialTab: {
@@ -4382,7 +4551,11 @@ const resources = {
           activityModalSubtitle: "Lịch hoạt động của {{name}}",
           activityDefault: "Hoạt động",
           loadFailed: "Không tải được danh sách cư dân",
-          detailLoadFailed: "Không tải được thông tin cư dân"
+          detailLoadFailed: "Không tải được thông tin cư dân",
+          viewDetail: "Chi tiết",
+          backToList: "Quay lại danh sách",
+          detailSubtitle: "Thông tin đầy đủ về cư dân",
+          hasMedicalAlerts: "Có cảnh báo y tế"
         },
         dailyCareSchedule: {
           title: "Lịch chăm sóc hằng ngày",
@@ -4865,6 +5038,41 @@ const resources = {
         errorLoadFailed: "Không thể tải thông tin cơ sở vật chất. Vui lòng thử lại sau."
       },
       admin: {
+        dishes: {
+          title: "Danh mục món ăn",
+          subtitle: "Quản lý tên món và lượng kcal để điều dưỡng chọn khi tạo thực đơn.",
+          addDish: "Thêm món",
+          searchPlaceholder: "Tìm tên món...",
+          statTotal: "Tổng món",
+          statActive: "Đang dùng",
+          statInactive: "Đã tắt",
+          showInactive: "Hiện món đã tắt",
+          colName: "Tên món",
+          colCalories: "Kcal",
+          colIngredients: "Thành phần",
+          empty: "Chưa có món nào",
+          createTitle: "Thêm món mới",
+          editTitle: "Sửa món",
+          fieldName: "Tên món",
+          fieldCalories: "Kcal",
+          fieldIngredients: "Thành phần",
+          ingredientsPlaceholder: "Phân tách bằng dấu phẩy, VD: yến mạch, sữa",
+          fieldActive: "Đang dùng",
+          statusActive: "Đang dùng",
+          statusInactive: "Đã tắt",
+          nameRequired: "Vui lòng nhập tên món.",
+          nameInvalid: "Tên món không được chứa số hoặc ký tự đặc biệt.",
+          caloriesInvalid: "Kcal chỉ được nhập số nguyên không âm.",
+          ingredientsInvalid: "Thành phần không được chứa ký tự đặc biệt.",
+          createSuccess: "Tạo món thành công.",
+          updateSuccess: "Cập nhật món thành công.",
+          deleteSuccess: "Xóa món thành công.",
+          deactivateSuccess: "Đã tắt món vì đang được dùng trong thực đơn.",
+          confirmDelete: "Bạn có chắc muốn xóa/tắt món này không?",
+          loadFailed: "Không tải được danh mục món.",
+          saveFailed: "Không lưu được món.",
+          deleteFailed: "Không xóa được món.",
+        },
         admissionRequests: {
           title: "Yêu cầu Nhập viện",
           subtitle: "Xem xét, đánh giá, phê duyệt và theo dõi các yêu cầu nhập viện của gia đình cho cư dân cao tuổi.",
@@ -6012,10 +6220,12 @@ const resources = {
             colFrom: "Từ ngày",
             colTo: "Đến ngày",
             colDays: "Số ngày",
+            colPeriod: "Thời gian nghỉ",
             colReason: "Lý do",
             colReplacement: "Người thế ca",
             colSubmitted: "Ngày gửi",
             colReviewNote: "Ghi chú / Lý do từ chối",
+            viewDetail: "Chi tiết",
             emptyList: "Không có đơn nghỉ phép nào",
             approve: "Duyệt",
             reject: "Từ chối",
@@ -6056,6 +6266,12 @@ const resources = {
               shiftsReassigned: "Đã chuyển {{count}} ca làm việc.",
               tasksReassigned: "Đã chuyển {{count}} nhiệm vụ chăm sóc.",
               shiftFallback: "Ca"
+            },
+            detail: {
+              title: "Chi tiết đơn nghỉ phép",
+              subtitle: "Thông tin đầy đủ và thao tác duyệt đơn",
+              backToList: "Quay lại danh sách",
+              actionsTitle: "Thao tác duyệt"
             }
           }
         }

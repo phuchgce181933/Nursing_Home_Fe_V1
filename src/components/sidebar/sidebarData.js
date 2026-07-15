@@ -33,6 +33,7 @@ import {
   Trophy,
   Stethoscope,
   Receipt,
+  UtensilsCrossed,
 } from 'lucide-react';
 
 export const sidebarData = [
@@ -99,6 +100,13 @@ export const sidebarData = [
       { title: 'sidebar.activityManagement', icon: Activity, path: '/admin/activities' },
       { title: 'sidebar.activityStatistics', icon: BarChart3, path: '/admin/activities/statistics' },
       { title: 'sidebar.participationResults', icon: Trophy, path: '/admin/activities/participation-results' },
+    ],
+  },
+  {
+    title: 'sidebar.nutrition',
+    icon: UtensilsCrossed,
+    children: [
+      { title: 'sidebar.dishes', icon: UtensilsCrossed, path: '/admin/dishes' },
     ],
   },
   {
