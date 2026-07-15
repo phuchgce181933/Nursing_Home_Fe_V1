@@ -59,5 +59,6 @@ export const sourceLabel = (v, t) => {
   const tt = resolveT(t);
   if (v === 'template') return tt('nurse.mealPlans.sourceTemplate');
   if (v === 'manual') return tt('nurse.mealPlans.sourceManual');
+  if (v === 'catalog') return tt('nurse.mealPlans.sourceCatalog');
   return v || '—';
 };

@@ -32,7 +32,7 @@ function MealIntakeNotesPage() {
   const loadResidents = async () => {
     try {
       const res = await mealIntakeNoteService.listResidents();
-      setResidents(Array.isArray(res?.data) ? res.data : []);
+      setResidents(Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : []);
     } catch (e) {
       setListError(resolveApiError(e, t, 'caregiver.mealIntake.loadResidentsFailed'));
     }
