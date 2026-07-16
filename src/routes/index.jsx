@@ -38,6 +38,7 @@ import ShiftManagementPage from '../pages/admin/staff/shifts';
 import StaffAssignmentPage from '../pages/admin/staff/assignments';
 import EmergencyAvailabilityPage from '../pages/admin/staff/emergency';
 import LeaveRequestAdminPage from '../pages/admin/staff/leave-requests';
+import LeaveRequestDetailPage from '../pages/admin/staff/leave-requests/LeaveRequestDetailPage';
 import LeaveRequestPage from '../pages/shared/LeaveRequestPage';
 import MyShiftsPage from '../pages/shared/MyShiftsPage';
 import AdminProfile from '../pages/admin/AdminProfile';
@@ -56,6 +57,7 @@ import CareAppointmentsPage from '../pages/admin/appointments';
 import AdminContractManagementPage from '../pages/admin/AdminContractManagementPage';
 import AdminInvoiceManagementPage from '../pages/admin/AdminInvoiceManagementPage';
 import AdminClinicalServicesPage from '../pages/admin/AdminClinicalServicesPage';
+import AdminDishesPage from '../pages/admin/dishes';
 import AdminMedicalChargesPage from '../pages/admin/AdminMedicalChargesPage';
 import DoctorDashboardPage from '../pages/doctor/DoctorDashboardPage';
 import DoctorProfile from '../pages/doctor/DoctorProfile';
@@ -68,6 +70,11 @@ import MealPlansPage from '../pages/nurse/MealPlansPage';
 import CaregiverDashboardPage from '../pages/caregiver/CaregiverDashboardPage';
 import CaregiverProfile from '../pages/caregiver/CaregiverProfile';
 import AssignedResidentsPage from '../pages/caregiver/AssignedResidentsPage';
+import CaregiverAssignedResidentDetailPage from '../pages/caregiver/AssignedResidentDetailPage';
+import DoctorAssignedResidentsPage from '../pages/doctor/AssignedResidentsPage';
+import DoctorAssignedResidentDetailPage from '../pages/doctor/AssignedResidentDetailPage';
+import NurseAssignedResidentsPage from '../pages/nurse/AssignedResidentsPage';
+import NurseAssignedResidentDetailPage from '../pages/nurse/AssignedResidentDetailPage';
 import DailyCareSchedulePage from '../pages/caregiver/daily-care-schedule/DailyCareSchedulePage';
 import HygieneActivitiesPage from '../pages/caregiver/hygiene-activities/HygieneActivitiesPage';
 import DailyBehaviorsPage from '../pages/caregiver/daily-behaviors/DailyBehaviorsPage';
@@ -143,6 +150,7 @@ function AppRoutes() {
         <Route path="staff/assignments" element={<StaffAssignmentPage />} />
         <Route path="staff/emergency" element={<EmergencyAvailabilityPage />} />
         <Route path="staff/leave-requests" element={<LeaveRequestAdminPage />} />
+        <Route path="staff/leave-requests/:id" element={<LeaveRequestDetailPage />} />
         <Route path="residents/create" element={<ResidentPage defaultMode="create" />} />
         <Route path="profile" element={<AdminProfile />} />
         <Route path="messages" element={<MessagesPage />} />
@@ -161,6 +169,7 @@ function AppRoutes() {
         <Route path="contracts" element={<AdminContractManagementPage />} />
         <Route path="invoices" element={<AdminInvoiceManagementPage />} />
         <Route path="services" element={<AdminClinicalServicesPage />} />
+        <Route path="dishes" element={<AdminDishesPage />} />
         <Route path="medical-charges" element={<AdminMedicalChargesPage />} />
         <Route path="incidents" element={<IncidentManagementPage />} />
         <Route path="*" element={<PlaceholderPage title="Trang quản trị" />} />
@@ -188,6 +197,7 @@ function AppRoutes() {
         <Route path="staff/assignments" element={<ManagerStaffAssignmentPage />} />
         <Route path="staff/emergency" element={<ManagerEmergencyAvailabilityPage />} />
         <Route path="staff/leave-requests" element={<ManagerLeaveRequestAdminPage />} />
+        <Route path="staff/leave-requests/:id" element={<LeaveRequestDetailPage />} />
         <Route path="activity-dashboard" element={<ManagerActivityDashboard />} />
         <Route path="*" element={<PlaceholderPage title="Trang quản lý vận hành" />} />
       </Route>
@@ -209,6 +219,8 @@ function AppRoutes() {
         <Route path="schedule" element={<DoctorSchedulePage />} />
         <Route path="patients" element={<PlaceholderPage title="Danh sách bệnh nhân" />} />
         <Route path="health-monitoring" element={<HealthMonitoringPage />} />
+        <Route path="assigned-residents" element={<DoctorAssignedResidentsPage />} />
+        <Route path="assigned-residents/:id" element={<DoctorAssignedResidentDetailPage />} />
         <Route path="residents/drug-allergies" element={<DoctorDrugAllergiesPage />} />
         <Route path="medications" element={<DoctorMedicationPage />} />
         <Route path="care-notes" element={<CareNotesPage />} />
@@ -237,6 +249,8 @@ function AppRoutes() {
         <Route path="meal-plans" element={<MealPlansPage />} />
 
         <Route path="health-monitoring" element={<HealthMonitoringPage />} />
+        <Route path="assigned-residents" element={<NurseAssignedResidentsPage />} />
+        <Route path="assigned-residents/:id" element={<NurseAssignedResidentDetailPage />} />
         <Route path="care-notes" element={<CareNotesPage />} />
         <Route path="appointments" element={<CareAppointmentsPage />} />
 
@@ -262,6 +276,7 @@ function AppRoutes() {
         <Route path="dashboard" element={<CaregiverDashboardPage />} />
         <Route path="profile" element={<CaregiverProfile />} />
         <Route path="assigned-residents" element={<AssignedResidentsPage />} />
+        <Route path="assigned-residents/:id" element={<CaregiverAssignedResidentDetailPage />} />
         <Route path="my-shifts" element={<MyShiftsPage />} />
         <Route path="leave" element={<LeaveRequestPage />} />
         <Route path="daily-care-schedule" element={<DailyCareSchedulePage />} />
@@ -269,7 +284,6 @@ function AppRoutes() {
         <Route path="hygiene-activities" element={<HygieneActivitiesPage />} />
         <Route path="daily-behaviors" element={<DailyBehaviorsPage />} />
         <Route path="diet-plans" element={<DietPlansPage />} />
-        <Route path="rehabilitation-schedule" element={<PlaceholderPage title="Rehabilitation Schedule" />} />
         <Route path="incidents" element={<IncidentManagementPage />} />
       </Route>
 

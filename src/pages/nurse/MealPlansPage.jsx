@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import mealPlanService from '../../services/mealPlan.service';
 import mealTimeScheduleService from '../../services/mealTimeSchedule.service';
 import specialDietService from '../../services/specialDiet.service';
-import { getLocalDateString } from '../../utils/dateUtils';
+import dishService from '../../services/dish.service';
+import { todayVN, addDaysToDateStr } from '../../utils/dateUtils';
 import {
   careStageLabel,
   dietTypeLabel,
@@ -16,18 +17,59 @@ import '../../styles/nurse/MealPlansPage.css';
 import { resolveApiError } from '../../utils/apiMessage';
 
 const MP = 'nurse.mealPlans';
+const CUSTOM_DISH_VALUE = '__custom__';
 
-const today = () => getLocalDateString();
-const addDays = (dateStr, delta) => {
-  const d = new Date(`${dateStr}T12:00:00`);
-  d.setDate(d.getDate() + delta);
-  return getLocalDateString(d);
+const today = () => todayVN();
+const addDays = (dateStr, delta) => addDaysToDateStr(dateStr, delta);
+const clampWorkDate = (dateStr) => {
+  const normalized = (dateStr || '').slice(0, 10) || today();
+  return normalized < today() ? today() : normalized;
 };
+
+function WorkDatePicker({ value, onChange, t }) {
+  return (
+    <div className="mp-date-switch mp-date-switch--form">
+      <button type="button" className="mp-btn-secondary" onClick={() => onChange(today())}>
+        {t('common.today')}
+      </button>
+      <button type="button" className="mp-btn-secondary" onClick={() => onChange(addDays(today(), 1))}>
+        {t(`${MP}.tomorrow`)}
+      </button>
+      <button type="button" className="mp-btn-secondary" onClick={() => onChange(addDays(today(), 7))}>
+        {t(`${MP}.in7Days`)}
+      </button>
+      <input type="date" min={today()} value={value} onChange={(e) => onChange(e.target.value)} />
+    </div>
+  );
+}
 const defaultMealTimeByType = (mealType) => {
   if (mealType === 'breakfast') return '07:30';
   if (mealType === 'lunch') return '11:30';
   return '17:30';
 };
+
+const residentIdsFromScheduleEntries = (scheduleEntries) =>
+  [...new Set((scheduleEntries || []).map((e) => String(e.residentId?._id || e.residentId || '')).filter(Boolean))];
+
+const publishedTimesFromScheduleEntries = (scheduleEntries) => {
+  const byResident = {};
+  for (const entry of scheduleEntries || []) {
+    const rid = String(entry.residentId?._id || entry.residentId || '');
+    if (!rid) continue;
+    byResident[rid] = {
+      breakfast: entry.breakfastTime,
+      lunch: entry.lunchTime,
+      dinner: entry.dinnerTime,
+    };
+  }
+  return {
+    byResident,
+    source: Object.keys(byResident).length ? 'published_schedule' : 'system_default',
+  };
+};
+
+const scheduleResidentCount = (schedule) =>
+  residentIdsFromScheduleEntries(schedule?.entries).length;
 
 function MealPlanTab() {
   const { t, i18n } = useTranslation();
@@ -49,7 +91,20 @@ function MealPlanTab() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailPlan, setDetailPlan] = useState(null);
   const [publishedTimes, setPublishedTimes] = useState({ byResident: {}, source: 'system_default' });
+  const [mealTimeScheduleDayId, setMealTimeScheduleDayId] = useState('');
+  const [publishedSchedules, setPublishedSchedules] = useState([]);
+  const [scheduleResidentIds, setScheduleResidentIds] = useState([]);
+  const [dishCatalog, setDishCatalog] = useState([]);
   const [error, setError] = useState('');
+  const suppressScheduleLoadRef = useRef(false);
+
+  const hasSelectedSchedule = Boolean(mealTimeScheduleDayId);
+
+  const selectableResidents = useMemo(() => {
+    if (!hasSelectedSchedule) return [];
+    const allowed = new Set(scheduleResidentIds);
+    return residents.filter((r) => allowed.has(String(r._id)));
+  }, [residents, hasSelectedSchedule, scheduleResidentIds]);
 
   const resolveMealTime = (residentId, mealType) => {
     const rid = String(residentId || '');
@@ -67,14 +122,16 @@ function MealPlanTab() {
     setLoading(true);
     setError('');
     try {
-      const [tplRes, residentRes] = await Promise.all([
+      const [tplRes, residentRes, dishRes] = await Promise.all([
         mealPlanService.getTemplates(),
         mealPlanService.listResidents({ status: 'admitted' }),
+        dishService.listDishes({ activeOnly: true }),
       ]);
       setCareStages(Array.isArray(tplRes.careStages) ? tplRes.careStages : []);
       setCareStage(Array.isArray(tplRes.careStages) && tplRes.careStages[0] ? tplRes.careStages[0] : '');
       setTemplates(Array.isArray(tplRes.templates) ? tplRes.templates : []);
       setResidents(Array.isArray(residentRes?.data) ? residentRes.data : []);
+      setDishCatalog(Array.isArray(dishRes?.data) ? dishRes.data : []);
     } catch (e) {
       setError(resolveApiError(e, t, `${MP}.loadBootFailed`));
     } finally {
@@ -82,7 +139,11 @@ function MealPlanTab() {
     }
   };
 
-  const loadPublishedMealTimes = () => {
+  const loadPublishedMealTimes = useCallback(() => {
+    if (!mealTimeScheduleDayId) {
+      setPublishedTimes({ byResident: {}, source: 'system_default' });
+      return;
+    }
     mealTimeScheduleService
       .getPublishedTimes({
         workDate: formWorkDate,
@@ -97,7 +158,68 @@ function MealPlanTab() {
       .catch(() => {
         setPublishedTimes({ byResident: {}, source: 'system_default' });
       });
-  };
+  }, [formWorkDate, selectedResidents, mealTimeScheduleDayId]);
+
+  const syncScheduleContext = useCallback(
+    async (scheduleId, { preserveSelections = false } = {}) => {
+      if (!scheduleId) {
+        setMealTimeScheduleDayId('');
+        setScheduleResidentIds([]);
+        setPublishedTimes({ byResident: {}, source: 'system_default' });
+        if (!preserveSelections) {
+          setSelectedResidents([]);
+          setEntries([]);
+        }
+        return;
+      }
+      const data = await mealTimeScheduleService.getSchedule(scheduleId);
+      const ids = residentIdsFromScheduleEntries(data.entries);
+      setMealTimeScheduleDayId(String(scheduleId));
+      setScheduleResidentIds(ids);
+      setPublishedTimes(publishedTimesFromScheduleEntries(data.entries));
+      if (!preserveSelections) {
+        setSelectedResidents(ids);
+        setEntries([]);
+      }
+    },
+    []
+  );
+
+  const loadPublishedSchedules = useCallback(
+    async (date, { preferredId } = {}) => {
+      try {
+        const res = await mealTimeScheduleService.listSchedules({
+          workDate: date,
+          status: 'published',
+          limit: 50,
+        });
+        const list = Array.isArray(res?.data) ? res.data : [];
+        setPublishedSchedules(list);
+        const preferred = preferredId ? String(preferredId) : '';
+        if (preferred && list.some((s) => String(s._id) === preferred)) {
+          await syncScheduleContext(preferred, { preserveSelections: true });
+          return;
+        }
+        if (list.length === 1) {
+          await syncScheduleContext(String(list[0]._id));
+          return;
+        }
+        if (!preferred) {
+          setMealTimeScheduleDayId('');
+          setScheduleResidentIds([]);
+          setPublishedTimes({ byResident: {}, source: 'system_default' });
+        }
+      } catch {
+        setPublishedSchedules([]);
+        if (!preferredId) {
+          setMealTimeScheduleDayId('');
+          setScheduleResidentIds([]);
+          setPublishedTimes({ byResident: {}, source: 'system_default' });
+        }
+      }
+    },
+    [syncScheduleContext]
+  );
 
   const loadPlans = async (date) => {
     try {
@@ -125,11 +247,39 @@ function MealPlanTab() {
   }, [listDate]);
 
   useEffect(() => {
+    if (suppressScheduleLoadRef.current) {
+      suppressScheduleLoadRef.current = false;
+      return;
+    }
+    loadPublishedSchedules(formWorkDate);
+  }, [formWorkDate, loadPublishedSchedules]);
+
+  useEffect(() => {
     loadPublishedMealTimes();
-  }, [formWorkDate, selectedResidents]);
+  }, [loadPublishedMealTimes]);
+
+  const handleWorkDateChange = (nextDate) => {
+    setFormWorkDate(nextDate);
+    setMealTimeScheduleDayId('');
+    setScheduleResidentIds([]);
+    setSelectedResidents([]);
+    setEntries([]);
+    setError('');
+  };
+
+  const handleScheduleChange = async (e) => {
+    const nextId = e.target.value;
+    setError('');
+    try {
+      await syncScheduleContext(nextId);
+    } catch (err) {
+      setError(resolveApiError(err, t, `${MP}.loadScheduleBootFailed`));
+    }
+  };
 
   const addFromTemplate = () => {
     setError('');
+    if (!mealTimeScheduleDayId) return setError(t(`${MP}.selectSchedule`));
     const tpl = templates.find((tp) => tp.key === selectedTemplate);
     if (!tpl) return setError(t(`${MP}.selectTemplate`));
     if (selectedResidents.length < 1) return setError(t(`${MP}.selectResidents`));
@@ -158,7 +308,9 @@ function MealPlanTab() {
   };
 
   const addManual = () => {
+    if (!mealTimeScheduleDayId) return setError(t(`${MP}.selectSchedule`));
     const rid = selectedResidents[0] || '';
+    if (!rid) return setError(t(`${MP}.selectResidents`));
     setEntries((prev) => [
       ...prev,
       {
@@ -170,6 +322,7 @@ function MealPlanTab() {
         nutritionNote: '',
         stageNote: '',
         source: 'manual',
+        dishId: '',
         mealTime: resolveMealTime(rid, 'breakfast'),
       },
     ]);
@@ -191,6 +344,27 @@ function MealPlanTab() {
     );
   };
 
+  const handleDishSelect = (idx, value) => {
+    if (value === CUSTOM_DISH_VALUE) {
+      patchEntry(idx, { dishId: '', source: 'manual' });
+      return;
+    }
+    const dish = dishCatalog.find((d) => String(d._id) === String(value));
+    if (!dish) return;
+    patchEntry(idx, {
+      dishId: String(dish._id),
+      mealName: dish.name,
+      calories: dish.calories,
+      ingredients: Array.isArray(dish.ingredients) ? dish.ingredients : [],
+      source: 'catalog',
+    });
+  };
+
+  const dishCatalogIds = useMemo(
+    () => new Set(dishCatalog.map((d) => String(d._id))),
+    [dishCatalog]
+  );
+
   const removeEntry = (idx) => setEntries((prev) => prev.filter((_, i) => i !== idx));
 
   const resetForm = () => {
@@ -199,13 +373,22 @@ function MealPlanTab() {
     setSelectedResidents([]);
     setEntries([]);
     setEditingId('');
+    setMealTimeScheduleDayId('');
+    setScheduleResidentIds([]);
+    setPublishedTimes({ byResident: {}, source: 'system_default' });
     setError('');
+    loadPublishedSchedules(formWorkDate);
   };
 
   const validate = () => {
     if (!careStage) return t(`${MP}.selectCareStage`);
     if (formWorkDate < today()) return t(`${MP}.pastDateMealPlan`);
+    if (!mealTimeScheduleDayId) return t(`${MP}.selectSchedule`);
     if (selectedResidents.length < 1) return t(`${MP}.selectResidents`);
+    const allowedResidents = new Set(scheduleResidentIds);
+    if (selectedResidents.some((id) => !allowedResidents.has(String(id)))) {
+      return t(`${TAB}.scheduleNoResidentsWarn`);
+    }
     if (!entries.length) return t(`${MP}.addAtLeastOneMealEntry`);
     const typeKeys = new Set();
     const timeKeys = new Set();
@@ -228,6 +411,7 @@ function MealPlanTab() {
 
   const buildPayload = () => ({
     workDate: formWorkDate,
+    mealTimeScheduleDayId,
     careStage,
     title,
     entries: entries.map((e) => ({
@@ -235,6 +419,7 @@ function MealPlanTab() {
       mealType: e.mealType,
       mealName: e.mealName,
       calories: e.calories === '' ? undefined : Number(e.calories),
+      dishId: e.dishId || undefined,
       ingredients: Array.isArray(e.ingredients)
         ? e.ingredients
         : String(e.ingredients || '')
@@ -277,7 +462,6 @@ function MealPlanTab() {
       const data = await mealPlanService.getPlan(id);
       setEditingId(data._id);
       setTitle(data.title || '');
-      setFormWorkDate((data.workDate || '').slice(0, 10) || today());
       setCareStage(data.careStage || '');
       const rows = Array.isArray(data.entries) ? data.entries : [];
       setEntries(
@@ -291,10 +475,16 @@ function MealPlanTab() {
           stageNote: r.stageNote || '',
           source: r.source || 'manual',
           templateKey: r.templateKey || '',
+          dishId: String(r.dishId?._id || r.dishId || ''),
           mealTime: r.mealTime || defaultMealTimeByType(r.mealType),
         }))
       );
       const picked = [...new Set(rows.map((r) => String(r.residentId?._id || r.residentId || '')).filter(Boolean))];
+      const scheduleId = String(data.mealTimeScheduleDayId?._id || data.mealTimeScheduleDayId || '');
+      const workDateStr = clampWorkDate(data.workDate);
+      suppressScheduleLoadRef.current = true;
+      setFormWorkDate(workDateStr);
+      await loadPublishedSchedules(workDateStr, { preferredId: scheduleId });
       setSelectedResidents(picked);
     } catch (e) {
       setError(resolveApiError(e, t, `${MP}.openDraftFailed`));
@@ -361,7 +551,25 @@ function MealPlanTab() {
           <div className="mp-form-grid form-grid">
             <div className="form-group">
               <label>{t(`${TAB}.workDate`)} *</label>
-              <input type="date" min={today()} value={formWorkDate} onChange={(e) => setFormWorkDate(e.target.value)} />
+              <WorkDatePicker value={formWorkDate} onChange={handleWorkDateChange} t={t} />
+            </div>
+            <div className="form-group">
+              <label>{t(`${TAB}.mealTimeSchedule`)}</label>
+              <select
+                className="mp-schedule-select"
+                value={mealTimeScheduleDayId}
+                onChange={handleScheduleChange}
+              >
+                <option value="">{t(`${TAB}.selectPublishedSchedule`)}</option>
+                {publishedSchedules.map((s) => (
+                  <option key={s._id} value={s._id}>
+                    {t(`${TAB}.scheduleOption`, {
+                      title: s.title || t(`${TAB}.defaultScheduleTitle`),
+                      count: scheduleResidentCount(s),
+                    })}
+                  </option>
+                ))}
+              </select>
             </div>
             <div className="form-group">
               <label>{t(`${TAB}.careStage`)} *</label>
@@ -378,17 +586,23 @@ function MealPlanTab() {
             </div>
           </div>
 
-          <div className="mp-resident-section">
-            <label className="mp-resident-label">{t(`${TAB}.residentsLabel`)} *</label>
+          <div className={`mp-resident-section${!hasSelectedSchedule ? ' mp-resident-section--disabled' : ''}`}>
+            <label className="mp-resident-label">
+              {hasSelectedSchedule
+                ? t(`${TAB}.residentsFromSchedule`, { count: scheduleResidentIds.length })
+                : t(`${TAB}.residentsLabel`)} *
+            </label>
             <div className="mp-resident-grid">
-              {residents.map((r) => {
+              {(hasSelectedSchedule ? selectableResidents : residents).map((r) => {
                 const id = String(r._id);
                 const checked = selectedResidents.includes(id);
+                const disabled = !hasSelectedSchedule;
                 return (
-                  <label key={id} className="mp-resident-item">
+                  <label key={id} className={`mp-resident-item${disabled ? ' mp-resident-item--disabled' : ''}`}>
                     <input
                       type="checkbox"
                       checked={checked}
+                      disabled={disabled}
                       onChange={(e) =>
                         setSelectedResidents((prev) => (e.target.checked ? [...prev, id] : prev.filter((x) => x !== id)))
                       }
@@ -401,19 +615,29 @@ function MealPlanTab() {
           </div>
 
           <p className="mp-hint">
-            {publishedTimes.source === 'published_schedule'
-              ? t(`${TAB}.timesFromScheduleHint`)
-              : t(`${TAB}.noPublishedScheduleHint`)}
+            {!hasSelectedSchedule
+              ? publishedSchedules.length
+                ? t(`${TAB}.selectScheduleHint`)
+                : t(`${TAB}.noPublishedScheduleHint`)
+              : publishedTimes.source === 'published_schedule'
+                ? t(`${TAB}.timesFromScheduleHint`)
+                : t(`${TAB}.scheduleNoResidentsWarn`)}
           </p>
 
-          <div className="mp-toolbar">
-            <select value={selectedTemplate} onChange={(e) => setSelectedTemplate(e.target.value)}>
+          <div className={`mp-toolbar${!hasSelectedSchedule ? ' mp-toolbar--disabled' : ''}`}>
+            <select
+              value={selectedTemplate}
+              disabled={!hasSelectedSchedule}
+              onChange={(e) => setSelectedTemplate(e.target.value)}
+            >
               <option value="">{t(`${TAB}.selectThreeMealTemplate`)}</option>
               {templates.map((tpl) => <option key={tpl.key} value={tpl.key}>{tpl.name}</option>)}
             </select>
-            <button type="button" className="mp-btn-primary" onClick={addFromTemplate}>+ {t(`${MP}.addFromTemplate`)}</button>
-            <button type="button" className="mp-btn-secondary" onClick={addManual}>+ {t(`${MP}.addManual`)}</button>
+            <button type="button" className="mp-btn-primary" disabled={!hasSelectedSchedule} onClick={addFromTemplate}>+ {t(`${MP}.addFromTemplate`)}</button>
+            <button type="button" className="mp-btn-secondary" disabled={!hasSelectedSchedule} onClick={addManual}>+ {t(`${MP}.addManual`)}</button>
           </div>
+
+          {!dishCatalog.length && <p className="mp-hint mp-hint--catalog">{t(`${TAB}.noDishCatalog`)}</p>}
 
           <table className="mp-table">
             <thead>
@@ -426,9 +650,15 @@ function MealPlanTab() {
               {entries.map((row, idx) => (
                 <tr key={`${idx}-${row.residentId}-${row.mealType}`}>
                   <td>
-                    <select value={row.residentId} onChange={(e) => patchEntry(idx, { residentId: e.target.value })}>
+                    <select
+                      value={row.residentId}
+                      disabled={!hasSelectedSchedule}
+                      onChange={(e) => patchEntry(idx, { residentId: e.target.value })}
+                    >
                       <option value="">—</option>
-                      {residents.map((r) => <option key={r._id} value={r._id}>{r.fullName || r.residentCode}</option>)}
+                      {(hasSelectedSchedule ? selectableResidents : residents).map((r) => (
+                        <option key={r._id} value={r._id}>{r.fullName || r.residentCode}</option>
+                      ))}
                     </select>
                   </td>
                   <td>
@@ -438,8 +668,49 @@ function MealPlanTab() {
                       <option value="dinner">{mealTypeLabel('dinner', t)}</option>
                     </select>
                   </td>
-                  <td><input value={row.mealName} onChange={(e) => patchEntry(idx, { mealName: e.target.value })} /></td>
-                  <td><input type="number" min="0" value={row.calories} onChange={(e) => patchEntry(idx, { calories: e.target.value })} /></td>
+                  <td>
+                    <div className="mp-dish-cell">
+                      <select
+                        className="mp-dish-select"
+                        value={
+                          row.dishId && (row.source === 'catalog' || dishCatalogIds.has(String(row.dishId)))
+                            ? String(row.dishId)
+                            : CUSTOM_DISH_VALUE
+                        }
+                        onChange={(e) => handleDishSelect(idx, e.target.value)}
+                      >
+                        <option value={CUSTOM_DISH_VALUE}>{t(`${TAB}.customDish`)}</option>
+                        {dishCatalog.map((dish) => (
+                          <option key={dish._id} value={dish._id}>
+                            {t(`${TAB}.dishOption`, { name: dish.name, calories: dish.calories })}
+                          </option>
+                        ))}
+                        {row.dishId &&
+                          row.source === 'catalog' &&
+                          !dishCatalogIds.has(String(row.dishId)) && (
+                            <option value={row.dishId}>
+                              {row.mealName} — {t(`${TAB}.dishUnavailable`)}
+                            </option>
+                          )}
+                      </select>
+                      {(!row.dishId || row.source !== 'catalog') && (
+                        <input
+                          className="mp-dish-custom-input"
+                          value={row.mealName}
+                          onChange={(e) => patchEntry(idx, { mealName: e.target.value, dishId: '', source: 'manual' })}
+                        />
+                      )}
+                    </div>
+                  </td>
+                  <td>
+                    <input
+                      type="number"
+                      min="0"
+                      value={row.calories}
+                      readOnly={Boolean(row.dishId && row.source === 'catalog')}
+                      onChange={(e) => patchEntry(idx, { calories: e.target.value })}
+                    />
+                  </td>
                   <td><input type="time" value={row.mealTime || defaultMealTimeByType(row.mealType)} onChange={(e) => patchEntry(idx, { mealTime: e.target.value })} /></td>
                   <td><input value={Array.isArray(row.ingredients) ? row.ingredients.join(', ') : row.ingredients || ''} onChange={(e) => patchEntry(idx, { ingredients: e.target.value })} /></td>
                   <td>{sourceLabel(row.source, t)}</td>
@@ -727,7 +998,7 @@ function SpecialDietTab() {
       const data = await specialDietService.getPlan(id);
       setEditingId(data._id);
       setTitle(data.title || '');
-      setWorkDate((data.workDate || '').slice(0, 10) || today());
+      setWorkDate(clampWorkDate(data.workDate));
       const rows = Array.isArray(data.entries) ? data.entries : [];
       setEntries(
         rows.map((r) => ({
@@ -807,7 +1078,7 @@ function SpecialDietTab() {
           <div className="mp-form-grid form-grid">
             <div className="form-group">
               <label>{t(`${TAB}.workDate`)} *</label>
-              <input type="date" min={today()} value={workDate} onChange={(e) => setWorkDate(e.target.value)} />
+              <WorkDatePicker value={workDate} onChange={setWorkDate} t={t} />
             </div>
             <div className="form-group">
               <label>{t(`${TAB}.titleLabel`)}</label>
@@ -1161,7 +1432,7 @@ function MealTimeScheduleTab() {
       const data = await mealTimeScheduleService.getSchedule(id);
       setEditingId(data._id);
       setTitle(data.title || '');
-      setFormWorkDate((data.workDate || '').slice(0, 10) || today());
+      setFormWorkDate(clampWorkDate(data.workDate));
       const rows = Array.isArray(data.entries) ? data.entries : [];
       setEntries(
         rows.map((r) => ({
@@ -1241,7 +1512,7 @@ function MealTimeScheduleTab() {
           <div className="mp-form-grid form-grid">
             <div className="form-group">
               <label>{t(`${TAB}.workDate`)}</label>
-              <input type="date" min={today()} value={formWorkDate} onChange={(e) => setFormWorkDate(e.target.value)} />
+              <WorkDatePicker value={formWorkDate} onChange={setFormWorkDate} t={t} />
             </div>
             <div className="form-group">
               <label>{t(`${TAB}.titleLabel`)}</label>
