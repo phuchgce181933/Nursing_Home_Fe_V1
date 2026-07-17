@@ -318,6 +318,7 @@ function AppRoutes() {
       >
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<FamilyDashboardPage />} />
+        <Route path="profile" element={<ProfilePage />} />
         <Route path="admission-requests" element={<AdmissionRequestsHistoryPage />} />
         <Route path="facility-tours" element={<FacilityTourHistoryPage />} />
         <Route path="activities" element={<FamilyActivityPage />} />
