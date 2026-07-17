@@ -227,6 +227,7 @@ function AppRoutes() {
         <Route path="my-shifts" element={<MyShiftsPage />} />
         <Route path="care-tasks" element={<DailyCareSchedulePage />} />
         <Route path="leave" element={<LeaveRequestPage />} />
+        <Route path="notifications" element={<NotificationsPage role="doctor" />} />
         <Route path="messages" element={<MessagesPage />} />
         <Route path="incidents" element={<IncidentManagementPage />} />
       </Route>
@@ -258,6 +259,7 @@ function AppRoutes() {
         <Route path="care-tasks" element={<DailyCareSchedulePage />} />
         <Route path="activity-schedule" element={<ActivitySchedulePage />} />
         <Route path="leave" element={<LeaveRequestPage />} />
+        <Route path="notifications" element={<NotificationsPage role="nurse" />} />
         <Route path="messages" element={<MessagesPage />} />
         <Route path="incidents" element={<IncidentManagementPage />} />
       </Route>

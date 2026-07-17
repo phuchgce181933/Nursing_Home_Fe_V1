@@ -443,7 +443,7 @@ function FamilyDashboardPage() {
         </div>
         {showBellPanel && (
           <div style={{ position: 'absolute', right: 24, top: 64, zIndex: 60 }}>
-            <div className="notification-panel" style={{ width: 360 }}>
+            <div className="notification-panel bell-notification-panel" style={{ width: 360 }}>
               <div className="panel-header">
                 <div className="meta" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
                   <strong style={{ fontSize: 18 }}>Thông báo</strong>

@@ -39,6 +39,7 @@ export const roleSidebarData = {
     { title: 'sidebar.servicePackages', icon: HeartPulse, path: '/doctor/service-packages' },
     { title: 'sidebar.incidents', icon: FileText, path: '/doctor/incidents' },
     { title: 'sidebar.staffLeave', icon: CalendarOff, path: '/doctor/leave' },
+    { title: 'sidebar.notifications', icon: Bell, path: '/doctor/notifications' },
     { title: 'sidebar.messages', icon: MessageSquare, path: '/doctor/messages' },
   ],
   caregiver: [
@@ -105,6 +106,7 @@ export const roleSidebarData = {
       path: '/caregiver/incidents',
     },
   ],
+
   nurse: [
     { title: 'sidebar.nurseDashboard', icon: LayoutDashboard, path: '/nurse/dashboard' },
     { title: 'sidebar.myProfile', icon: UserCircle, path: '/nurse/profile' },
@@ -121,8 +123,10 @@ export const roleSidebarData = {
     { title: 'sidebar.servicePackages', icon: HeartPulse, path: '/nurse/service-packages' },
     { title: 'sidebar.incidents', icon: FileText, path: '/nurse/incidents' },
     { title: 'sidebar.staffLeave', icon: CalendarOff, path: '/nurse/leave' },
+    { title: 'sidebar.notifications', icon: Bell, path: '/nurse/notifications' },
     { title: 'sidebar.messages', icon: MessageSquare, path: '/nurse/messages' },
   ],
+
   family: [
     { title: 'sidebar.myProfile', icon: UserCircle, path: '/family/profile' },
     { title: 'sidebar.familyDashboard', icon: LayoutDashboard, path: '/family/dashboard' },
@@ -134,6 +138,7 @@ export const roleSidebarData = {
     { title: 'sidebar.notifications', icon: Bell, path: '/family/notifications' },
     { title: 'sidebar.messages', icon: MessageSquare, path: '/family/messages' },
   ],
+
   pharmacist: [
     { title: 'sidebar.pharmacyOverview', icon: LayoutDashboard, path: '/pharmacist/overview' },
     { title: 'sidebar.myProfile', icon: UserCircle, path: '/pharmacist/profile' },

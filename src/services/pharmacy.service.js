@@ -1,11 +1,3 @@
-/**
- * pharmacy.service.js
- * API client for Pharmacy module
- *
- * Base URL: /api/pharmacy
- * Auth: Bearer Token via axiosClient
- */
-
 import axiosClient from '../api/axiosClient';
 
 const createMedication = async (body) => {
