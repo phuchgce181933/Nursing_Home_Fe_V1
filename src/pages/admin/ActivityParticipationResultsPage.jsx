@@ -18,6 +18,8 @@ export default function ActivityParticipationResultsPage() {
   const [appliedFilters, setAppliedFilters] = useState({ search: '', status: 'completed' });
 
   const [editingId, setEditingId] = useState(null);
+  const [editingOccurrenceDate, setEditingOccurrenceDate] = useState(null);
+  const [editingOccurrenceOptions, setEditingOccurrenceOptions] = useState([]);
   const [form, setForm] = useState({
     attendanceRecords: [],
     participationRecords: [],
@@ -26,7 +28,7 @@ export default function ActivityParticipationResultsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [residents, setResidents] = useState({});
 
-  const buildAttendanceDraftFromActivity = useCallback((activity) => {
+  const buildAttendanceDraftFromActivity = useCallback((activity, targetOccurrenceDate = null) => {
     if (!activity) {
       return {
         attendanceRecords: [],
@@ -34,28 +36,39 @@ export default function ActivityParticipationResultsPage() {
       };
     }
 
-    const existingAttendance = (activity.attendanceRecords || []).reduce((acc, record) => {
-      acc[record.residentId] = record;
-      return acc;
-    }, {});
-    const existingParticipation = (activity.participationRecords || []).reduce((acc, record) => {
-      acc[record.residentId] = record;
-      return acc;
-    }, {});
+    const keyForDate = (d) => (d ? new Date(d).toISOString().slice(0,10) : null);
+    const targetKey = keyForDate(targetOccurrenceDate);
+
+    const findForResident = (records = [], residentId) => {
+      // prefer record matching target occurrenceDate, then undated
+      const byDate = (records || []).find((r) => r && r.residentId && String(r.residentId) === String(residentId) && r.occurrenceDate && keyForDate(r.occurrenceDate) === targetKey);
+      if (byDate) return byDate;
+      const noDate = (records || []).find((r) => r && r.residentId && String(r.residentId) === String(residentId) && !r.occurrenceDate);
+      return noDate || null;
+    };
+
+    const existingAttendance = activity.attendanceRecords || [];
+    const existingParticipation = activity.participationRecords || [];
 
     const participantIds = activity.participantResidentIds || [];
     return {
-      attendanceRecords: participantIds.map((residentId) => ({
-        residentId,
-        status: existingAttendance[residentId]?.status || 'present',
-        note: existingAttendance[residentId]?.note || '',
-      })),
-      participationRecords: participantIds.map((residentId) => ({
-        residentId,
-        participationLevel: existingParticipation[residentId]?.participationLevel || 'active',
-        comment: existingParticipation[residentId]?.comment || '',
-        incident: existingParticipation[residentId]?.incident || '',
-      })),
+      attendanceRecords: participantIds.map((residentId) => {
+        const rec = findForResident(existingAttendance, residentId);
+        return {
+          residentId,
+          status: rec?.status || 'present',
+          note: rec?.note || '',
+        };
+      }),
+      participationRecords: participantIds.map((residentId) => {
+        const rec = findForResident(existingParticipation, residentId);
+        return {
+          residentId,
+          participationLevel: rec?.participationLevel || 'active',
+          comment: rec?.comment || '',
+          incident: rec?.incident || '',
+        };
+      }),
     };
   }, []);
 
@@ -136,13 +149,31 @@ export default function ActivityParticipationResultsPage() {
   };
 
   const handleEdit = (activity) => {
+    // choose latest occurrenceDate from activity records, fallback to scheduledAt
+    const occDates = [];
+    (activity.attendanceRecords || []).forEach((r) => { if (r?.occurrenceDate) occDates.push(new Date(r.occurrenceDate)); });
+    (activity.participationRecords || []).forEach((r) => { if (r?.occurrenceDate) occDates.push(new Date(r.occurrenceDate)); });
+    let chosen = null;
+    if (occDates.length > 0) {
+      const unique = [...new Set(occDates.map(d => new Date(d).toISOString().slice(0,10)))];
+      const options = unique.map(d => new Date(d + 'T00:00:00.000Z').toISOString());
+      setEditingOccurrenceOptions(options);
+      const max = occDates.reduce((a,b) => (a > b ? a : b));
+      chosen = new Date(max.getFullYear(), max.getMonth(), max.getDate()).toISOString();
+    } else if (activity.scheduledAt) {
+      const d = new Date(activity.scheduledAt);
+      chosen = new Date(d.getFullYear(), d.getMonth(), d.getDate()).toISOString();
+    }
+
     setEditingId(activity._id);
-    setForm(buildAttendanceDraftFromActivity(activity));
+    setEditingOccurrenceDate(chosen);
+    setForm(buildAttendanceDraftFromActivity(activity, chosen));
     setFormError(null);
   };
 
   const handleCancel = () => {
     setEditingId(null);
+    setEditingOccurrenceDate(null);
     setForm({
       attendanceRecords: [],
       participationRecords: [],
@@ -156,10 +187,18 @@ export default function ActivityParticipationResultsPage() {
 
     try {
       setSubmitting(true);
-      await activityService.recordParticipationResult(editingId, {
-        attendanceRecords: form.attendanceRecords,
-        participationRecords: form.participationRecords,
-      });
+      const payload = {
+        attendanceRecords: (form.attendanceRecords || []).map((r) => ({ ...r })),
+        participationRecords: (form.participationRecords || []).map((r) => ({ ...r })),
+      };
+      // attach occurrenceDate if we have one selected
+      if (editingOccurrenceDate) {
+        const occurrenceDateOnly = new Date(editingOccurrenceDate).toISOString();
+        payload.attendanceRecords = payload.attendanceRecords.map((r) => ({ ...r, occurrenceDate: occurrenceDateOnly }));
+        payload.participationRecords = payload.participationRecords.map((r) => ({ ...r, occurrenceDate: occurrenceDateOnly }));
+      }
+
+      await activityService.recordParticipationResult(editingId, payload);
 
       handleCancel();
       fetchActivities();
@@ -255,9 +294,19 @@ export default function ActivityParticipationResultsPage() {
                 activities.map((activity) => (
                   <tr key={activity._id} className="adm-table-row">
                     <td style={{ fontWeight: 500 }}>{activity.title}</td>
-                    <td>
-                      {activity.scheduledAt ? new Date(activity.scheduledAt).toLocaleString('vi-VN') : '-'}
-                    </td>
+                      <td>
+                        {(() => {
+                          // show latest occurrenceDate if any, otherwise scheduledAt
+                          const occs = (activity.attendanceRecords || []).map(r => r?.occurrenceDate).filter(Boolean)
+                            .concat((activity.participationRecords || []).map(r => r?.occurrenceDate).filter(Boolean));
+                          if (occs.length > 0) {
+                            const dates = occs.map(d => new Date(d));
+                            const max = dates.reduce((a,b) => (a > b ? a : b));
+                            return max.toLocaleDateString('vi-VN');
+                          }
+                          return activity.scheduledAt ? new Date(activity.scheduledAt).toLocaleDateString('vi-VN') : '-';
+                        })()}
+                      </td>
                     <td style={{ textAlign: 'center' }}>
                       {activity.participantResidentIds?.length || 0}
                     </td>
@@ -314,6 +363,21 @@ export default function ActivityParticipationResultsPage() {
             </div>
 
             <form onSubmit={handleSubmit} className="adm-modal-body">
+                    {editingOccurrenceOptions.length > 0 && (
+                      <div style={{ marginBottom: 12 }}>
+                        <label className="text-sm font-semibold">Chọn ngày</label>
+                        <select className="adm-filter-select" value={editingOccurrenceDate || ''} onChange={(e) => {
+                          const val = e.target.value || null;
+                          setEditingOccurrenceDate(val);
+                          const act = activities.find(a => a._id === editingId);
+                          setForm(buildAttendanceDraftFromActivity(act, val));
+                        }}>
+                          {editingOccurrenceOptions.map((opt) => (
+                            <option key={opt} value={opt}>{new Date(opt).toLocaleDateString('vi-VN')}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
               {form.attendanceRecords.length > 0 && (
                 <div className="adm-modal-section">
                   <label className="text-sm font-semibold">Ghi nhận từng cư dân</label>

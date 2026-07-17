@@ -361,6 +361,29 @@ function IncidentManagementPage() {
     event.preventDefault();
     setIsSaving(true);
     setMessage('');
+    // Validate that incident date is today (only time may be edited)
+    try {
+      const incidentAtVal = form.incidentAt;
+      if (!incidentAtVal) {
+        setMessageType('error');
+        setMessage(t('incidents.error.invalidIncidentAt') || 'Thời gian xảy ra không hợp lệ.');
+        setIsSaving(false);
+        return;
+      }
+      const datePart = (incidentAtVal.split && incidentAtVal.split('T')[0]) || '';
+      const today = new Date().toISOString().slice(0, 10);
+      if (datePart !== today) {
+        setMessageType('error');
+        setMessage(t('incidents.error.incidentDateMustBeToday') || 'Thời gian xảy ra phải là ngày hôm nay.');
+        setIsSaving(false);
+        return;
+      }
+    } catch (err) {
+      setMessageType('error');
+      setMessage(t('incidents.error.invalidIncidentAt') || 'Thời gian xảy ra không hợp lệ.');
+      setIsSaving(false);
+      return;
+    }
     try {
       const payload = {
         ...form,
@@ -463,9 +486,39 @@ function IncidentManagementPage() {
   };
 
   const handleOpenDrawer = () => {
-    setForm(initialForm);
+    // Pre-fill incidentAt with today's date and current time (local)
+    const now = new Date();
+    const today = now.toISOString().slice(0, 10);
+    const hh = String(now.getHours()).padStart(2, '0');
+    const mm = String(now.getMinutes()).padStart(2, '0');
+    const datetimeLocal = `${today}T${hh}:${mm}`;
+    setForm({ ...initialForm, incidentAt: datetimeLocal });
     setDrawerJustOpened(true);
     setDrawerOpen(true);
+  };
+
+  // Helper to extract time part (HH:MM) from form.incidentAt
+  const getIncidentTime = () => {
+    try {
+      if (!form.incidentAt) return '';
+      const parts = form.incidentAt.split('T');
+      return (parts[1] || '').slice(0, 5);
+    } catch (e) {
+      return '';
+    }
+  };
+
+  // Update form.incidentAt time portion while keeping date unchanged
+  const setIncidentTime = (timeStr) => {
+    try {
+      const datePart = (form.incidentAt && form.incidentAt.split('T')[0]) || new Date().toISOString().slice(0, 10);
+      const normalizedTime = timeStr && timeStr.length === 5 ? timeStr : '00:00';
+      setForm((c) => ({ ...c, incidentAt: `${datePart}T${normalizedTime}` }));
+    } catch (e) {
+      // fallback
+      const today = new Date().toISOString().slice(0, 10);
+      setForm((c) => ({ ...c, incidentAt: `${today}T00:00` }));
+    }
   };
 
   /* ── Computed ──────────────────────────────────────────────── */
@@ -641,17 +694,21 @@ function IncidentManagementPage() {
                     <Eye size={14} />
                     {t('incidents.viewDetail')}
                   </button>
-                  {statusOptions.map((status) => (
-                    <button
-                      key={status}
-                      type="button"
-                      className={`ic-btn ic-btn--small ${status === incident.status ? 'ic-btn--primary' : 'ic-btn--secondary'}`}
-                      onClick={() => handleStatusUpdate(incident._id, status)}
-                      disabled={isSaving || status === incident.status}
-                    >
-                      {STATUS_DISPLAY[status]}
-                    </button>
-                  ))}
+                  {statusOptions.map((status, idx) => {
+                    const orderIndex = statusOptions.indexOf(incident.status);
+                    const disabled = isSaving || status === incident.status || idx < orderIndex;
+                    return (
+                      <button
+                        key={status}
+                        type="button"
+                        className={`ic-btn ic-btn--small ${status === incident.status ? 'ic-btn--primary' : 'ic-btn--secondary'}`}
+                        onClick={() => handleStatusUpdate(incident._id, status)}
+                        disabled={disabled}
+                      >
+                        {STATUS_DISPLAY[status]}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -788,15 +845,25 @@ function IncidentManagementPage() {
                   </select>
                 </div>
 
-                <div className="ic-field">
+                <div className="ic-field ic-field--horizontal">
                   <label className="ic-field__label">{t('incidents.form.incidentAt')} *</label>
-                  <input
-                    className="ic-field__input"
-                    type="datetime-local"
-                    value={form.incidentAt}
-                    onChange={(e) => setForm((c) => ({ ...c, incidentAt: e.target.value }))}
-                    required
-                  />
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <input
+                      className="ic-field__input"
+                      type="date"
+                      value={(form.incidentAt && form.incidentAt.split('T')[0]) || ''}
+                      disabled
+                      aria-disabled
+                    />
+                    <input
+                      className="ic-field__input"
+                      type="time"
+                      value={getIncidentTime()}
+                      onChange={(e) => setIncidentTime(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div style={{ fontSize: 12, color: '#666', marginTop: 6 }}>{t('incidents.form.incidentAtHelp')}</div>
                 </div>
 
                 <div className="ic-field">
