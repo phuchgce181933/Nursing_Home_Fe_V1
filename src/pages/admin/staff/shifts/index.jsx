@@ -26,6 +26,7 @@ import { getApiErrorPayload, blockingCareTasksMessage } from '../../../../utils/
 import BlockingCareTasksAlert from '../../../../components/staff/BlockingCareTasksAlert';
 import { useTranslation } from 'react-i18next';
 import { resolveApiError } from '../../../../utils/apiMessage';
+import { validateSplitShiftDuration } from '../../../../utils/shiftDurationValidation';
 import AdminPageShell from '../../../../components/admin/AdminPageShell';
 import '../../../../styles/admin/ShiftManagementPage.css';
 
@@ -73,6 +74,12 @@ const getCareScheduleStatusLabels = (t) => ({
 const getStaffRoleLabel = (t, role) => t(`common.roles.${role}`, { defaultValue: role });
 
 const isFlexibleTemplate = (tpl) => Boolean(tpl?.isFlexibleTime || tpl?.shiftCode === 'SPLIT');
+
+const splitShiftDurationError = (form, t) => {
+  const errorKey = validateSplitShiftDuration(form.startTime, form.endTime);
+  if (!errorKey) return '';
+  return t(`${NS}.createModal.${errorKey}`);
+};
 
 const templateOptionLabel = (t, tpl) =>
   isFlexibleTemplate(tpl)
@@ -509,6 +516,13 @@ function CreateShiftModal({ templates, onSave, onClose }) {
       setError(t(`${NS}.createModal.splitTimeRequired`));
       return;
     }
+    if (flexible) {
+      const durationError = splitShiftDurationError(form, t);
+      if (durationError) {
+        setError(durationError);
+        return;
+      }
+    }
     try {
       const payload = buildShiftPayload(form, { template: selectedTemplate });
       const res = await onSave(payload);
@@ -688,6 +702,13 @@ function UpdateShiftModal({ shift, templates, onSave, onClose }) {
     if (flexible && (!form.startTime || !form.endTime)) {
       setError(t(`${NS}.createModal.splitTimeRequired`));
       return;
+    }
+    if (flexible) {
+      const durationError = splitShiftDurationError(form, t);
+      if (durationError) {
+        setError(durationError);
+        return;
+      }
     }
     try {
       const payload = buildShiftPayload(form, { isUpdate: true, template: selectedTemplate });

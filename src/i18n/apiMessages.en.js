@@ -113,6 +113,11 @@ export const apiErrorsEn = {
   SHIFT_PAST_DATE: 'Cannot create or assign shifts for a past date',
   SHIFT_TIME_INVALID: 'startTime/endTime may only be used with flexible (SPLIT) shift templates',
   SHIFT_TIME_UNRESOLVABLE: 'Could not resolve shift time window',
+  SHIFT_FLEXIBLE_TIME_REQUIRED: 'startTime and endTime are required for split shifts',
+  SHIFT_FLEXIBLE_TIME_FORMAT: 'Split shift times must use HH:mm format',
+  SHIFT_FLEXIBLE_END_BEFORE_START: 'End time must be after start time (split shift on the same day)',
+  SHIFT_FLEXIBLE_DURATION_MIN: 'Split shift must be at least {{minHours}} hour(s)',
+  SHIFT_FLEXIBLE_DURATION_MAX: 'Split shift cannot exceed {{maxHours}} hour(s)',
   SHIFT_STAFF_BANNED: 'Cannot assign shift to a banned staff account',
   SHIFT_STAFF_INACTIVE: 'Cannot assign shift to an inactive staff account',
   SHIFT_ADMIN_NOT_ASSIGNABLE: 'Cannot assign shifts to admin or manager accounts',
@@ -135,6 +140,12 @@ export const apiErrorsEn = {
   BEHAVIOR_RECORD_NOT_FOUND: 'Behavior record not found',
   HYGIENE_RECORD_NOT_FOUND: 'Hygiene activity record not found',
   MEAL_INTAKE_RECORD_NOT_FOUND: 'Meal intake record not found',
+  MEAL_INTAKE_SHIFT_WINDOW_CLOSED:
+    'Recording or editing meal intake is only allowed during your shift or within 30 minutes after it ends',
+  HYGIENE_SHIFT_WINDOW_CLOSED:
+    'Recording or editing hygiene activities is only allowed during your shift or within 30 minutes after it ends',
+  BEHAVIOR_SHIFT_WINDOW_CLOSED:
+    'Recording or editing daily behavior observations is only allowed during your shift or within 30 minutes after it ends',
   MEAL_WORK_DATE_INVALID: 'workDate must be YYYY-MM-DD',
   MEAL_OBJECT_ID_INVALID: '{{label}} is invalid',
   MEAL_USER_NOT_IDENTIFIED: 'User could not be identified',
@@ -169,6 +180,8 @@ export const apiErrorsEn = {
   MEAL_SPECIAL_DIET_PUBLISH_PAST_DATE: 'Cannot publish special diet plan for a past date',
   MEAL_SPECIAL_DIET_PUBLISH_EMPTY: 'Cannot publish an empty special diet plan',
   MEAL_SPECIAL_DIET_PUBLISH_NO_RESIDENTS: 'Special diet plan must have at least one resident before publish',
+  MEAL_SPECIAL_DIET_PUBLISH_DUPLICATE_RESIDENT:
+    'Some residents already have a published special diet for this date: {{residents}}',
   MEAL_ENTRY_DIET_TYPE_INVALID: 'entries[{{index}}].dietType must be one of: {{allowed}}',
   MEAL_ENTRY_EFFECTIVE_TIME_INVALID: 'entries[{{index}}].effectiveTime must be HH:mm',
   MEAL_ENTRY_EFFECTIVE_TIME_PAST_TODAY: 'Effective time cannot be in the past — must be from now onward for today',
@@ -178,6 +191,8 @@ export const apiErrorsEn = {
   MEAL_TIME_SCHEDULE_PUBLISH_PAST_DATE: 'Cannot publish meal time schedule for a past date',
   MEAL_TIME_SCHEDULE_PUBLISH_EMPTY: 'Cannot publish an empty meal time schedule',
   MEAL_TIME_SCHEDULE_PUBLISH_NO_RESIDENTS: 'Meal time schedule must have at least one resident before publish',
+  MEAL_TIME_SCHEDULE_PUBLISH_DUPLICATE_RESIDENT:
+    'Some residents already have a published meal time schedule for this date: {{residents}}',
   MEAL_TIME_SCHEDULE_NO_RESIDENTS: 'Meal time schedule must include at least one resident',
   MEAL_TIME_SCHEDULE_RESIDENTS_MISMATCH: 'Some meal plan residents are not in the selected meal time schedule',
   MEAL_RESIDENT_NO_MEAL_TIME_IN_SCHEDULE: 'Resident has no {{mealType}} time in the selected meal time schedule',
