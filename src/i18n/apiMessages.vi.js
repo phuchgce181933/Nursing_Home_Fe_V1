@@ -113,6 +113,11 @@ export const apiErrorsVi = {
   SHIFT_PAST_DATE: 'Không thể tạo hoặc phân công ca cho ngày trong quá khứ',
   SHIFT_TIME_INVALID: 'startTime/endTime chỉ được dùng với mẫu ca gãy (SPLIT)',
   SHIFT_TIME_UNRESOLVABLE: 'Không thể xác định mốc thời gian ca',
+  SHIFT_FLEXIBLE_TIME_REQUIRED: 'startTime và endTime là bắt buộc cho ca gãy',
+  SHIFT_FLEXIBLE_TIME_FORMAT: 'Giờ ca gãy phải có định dạng HH:mm',
+  SHIFT_FLEXIBLE_END_BEFORE_START: 'Giờ kết thúc phải sau giờ bắt đầu (ca gãy trong cùng ngày)',
+  SHIFT_FLEXIBLE_DURATION_MIN: 'Ca gãy phải có thời lượng tối thiểu {{minHours}} giờ',
+  SHIFT_FLEXIBLE_DURATION_MAX: 'Ca gãy không được vượt quá {{maxHours}} giờ',
   SHIFT_STAFF_BANNED: 'Không thể phân ca cho nhân viên có tài khoản bị khóa',
   SHIFT_STAFF_INACTIVE: 'Không thể phân ca cho nhân viên không hoạt động',
   SHIFT_ADMIN_NOT_ASSIGNABLE: 'Không thể phân ca cho tài khoản admin hoặc manager',
@@ -135,6 +140,12 @@ export const apiErrorsVi = {
   BEHAVIOR_RECORD_NOT_FOUND: 'Không tìm thấy bản ghi hành vi',
   HYGIENE_RECORD_NOT_FOUND: 'Không tìm thấy bản ghi hoạt động vệ sinh',
   MEAL_INTAKE_RECORD_NOT_FOUND: 'Không tìm thấy bản ghi ghi nhận bữa ăn',
+  MEAL_INTAKE_SHIFT_WINDOW_CLOSED:
+    'Chỉ ghi nhận/chỉnh sửa bữa ăn trong ca hoặc 30 phút sau khi hết ca',
+  HYGIENE_SHIFT_WINDOW_CLOSED:
+    'Chỉ ghi nhận/chỉnh sửa hoạt động vệ sinh trong ca hoặc 30 phút sau khi hết ca',
+  BEHAVIOR_SHIFT_WINDOW_CLOSED:
+    'Chỉ ghi nhận/chỉnh sửa hành vi hằng ngày trong ca hoặc 30 phút sau khi hết ca',
   MEAL_WORK_DATE_INVALID: 'workDate phải đúng định dạng YYYY-MM-DD',
   MEAL_OBJECT_ID_INVALID: '{{label}} không hợp lệ',
   MEAL_USER_NOT_IDENTIFIED: 'Không xác định được người dùng',
@@ -169,6 +180,8 @@ export const apiErrorsVi = {
   MEAL_SPECIAL_DIET_PUBLISH_PAST_DATE: 'Không thể đăng kế hoạch chế độ ăn cho ngày trong quá khứ',
   MEAL_SPECIAL_DIET_PUBLISH_EMPTY: 'Không thể đăng kế hoạch chế độ ăn rỗng',
   MEAL_SPECIAL_DIET_PUBLISH_NO_RESIDENTS: 'Kế hoạch chế độ ăn phải có ít nhất một cư dân trước khi đăng',
+  MEAL_SPECIAL_DIET_PUBLISH_DUPLICATE_RESIDENT:
+    'Một số cư dân đã có chế độ ăn đặc biệt publish cho ngày này: {{residents}}',
   MEAL_ENTRY_DIET_TYPE_INVALID: 'entries[{{index}}].dietType phải thuộc một trong: {{allowed}}',
   MEAL_ENTRY_EFFECTIVE_TIME_INVALID: 'entries[{{index}}].effectiveTime phải đúng định dạng HH:mm',
   MEAL_ENTRY_EFFECTIVE_TIME_PAST_TODAY: 'Giờ hiệu lực không được đặt trong quá khứ — phải từ thời điểm hiện tại trở đi (ngày hôm nay)',
@@ -178,6 +191,8 @@ export const apiErrorsVi = {
   MEAL_TIME_SCHEDULE_PUBLISH_PAST_DATE: 'Không thể đăng lịch giờ ăn cho ngày trong quá khứ',
   MEAL_TIME_SCHEDULE_PUBLISH_EMPTY: 'Không thể đăng lịch giờ ăn rỗng',
   MEAL_TIME_SCHEDULE_PUBLISH_NO_RESIDENTS: 'Lịch giờ ăn phải có ít nhất một cư dân trước khi đăng',
+  MEAL_TIME_SCHEDULE_PUBLISH_DUPLICATE_RESIDENT:
+    'Một số cư dân đã có lịch giờ ăn publish cho ngày này: {{residents}}',
   MEAL_TIME_SCHEDULE_NO_RESIDENTS: 'Lịch giờ ăn phải có ít nhất một cư dân',
   MEAL_TIME_SCHEDULE_RESIDENTS_MISMATCH: 'Một số cư dân trong kế hoạch bữa ăn không có trong lịch giờ ăn đã chọn',
   MEAL_RESIDENT_NO_MEAL_TIME_IN_SCHEDULE: 'Cư dân chưa có giờ {{mealType}} trong lịch giờ ăn đã chọn',

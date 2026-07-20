@@ -1,8 +1,7 @@
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ALL_STAFF_ROLE_OPTIONS } from '../../../../constants/rolePolicy';
-
-const PHONE_REGEX = /^(\+84|0)[0-9]{8,10}$/;
+import { isValidStaffPhone } from '../../../../utils/staffPhoneValidation';
 
 export default function StaffEditModal({
   loading = false,
@@ -23,7 +22,7 @@ export default function StaffEditModal({
   const handlePhoneChange = (val) => {
     set('phone', val);
     if (!val.trim()) { setPhoneError(''); return; }
-    if (!PHONE_REGEX.test(val.trim())) {
+    if (!isValidStaffPhone(val)) {
       setPhoneError(t('admin.staff.profiles.validation.phoneInvalid'));
       return;
     }
@@ -59,7 +58,7 @@ export default function StaffEditModal({
 
   const handleSave = () => {
     if (phoneError || loading) return;
-    if (form.phone?.trim() && !PHONE_REGEX.test(form.phone.trim())) {
+    if (form.phone?.trim() && !isValidStaffPhone(form.phone)) {
       setPhoneError(t('admin.staff.profiles.validation.phoneInvalid'));
       return;
     }

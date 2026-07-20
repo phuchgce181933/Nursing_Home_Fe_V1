@@ -9,6 +9,8 @@ function HygieneListFilters({
   residents,
   loading,
   maxDate,
+  readOnly = false,
+  canCreate = true,
   onWorkDateChange,
   onActivityCategoryChange,
   onResidentIdChange,
@@ -52,13 +54,15 @@ function HygieneListFilters({
           </select>
         </label>
         <div className="resident-page__filter-actions">
-          <button
-            type="button"
-            className="resident-page__button resident-page__button--primary"
-            onClick={onOpenCreate}
-          >
-            {t('caregiver.hygiene.addRecord')}
-          </button>
+          {!readOnly && canCreate && (
+            <button
+              type="button"
+              className="resident-page__button resident-page__button--primary"
+              onClick={onOpenCreate}
+            >
+              {t('caregiver.hygiene.addRecord')}
+            </button>
+          )}
           <button
             type="button"
             className="resident-page__button resident-page__button--ghost"

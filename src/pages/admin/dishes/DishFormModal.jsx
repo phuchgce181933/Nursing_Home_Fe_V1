@@ -64,14 +64,16 @@ export default function DishFormModal({
               }
             />
           </div>
-          <div className="form-group form-grid--full form-group--checkbox">
-            <input
-              id="dish-active"
-              type="checkbox"
-              checked={formData.isActive}
-              onChange={(e) => onChange({ ...formData, isActive: e.target.checked })}
-            />
-            <label htmlFor="dish-active">{t(`${ns}.fieldActive`)}</label>
+          <div className="form-grid--full dish-form-modal__active-row">
+            <label className="dish-form-modal__active-toggle" htmlFor="dish-active">
+              <input
+                id="dish-active"
+                type="checkbox"
+                checked={formData.isActive}
+                onChange={(e) => onChange({ ...formData, isActive: e.target.checked })}
+              />
+              <span>{t(`${ns}.fieldActive`)}</span>
+            </label>
           </div>
         </div>
 
