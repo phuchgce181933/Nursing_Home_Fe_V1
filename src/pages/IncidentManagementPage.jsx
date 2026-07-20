@@ -21,6 +21,8 @@ import residentService from '../services/resident.service';
 import facilityService from '../services/facility.service';
 import { useAuth } from '../hooks/useAuth';
 import incidentService from '../services/incident.service';
+import clinicalServiceService from '../services/clinicalService.service';
+import staffService from '../services/staff.service';
 import { floorLabel } from '../utils/residentArea';
 import '../styles/shared/IncidentManagementPage.css';
 
@@ -70,6 +72,10 @@ function IncidentManagementPage() {
   const [incidents, setIncidents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [optionsLoading, setOptionsLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [pageSize] = useState(10);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('success');
@@ -91,6 +97,15 @@ function IncidentManagementPage() {
   const [selectedHandlers, setSelectedHandlers] = useState([]);
   const [assigningHandlers, setAssigningHandlers] = useState(false);
   const [drawerJustOpened, setDrawerJustOpened] = useState(false);
+  const [resolutionForm, setResolutionForm] = useState(null);
+  const [resolutionFiles, setResolutionFiles] = useState([]);
+  const [savingResolution, setSavingResolution] = useState(false);
+  const [clinicalServices, setClinicalServices] = useState([]);
+  const [selectedClinicalServices, setSelectedClinicalServices] = useState({});
+  const [medSuggestions] = useState(["Paracetamol", "Amoxicillin", "Ibuprofen", "Metformin", "Aspirin", "Omeprazole"]);
+  const [medSuggestionOpenIndex, setMedSuggestionOpenIndex] = useState(-1);
+  const immediateActionOptions = ['Lau sàn', 'Hỗ trợ cư dân', 'Gọi bác sĩ', 'Liên hệ gia đình', 'Chuyển viện', 'Khác'];
+  const [staffAvailabilityMap, setStaffAvailabilityMap] = useState({});
 
   const isAdmin = String(user?.role || '').toLowerCase() === 'admin';
   const isCaregiver = String(user?.role || '').toLowerCase() === 'caregiver';
@@ -107,6 +122,47 @@ function IncidentManagementPage() {
     const role = staff?.role ? ` — ${staff.role.toUpperCase()}` : '';
     const email = staff?.email ? ` • ${staff.email}` : '';
     return `${name}${role}${email}`;
+  };
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const res = await clinicalServiceService.listServices({ active: true, page: 1, limit: 500 });
+        const services = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+        if (mounted && services.length > 0) setClinicalServices(services);
+        else if (mounted && clinicalServices.length === 0) setClinicalServices([]);
+      } catch (err) {
+        if (mounted && clinicalServices.length === 0) setClinicalServices([]);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+
+  const getSelectedClinicalServiceFieldValue = (serviceId, fieldCode) => {
+    return selectedClinicalServices[serviceId]?.fieldValues?.[fieldCode] ?? '';
+  };
+  const setSelectedClinicalServiceFieldValue = (serviceId, fieldCode, value) => {
+    setSelectedClinicalServices((prev) => {
+      const svc = prev[serviceId];
+      if (!svc) return prev;
+      const nextFieldValues = { ...(svc.fieldValues || {}) };
+      nextFieldValues[fieldCode] = value;
+      return { ...prev, [serviceId]: { ...svc, fieldValues: nextFieldValues } };
+    });
+  };
+
+  const getStaffSelectionId = (staff) => {
+    if (!staff) return '';
+    return String(
+      staff?.staffProfile?._id
+      || staff?.staffProfile?.id
+      || staff?.userId?._id
+      || staff?.userId
+      || staff?.id
+      || staff?._id
+      || ''
+    );
   };
 
   const floorLabelMap = useMemo(
@@ -207,7 +263,10 @@ function IncidentManagementPage() {
     });
   };
 
-  const toggleAssignedStaff = (staffId) => {
+  const toggleAssignedStaff = (staff) => {
+    const staffId = getStaffSelectionId(staff);
+    if (!staffId) return;
+
     setForm((current) => {
       const alreadyAssigned = current.assignedStaffIds.includes(staffId);
       return {
@@ -219,6 +278,24 @@ function IncidentManagementPage() {
     });
   };
 
+  const getStaffAvailabilityKey = (staff) => {
+    if (!staff) return '';
+    return String(staff?.userId?._id || staff?.userId || staff?._id || staff?.id || '');
+  };
+
+  const getStaffAvailability = (staff) => {
+    const key = getStaffAvailabilityKey(staff);
+    return key ? staffAvailabilityMap[key] : null;
+  };
+
+  const getStaffAvailabilityLabel = (staff) => {
+    const availability = getStaffAvailability(staff);
+    if (!availability) return '—';
+    const status = availability.availabilityStatus || availability.readinessLabelVi || '—';
+    const isOnDuty = availability.isOnShift || availability.onShift || availability.availabilityStatus === 'On Duty';
+    return isOnDuty ? `Đang đi làm · ${status}` : `Không trực · ${status}`;
+  };
+
   const getReporterStaffSelectionId = (incident) => {
     if (!incident || !staffAccounts.length) return null;
 
@@ -228,8 +305,8 @@ function IncidentManagementPage() {
     const reportedByUserId = reportedByUser?._id || reportedByUser?.id || reportedByUser;
 
     const matchedStaff = staffAccounts.find((staff) => {
-      const staffId = staff?._id || staff?.id;
-      const staffUserId = staff?.userId?._id || staff?.userId || staff?.userId?.id;
+      const staffId = getStaffSelectionId(staff);
+      const staffUserId = getStaffSelectionId(staff);
       const staffEmail = staff?.email?.toLowerCase?.() || staff?.userId?.email?.toLowerCase?.();
       const staffName = staff?.fullName || staff?.userId?.fullName || '';
 
@@ -240,7 +317,7 @@ function IncidentManagementPage() {
       return false;
     });
 
-    return matchedStaff?._id || matchedStaff?.id || null;
+    return matchedStaff ? getStaffSelectionId(matchedStaff) : null;
   };
 
   /* ── Data loading ──────────────────────────────────────────── */
@@ -248,14 +325,15 @@ function IncidentManagementPage() {
     setLoading(true);
     try {
       const payload = {
-        page: 1,
-        limit: 20,
+        page,
+        limit: pageSize,
         ...(search ? { search } : {}),
         ...(statusFilter ? { status: statusFilter } : {}),
-        ...(isAdmin || isCaregiver ? {} : { reporterRole: user?.role }),
       };
       const data = await incidentService.listIncidents(payload);
       setIncidents(data.items || []);
+      setTotalPages(data.totalPages || 1);
+      setTotalItems(data.total || 0);
       setMessage('');
     } catch (error) {
       setMessageType('error');
@@ -285,7 +363,7 @@ function IncidentManagementPage() {
       }
 
       if (currentUserStaff) {
-        const staffId = currentUserStaff._id || currentUserStaff.id;
+        const staffId = getStaffSelectionId(currentUserStaff);
         console.log('[DEBUG] Setting assigned staff to:', staffId);
         setForm((prev) => ({
           ...prev,
@@ -321,7 +399,41 @@ function IncidentManagementPage() {
   useEffect(() => {
     if (!user) return;
     loadIncidents();
-  }, [user, search, statusFilter]);
+  }, [user, search, statusFilter, page, pageSize, isAdmin, isCaregiver]);
+
+  useEffect(() => {
+    if (!isAdmin || !staffAccounts.length) {
+      setStaffAvailabilityMap({});
+      return;
+    }
+
+    let active = true;
+    const loadAvailability = async () => {
+      try {
+        const today = new Date().toISOString().slice(0, 10);
+        const roles = ['nurse', 'doctor', 'caregiver', 'pharmacist'];
+        const availabilityResponses = await Promise.all(
+          roles.map((role) => staffService.getAvailability({ role, date: today }).catch(() => []))
+        );
+
+        if (!active) return;
+        const nextMap = {};
+        const rows = availabilityResponses.flatMap((response) =>
+          Array.isArray(response) ? response : response?.data || []
+        );
+        rows.forEach((row) => {
+          const key = String(row?._id || row?.userId?._id || row?.userId || '');
+          if (key) nextMap[key] = row;
+        });
+        setStaffAvailabilityMap(nextMap);
+      } catch (error) {
+        if (active) setStaffAvailabilityMap({});
+      }
+    };
+
+    loadAvailability();
+    return () => { active = false; };
+  }, [isAdmin, staffAccounts]);
 
   useEffect(() => {
     if (!user) return;
@@ -421,6 +533,16 @@ function IncidentManagementPage() {
     }
   };
 
+  const handleSearchChange = (event) => {
+    setSearch(event.target.value);
+    setPage(1);
+  };
+
+  const handleStatusFilterChange = (nextStatus) => {
+    setStatusFilter(nextStatus);
+    setPage(1);
+  };
+
   const handleViewDetail = async (incidentId) => {
     setDetailOpen(true);
     setDetailLoading(true);
@@ -428,6 +550,18 @@ function IncidentManagementPage() {
     try {
       const data = await incidentService.getIncident(incidentId);
       setDetailIncident(data);
+      // Initialize resolution form from incident
+      setResolutionForm({
+        status: data?.resolution?.status || 'In Progress',
+        method: data?.resolution?.method || '',
+        rootCause: data?.resolution?.rootCause || '',
+        detailedCause: data?.resolution?.detailedCause || '',
+        immediateActions: data?.resolution?.immediateActions || [],
+        medical: data?.resolution?.medical || { medications: [], procedures: [], residentCondition: '', needFollowUp: false },
+        result: data?.resolution?.result || '',
+        notes: data?.resolution?.notes || '',
+      });
+      setResolutionFiles([]);
     } catch (error) {
       setMessageType('error');
       setMessage(error?.response?.data?.message || t('incidents.error.loadFailed'));
@@ -442,7 +576,6 @@ function IncidentManagementPage() {
       const csv = await incidentService.exportIncidents({
         ...(search ? { search } : {}),
         ...(statusFilter ? { status: statusFilter } : {}),
-        ...(isAdmin || isCaregiver ? {} : { reporterRole: user?.role }),
       });
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
       const url = URL.createObjectURL(blob);
@@ -608,7 +741,7 @@ function IncidentManagementPage() {
           <input
             className="ic-search__input"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={handleSearchChange}
             placeholder={t('incidents.searchPlaceholder')}
           />
         </div>
@@ -616,7 +749,7 @@ function IncidentManagementPage() {
           <button
             type="button"
             className={`ic-pill ${statusFilter === '' ? 'ic-pill--active' : ''}`}
-            onClick={() => setStatusFilter('')}
+            onClick={() => handleStatusFilterChange('')}
           >
             {t('incidents.filter.all')}
           </button>
@@ -625,7 +758,7 @@ function IncidentManagementPage() {
               key={s}
               type="button"
               className={`ic-pill ${statusFilter === s ? 'ic-pill--active' : ''}`}
-              onClick={() => setStatusFilter(s)}
+              onClick={() => handleStatusFilterChange(s)}
             >
               {STATUS_DISPLAY[s]}
             </button>
@@ -633,7 +766,7 @@ function IncidentManagementPage() {
         </div>
       </div>
 
-      {/* ── Incident card list ─────────────────────────────── */}
+      {/* ── Incident table ─────────────────────────────── */}
       {loading ? (
         <LoadingSpinner label={t('incidents.loading')} />
       ) : incidents.length === 0 ? (
@@ -642,78 +775,117 @@ function IncidentManagementPage() {
           <p>{t('incidents.noIncidents')}</p>
         </div>
       ) : (
-        <div className="ic-list">
-          {incidents.map((incident, idx) => (
-            <div
-              key={incident._id}
-              className="ic-card"
-              style={{ animationDelay: `${0.05 * (idx % 8)}s` }}
-            >
-              <div className={`ic-card__severity-bar ic-card__severity-bar--${incident.severity}`} />
-              <div className="ic-card__body">
-                <div className="ic-card__top">
-                  <div>
-                    <span className="ic-card__type">{incident.incidentType}</span>
-                    <p className="ic-card__resident">
-                      {Array.isArray(incident.residentIds) && incident.residentIds.length > 0
-                        ? incident.residentIds.map((resident) => resident?.fullName || resident).join(', ')
-                        : incident.residentId?.fullName || incident.residentId || t('incidents.unknownResident')}
-                    </p>
-                  </div>
-                  <span className={`ic-badge ic-badge--${incident.status}`}>
-                    {STATUS_DISPLAY[incident.status] || incident.status}
-                  </span>
-                </div>
+        <>
+          <div className="ic-table-wrapper">
+            <table className="ic-table">
+              <thead>
+                <tr>
+                  <th>Loại sự cố</th>
+                  <th>Cư dân</th>
+                  <th>Độ nghiêm trọng</th>
+                  <th>Trạng thái</th>
+                  <th>Nhân viên được giao</th>
+                  <th>Thời gian</th>
+                  <th>Hành động</th>
+                </tr>
+              </thead>
+              <tbody>
+                {incidents.map((incident) => {
+                  const assignedStaffList = Array.isArray(incident.assignedStaffIds) ? incident.assignedStaffIds : [];
+                  return (
+                    <tr key={incident._id}>
+                      <td>
+                        <div className="ic-table-title">{incident.incidentType}</div>
+                        <div className="ic-table-subtext">{incident.location || '—'}</div>
+                      </td>
+                      <td>
+                        <div className="ic-table-title">
+                          {Array.isArray(incident.residentIds) && incident.residentIds.length > 0
+                            ? incident.residentIds.map((resident) => resident?.fullName || resident).join(', ')
+                            : incident.residentId?.fullName || incident.residentId || t('incidents.unknownResident')}
+                        </div>
+                        <div className="ic-table-subtext">{incident.reporterName || incident.reporterEmail || t('incidents.unknown')}</div>
+                      </td>
+                      <td>
+                        <span className={`ic-severity ic-severity--${incident.severity}`}>
+                          {SEVERITY_DISPLAY[incident.severity] || incident.severity}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={`ic-badge ic-badge--${incident.status}`}>
+                          {STATUS_DISPLAY[incident.status] || incident.status}
+                        </span>
+                      </td>
+                      <td>
+                        {assignedStaffList.length > 0 ? (
+                          <div className="ic-assigned-list">
+                            {assignedStaffList.map((staff) => {
+                              const availabilityLabel = getStaffAvailabilityLabel(staff);
+                              return (
+                                <div key={staff?._id || staff?.id || staff?.userId?._id || staff?.userId} className="ic-assigned-item">
+                                  <span>{staff?.userId?.fullName || staff?.fullName || staff?.userId?.email || staff?.email || '—'}</span>
+                                  <small className={availabilityLabel.includes('Đang đi làm') ? 'ic-availability ic-availability--on' : 'ic-availability ic-availability--off'}>{availabilityLabel}</small>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <span className="ic-muted">Chưa phân công</span>
+                        )}
+                      </td>
+                      <td>
+                        <div className="ic-table-title">{formatDate(incident.incidentAt)}</div>
+                        <div className="ic-table-subtext">{incident.description || '—'}</div>
+                      </td>
+                      <td>
+                        <div className="ic-table-actions">
+                          <button
+                            type="button"
+                            className="ic-btn ic-btn--small ic-btn--secondary"
+                            onClick={() => handleViewDetail(incident._id)}
+                          >
+                            <Eye size={14} />
+                            {t('incidents.viewDetail')}
+                          </button>
+                          <div className="ic-status-actions">
+                            {statusOptions.map((status, idx) => {
+                              const orderIndex = statusOptions.indexOf(incident.status);
+                              const disabled = isSaving || status === incident.status || idx < orderIndex;
+                              return (
+                                <button
+                                  key={status}
+                                  type="button"
+                                  className={`ic-btn ic-btn--small ${status === incident.status ? 'ic-btn--primary' : 'ic-btn--secondary'}`}
+                                  onClick={() => handleStatusUpdate(incident._id, status)}
+                                  disabled={disabled}
+                                >
+                                  {STATUS_DISPLAY[status]}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
 
-                <p className="ic-card__description">{incident.description}</p>
-
-                <div className="ic-card__meta">
-                  <span className="ic-card__meta-item">
-                    <MapPin size={13} /> {incident.location || '—'}
-                  </span>
-                  <span className="ic-card__meta-item">
-                    <Clock size={13} /> {formatDate(incident.incidentAt)}
-                  </span>
-                  <span className="ic-card__meta-item">
-                    <User size={13} /> {incident.reporterName || incident.reporterEmail || t('incidents.unknown')}
-                  </span>
-                </div>
-
-                <div className="ic-card__meta">
-                  <span className={`ic-severity ic-severity--${incident.severity}`}>
-                    {SEVERITY_DISPLAY[incident.severity] || incident.severity}
-                  </span>
-                </div>
-
-                <div className="ic-card__actions">
-                  <button
-                    type="button"
-                    className="ic-btn ic-btn--small ic-btn--secondary"
-                    onClick={() => handleViewDetail(incident._id)}
-                  >
-                    <Eye size={14} />
-                    {t('incidents.viewDetail')}
-                  </button>
-                  {statusOptions.map((status, idx) => {
-                    const orderIndex = statusOptions.indexOf(incident.status);
-                    const disabled = isSaving || status === incident.status || idx < orderIndex;
-                    return (
-                      <button
-                        key={status}
-                        type="button"
-                        className={`ic-btn ic-btn--small ${status === incident.status ? 'ic-btn--primary' : 'ic-btn--secondary'}`}
-                        onClick={() => handleStatusUpdate(incident._id, status)}
-                        disabled={disabled}
-                      >
-                        {STATUS_DISPLAY[status]}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+          <div className="ic-pagination">
+            <span className="ic-pagination__summary">Hiển thị {incidents.length} / {totalItems} sự cố</span>
+            <div className="ic-pagination__controls">
+              <button type="button" className="ic-btn ic-btn--secondary" disabled={page <= 1 || loading} onClick={() => setPage((prev) => Math.max(prev - 1, 1))}>
+                Trước
+              </button>
+              <span className="ic-pagination__page">Trang {page} / {totalPages}</span>
+              <button type="button" className="ic-btn ic-btn--secondary" disabled={page >= totalPages || loading} onClick={() => setPage((prev) => Math.min(prev + 1, totalPages))}>
+                Tiếp
+              </button>
             </div>
-          ))}
-        </div>
+          </div>
+        </>
       )}
 
       {/* ── Detail drawer ─────────────────────────────────── */}
@@ -797,6 +969,274 @@ function IncidentManagementPage() {
                       </button>
                     </div>
                   )}
+                  {/* Thông tin giải quyết (chỉ nhập khi đang xác minh) */}
+                  <div style={{ marginTop: 20, paddingTop: 20, borderTop: '1px solid #e0e0e0' }}>
+                    <h3 style={{ marginBottom: 8 }}>Thông tin giải quyết</h3>
+                    {detailIncident.status === 'investigating' ? (
+                      resolutionForm ? (
+                        <div>
+                          <div className="ic-field">
+                            <label className="ic-field__label">Trạng thái giải quyết *</label>
+                            <select className="ic-field__select" value={resolutionForm.status} onChange={(e) => setResolutionForm((s) => ({ ...s, status: e.target.value }))}>
+                              <option value="In Progress">Đang tiến hành</option>
+                              <option value="Resolved">Đã giải quyết</option>
+                              <option value="Escalated">Đã nâng cấp</option>
+                            </select>
+                          </div>
+
+                          <div className="ic-field">
+                            <label className="ic-field__label">Phương pháp giải quyết *</label>
+                            <input className="ic-field__input" value={resolutionForm.method} onChange={(e) => setResolutionForm((s) => ({ ...s, method: e.target.value }))} />
+                          </div>
+
+                          <div className="ic-field">
+                            <label className="ic-field__label">Tình trạng cư dân</label>
+                            <select className="ic-field__select" value={resolutionForm.medical?.residentCondition || ''} onChange={(e) => {
+                              const val = e.target.value;
+                              setResolutionForm((s) => ({ ...s, medical: { ...s.medical, residentCondition: val, procedures: val === 'NoResident' ? [] : (s.medical?.procedures || []), medications: val === 'NoResident' ? [] : (s.medical?.medications || []) } }));
+                            }}>
+                              <option value="">Chọn</option>
+                              <option value="Stable">Ổn định</option>
+                              <option value="Improving">Đang cải thiện</option>
+                              <option value="Critical">Nguy kịch</option>
+                              <option value="Hospitalized">Nhập viện</option>
+                              <option value="NoResident">Không có cư dân liên quan</option>
+                              <option value="UnknownResident">Không rõ cư dân liên quan</option>
+                            </select>
+                          </div>
+
+                          <div className="ic-field">
+                            <label className="ic-field__label">Nguyên nhân chính *</label>
+                            <select className="ic-field__select" value={resolutionForm.rootCause} onChange={(e) => setResolutionForm((s) => ({ ...s, rootCause: e.target.value }))}>
+                              <option value="Wet Floor">Sàn ướt</option>
+                              <option value="Resident Lost Balance">Cư dân mất thăng bằng</option>
+                              <option value="Equipment Failure">Hỏng thiết bị</option>
+                              <option value="Staff Error">Lỗi nhân viên</option>
+                              <option value="Unknown">Không rõ</option>
+                              <option value="Other">Khác</option>
+                            </select>
+                            {resolutionForm.rootCause === 'Other' && (
+                              <input className="ic-field__input" placeholder="Mô tả nguyên nhân khác" value={resolutionForm.rootCauseOther || ''} onChange={(e) => setResolutionForm((s) => ({ ...s, rootCauseOther: e.target.value }))} style={{ marginTop: 8 }} />
+                            )}
+                          </div>
+
+                          <div className="ic-field ic-form-full">
+                            <label className="ic-field__label">Nguyên nhân chi tiết</label>
+                            <textarea className="ic-field__textarea" rows={3} value={resolutionForm.detailedCause} onChange={(e) => setResolutionForm((s) => ({ ...s, detailedCause: e.target.value }))} />
+                          </div>
+
+                          <div className="ic-field ic-form-full">
+                            <label className="ic-field__label">Hành động ngay lập tức</label>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                              {immediateActionOptions
+                                .filter((act) => {
+                                  const noResident = resolutionForm.medical?.residentCondition === 'NoResident';
+                                  if (!noResident) return true;
+                                  const lower = String(act).toLowerCase();
+                                  return !(lower.includes('cư dân') || lower.includes('hỗ trợ') || lower.includes('khám') || lower.includes('resident'));
+                                })
+                                .map((act) => (
+                                  <label key={act} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <input type="checkbox" checked={(resolutionForm.immediateActions || []).includes(act)} onChange={(e) => {
+                                      const prev = resolutionForm.immediateActions || [];
+                                      if (e.target.checked) setResolutionForm((s) => ({ ...s, immediateActions: [...prev, act] }));
+                                      else setResolutionForm((s) => ({ ...s, immediateActions: prev.filter((i) => i !== act) }));
+                                    }} />
+                                    <span>{act}</span>
+                                  </label>
+                                ))}
+                              {(resolutionForm.immediateActions || []).includes('Khác') && (
+                                <input className="ic-field__input" placeholder="Mô tả hành động khác" value={resolutionForm.immediateOther || ''} onChange={(e) => setResolutionForm((s) => ({ ...s, immediateOther: e.target.value }))} />
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="ic-field ic-form-full">
+                            <label className="ic-field__label">Chăm sóc y tế</label>
+                            <div style={{ marginBottom: 8 }}>
+                              <button type="button" className="ic-btn ic-btn--secondary" onClick={() => {
+                                setResolutionForm((s) => ({ ...s, medical: { ...s.medical, medications: [...(s.medical?.medications || []), { name: '', dose: '', time: '' }] } }));
+                              }}>+ Thêm thuốc</button>
+                            </div>
+                            {(resolutionForm.medical?.medications || []).map((med, idx) => (
+                            <div key={idx} style={{ display: 'flex', gap: 8, marginBottom: 6, alignItems: 'center' }}>
+                              <div style={{ position: 'relative', flex: 1 }}>
+                                <input placeholder="Tên thuốc" value={med.name} onChange={(e) => {
+                                  const next = [...resolutionForm.medical.medications]; next[idx].name = e.target.value; setResolutionForm((s) => ({ ...s, medical: { ...s.medical, medications: next } }));
+                                  setMedSuggestionOpenIndex(idx);
+                                }} onFocus={() => setMedSuggestionOpenIndex(idx)} />
+                                {medSuggestionOpenIndex === idx && med.name && (
+                                  <ul style={{ position: 'absolute', left: 0, right: 0, background: '#fff', border: '1px solid #ddd', zIndex: 10, maxHeight: 120, overflow: 'auto', marginTop: 4, padding: 6, borderRadius: 4 }}>
+                                    {medSuggestions.filter(s => s.toLowerCase().includes(med.name.toLowerCase())).map((sug) => (
+                                      <li key={sug} style={{ padding: 6, cursor: 'pointer' }} onMouseDown={(ev) => { ev.preventDefault(); const next = [...resolutionForm.medical.medications]; next[idx].name = sug; setResolutionForm((s) => ({ ...s, medical: { ...s.medical, medications: next } })); setMedSuggestionOpenIndex(-1); }}>{sug}</li>
+                                    ))}
+                                  </ul>
+                                )}
+                              </div>
+                              <input placeholder="Liều" value={med.dose} onChange={(e) => {
+                                const next = [...resolutionForm.medical.medications]; next[idx].dose = e.target.value; setResolutionForm((s) => ({ ...s, medical: { ...s.medical, medications: next } }));
+                              }} style={{ width: 120 }} />
+                              <input placeholder="Thời gian" value={med.time} onChange={(e) => {
+                                const next = [...resolutionForm.medical.medications]; next[idx].time = e.target.value; setResolutionForm((s) => ({ ...s, medical: { ...s.medical, medications: next } }));
+                              }} style={{ width: 120 }} />
+                              <button type="button" className="ic-btn ic-btn--danger" onClick={() => {
+                                const next = [...(resolutionForm.medical?.medications || [])]; next.splice(idx, 1); setResolutionForm((s) => ({ ...s, medical: { ...s.medical, medications: next } }));
+                              }} style={{ background: '#ff6b6b', color: '#fff', border: 'none', padding: '6px 8px', borderRadius: 4 }}>Xóa</button>
+                            </div>
+                            ))}
+
+                            <div style={{ marginTop: 8 }}>
+                              {(clinicalServices.length > 0 ? clinicalServices : []).map((svc) => {
+                                const selected = !!selectedClinicalServices[svc._id];
+                                return (
+                                  <div key={svc._id} style={{ display: 'grid', gap: 6, marginBottom: 6 }}>
+                                    <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                      <input type="checkbox" checked={selected || (resolutionForm.medical?.procedures || []).includes(svc.serviceName)} onChange={(e) => {
+                                        const procs = resolutionForm.medical?.procedures || [];
+                                        if (e.target.checked) {
+                                          // add procedure name
+                                          setResolutionForm((s) => ({ ...s, medical: { ...s.medical, procedures: [...procs, svc.serviceName] } }));
+                                          setSelectedClinicalServices((prev) => ({ ...prev, [svc._id]: { ...svc, fieldValues: {} } }));
+                                        } else {
+                                          setResolutionForm((s) => ({ ...s, medical: { ...s.medical, procedures: procs.filter((p) => p !== svc.serviceName) } }));
+                                          setSelectedClinicalServices((prev) => { const copy = { ...prev }; delete copy[svc._id]; return copy; });
+                                        }
+                                      }} />
+                                      <span>{svc.serviceName}</span>
+                                    </label>
+
+                                    {selected && svc.fields && svc.fields.length > 0 && (
+                                      <div style={{ padding: '8px 12px', border: '1px solid #eef2f7', borderRadius: 6, marginLeft: 20 }}>
+                                        <div style={{ fontWeight: 700, marginBottom: 6 }}>{svc.serviceName} — Thông tin</div>
+                                        {svc.fields.map((field) => {
+                                          const value = getSelectedClinicalServiceFieldValue(svc._id, field.fieldCode);
+                                          return (
+                                            <div key={field.fieldCode} style={{ marginBottom: 8 }}>
+                                              <label style={{ display: 'block', marginBottom: 6 }}>{field.label}{field.required ? ' *' : ''}</label>
+                                              {field.type === 'NUMBER' ? (
+                                                <input type="number" className="ic-field__input" placeholder={field.placeholder || ''} value={value} onChange={(e) => setSelectedClinicalServiceFieldValue(svc._id, field.fieldCode, e.target.value)} />
+                                              ) : field.type === 'DROPDOWN' ? (
+                                                <select className="ic-field__select" value={value} onChange={(e) => setSelectedClinicalServiceFieldValue(svc._id, field.fieldCode, e.target.value)}>
+                                                  <option value="">-- Chọn --</option>
+                                                  {(Array.isArray(field.options) ? field.options : []).map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                                </select>
+                                              ) : (
+                                                <input type="text" className="ic-field__input" placeholder={field.placeholder || ''} value={value} onChange={(e) => setSelectedClinicalServiceFieldValue(svc._id, field.fieldCode, e.target.value)} />
+                                              )}
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                              {(resolutionForm.medical?.procedures || []).includes('Khác') && (
+                                <input className="ic-field__input" placeholder="Mô tả dịch vụ khác" value={resolutionForm.medical?.proceduresOther || ''} onChange={(e) => setResolutionForm((s) => ({ ...s, medical: { ...s.medical, proceduresOther: e.target.value } }))} />
+                              )}
+                            </div>
+
+                            <div style={{ marginTop: 8 }}>
+                              <label className="ic-field__label">Cần theo dõi</label>
+                              <div>
+                                <label style={{ marginRight: 12 }}><input type="radio" name="followup" checked={resolutionForm.medical?.needFollowUp === true} onChange={() => setResolutionForm((s) => ({ ...s, medical: { ...s.medical, needFollowUp: true } }))} /> Có</label>
+                                <label><input type="radio" name="followup" checked={resolutionForm.medical?.needFollowUp === false} onChange={() => setResolutionForm((s) => ({ ...s, medical: { ...s.medical, needFollowUp: false } }))} /> Không</label>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="ic-field ic-form-full">
+                            <label className="ic-field__label">Kết quả giải quyết *</label>
+                            <textarea className="ic-field__textarea" rows={3} value={resolutionForm.result} onChange={(e) => setResolutionForm((s) => ({ ...s, result: e.target.value }))} />
+                          </div>
+
+                          <div className="ic-field">
+                            <label className="ic-field__label">Đính kèm</label>
+                            <input type="file" multiple onChange={(e) => setResolutionFiles(Array.from(e.target.files || []))} />
+                          </div>
+
+                          <div className="ic-field ic-form-full">
+                            <label className="ic-field__label">Ghi chú</label>
+                            <textarea className="ic-field__textarea" rows={2} value={resolutionForm.notes} onChange={(e) => setResolutionForm((s) => ({ ...s, notes: e.target.value }))} />
+                          </div>
+
+                          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                            <button type="button" className="ic-btn ic-btn--secondary" onClick={() => { setResolutionForm(null); setResolutionFiles([]); }}>{t('incidents.form.cancel') || 'Hủy'}</button>
+                            <button type="button" className="ic-btn ic-btn--secondary" disabled={savingResolution} onClick={async () => {
+                              // Save draft
+                              setSavingResolution(true);
+                              try {
+                                const payload = { ...resolutionForm, action: 'saveDraft' };
+                                if (payload.rootCause === 'Other') payload.rootCause = payload.rootCauseOther || '';
+                                if (payload.immediateOther) payload.immediateActions = [...(payload.immediateActions || []), payload.immediateOther];
+                                // include medical.proceduresOther if present
+                                if (payload.medical?.proceduresOther) payload.medical.procedures = [...(payload.medical.procedures || []), payload.medical.proceduresOther];
+                                // if no resident involved, remove medications
+                                if (payload.medical?.residentCondition === 'NoResident') {
+                                  if (payload.medical && payload.medical.medications) delete payload.medical.medications;
+                                }
+                                await incidentService.updateIncidentResolution(detailIncident._id, payload, resolutionFiles);
+                                setMessageType('success'); setMessage('Lưu nháp thành công');
+                                await loadIncidents();
+                                await handleViewDetail(detailIncident._id);
+                              } catch (err) {
+                                setMessageType('error'); setMessage(err?.response?.data?.message || 'Lưu nháp thất bại');
+                              } finally { setSavingResolution(false); }
+                            }}>{t('incidents.form.saveDraft') || 'Lưu nháp'}</button>
+                            <button type="button" className="ic-btn ic-btn--primary" disabled={savingResolution} onClick={async () => {
+                              // Mark as resolved
+                              if (!resolutionForm.result || !resolutionForm.method || !resolutionForm.rootCause) {
+                                setMessageType('error'); setMessage('Vui lòng điền đầy đủ: Phương pháp, Nguyên nhân chính và Kết quả');
+                                return;
+                              }
+                              setSavingResolution(true);
+                              try {
+                                const payload = { ...resolutionForm, action: 'markResolved' };
+                                if (payload.rootCause === 'Other') payload.rootCause = payload.rootCauseOther || '';
+                                if (payload.immediateOther) payload.immediateActions = [...(payload.immediateActions || []), payload.immediateOther];
+                                if (payload.medical?.proceduresOther) payload.medical.procedures = [...(payload.medical.procedures || []), payload.medical.proceduresOther];
+                                if (payload.medical?.residentCondition === 'NoResident') {
+                                  if (payload.medical && payload.medical.medications) delete payload.medical.medications;
+                                }
+                                await incidentService.updateIncidentResolution(detailIncident._id, payload, resolutionFiles);
+                                setMessageType('success'); setMessage('Đã đánh dấu là đã giải quyết');
+                                await loadIncidents();
+                                setDetailOpen(false); setDetailIncident(null);
+                              } catch (err) {
+                                setMessageType('error'); setMessage(err?.response?.data?.message || 'Đánh dấu giải quyết thất bại');
+                              } finally { setSavingResolution(false); }
+                            }}>{t('incidents.form.markResolved') || 'Đánh dấu đã giải quyết'}</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ color: '#666' }}>Đang tải thông tin giải quyết...</div>
+                      )
+                    ) : (
+                      <div>
+                        {detailIncident.resolution ? (
+                          <div>
+                            <div><strong>Trạng thái giải quyết:</strong> {detailIncident.resolution.status || '—'}</div>
+                            <div><strong>Phương pháp:</strong> {detailIncident.resolution.method || '—'}</div>
+                            <div><strong>Nguyên nhân chính:</strong> {detailIncident.resolution.rootCause || '—'}</div>
+                            <div><strong>Hành động ngay lập tức:</strong> {(detailIncident.resolution.immediateActions || []).join(', ') || '—'}</div>
+                            <div><strong>Kết quả:</strong> {detailIncident.resolution.result || '—'}</div>
+                            <div><strong>Ghi chú:</strong> {detailIncident.resolution.notes || '—'}</div>
+                            <div><strong>Thời gian hoàn thành:</strong> {detailIncident.resolution.completedAt ? new Date(detailIncident.resolution.completedAt).toLocaleString('vi-VN') : '—'}</div>
+                            <div style={{ marginTop: 8 }}>
+                              <strong>File đính kèm:</strong>
+                              <ul>
+                                {(detailIncident.resolution.attachments || []).map((att) => (
+                                  <li key={att.fileUrl}><a href={att.fileUrl} target="_blank" rel="noreferrer">{att.fileName || att.fileUrl}</a></li>
+                                ))}
+                              </ul>
+                            </div>
+                          </div>
+                        ) : (
+                          <div>Chưa có thông tin giải quyết.</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </>
               ) : (
                 <div className="ic-empty">
@@ -951,17 +1391,20 @@ function IncidentManagementPage() {
                         <div className="ic-multi-select-empty">{t('incidents.form.noStaff')}</div>
                       ) : (
                         filteredStaff.map((staff) => {
-                          const isChecked = form.assignedStaffIds.includes(staff._id);
+                          const staffId = getStaffSelectionId(staff);
+                          const isChecked = form.assignedStaffIds.includes(staffId);
+                          const availabilityLabel = getStaffAvailabilityLabel(staff);
                           return (
                             <label key={staff._id} className="ic-multi-select-item">
                               <input
                                 type="checkbox"
                                 checked={isChecked}
-                                onChange={() => toggleAssignedStaff(staff._id)}
+                                onChange={() => toggleAssignedStaff(staff)}
                                 disabled={optionsLoading}
                               />
                               <div className="ic-multi-select-item__label">
                                 <span className="ic-multi-select-item__name">{formatStaffLabel(staff)}</span>
+                                <span className={availabilityLabel.includes('Đang đi làm') ? 'ic-availability ic-availability--on' : 'ic-availability ic-availability--off'}>{availabilityLabel}</span>
                               </div>
                             </label>
                           );
@@ -1014,25 +1457,29 @@ function IncidentManagementPage() {
                   <label className="ic-field__label">{t('incidents.form.assignedStaff')} *</label>
                   <div className="ic-multi-select">
                     {staffAccounts.length > 0 ? (
-                      staffAccounts.map((staff) => (
-                        <label key={staff._id || staff.id} className="ic-multi-select-item">
-                          <input
-                            type="checkbox"
-                            checked={selectedHandlers.includes(staff._id || staff.id)}
-                            onChange={(e) => {
-                              const id = staff._id || staff.id;
-                              if (e.target.checked) {
-                                setSelectedHandlers([...selectedHandlers, id]);
-                              } else {
-                                setSelectedHandlers(selectedHandlers.filter((s) => s !== id));
-                              }
-                            }}
-                          />
-                          <div className="ic-multi-select-item__label">
-                            <span className="ic-multi-select-item__name">{formatStaffLabel(staff)}</span>
-                          </div>
-                        </label>
-                      ))
+                      staffAccounts.map((staff) => {
+                        const availabilityLabel = getStaffAvailabilityLabel(staff);
+                        const staffId = getStaffSelectionId(staff);
+                        return (
+                          <label key={staffId || staff._id || staff.id} className="ic-multi-select-item">
+                            <input
+                              type="checkbox"
+                              checked={selectedHandlers.includes(staffId)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedHandlers([...selectedHandlers, staffId]);
+                                } else {
+                                  setSelectedHandlers(selectedHandlers.filter((s) => s !== staffId));
+                                }
+                              }}
+                            />
+                            <div className="ic-multi-select-item__label">
+                              <span className="ic-multi-select-item__name">{formatStaffLabel(staff)}</span>
+                              <span className={availabilityLabel.includes('Đang đi làm') ? 'ic-availability ic-availability--on' : 'ic-availability ic-availability--off'}>{availabilityLabel}</span>
+                            </div>
+                          </label>
+                        );
+                      })
                     ) : (
                       <p style={{ color: '#666', padding: '10px' }}>{t('incidents.noStaff')}</p>
                     )}

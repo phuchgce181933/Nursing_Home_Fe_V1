@@ -10,9 +10,17 @@ const STATUS_OPTIONS = [
   { value: '', label: 'Tất cả trạng thái' },
   { value: 'draft', label: 'Nháp' },
   { value: 'scheduled', label: 'Đã lên lịch' },
+  { value: 'ongoing', label: 'Đang diễn ra' },
   { value: 'completed', label: 'Đã hoàn thành' },
   { value: 'cancelled', label: 'Đã huỷ' },
 ];
+
+const getStatusOptionsForForm = (currentStatus) => {
+  if (currentStatus === 'ongoing') {
+    return STATUS_OPTIONS;
+  }
+  return STATUS_OPTIONS.filter((item) => item.value !== 'ongoing');
+};
 
 const toInputDateTimeLocal = (isoString) => {
   if (!isoString) return '';
@@ -484,7 +492,7 @@ export default function AdminActivitiesPage() {
       participantResidentIds: Array.isArray(form.participantResidentIds)
         ? form.participantResidentIds.filter(Boolean)
         : [],
-      status: form.status,
+      ...(editingId && form.status === 'ongoing' ? {} : { status: form.status }),
     };
 
     try {
@@ -825,7 +833,7 @@ export default function AdminActivitiesPage() {
                 value={form.status}
                 onChange={(e) => setForm({ ...form, status: e.target.value })}
               >
-                {STATUS_OPTIONS.filter((item) => item.value).map((item) => (
+                {getStatusOptionsForForm(form.status).filter((item) => item.value).map((item) => (
                   <option key={item.value} value={item.value}>
                     {item.label}
                   </option>

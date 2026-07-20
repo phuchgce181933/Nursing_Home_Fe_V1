@@ -585,6 +585,39 @@
     gap: 8px;
   }
 
+  .adm-table-responsive {
+    overflow-x: auto;
+  }
+
+  .adm-participation-table {
+    width: 100%;
+    min-width: 640px;
+    border-collapse: collapse;
+  }
+
+  .adm-participation-table th,
+  .adm-participation-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #e2e8f0;
+    text-align: left;
+    vertical-align: top;
+  }
+
+  .adm-participation-table th {
+    background: #f8fafc;
+    font-size: 12px;
+    font-weight: 700;
+    color: #475569;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .adm-participation-table .adm-filter-select,
+  .adm-participation-table .adm-filter-input {
+    width: 100%;
+    min-width: 180px;
+  }
+
   .adm-modal-actions {
     display: flex;
     gap: 12px;
