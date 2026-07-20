@@ -507,6 +507,42 @@
   cursor: not-allowed;
 }
 
+.mp-resident-item--covered {
+  opacity: 0.72;
+  background: #fffbeb;
+  border-color: #fcd34d;
+}
+
+.mp-resident-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #92400e;
+  background: #fef3c7;
+  vertical-align: middle;
+}
+
+.mp-coverage-banner {
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid #fcd34d;
+  background: #fffbeb;
+  color: #92400e;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.mp-coverage-banner p {
+  margin: 0;
+}
+
+.mp-coverage-banner p + p {
+  margin-top: 6px;
+}
+
 .mp-toolbar--disabled {
   opacity: 0.7;
 }

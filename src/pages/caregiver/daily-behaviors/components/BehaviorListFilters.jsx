@@ -10,6 +10,8 @@ function BehaviorListFilters({
   residents,
   loading,
   maxDate,
+  readOnly = false,
+  canCreate = true,
   onWorkDateChange,
   onObservationCategoryChange,
   onSeverityChange,
@@ -65,13 +67,15 @@ function BehaviorListFilters({
           </select>
         </label>
         <div className="resident-page__filter-actions">
-          <button
-            type="button"
-            className="resident-page__button resident-page__button--primary"
-            onClick={onOpenCreate}
-          >
-            {t('caregiver.dailyBehaviors.addRecord')}
-          </button>
+          {!readOnly && canCreate && (
+            <button
+              type="button"
+              className="resident-page__button resident-page__button--primary"
+              onClick={onOpenCreate}
+            >
+              {t('caregiver.dailyBehaviors.addRecord')}
+            </button>
+          )}
           <button
             type="button"
             className="resident-page__button resident-page__button--ghost"

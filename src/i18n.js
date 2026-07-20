@@ -16,6 +16,12 @@ const resources = {
       sidebar: {
         clinical: "Clinical",
         clinicalServices: "Clinical Services",
+        nutrition: "Nutrition",
+        dishes: "Dish Catalog",
+        mealIntakeNoteList: "View Meal Intake Note List",
+        dailyCare: "Daily Care",
+        hygieneActivityList: "View Hygiene Activity List",
+        dailyBehaviorList: "View Daily Behavior List",
         ecg: "ECG / Electrocardiogram",
         imaging: "Imaging & Radiology",
         assessments: "Assessments",
@@ -598,6 +604,14 @@ const resources = {
           selectResidents: "Please select at least one resident",
           scheduleNoResidents: "Selected schedule has no residents",
           residentsAlreadyInTable: "All selected residents are already in the table",
+          residentsAlreadyPublished: "Selected residents already have a published record for this date",
+          coverageBadgeSchedule: "Has meal times",
+          coverageBadgeMealPlan: "Has meal plan",
+          coverageBadgeSpecialDiet: "Has special diet",
+          coveragePublishedBy: "Published by {{name}}",
+          coverageWarningSchedule: "{{name}} already has a published meal time schedule{{title}} (by {{publisher}}).",
+          coverageWarningMealPlan: "{{name}} already has a published meal plan{{title}} (by {{publisher}}).",
+          coverageWarningSpecialDiet: "{{name}} already has a published special diet{{title}} (by {{publisher}}).",
           selectResidentsBeforeManual: "Select at least one resident before adding manually",
           residentAlreadyInTable: "This resident is already in the table",
           selectCareStage: "Please select a care stage",
@@ -936,13 +950,16 @@ const resources = {
           },
           plannedMealBanner: {
             duplicate: "A record already exists for this meal today. Please close and select Edit from the list.",
+            duplicateWithRecorder: "A record already exists for this meal (recorded by {{name}}). Please edit from the list.",
             published: "Published meal plan: <strong>{{mealName}}</strong>",
             kcal: " · {{calories}} kcal",
             time: " · Time {{time}}",
             noMenu: "No published meal plan for this meal — cannot record.",
             scheduledTime: " Expected time: {{time}}.",
             contactNurse: " Please contact nursing to publish the meal plan first."
-          }
+          },
+          shiftWindowClosed:
+            "Recording or editing is only allowed during your shift or within 30 minutes after it ends."
         },
         dietPlans: {
           title: "Diet Plans",
@@ -1066,8 +1083,11 @@ const resources = {
           },
           contextBanner: {
             duplicate: "A record already exists for <strong>{{activity}}</strong> today. Please close and select Edit from the list.",
+            duplicateWithRecorder: "A record already exists for {{activity}} (recorded by {{name}}). Please edit from the list.",
             recording: "Recording activity: <strong>{{activity}}</strong>"
-          }
+          },
+          shiftWindowClosed:
+            "Recording or editing is only allowed during your shift or within 30 minutes after it ends."
         },
         dailyBehaviors: {
           title: "Daily Behaviors",
@@ -1128,7 +1148,9 @@ const resources = {
           deleteModal: {
             title: "Delete behavior record",
             confirm: "Are you sure you want to delete this record?"
-          }
+          },
+          shiftWindowClosed:
+            "Recording or editing is only allowed during your shift or within 30 minutes after it ends."
         }
       },
       home: {
@@ -1370,6 +1392,68 @@ const resources = {
         errorLoadFailed: "Could not load facility data. Please try again."
       },
       admin: {
+        mealIntake: {
+          title: "Meal Intake Note List",
+          subtitle: "Read-only view of all meal intake records",
+          recordsList: "Intake records",
+          colRecordedBy: "Recorded by",
+          emptyFiltered: "No records match the filters",
+          loadResidentsFailed: "Failed to load residents",
+          loadRecordsFailed: "Failed to load intake records",
+        },
+        hygiene: {
+          title: "Hygiene Activity List",
+          subtitle: "Read-only view of all hygiene activity records",
+          recordsList: "Activity records",
+          colRecordedBy: "Recorded by",
+          emptyFiltered: "No records match the filters",
+          loadResidentsFailed: "Failed to load residents",
+          loadRecordsFailed: "Failed to load activity records",
+        },
+        dailyBehaviors: {
+          title: "Daily Behavior List",
+          subtitle: "Read-only view of all daily behavior records",
+          recordsList: "Behavior records",
+          colRecordedBy: "Recorded by",
+          emptyFiltered: "No records match the filters",
+          loadResidentsFailed: "Failed to load residents",
+          loadRecordsFailed: "Failed to load behavior records",
+        },
+        dishes: {
+          title: "Dish Catalog",
+          subtitle: "Manage dish names and calories for nurses to use when creating meal plans.",
+          addDish: "Add dish",
+          searchPlaceholder: "Search dish name...",
+          statTotal: "Total dishes",
+          statActive: "Active",
+          statInactive: "Inactive",
+          showInactive: "Show inactive dishes",
+          colName: "Dish name",
+          colCalories: "Calories (kcal)",
+          colIngredients: "Ingredients",
+          empty: "No dishes yet",
+          createTitle: "Add new dish",
+          editTitle: "Edit dish",
+          fieldName: "Dish name",
+          fieldCalories: "Calories",
+          fieldIngredients: "Ingredients",
+          ingredientsPlaceholder: "Comma-separated, e.g. oats, milk",
+          fieldActive: "Active",
+          statusActive: "Active",
+          statusInactive: "Inactive",
+          nameRequired: "Please enter a dish name.",
+          nameInvalid: "Dish name cannot contain numbers or special characters.",
+          caloriesInvalid: "Calories must be a non-negative whole number.",
+          ingredientsInvalid: "Ingredients cannot contain special characters.",
+          createSuccess: "Dish created successfully.",
+          updateSuccess: "Dish updated successfully.",
+          deleteSuccess: "Dish deleted successfully.",
+          deactivateSuccess: "Dish deactivated because it is used in meal plans.",
+          confirmDelete: "Are you sure you want to delete/deactivate this dish?",
+          loadFailed: "Failed to load dish catalog.",
+          saveFailed: "Failed to save dish.",
+          deleteFailed: "Failed to delete dish.",
+        },
         admissionRequests: {
           title: "Admission Requests",
           subtitle: "Review, evaluate, approve, and track family admission requests for elderly residents.",
@@ -1820,6 +1904,12 @@ const resources = {
               grandchild: "Grandchild",
               guardian: "Guardian",
               other: "Other"
+            },
+            validation: {
+              phoneInvalid: "Phone number must be exactly 10 digits starting with 0 (e.g. 0912345678)",
+              contactRequiredFields: "Each emergency contact must have full name, relationship, and phone number.",
+              duplicatePhone: "Two family contacts cannot share the same phone number ({{phone}}).",
+              duplicateEmail: "Two family contacts cannot share the same email ({{email}})."
             }
           },
           byArea: {
@@ -2120,13 +2210,10 @@ const resources = {
               passwordLetter: "Password must contain at least 1 letter",
               passwordDigit: "Password must contain at least 1 number",
               roleRequired: "Please select a role",
-              phoneInvalid: "Invalid phone number (e.g. 0912345678 or +84912345678)",
+              phoneInvalid: "Phone number must be exactly 10 digits starting with 0 (e.g. 0912345678)",
               phoneDuplicate: "Phone number is already in use",
               dateOfBirthInvalid: "Invalid date of birth",
               dateOfBirthMinAge: "Staff must be at least 18 years old",
-              dateOfBirthDoctorMinAge: "Doctor must be at least 24 years old",
-              dateOfBirthMaxAgeMale: "Male staff cannot exceed 60 years old",
-              dateOfBirthMaxAgeFemale: "Female staff cannot exceed 55 years old",
               genderRequiredForDob: "Please select Male or Female when entering date of birth",
               usernameInvalid: "Username must be 3–30 characters, letters, numbers and underscore only",
               passwordMinEdit: "At least 8 characters",
@@ -2241,6 +2328,9 @@ const resources = {
               selectShiftRequired: 'Please select a shift',
               selectStaffRequired: 'Please select staff',
               splitTimeRequired: 'Please enter start and end time for split shift',
+              splitEndBeforeStart: 'End time must be after start time (split shift on the same day)',
+              splitDurationMin: 'Split shift must be at least 1 hour',
+              splitDurationMax: 'Split shift cannot exceed 12 hours',
               shiftLabel: 'Shift *',
               staffLabel: 'Staff *',
               workDateLabel: 'Work date *',
@@ -3510,6 +3600,12 @@ const resources = {
       sidebar: {
         clinical: "Lâm sàng",
         clinicalServices: "Danh mục dịch vụ lâm sàng",
+        nutrition: "Dinh dưỡng",
+        dishes: "Danh mục món ăn",
+        mealIntakeNoteList: "Xem danh sách ghi nhận bữa ăn",
+        dailyCare: "Chăm sóc hằng ngày",
+        hygieneActivityList: "Xem danh sách hoạt động vệ sinh",
+        dailyBehaviorList: "Xem danh sách hành vi hằng ngày",
         ecg: "ECG / Điện tâm đồ",
         imaging: "Hình ảnh & Chẩn đoán hình ảnh",
         assessments: "Đánh giá lâm sàng",
@@ -4093,6 +4189,14 @@ const resources = {
           selectResidents: "Vui lòng chọn ít nhất 1 cư dân",
           scheduleNoResidents: "Lịch giờ ăn đã chọn không có cư dân",
           residentsAlreadyInTable: "Các cư dân đã chọn đều có trong bảng",
+          residentsAlreadyPublished: "Cư dân đã chọn đã có bản publish cho ngày này",
+          coverageBadgeSchedule: "Đã có lịch giờ ăn",
+          coverageBadgeMealPlan: "Đã có thực đơn",
+          coverageBadgeSpecialDiet: "Đã có chế độ ăn đặc biệt",
+          coveragePublishedBy: "Publish bởi {{name}}",
+          coverageWarningSchedule: "{{name}} đã có lịch giờ ăn publish{{title}} ({{publisher}}).",
+          coverageWarningMealPlan: "{{name}} đã có thực đơn publish{{title}} ({{publisher}}).",
+          coverageWarningSpecialDiet: "{{name}} đã có chế độ ăn đặc biệt publish{{title}} ({{publisher}}).",
           selectResidentsBeforeManual: "Vui lòng chọn ít nhất 1 cư dân trước khi thêm thủ công",
           residentAlreadyInTable: "Cư dân này đã có trong bảng",
           selectCareStage: "Vui lòng chọn giai đoạn chăm sóc",
@@ -4431,13 +4535,16 @@ const resources = {
           },
           plannedMealBanner: {
             duplicate: "Đã có ghi nhận cho bữa này trong ngày. Vui lòng đóng và chọn Sửa từ danh sách.",
+            duplicateWithRecorder: "Đã có ghi nhận cho bữa này ({{name}} ghi nhận). Vui lòng sửa từ danh sách.",
             published: "Thực đơn publish: {{mealName}}",
             kcal: " · {{calories}} kcal",
             time: " · Giờ {{time}}",
             noMenu: "Chưa có thực đơn publish cho bữa này — không thể ghi nhận.",
             scheduledTime: " Giờ dự kiến: {{time}}.",
             contactNurse: " Vui lòng liên hệ điều dưỡng để publish thực đơn trước."
-          }
+          },
+          shiftWindowClosed:
+            "Chỉ ghi nhận/chỉnh sửa trong ca hoặc 30 phút sau khi hết ca."
         },
         dietPlans: {
           title: "Xem chế độ ăn uống",
@@ -4561,8 +4668,11 @@ const resources = {
           },
           contextBanner: {
             duplicate: "Đã có ghi nhận cho {{activity}} trong ngày này. Vui lòng đóng và chọn Sửa từ danh sách.",
+            duplicateWithRecorder: "Đã có ghi nhận cho {{activity}} ({{name}} ghi nhận). Vui lòng sửa từ danh sách.",
             recording: "Ghi nhận hoạt động: {{activity}}"
-          }
+          },
+          shiftWindowClosed:
+            "Chỉ ghi nhận/chỉnh sửa trong ca hoặc 30 phút sau khi hết ca."
         },
         dailyBehaviors: {
           title: "Ghi nhận hành vi hằng ngày",
@@ -4623,7 +4733,9 @@ const resources = {
           deleteModal: {
             title: "Xóa ghi nhận hành vi",
             confirm: "Bạn có chắc muốn xóa bản ghi này?"
-          }
+          },
+          shiftWindowClosed:
+            "Chỉ ghi nhận/chỉnh sửa trong ca hoặc 30 phút sau khi hết ca."
         }
       },
       home: {
@@ -4865,6 +4977,69 @@ const resources = {
         errorLoadFailed: "Không thể tải thông tin cơ sở vật chất. Vui lòng thử lại sau."
       },
       admin: {
+
+        mealIntake: {
+          title: "Danh sách ghi nhận bữa ăn",
+          subtitle: "Chỉ xem — toàn bộ ghi nhận bữa ăn",
+          recordsList: "Danh sách ghi nhận",
+          colRecordedBy: "Người ghi nhận",
+          emptyFiltered: "Chưa có ghi nhận trong bộ lọc này",
+          loadResidentsFailed: "Không tải được danh sách cư dân",
+          loadRecordsFailed: "Không tải được danh sách ghi nhận",
+        },
+        hygiene: {
+          title: "Danh sách hoạt động vệ sinh",
+          subtitle: "Chỉ xem — toàn bộ ghi nhận hoạt động vệ sinh",
+          recordsList: "Danh sách ghi nhận",
+          colRecordedBy: "Người ghi nhận",
+          emptyFiltered: "Chưa có ghi nhận trong bộ lọc này",
+          loadResidentsFailed: "Không tải được danh sách cư dân",
+          loadRecordsFailed: "Không tải được danh sách ghi nhận",
+        },
+        dailyBehaviors: {
+          title: "Danh sách hành vi hằng ngày",
+          subtitle: "Chỉ xem — toàn bộ ghi nhận hành vi hằng ngày",
+          recordsList: "Danh sách ghi nhận",
+          colRecordedBy: "Người ghi nhận",
+          emptyFiltered: "Chưa có ghi nhận trong bộ lọc này",
+          loadResidentsFailed: "Không tải được danh sách cư dân",
+          loadRecordsFailed: "Không tải được danh sách ghi nhận",
+        },
+        dishes: {
+          title: "Danh mục món ăn",
+          subtitle: "Quản lý tên món và lượng kcal để điều dưỡng chọn khi tạo thực đơn.",
+          addDish: "Thêm món",
+          searchPlaceholder: "Tìm tên món...",
+          statTotal: "Tổng món",
+          statActive: "Đang dùng",
+          statInactive: "Đã tắt",
+          showInactive: "Hiện món đã tắt",
+          colName: "Tên món",
+          colCalories: "Kcal",
+          colIngredients: "Thành phần",
+          empty: "Chưa có món nào",
+          createTitle: "Thêm món mới",
+          editTitle: "Sửa món",
+          fieldName: "Tên món",
+          fieldCalories: "Kcal",
+          fieldIngredients: "Thành phần",
+          ingredientsPlaceholder: "Phân tách bằng dấu phẩy, VD: yến mạch, sữa",
+          fieldActive: "Đang dùng",
+          statusActive: "Đang dùng",
+          statusInactive: "Đã tắt",
+          nameRequired: "Vui lòng nhập tên món.",
+          nameInvalid: "Tên món không được chứa số hoặc ký tự đặc biệt.",
+          caloriesInvalid: "Kcal chỉ được nhập số nguyên không âm.",
+          ingredientsInvalid: "Thành phần không được chứa ký tự đặc biệt.",
+          createSuccess: "Tạo món thành công.",
+          updateSuccess: "Cập nhật món thành công.",
+          deleteSuccess: "Xóa món thành công.",
+          deactivateSuccess: "Đã tắt món vì đang được dùng trong thực đơn.",
+          confirmDelete: "Bạn có chắc muốn xóa/tắt món này không?",
+          loadFailed: "Không tải được danh mục món.",
+          saveFailed: "Không lưu được món.",
+          deleteFailed: "Không xóa được món.",
+        },
         admissionRequests: {
           title: "Yêu cầu Nhập viện",
           subtitle: "Xem xét, đánh giá, phê duyệt và theo dõi các yêu cầu nhập viện của gia đình cho cư dân cao tuổi.",
@@ -5271,6 +5446,12 @@ const resources = {
               grandchild: "Cháu",
               guardian: "Người giám hộ",
               other: "Khác"
+            },
+            validation: {
+              phoneInvalid: "Số điện thoại phải gồm đúng 10 chữ số bắt đầu bằng 0 (VD: 0912345678)",
+              contactRequiredFields: "Mỗi liên hệ khẩn cấp phải có họ tên, quan hệ và số điện thoại.",
+              duplicatePhone: "Không thể có hai thân nhân cùng số điện thoại {{phone}}.",
+              duplicateEmail: "Không thể có hai thân nhân cùng email {{email}}."
             }
           },
           byArea: {
@@ -5571,13 +5752,10 @@ const resources = {
               passwordLetter: "Mật khẩu phải chứa ít nhất 1 chữ cái",
               passwordDigit: "Mật khẩu phải chứa ít nhất 1 chữ số",
               roleRequired: "Vui lòng chọn vai trò",
-              phoneInvalid: "Số điện thoại không hợp lệ (VD: 0912345678 hoặc +84912345678)",
+              phoneInvalid: "Số điện thoại phải gồm đúng 10 chữ số bắt đầu bằng 0 (VD: 0912345678)",
               phoneDuplicate: "Số điện thoại đã được sử dụng",
               dateOfBirthInvalid: "Ngày sinh không hợp lệ",
               dateOfBirthMinAge: "Nhân viên phải đủ 18 tuổi",
-              dateOfBirthDoctorMinAge: "Bác sĩ phải đủ 24 tuổi",
-              dateOfBirthMaxAgeMale: "Nhân viên nam không được quá 60 tuổi",
-              dateOfBirthMaxAgeFemale: "Nhân viên nữ không được quá 55 tuổi",
               genderRequiredForDob: "Vui lòng chọn giới tính Nam hoặc Nữ khi nhập ngày sinh",
               usernameInvalid: "Username 3–30 ký tự, chỉ chữ cái, số và dấu gạch dưới",
               passwordMinEdit: "Ít nhất 8 ký tự",
@@ -5692,6 +5870,9 @@ const resources = {
               selectShiftRequired: 'Vui lòng chọn ca làm việc',
               selectStaffRequired: 'Vui lòng chọn nhân viên',
               splitTimeRequired: 'Vui lòng nhập giờ bắt đầu và kết thúc cho ca gãy',
+              splitEndBeforeStart: 'Giờ kết thúc phải sau giờ bắt đầu (ca gãy trong cùng ngày)',
+              splitDurationMin: 'Ca gãy phải có thời lượng tối thiểu 1 giờ',
+              splitDurationMax: 'Ca gãy không được vượt quá 12 giờ',
               shiftLabel: 'Ca làm việc *',
               staffLabel: 'Nhân viên *',
               workDateLabel: 'Ngày làm việc *',

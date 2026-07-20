@@ -18,7 +18,7 @@ const toDatetimeLocalValue = (iso) => {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
 
-function BehaviorFormModal({ open, mode, recordId, residents, defaultWorkDate, maxDate, onClose, onSuccess }) {
+function BehaviorFormModal({ open, mode, recordId, residents, defaultWorkDate, maxDate, canMutate = true, onClose, onSuccess }) {
   const { t } = useTranslation();
   const isEdit = mode === 'edit';
   const ns = 'caregiver';
@@ -161,6 +161,7 @@ function BehaviorFormModal({ open, mode, recordId, residents, defaultWorkDate, m
     : t(`${ns}.dailyBehaviors.formModal.titleCreate`);
   const activeSeverityOptions =
     observationCategory === 'abnormal' ? abnormalSeverityOptions : severityOptions;
+  const saveDisabled = saving || loading || (!isEdit && canMutate === false);
 
   return (
     <div className="behavior-page__modal-overlay" onClick={saving ? undefined : onClose}>
@@ -294,7 +295,7 @@ function BehaviorFormModal({ open, mode, recordId, residents, defaultWorkDate, m
               {error && <p className="form-error">{error}</p>}
 
               <div className="behavior-page__actions">
-                <button type="submit" className="btn-primary" disabled={saving}>
+                <button type="submit" className="btn-primary" disabled={saveDisabled}>
                   {saving ? t(`${c}.savingRecord`) : isEdit ? t(`${c}.update`) : t(`${c}.saveRecord`)}
                 </button>
                 <button type="button" className="btn-secondary" disabled={saving} onClick={onClose}>

@@ -5,6 +5,22 @@
   color: #1e293b;
 }
 
+.behavior-page__context {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  background: #f0fdfa;
+  border: 1px solid #99f6e4;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  color: #0f766e;
+}
+
+.behavior-page__context--warn {
+  background: #fff7ed;
+  border-color: #fed7aa;
+  color: #9a3412;
+}
+
 .behavior-page__form-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));

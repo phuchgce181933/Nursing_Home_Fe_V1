@@ -34,6 +34,8 @@ import {
   Stethoscope,
   Receipt,
   UtensilsCrossed,
+  Droplets,
+  Brain,
 } from 'lucide-react';
 
 export const sidebarData = [
@@ -103,10 +105,19 @@ export const sidebarData = [
     ],
   },
   {
+    title: 'sidebar.dailyCare',
+    icon: ClipboardList,
+    children: [
+      { title: 'sidebar.hygieneActivityList', icon: Droplets, path: '/admin/hygiene-activities' },
+      { title: 'sidebar.dailyBehaviorList', icon: Brain, path: '/admin/daily-behaviors' },
+    ],
+  },
+  {
     title: 'sidebar.nutrition',
     icon: UtensilsCrossed,
     children: [
       { title: 'sidebar.dishes', icon: UtensilsCrossed, path: '/admin/dishes' },
+      { title: 'sidebar.mealIntakeNoteList', icon: ClipboardList, path: '/admin/meal-intake-notes' },
     ],
   },
   {
