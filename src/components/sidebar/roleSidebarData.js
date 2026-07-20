@@ -85,11 +85,6 @@ export const roleSidebarData = {
       path: '/caregiver/diet-plans',
     },
     {
-      title: 'sidebar.rehabSchedule',
-      icon: Dumbbell,
-      path: '/caregiver/rehabilitation-schedule',
-    },
-    {
       title: 'sidebar.hygieneActivities',
 
       icon: Droplets,
