@@ -198,6 +198,7 @@ function AppRoutes() {
         <Route path="staff/emergency" element={<ManagerEmergencyAvailabilityPage />} />
         <Route path="staff/leave-requests" element={<ManagerLeaveRequestAdminPage />} />
         <Route path="staff/leave-requests/:id" element={<LeaveRequestDetailPage />} />
+        <Route path="incidents" element={<IncidentManagementPage />} />
         <Route path="activity-dashboard" element={<ManagerActivityDashboard />} />
         <Route path="*" element={<PlaceholderPage title="Trang quản lý vận hành" />} />
       </Route>
@@ -301,6 +302,7 @@ function AppRoutes() {
         <Route path="medications" element={<PharmacyPage defaultTab="medications" />} />
         <Route path="suppliers" element={<PharmacyPage defaultTab="suppliers" />} />
         <Route path="stocks" element={<PharmacyPage defaultTab="stocks" />} />
+        <Route path="incidents" element={<IncidentManagementPage />} />
         <Route path="dispense" element={<PharmacyPage defaultTab="dispense" />} />
         <Route path="reports" element={<PharmacyPage defaultTab="reports" />} />
         <Route path="*" element={<PlaceholderPage title="Trang dược sĩ" />} />

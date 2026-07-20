@@ -698,75 +698,60 @@ export default function ActivitySchedulePage() {
                 disabled={!attendanceAllowed}
               />
 
-              {draft.attendanceRecords.map((record) => {
-                const resident = residents[record.residentId];
-                return (
-                  <div key={record.residentId} className="as-resident-record-card">
-                    <div className="as-resident-record-title">
-                      <User size={14} />
-                      <span>{resident?.fullName || record.residentId}</span>
-                    </div>
-
-                    <div className="as-resident-record-grid">
-                      <div>
-                        <label className="as-record-label">Điểm danh</label>
-                        <select
-                          className="as-record-select"
-                          value={record.status}
-                          onChange={(e) => handleAttendanceChange(record.residentId, 'status', e.target.value)}
-                          disabled={!attendanceAllowed}
-                        >
-                          <option value="present">Có mặt</option>
-                          <option value="absent">Vắng mặt</option>
-                          <option value="late">Muộn</option>
-                          <option value="left_early">Về sớm</option>
-                        </select>
+              <div className="as-resident-list">
+                {draft.attendanceRecords.map((record) => {
+                  const resident = residents[record.residentId];
+                  const participation = draft.participationRecords.find((item) => item.residentId === record.residentId) || { participationLevel: 'active', comment: '', incident: '' };
+                  return (
+                    <div key={record.residentId} className="as-resident-record-card">
+                      <div className="as-resident-record-title">
+                        <User size={14} />
+                        <span>{resident?.fullName || record.residentId}</span>
                       </div>
 
-                      <div>
-                        <label className="as-record-label">Mức độ tham gia</label>
-                        <select
-                          className="as-record-select"
-                          value={draft.participationRecords.find((item) => item.residentId === record.residentId)?.participationLevel || 'active'}
-                          onChange={(e) => handleParticipationChange(record.residentId, 'participationLevel', e.target.value)}
-                          disabled={!attendanceAllowed}
-                        >
-                          <option value="active">Tích cực</option>
-                          <option value="partial">Một phần</option>
-                          <option value="passive">Thụ động</option>
-                        </select>
+                      <div className="as-resident-record-grid">
+                        <div>
+                          <label className="as-record-label">Điểm danh</label>
+                          <select
+                            className="as-record-select"
+                            value={record.status}
+                            onChange={(e) => handleAttendanceChange(record.residentId, 'status', e.target.value)}
+                            disabled={!attendanceAllowed}
+                          >
+                            <option value="present">Có mặt</option>
+                            <option value="absent">Vắng mặt</option>
+                            <option value="late">Muộn</option>
+                            <option value="left_early">Về sớm</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="as-record-label">Mức độ tham gia</label>
+                          <select
+                            className="as-record-select"
+                            value={participation.participationLevel || 'active'}
+                            onChange={(e) => handleParticipationChange(record.residentId, 'participationLevel', e.target.value)}
+                            disabled={!attendanceAllowed}
+                          >
+                            <option value="passive">Không tham gia</option>
+                            <option value="partial">Tham gia TB</option>
+                            <option value="active">Thường xuyên tham gia</option>
+                          </select>
+                        </div>
                       </div>
+
+                      <label className="as-record-label">Nhận xét</label>
+                      <textarea
+                        className="as-record-textarea"
+                        value={participation.comment || ''}
+                        onChange={(e) => handleParticipationChange(record.residentId, 'comment', e.target.value)}
+                        placeholder="Nhập nhận xét..."
+                        disabled={!attendanceAllowed}
+                      />
                     </div>
-
-                    <label className="as-record-label">Nhận xét</label>
-                    <textarea
-                      className="as-record-textarea"
-                      value={draft.participationRecords.find((item) => item.residentId === record.residentId)?.comment || ''}
-                      onChange={(e) => handleParticipationChange(record.residentId, 'comment', e.target.value)}
-                      placeholder="Nhập nhận xét..."
-                      disabled={!attendanceAllowed}
-                    />
-
-                    <label className="as-record-label">Sự cố</label>
-                    <textarea
-                      className="as-record-textarea"
-                      value={draft.participationRecords.find((item) => item.residentId === record.residentId)?.incident || ''}
-                      onChange={(e) => handleParticipationChange(record.residentId, 'incident', e.target.value)}
-                      placeholder="Nếu có, ghi rõ sự cố..."
-                      disabled={!attendanceAllowed}
-                    />
-
-                    <label className="as-record-label">Ghi chú điểm danh</label>
-                    <textarea
-                      className="as-record-textarea"
-                      value={record.note || ''}
-                      onChange={(e) => handleAttendanceChange(record.residentId, 'note', e.target.value)}
-                      placeholder="Ghi chú thêm về điểm danh..."
-                      disabled={!attendanceAllowed}
-                    />
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           </div>
 

@@ -30,11 +30,33 @@ const assignHandlers = async (id, payload) => {
   return response.data;
 };
 
+const updateIncidentResolution = async (id, payload = {}, files = []) => {
+  const form = new FormData();
+  Object.keys(payload || {}).forEach((key) => {
+    const val = payload[key];
+    if (val === undefined || val === null) return;
+    if (typeof val === 'object' && !(val instanceof File) && !(val instanceof Blob)) {
+      form.append(key, JSON.stringify(val));
+    } else {
+      form.append(key, String(val));
+    }
+  });
+  (files || []).forEach((file) => {
+    form.append('resolutionFiles', file);
+  });
+
+  const response = await axiosClient.patch(`/incidents/${id}/resolution`, form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return response.data;
+};
+
 export default {
   listIncidents,
   getIncident,
   createIncident,
   updateIncidentStatus,
   assignHandlers,
+  updateIncidentResolution,
   exportIncidents,
 };
