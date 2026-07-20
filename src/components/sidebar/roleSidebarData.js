@@ -84,11 +84,7 @@ export const roleSidebarData = {
       icon: Apple,
       path: '/caregiver/diet-plans',
     },
-    {
-      title: 'sidebar.rehabSchedule',
-      icon: Dumbbell,
-      path: '/caregiver/rehabilitation-schedule',
-    },
+   
     {
       title: 'sidebar.hygieneActivities',
 
