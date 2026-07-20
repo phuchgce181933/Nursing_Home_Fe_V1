@@ -128,6 +128,7 @@ export const roleSidebarData = {
   ],
 
   family: [
+    { title: 'sidebar.myProfile', icon: UserCircle, path: '/family/profile' },
     { title: 'sidebar.familyDashboard', icon: LayoutDashboard, path: '/family/dashboard' },
     { title: 'sidebar.admissionHistory', icon: History, path: '/family/admission-requests' },
     { title: 'sidebar.facilityTourHistory', icon: Calendar, path: '/family/facility-tours' },

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import AdminPageShell from '../../../components/admin/AdminPageShell';
 import ListPagination from '../../../components/ui/ListPagination';
 import useClientPagination from '../../../hooks/useClientPagination';
+import useAuth from '../../../hooks/useAuth';
 import dailyBehaviorService from '../../../services/dailyBehavior.service';
 import { resolveApiError } from '../../../utils/apiMessage';
 import { getLocalDateString } from '../../../utils/dateUtils';
@@ -30,12 +31,14 @@ function detailSummary(row, t) {
 
 function DailyBehaviorsPage() {
   const { t, i18n } = useTranslation();
+  const { user } = useAuth();
   const [workDate, setWorkDate] = useState(today());
   const [observationCategory, setObservationCategory] = useState('');
   const [severity, setSeverity] = useState('');
   const [residentId, setResidentId] = useState('');
   const [residents, setResidents] = useState([]);
   const [records, setRecords] = useState([]);
+  const [canMutate, setCanMutate] = useState(false);
   const [loading, setLoading] = useState(false);
   const [listError, setListError] = useState('');
 
@@ -65,13 +68,15 @@ function DailyBehaviorsPage() {
         limit: 100,
       });
       setRecords(Array.isArray(res?.data) ? res.data : []);
+      setCanMutate(Boolean(res?.meta?.canMutate));
     } catch (e) {
       setListError(resolveApiError(e, t, 'caregiver.dailyBehaviors.loadRecordsFailed'));
       setRecords([]);
+      setCanMutate(false);
     } finally {
       setLoading(false);
     }
-  }, [workDate, observationCategory, severity, residentId]);
+  }, [workDate, observationCategory, severity, residentId, t]);
 
   useEffect(() => {
     loadResidents();
@@ -116,6 +121,12 @@ function DailyBehaviorsPage() {
     <AdminPageShell title={t('caregiver.dailyBehaviors.title')} subtitle={t('caregiver.dailyBehaviors.subtitle')}>
       {listError && <div className="resident-page__error">{listError}</div>}
 
+      {!loading && !canMutate && (
+        <p className="behavior-page__context behavior-page__context--warn">
+          {t('caregiver.dailyBehaviors.shiftWindowClosed')}
+        </p>
+      )}
+
       <BehaviorListFilters
         workDate={workDate}
         observationCategory={observationCategory}
@@ -124,6 +135,7 @@ function DailyBehaviorsPage() {
         residents={residents}
         loading={loading}
         maxDate={today()}
+        canCreate={canMutate}
         onWorkDateChange={setWorkDate}
         onObservationCategoryChange={setObservationCategory}
         onSeverityChange={setSeverity}
@@ -135,6 +147,9 @@ function DailyBehaviorsPage() {
       <BehaviorRecordsTable
         records={paginatedRecords}
         loading={loading}
+        canMutate={canMutate}
+        showRecordedBy
+        currentUserId={user?._id}
         onEdit={(row) => setFormModal({ mode: 'edit', id: row._id })}
         onDelete={handleOpenDelete}
       />
@@ -150,6 +165,7 @@ function DailyBehaviorsPage() {
         residents={residents}
         defaultWorkDate={workDate}
         maxDate={today()}
+        canMutate={canMutate}
         onClose={() => setFormModal(null)}
         onSuccess={() => {
           setFormModal(null);

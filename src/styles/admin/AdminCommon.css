@@ -150,14 +150,22 @@
   justify-content: center;
   padding: 16px;
   z-index: 999;
+  overflow-y: auto;
 }
 
 .adm-modal-card {
   width: min(100%, 720px);
+  max-height: calc(100vh - 32px);
   background: #ffffff;
   border-radius: 20px;
   box-shadow: 0 20px 60px rgba(15, 23, 42, 0.18);
   overflow: hidden;
+}
+
+.adm-modal-body {
+  padding: 0 20px 100px; /* leave room for sticky footer */
+  max-height: calc(100vh - 240px);
+  overflow-y: auto;
 }
 
 .adm-modal-header,
@@ -180,4 +188,9 @@
 
 .adm-modal-footer {
   background: #f8fafc;
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
+  padding: 16px 20px;
+  box-shadow: 0 -8px 20px rgba(15, 23, 42, 0.06);
 }

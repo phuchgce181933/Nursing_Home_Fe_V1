@@ -4,6 +4,7 @@ import { Search, RefreshCw, Users, Phone } from 'lucide-react';
 import residentService from '../../../../services/resident.service';
 import { formatLeaveDate } from '../../../../utils/leaveUtils';
 import { resolveApiError } from '../../../../utils/apiMessage';
+import { isValidStaffPhone } from '../../../../utils/staffPhoneValidation';
 import { FaEye } from 'react-icons/fa';
 import AdminPageShell from '../../../../components/admin/AdminPageShell';
 import ListPagination from '../../../../components/ui/ListPagination';
@@ -232,6 +233,11 @@ export default function FamilyManagementPage() {
   const handleSaveContact = async (payload) => {
     setContactSaving(true);
     setContactError('');
+    if (!isValidStaffPhone(payload.phone)) {
+      setContactError(t('admin.residents.family.validation.phoneInvalid'));
+      setContactSaving(false);
+      return;
+    }
     const excludeId =
       contactModal?.mode === 'edit' && contactModal.contact?._id ? contactModal.contact._id : null;
     const duplicate = findDuplicateContact(payload, contacts, excludeId);

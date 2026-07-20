@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import AdminPageShell from '../../../components/admin/AdminPageShell';
 import ListPagination from '../../../components/ui/ListPagination';
 import useClientPagination from '../../../hooks/useClientPagination';
+import useAuth from '../../../hooks/useAuth';
 import hygieneActivityService from '../../../services/hygieneActivity.service';
 import { resolveApiError } from '../../../utils/apiMessage';
 import { getLocalDateString } from '../../../utils/dateUtils';
@@ -18,11 +19,13 @@ const today = () => getLocalDateString();
 
 function HygieneActivitiesPage() {
   const { t, i18n } = useTranslation();
+  const { user } = useAuth();
   const [workDate, setWorkDate] = useState(today());
   const [activityCategory, setActivityCategory] = useState('');
   const [residentId, setResidentId] = useState('');
   const [residents, setResidents] = useState([]);
   const [records, setRecords] = useState([]);
+  const [canMutate, setCanMutate] = useState(false);
   const [loading, setLoading] = useState(false);
   const [listError, setListError] = useState('');
 
@@ -51,13 +54,15 @@ function HygieneActivitiesPage() {
         limit: 100,
       });
       setRecords(Array.isArray(res?.data) ? res.data : []);
+      setCanMutate(Boolean(res?.meta?.canMutate));
     } catch (e) {
       setListError(resolveApiError(e, t, 'caregiver.hygiene.loadRecordsFailed'));
       setRecords([]);
+      setCanMutate(false);
     } finally {
       setLoading(false);
     }
-  }, [workDate, activityCategory, residentId]);
+  }, [workDate, activityCategory, residentId, t]);
 
   useEffect(() => {
     loadResidents();
@@ -102,6 +107,12 @@ function HygieneActivitiesPage() {
     <AdminPageShell title={t('caregiver.hygiene.title')} subtitle={t('caregiver.hygiene.subtitle')}>
       {listError && <div className="resident-page__error">{listError}</div>}
 
+      {!loading && !canMutate && (
+        <p className="hygiene-page__context hygiene-page__context--warn">
+          {t('caregiver.hygiene.shiftWindowClosed')}
+        </p>
+      )}
+
       <HygieneListFilters
         workDate={workDate}
         activityCategory={activityCategory}
@@ -109,6 +120,7 @@ function HygieneActivitiesPage() {
         residents={residents}
         loading={loading}
         maxDate={today()}
+        canCreate={canMutate}
         onWorkDateChange={setWorkDate}
         onActivityCategoryChange={setActivityCategory}
         onResidentIdChange={setResidentId}
@@ -119,6 +131,9 @@ function HygieneActivitiesPage() {
       <HygieneRecordsTable
         records={paginatedRecords}
         loading={loading}
+        canMutate={canMutate}
+        showRecordedBy
+        currentUserId={user?._id}
         onEdit={(row) => setFormModal({ mode: 'edit', id: row._id })}
         onDelete={handleOpenDelete}
       />
@@ -134,6 +149,7 @@ function HygieneActivitiesPage() {
         residents={residents}
         defaultWorkDate={workDate}
         maxDate={today()}
+        canMutate={canMutate}
         onClose={() => setFormModal(null)}
         onSuccess={() => {
           setFormModal(null);

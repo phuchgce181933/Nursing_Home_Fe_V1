@@ -58,6 +58,9 @@ import AdminContractManagementPage from '../pages/admin/AdminContractManagementP
 import AdminInvoiceManagementPage from '../pages/admin/AdminInvoiceManagementPage';
 import AdminClinicalServicesPage from '../pages/admin/AdminClinicalServicesPage';
 import AdminDishesPage from '../pages/admin/dishes';
+import AdminMealIntakeNotesPage from '../pages/admin/meal-intake-notes';
+import AdminHygieneActivitiesPage from '../pages/admin/hygiene-activities';
+import AdminDailyBehaviorsPage from '../pages/admin/daily-behaviors';
 import AdminMedicalChargesPage from '../pages/admin/AdminMedicalChargesPage';
 import DoctorDashboardPage from '../pages/doctor/DoctorDashboardPage';
 import DoctorProfile from '../pages/doctor/DoctorProfile';
@@ -170,6 +173,9 @@ function AppRoutes() {
         <Route path="invoices" element={<AdminInvoiceManagementPage />} />
         <Route path="services" element={<AdminClinicalServicesPage />} />
         <Route path="dishes" element={<AdminDishesPage />} />
+        <Route path="meal-intake-notes" element={<AdminMealIntakeNotesPage />} />
+        <Route path="hygiene-activities" element={<AdminHygieneActivitiesPage />} />
+        <Route path="daily-behaviors" element={<AdminDailyBehaviorsPage />} />
         <Route path="medical-charges" element={<AdminMedicalChargesPage />} />
         <Route path="incidents" element={<IncidentManagementPage />} />
         <Route path="*" element={<PlaceholderPage title="Trang quản trị" />} />
@@ -334,6 +340,7 @@ function AppRoutes() {
       >
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<FamilyDashboardPage />} />
+        <Route path="profile" element={<ProfilePage />} />
         <Route path="admission-requests" element={<AdmissionRequestsHistoryPage />} />
         <Route path="facility-tours" element={<FacilityTourHistoryPage />} />
         <Route path="activities" element={<FamilyActivityPage />} />

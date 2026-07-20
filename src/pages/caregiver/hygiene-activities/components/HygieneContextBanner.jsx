@@ -10,9 +10,12 @@ function HygieneContextBanner({ context }) {
   const activity = hygieneActivityLabel(context.activityType, t);
 
   if (context.hasExistingRecord) {
+    const name = context.existingRecordedByName;
     return (
       <p className="hygiene-page__context hygiene-page__context--warn">
-        {t(`${ns}.duplicate`, { activity })}
+        {name
+          ? t(`${ns}.duplicateWithRecorder`, { activity, name })
+          : t(`${ns}.duplicate`, { activity })}
       </p>
     );
   }

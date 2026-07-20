@@ -13,7 +13,7 @@ import {
 } from '../constants';
 import HygieneContextBanner from './HygieneContextBanner';
 
-function HygieneFormModal({ open, mode, recordId, residents, defaultWorkDate, maxDate, onClose, onSuccess }) {
+function HygieneFormModal({ open, mode, recordId, residents, defaultWorkDate, maxDate, canMutate = true, onClose, onSuccess }) {
   const { t } = useTranslation();
   const isEdit = mode === 'edit';
   const ns = 'caregiver';
@@ -137,7 +137,12 @@ function HygieneFormModal({ open, mode, recordId, residents, defaultWorkDate, ma
   const title = isEdit
     ? t(`${ns}.hygiene.formModal.titleEdit`)
     : t(`${ns}.hygiene.formModal.titleCreate`);
-  const saveDisabled = saving || loading || (!isEdit && (context?.hasExistingRecord || !context));
+  const saveDisabled =
+    saving ||
+    loading ||
+    (!isEdit && (context?.hasExistingRecord || !context)) ||
+    (!isEdit && context?.canRecord === false) ||
+    (!isEdit && canMutate === false);
 
   return (
     <div className="hygiene-page__modal-overlay" onClick={saving ? undefined : onClose}>

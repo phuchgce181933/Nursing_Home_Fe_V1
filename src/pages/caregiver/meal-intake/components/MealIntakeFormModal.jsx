@@ -6,7 +6,7 @@ import { mealTypeLabel } from '../../../../utils/nutritionLabels';
 import { getIntakeStatusOptions, getMealTypeOptions } from '../constants';
 import MealIntakePlannedMealBanner from './MealIntakePlannedMealBanner';
 
-function MealIntakeFormModal({ open, mode, recordId, residents, defaultWorkDate, maxDate, onClose, onSuccess }) {
+function MealIntakeFormModal({ open, mode, recordId, residents, defaultWorkDate, maxDate, canMutate = true, onClose, onSuccess }) {
   const { t } = useTranslation();
   const isEdit = mode === 'edit';
   const ns = 'caregiver';
@@ -144,12 +144,15 @@ function MealIntakeFormModal({ open, mode, recordId, residents, defaultWorkDate,
   const createBlockedNoMenu =
     !isEdit && context && !context.hasExistingRecord && !context.plannedMeal;
   const createBlockedPending = !isEdit && (!residentId || !workDate || !mealType || !context);
+  const createBlockedShiftWindow = !isEdit && context && context.canRecord === false;
   const saveDisabled =
     saving ||
     loading ||
     (!isEdit && context?.hasExistingRecord) ||
     createBlockedNoMenu ||
-    createBlockedPending;
+    createBlockedPending ||
+    createBlockedShiftWindow ||
+    (!isEdit && canMutate === false);
 
   return (
     <div className="meal-intake-page__modal-overlay" onClick={saving ? undefined : onClose}>

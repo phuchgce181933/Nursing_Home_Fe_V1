@@ -15,6 +15,12 @@ import {
 } from '../../utils/nutritionLabels';
 import '../../styles/nurse/MealPlansPage.css';
 import { resolveApiError } from '../../utils/apiMessage';
+import {
+  getResidentCoverage,
+  ResidentCoverageBadge,
+  SelectedCoverageBanner,
+  useNutritionCoverage,
+} from './components/mealPlanCoverage';
 
 const MP = 'nurse.mealPlans';
 const CUSTOM_DISH_VALUE = '__custom__';
@@ -97,6 +103,7 @@ function MealPlanTab() {
   const [dishCatalog, setDishCatalog] = useState([]);
   const [error, setError] = useState('');
   const suppressScheduleLoadRef = useRef(false);
+  const coverageByResident = useNutritionCoverage(formWorkDate, residents);
 
   const hasSelectedSchedule = Boolean(mealTimeScheduleDayId);
 
@@ -116,6 +123,27 @@ function MealPlanTab() {
   const residentMap = useMemo(
     () => Object.fromEntries(residents.map((r) => [String(r._id), r.fullName || r.residentCode])),
     [residents]
+  );
+
+  const mealPlanCoverageBannerItems = useMemo(
+    () =>
+      selectedResidents
+        .map((id) => {
+          const info = getResidentCoverage(coverageByResident, id, 'mealPlan');
+          if (!info.published) return null;
+          const name = residentMap[id] || id;
+          const titleSuffix = info.planTitle ? ` (${info.planTitle})` : '';
+          return {
+            key: id,
+            text: t(`${MP}.coverageWarningMealPlan`, {
+              name,
+              publisher: info.publishedByName || '—',
+              title: titleSuffix,
+            }),
+          };
+        })
+        .filter(Boolean),
+    [selectedResidents, coverageByResident, residentMap, t]
   );
 
   const loadBoot = async () => {
@@ -586,6 +614,8 @@ function MealPlanTab() {
             </div>
           </div>
 
+          <SelectedCoverageBanner items={mealPlanCoverageBannerItems} />
+
           <div className={`mp-resident-section${!hasSelectedSchedule ? ' mp-resident-section--disabled' : ''}`}>
             <label className="mp-resident-label">
               {hasSelectedSchedule
@@ -597,8 +627,12 @@ function MealPlanTab() {
                 const id = String(r._id);
                 const checked = selectedResidents.includes(id);
                 const disabled = !hasSelectedSchedule;
+                const planCoverage = getResidentCoverage(coverageByResident, id, 'mealPlan');
                 return (
-                  <label key={id} className={`mp-resident-item${disabled ? ' mp-resident-item--disabled' : ''}`}>
+                  <label
+                    key={id}
+                    className={`mp-resident-item${disabled ? ' mp-resident-item--disabled' : ''}${planCoverage.published ? ' mp-resident-item--covered' : ''}`}
+                  >
                     <input
                       type="checkbox"
                       checked={checked}
@@ -608,6 +642,15 @@ function MealPlanTab() {
                       }
                     />{' '}
                     {r.fullName || r.residentCode}
+                    <ResidentCoverageBadge
+                      info={planCoverage}
+                      label={t(`${MP}.coverageBadgeMealPlan`)}
+                      publisherLabel={
+                        planCoverage.publishedByName
+                          ? t(`${MP}.coveragePublishedBy`, { name: planCoverage.publishedByName })
+                          : undefined
+                      }
+                    />
                   </label>
                 );
               })}
@@ -849,6 +892,33 @@ function SpecialDietTab() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailPlan, setDetailPlan] = useState(null);
   const [error, setError] = useState('');
+  const coverageByResident = useNutritionCoverage(workDate, residents);
+
+  const residentMap = useMemo(
+    () => Object.fromEntries(residents.map((r) => [String(r._id), r.fullName || r.residentCode])),
+    [residents]
+  );
+
+  const specialCoverageBannerItems = useMemo(
+    () =>
+      selectedResidents
+        .map((id) => {
+          const info = getResidentCoverage(coverageByResident, id, 'specialDiet');
+          if (!info.published) return null;
+          const name = residentMap[id] || id;
+          const titleSuffix = info.planTitle ? ` (${info.planTitle})` : '';
+          return {
+            key: id,
+            text: t(`${MP}.coverageWarningSpecialDiet`, {
+              name,
+              publisher: info.publishedByName || '—',
+              title: titleSuffix,
+            }),
+          };
+        })
+        .filter(Boolean),
+    [selectedResidents, coverageByResident, residentMap, t]
+  );
 
   const loadBoot = async () => {
     setLoading(true);
@@ -898,7 +968,11 @@ function SpecialDietTab() {
     const tpl = templates.find((tp) => tp.key === selectedTemplate);
     if (!tpl) return setError(t(`${MP}.selectTemplate`));
     if (selectedResidents.length < 1) return setError(t(`${MP}.selectResidents`));
-    const generated = selectedResidents.map((residentId) => ({
+    const eligibleResidents = selectedResidents.filter(
+      (id) => !getResidentCoverage(coverageByResident, id, 'specialDiet').published
+    );
+    if (!eligibleResidents.length) return setError(t(`${MP}.residentsAlreadyPublished`));
+    const generated = eligibleResidents.map((residentId) => ({
       residentId,
       dietType: tpl.dietType,
       restrictions: Array.isArray(tpl.restrictions) ? tpl.restrictions : [],
@@ -912,10 +986,15 @@ function SpecialDietTab() {
   };
 
   const addManual = () => {
+    const rid = selectedResidents[0] || '';
+    if (!rid) return setError(t(`${MP}.selectResidentsBeforeManual`));
+    if (getResidentCoverage(coverageByResident, rid, 'specialDiet').published) {
+      return setError(t(`${MP}.residentsAlreadyPublished`));
+    }
     setEntries((prev) => [
       ...prev,
       {
-        residentId: selectedResidents[0] || '',
+        residentId: rid,
         dietType: 'custom',
         restrictions: [],
         nutritionGoal: '',
@@ -1086,22 +1165,39 @@ function SpecialDietTab() {
             </div>
           </div>
 
+          <SelectedCoverageBanner items={specialCoverageBannerItems} />
+
           <div className="mp-resident-section">
             <label className="mp-resident-label">{t(`${TAB}.residentsLabel`)} *</label>
             <div className="mp-resident-grid">
               {residents.map((r) => {
                 const id = String(r._id);
                 const checked = selectedResidents.includes(id);
+                const dietCoverage = getResidentCoverage(coverageByResident, id, 'specialDiet');
+                const covered = dietCoverage.published;
                 return (
-                  <label key={id} className="mp-resident-item">
+                  <label
+                    key={id}
+                    className={`mp-resident-item${covered ? ' mp-resident-item--covered' : ''}`}
+                  >
                     <input
                       type="checkbox"
                       checked={checked}
+                      disabled={covered}
                       onChange={(e) =>
                         setSelectedResidents((prev) => (e.target.checked ? [...prev, id] : prev.filter((x) => x !== id)))
                       }
                     />{' '}
                     {r.fullName || r.residentCode}
+                    <ResidentCoverageBadge
+                      info={dietCoverage}
+                      label={t(`${MP}.coverageBadgeSpecialDiet`)}
+                      publisherLabel={
+                        dietCoverage.publishedByName
+                          ? t(`${MP}.coveragePublishedBy`, { name: dietCoverage.publishedByName })
+                          : undefined
+                      }
+                    />
                   </label>
                 );
               })}
@@ -1271,10 +1367,32 @@ function MealTimeScheduleTab() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailSchedule, setDetailSchedule] = useState(null);
   const [error, setError] = useState('');
+  const coverageByResident = useNutritionCoverage(formWorkDate, residents);
 
   const residentMap = useMemo(
     () => Object.fromEntries(residents.map((r) => [String(r._id), r.fullName || r.residentCode])),
     [residents]
+  );
+
+  const scheduleCoverageBannerItems = useMemo(
+    () =>
+      selectedResidents
+        .map((id) => {
+          const info = getResidentCoverage(coverageByResident, id, 'mealTimeSchedule');
+          if (!info.published) return null;
+          const name = residentMap[id] || id;
+          const titleSuffix = info.scheduleTitle ? ` (${info.scheduleTitle})` : '';
+          return {
+            key: id,
+            text: t(`${MP}.coverageWarningSchedule`, {
+              name,
+              publisher: info.publishedByName || '—',
+              title: titleSuffix,
+            }),
+          };
+        })
+        .filter(Boolean),
+    [selectedResidents, coverageByResident, residentMap, t]
   );
 
   const loadBoot = async () => {
@@ -1330,6 +1448,7 @@ function MealTimeScheduleTab() {
     const existing = new Set(entries.map((e) => String(e.residentId)));
     const generated = selectedResidents
       .filter((id) => !existing.has(String(id)))
+      .filter((id) => !getResidentCoverage(coverageByResident, id, 'mealTimeSchedule').published)
       .map((residentId) => ({
         residentId,
         breakfastTime: tpl.breakfastTime || defaultMealTimes.breakfast,
@@ -1339,13 +1458,16 @@ function MealTimeScheduleTab() {
         source: 'template',
         templateKey: tpl.key,
       }));
-    if (!generated.length) return setError(t(`${MP}.residentsAlreadyInTable`));
+    if (!generated.length) return setError(t(`${MP}.residentsAlreadyPublished`));
     setEntries((prev) => [...prev, ...generated]);
   };
 
   const addManual = () => {
     const rid = selectedResidents[0] || '';
     if (!rid) return setError(t(`${MP}.selectResidentsBeforeManual`));
+    if (getResidentCoverage(coverageByResident, rid, 'mealTimeSchedule').published) {
+      return setError(t(`${MP}.residentsAlreadyPublished`));
+    }
     if (entries.some((e) => String(e.residentId) === String(rid))) {
       return setError(t(`${MP}.residentAlreadyInTable`));
     }
@@ -1520,22 +1642,39 @@ function MealTimeScheduleTab() {
             </div>
           </div>
 
+          <SelectedCoverageBanner items={scheduleCoverageBannerItems} />
+
           <div className="mp-resident-section">
             <label className="mp-resident-label">{t(`${TAB}.residentsLabel`)} *</label>
             <div className="mp-resident-grid">
               {residents.map((r) => {
                 const id = String(r._id);
                 const checked = selectedResidents.includes(id);
+                const scheduleCoverage = getResidentCoverage(coverageByResident, id, 'mealTimeSchedule');
+                const covered = scheduleCoverage.published;
                 return (
-                  <label key={id} className="mp-resident-item">
+                  <label
+                    key={id}
+                    className={`mp-resident-item${covered ? ' mp-resident-item--covered' : ''}`}
+                  >
                     <input
                       type="checkbox"
                       checked={checked}
+                      disabled={covered}
                       onChange={(e) =>
                         setSelectedResidents((prev) => (e.target.checked ? [...prev, id] : prev.filter((x) => x !== id)))
                       }
                     />{' '}
                     {r.fullName || r.residentCode}
+                    <ResidentCoverageBadge
+                      info={scheduleCoverage}
+                      label={t(`${MP}.coverageBadgeSchedule`)}
+                      publisherLabel={
+                        scheduleCoverage.publishedByName
+                          ? t(`${MP}.coveragePublishedBy`, { name: scheduleCoverage.publishedByName })
+                          : undefined
+                      }
+                    />
                   </label>
                 );
               })}

@@ -7,9 +7,12 @@ function MealIntakePlannedMealBanner({ context }) {
   if (!context) return null;
 
   if (context.hasExistingRecord) {
+    const name = context.existingRecordedByName;
     return (
       <p className="meal-intake-page__context meal-intake-page__context--warn">
-        {t(`${ns}.duplicate`)}
+        {name
+          ? t(`${ns}.duplicateWithRecorder`, { name })
+          : t(`${ns}.duplicate`)}
       </p>
     );
   }
