@@ -381,80 +381,62 @@ export default function ActivityParticipationResultsPage() {
               {form.attendanceRecords.length > 0 && (
                 <div className="adm-modal-section">
                   <label className="text-sm font-semibold">Ghi nhận từng cư dân</label>
-                  {form.attendanceRecords.map((record) => {
-                    const resident = residents[record.residentId];
-                    const participation = form.participationRecords.find((item) => item.residentId === record.residentId) || { participationLevel: 'active', comment: '', incident: '' };
+                  <div className="adm-table-responsive">
+                    <table className="adm-table adm-participation-table">
+                      <thead>
+                        <tr>
+                          <th>Cư dân</th>
+                          <th>Điểm danh</th>
+                          <th>Mức độ tham gia</th>
+                          <th>Nhận xét</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {form.attendanceRecords.map((record) => {
+                          const resident = residents[record.residentId];
+                          const participation = form.participationRecords.find((item) => item.residentId === record.residentId) || { participationLevel: 'active', comment: '', incident: '' };
 
-                    return (
-                      <div key={record.residentId} className="adm-modal-card">
-                        <div className="adm-modal-card-title">
-                          {resident?.fullName || record.residentId}
-                        </div>
-
-                        <div className="adm-modal-grid">
-                          <div className="adm-modal-field">
-                            <label className="text-sm font-semibold">Điểm danh</label>
-                            <select
-                              className="adm-filter-select"
-                              value={record.status}
-                              onChange={(e) => updateAttendanceRecord(record.residentId, 'status', e.target.value)}
-                            >
-                              <option value="present">Có mặt</option>
-                              <option value="absent">Vắng mặt</option>
-                              <option value="late">Muộn</option>
-                              <option value="left_early">Về sớm</option>
-                            </select>
-                          </div>
-
-                          <div className="adm-modal-field">
-                            <label className="text-sm font-semibold">Mức độ tham gia</label>
-                            <select
-                              className="adm-filter-select"
-                              value={participation.participationLevel}
-                              onChange={(e) => updateParticipationRecord(record.residentId, 'participationLevel', e.target.value)}
-                            >
-                              <option value="active">Tích cực</option>
-                              <option value="partial">Một phần</option>
-                              <option value="passive">Thụ động</option>
-                            </select>
-                          </div>
-                        </div>
-
-                        <div className="adm-modal-field">
-                          <label className="text-sm font-semibold">Nhận xét</label>
-                          <textarea
-                            rows="2"
-                            className="adm-filter-input"
-                            value={participation.comment}
-                            onChange={(e) => updateParticipationRecord(record.residentId, 'comment', e.target.value)}
-                            placeholder="Nhận xét cho cư dân này..."
-                          />
-                        </div>
-
-                        <div className="adm-modal-field">
-                          <label className="text-sm font-semibold">Sự cố</label>
-                          <textarea
-                            rows="2"
-                            className="adm-filter-input"
-                            value={participation.incident}
-                            onChange={(e) => updateParticipationRecord(record.residentId, 'incident', e.target.value)}
-                            placeholder="Nếu có, ghi rõ sự cố..."
-                          />
-                        </div>
-
-                        <div className="adm-modal-field">
-                          <label className="text-sm font-semibold">Ghi chú điểm danh</label>
-                          <textarea
-                            rows="2"
-                            className="adm-filter-input"
-                            value={record.note || ''}
-                            onChange={(e) => updateAttendanceRecord(record.residentId, 'note', e.target.value)}
-                            placeholder="Ghi chú thêm..."
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
+                          return (
+                            <tr key={record.residentId}>
+                              <td>{resident?.fullName || record.residentId}</td>
+                              <td>
+                                <select
+                                  className="adm-filter-select"
+                                  value={record.status}
+                                  onChange={(e) => updateAttendanceRecord(record.residentId, 'status', e.target.value)}
+                                >
+                                  <option value="present">Có mặt</option>
+                                  <option value="absent">Vắng mặt</option>
+                                  <option value="late">Muộn</option>
+                                  <option value="left_early">Về sớm</option>
+                                </select>
+                              </td>
+                              <td>
+                                <select
+                                  className="adm-filter-select"
+                                  value={participation.participationLevel}
+                                  onChange={(e) => updateParticipationRecord(record.residentId, 'participationLevel', e.target.value)}
+                                >
+                                  <option value="passive">Không tham gia</option>
+                                  <option value="partial">Tham gia TB</option>
+                                  <option value="active">Thường xuyên tham gia</option>
+                                </select>
+                              </td>
+                              <td>
+                                <textarea
+                                  rows="2"
+                                  className="adm-filter-input"
+                                  value={participation.comment}
+                                  onChange={(e) => updateParticipationRecord(record.residentId, 'comment', e.target.value)}
+                                  placeholder="Nhận xét..."
+                                />
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
 

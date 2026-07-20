@@ -84,10 +84,9 @@ export const roleSidebarData = {
       icon: Apple,
       path: '/caregiver/diet-plans',
     },
-   
+
     {
       title: 'sidebar.hygieneActivities',
-
       icon: Droplets,
       path: '/caregiver/hygiene-activities',
     },
@@ -141,6 +140,7 @@ export const roleSidebarData = {
     { title: 'sidebar.medication', icon: Pill, path: '/pharmacist/medications' },
     { title: 'sidebar.pharmacySuppliers', icon: Truck, path: '/pharmacist/suppliers' },
     { title: 'sidebar.pharmacyStocks', icon: PackageOpen, path: '/pharmacist/stocks' },
+    { title: 'sidebar.incidents', icon: FileText, path: '/pharmacist/incidents' },
     { title: 'sidebar.pharmacyReports', icon: FileText, path: '/pharmacist/reports' },
   ],
 };

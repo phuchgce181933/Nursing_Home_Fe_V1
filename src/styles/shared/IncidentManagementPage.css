@@ -401,6 +401,22 @@
   overflow-y: auto;
   padding: 26px;
 }
+
+/* Medication suggestion dropdown */
+.ic-suggestion-list {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: #fff;
+  border: 1px solid #e6e6e6;
+  box-shadow: 0 6px 18px rgba(2,6,23,0.06);
+  z-index: 30;
+  max-height: 160px;
+  overflow: auto;
+  border-radius: 6px;
+}
+.ic-suggestion-list li { padding: 8px 10px; cursor: pointer; }
+.ic-suggestion-list li:hover { background: #f1f5f9; }
 .ic-drawer__footer {
   padding: 18px 26px;
   border-top: 1px solid #e2e8f0;
@@ -529,6 +545,106 @@
   color: #cbd5e1;
 }
 
+/* ── Table view ─────────────────────────────────────────────── */
+.ic-table-wrapper {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+}
+.ic-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 980px;
+}
+.ic-table th,
+.ic-table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid #f1f5f9;
+  text-align: left;
+  vertical-align: top;
+}
+.ic-table th {
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.ic-table tbody tr:hover {
+  background: #f8fbff;
+}
+.ic-table-title {
+  font-weight: 600;
+  color: #0f172a;
+}
+.ic-table-subtext {
+  margin-top: 4px;
+  font-size: 0.8rem;
+  color: #64748b;
+  line-height: 1.4;
+}
+.ic-assigned-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ic-assigned-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.82rem;
+  color: #334155;
+}
+.ic-availability {
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+.ic-availability--on {
+  color: #15803d;
+}
+.ic-availability--off {
+  color: #b45309;
+}
+.ic-muted {
+  color: #64748b;
+  font-size: 0.8rem;
+}
+.ic-table-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ic-status-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ic-pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 16px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.ic-pagination__summary {
+  color: #64748b;
+  font-size: 0.85rem;
+}
+.ic-pagination__controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ic-pagination__page {
+  color: #334155;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
 /* ── Delete confirm modal (centered) ────────────────────────── */
 .ic-modal-overlay {
   position: fixed;
@@ -571,6 +687,7 @@
 @media (max-width: 900px) {
   .ic-stats { grid-template-columns: repeat(2, 1fr); }
   .ic-list  { grid-template-columns: 1fr; }
+  .ic-table-wrapper { overflow-x: auto; }
 }
 @media (max-width: 640px) {
   .ic-page { padding: 18px 16px; }
@@ -578,4 +695,5 @@
   .ic-header { flex-direction: column; align-items: flex-start; }
   .ic-filters { flex-direction: column; align-items: stretch; }
   .ic-search { max-width: 100%; }
+  .ic-pagination { flex-direction: column; align-items: flex-start; }
 }

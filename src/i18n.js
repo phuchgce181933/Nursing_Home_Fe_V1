@@ -493,32 +493,6 @@ const resources = {
             skipped: "Skip"
           }
         },
-        assignedResidents: {
-          title: "Assigned Residents",
-          subtitle: "Residents assigned to you. View details for allergies, conditions, and care information.",
-          searchLabel: "Search by name or code",
-          searchPlaceholder: "Enter name or resident code...",
-          emptyFiltered: "No matching residents found",
-          emptyList: "No residents in your assignment list",
-          detailTitle: "Resident details",
-          detailSubtitle: "Full resident information",
-          backToList: "Back to list",
-          viewDetail: "View details",
-          hasMedicalAlerts: "Medical alerts",
-          drugAllergies: "Allergies",
-          otherAllergies: "Other allergies",
-          chronicConditions: "Chronic conditions",
-          bloodType: "Blood type",
-          initialHealth: "Initial condition",
-          admittedAt: "Admission date",
-          allergiesDrug: "Drugs",
-          allergiesOther: "Other",
-          activityScheduleLabel: "Activity schedule",
-          noScheduledActivities: "No scheduled activities",
-          activityDefault: "Activity",
-          loadFailed: "Failed to load resident list",
-          detailLoadFailed: "Failed to load resident details"
-        },
         residents: {
           common: {
             search: "Search",
@@ -593,32 +567,6 @@ const resources = {
             skipped: "Skip"
           }
         },
-        assignedResidents: {
-          title: "Assigned Residents",
-          subtitle: "Residents assigned to you. View details for allergies, conditions, and care information.",
-          searchLabel: "Search by name or code",
-          searchPlaceholder: "Enter name or resident code...",
-          emptyFiltered: "No matching residents found",
-          emptyList: "No residents in your assignment list",
-          detailTitle: "Resident details",
-          detailSubtitle: "Full resident information",
-          backToList: "Back to list",
-          viewDetail: "View details",
-          hasMedicalAlerts: "Medical alerts",
-          drugAllergies: "Allergies",
-          otherAllergies: "Other allergies",
-          chronicConditions: "Chronic conditions",
-          bloodType: "Blood type",
-          initialHealth: "Initial condition",
-          admittedAt: "Admission date",
-          allergiesDrug: "Drugs",
-          allergiesOther: "Other",
-          activityScheduleLabel: "Activity schedule",
-          noScheduledActivities: "No scheduled activities",
-          activityDefault: "Activity",
-          loadFailed: "Failed to load resident list",
-          detailLoadFailed: "Failed to load resident details"
-        },
         mealPlans: {
           title: "Meal Planning",
           tabSchedule: "Schedule Meal Times",
@@ -629,11 +577,9 @@ const resources = {
           tabSpecialDietsShort: "Special Diets",
           sourceTemplate: "Template",
           sourceManual: "Manual",
-          sourceCatalog: "Catalog",
           sourcePattern: "Template pattern",
           yesterday: "Yesterday",
           tomorrow: "Tomorrow",
-          in7Days: "+7 days",
           saveDraft: "Save Draft",
           updateDraft: "Update Draft",
           reset: "Reset",
@@ -719,11 +665,6 @@ const resources = {
             emptyDetailMeals: 'Schedule has no meal details yet',
             duplicateMealType: 'A resident cannot have the same meal type twice in this plan.',
             duplicateMealTime: 'A resident cannot have two meals at the same time ({{time}}) in this plan.',
-            selectDish: '— Select dish —',
-            customDish: 'Enter custom dish...',
-            dishOption: '{{name}} — {{calories}} kcal',
-            noDishCatalog: 'No dishes in catalog — contact Admin or enter manually.',
-            dishUnavailable: 'Catalog dish no longer available (showing saved name)',
 
           },
           specialTab: {
@@ -960,11 +901,7 @@ const resources = {
           activityModalSubtitle: "Scheduled activities for {{name}}",
           activityDefault: "Activity",
           loadFailed: "Failed to load resident list",
-          detailLoadFailed: "Failed to load resident details",
-          viewDetail: "View details",
-          backToList: "Back to list",
-          detailSubtitle: "Full resident information",
-          hasMedicalAlerts: "Medical alerts"
+          detailLoadFailed: "Failed to load resident details"
         },
         dailyCareSchedule: {
           title: "Daily Care Schedule",
@@ -2715,12 +2652,10 @@ const resources = {
             colFrom: "From",
             colTo: "To",
             colDays: "Days",
-            colPeriod: "Leave period",
             colReason: "Reason",
             colReplacement: "Replacement",
             colSubmitted: "Submitted",
             colReviewNote: "Review note / Rejection reason",
-            viewDetail: "View details",
             emptyList: "No leave requests",
             approve: "Approve",
             reject: "Reject",
@@ -2761,12 +2696,6 @@ const resources = {
               shiftsReassigned: "Transferred {{count}} work shifts.",
               tasksReassigned: "Transferred {{count}} care tasks.",
               shiftFallback: "Shift"
-            },
-            detail: {
-              title: "Leave request details",
-              subtitle: "Full information and approval actions",
-              backToList: "Back to list",
-              actionsTitle: "Review actions"
             }
           }
         }
@@ -4123,103 +4052,103 @@ const resources = {
           }
         }
       },
-      doctor: {
+       doctor: {
         careTasks: {
-          title: "Nhiệm vụ chăm sóc",
-          subtitle: "Xem và cập nhật các nhiệm vụ chăm sóc được phân công cho bạn trong ngày. Lịch được tạo khi quản lý publish lịch chăm sóc hoặc giao nhiệm vụ riêng lẻ.",
-          tasksToday: "Nhiệm vụ trong ngày",
-          colTaskType: "Loại nhiệm vụ",
-          colCareLevel: "Mức độ",
-          colShift: "Ca",
-          update: "Cập nhật",
-          emptyTasks: "Không có nhiệm vụ chăm sóc trong ngày này. Nếu bạn kỳ vọng có lịch, vui lòng liên hệ quản lý để publish lịch chăm sóc.",
-          loadFailed: "Không tải được lịch chăm sóc",
-          detailTitle: "Chi tiết nhiệm vụ",
-          updateTitle: "Cập nhật trạng thái",
-          notes: "Ghi chú",
+          title: "Care Tasks",
+          subtitle: "View and update care tasks assigned to you for the day. Schedules are created when managers publish care schedules or assign individual tasks.",
+          tasksToday: "Tasks for the day",
+          colTaskType: "Task type",
+          colCareLevel: "Care level",
+          colShift: "Shift",
+          update: "Update",
+          emptyTasks: "No care tasks for this day. If you expected a schedule, contact your manager to publish the care schedule.",
+          loadFailed: "Failed to load care schedule",
+          detailTitle: "Task details",
+          updateTitle: "Update status",
+          notes: "Notes",
           noNotes: "—",
-          taskEndedHint: "Nhiệm vụ đã kết thúc. Trạng thái \"bỏ lỡ\" do hệ thống tự gán khi hết ca.",
-          taskDetailLoadFailed: "Không tải được chi tiết nhiệm vụ",
-          updateFailed: "Cập nhật thất bại",
-          colTime: "Giờ",
-          colRoom: "Phòng",
+          taskEndedHint: "This task has ended. \"Missed\" status is assigned automatically when the shift ends.",
+          taskDetailLoadFailed: "Failed to load task details",
+          updateFailed: "Update failed",
+          colTime: "Time",
+          colRoom: "Room",
           statusAction: {
-            in_progress: "Bắt đầu",
-            completed: "Hoàn thành",
-            skipped: "Bỏ qua"
+            in_progress: "Start",
+            completed: "Complete",
+            skipped: "Skip"
           }
         },
         assignedResidents: {
-          title: "Cư dân phụ trách",
-          subtitle: "Danh sách cư dân được phân công cho bạn. Xem chi tiết để biết dị ứng, bệnh nền và thông tin chăm sóc.",
-          searchLabel: "Tìm theo tên hoặc mã",
-          searchPlaceholder: "Nhập tên hoặc mã cư dân...",
-          emptyFiltered: "Không tìm thấy cư dân phù hợp",
-          emptyList: "Chưa có cư dân trong danh sách phụ trách",
-          detailTitle: "Chi tiết cư dân",
-          detailSubtitle: "Thông tin đầy đủ về cư dân",
-          backToList: "Quay lại danh sách",
-          viewDetail: "Chi tiết",
-          hasMedicalAlerts: "Có cảnh báo y tế",
-          drugAllergies: "Dị ứng",
-          otherAllergies: "Dị ứng khác",
-          chronicConditions: "Bệnh nền",
-          bloodType: "Nhóm máu",
-          initialHealth: "Tình trạng ban đầu",
-          admittedAt: "Ngày nhập viện",
-          allergiesDrug: "Thuốc",
-          allergiesOther: "Khác",
-          activityScheduleLabel: "Lịch hoạt động",
-          noScheduledActivities: "Không có lịch hoạt động",
-          activityDefault: "Hoạt động",
-          loadFailed: "Không tải được danh sách cư dân",
-          detailLoadFailed: "Không tải được thông tin cư dân"
+          title: "Assigned Residents",
+          subtitle: "Residents assigned to you. View details for allergies, conditions, and care information.",
+          searchLabel: "Search by name or code",
+          searchPlaceholder: "Enter name or resident code...",
+          emptyFiltered: "No matching residents found",
+          emptyList: "No residents in your assignment list",
+          detailTitle: "Resident details",
+          detailSubtitle: "Full resident information",
+          backToList: "Back to list",
+          viewDetail: "View details",
+          hasMedicalAlerts: "Medical alerts",
+          drugAllergies: "Allergies",
+          otherAllergies: "Other allergies",
+          chronicConditions: "Chronic conditions",
+          bloodType: "Blood type",
+          initialHealth: "Initial condition",
+          admittedAt: "Admission date",
+          allergiesDrug: "Drugs",
+          allergiesOther: "Other",
+          activityScheduleLabel: "Activity schedule",
+          noScheduledActivities: "No scheduled activities",
+          activityDefault: "Activity",
+          loadFailed: "Failed to load resident list",
+          detailLoadFailed: "Failed to load resident details"
         },
         residents: {
           common: {
-            search: "Tìm kiếm",
-            searchPlaceholder: "Tên hoặc mã cư dân...",
-            status: "Trạng thái",
-            filterRecordAll: "Tất cả hồ sơ",
-            notRecordedYet: "Chưa ghi",
-            recorded: "Đã ghi",
-            colCode: "Mã",
-            colFullName: "Họ tên",
-            colActions: "Thao tác",
-            noResidents: "Không tìm thấy cư dân",
-            viewResidentDetail: "Xem chi tiết cư dân",
-            edit: "Sửa",
-            loadingDetail: "Đang tải chi tiết...",
-            retryLoad: "Tải lại",
-            close: "Đóng",
-            lastUpdated: "Cập nhật lần cuối: {{date}}",
-            loadListFailed: "Không tải được danh sách cư dân",
-            noResidentSelected: "Chưa chọn cư dân"
+            search: "Search",
+            searchPlaceholder: "Name or resident code...",
+            status: "Status",
+            filterRecordAll: "All records",
+            notRecordedYet: "Not recorded yet",
+            recorded: "Recorded",
+            colCode: "Code",
+            colFullName: "Full name",
+            colActions: "Actions",
+            noResidents: "No residents found",
+            viewResidentDetail: "View resident details",
+            edit: "Edit",
+            loadingDetail: "Loading details...",
+            retryLoad: "Retry load",
+            close: "Close",
+            lastUpdated: "Last updated: {{date}}",
+            loadListFailed: "Failed to load resident list",
+            noResidentSelected: "No resident selected"
           },
           initialHealth: {
-            updateAction: "Cập nhật"
+            updateAction: "Update"
           },
           preExistingConditions: {
-            updateFailed: "Cập nhật thất bại"
+            updateFailed: "Update failed"
           },
           drugAllergies: {
-            title: "Quản lý dị ứng",
-            subtitle: "Bác sĩ ghi nhận và cập nhật dị ứng của cư dân để kê đơn và chăm sóc an toàn.",
-            detailTitle: "Chi tiết dị ứng",
-            editTitle: "Cập nhật dị ứng",
-            saveSuccess: "Đã cập nhật dị ứng",
-            currentData: "Dữ liệu hiện tại",
-            noAllergyData: "Chưa có dữ liệu dị ứng.",
-            allergiesPlaceholder: "Ví dụ: Penicillin, Sulfonamide, Aspirin",
-            requireOneAllergy: "Vui lòng nhập ít nhất một dị ứng",
-            allergiesLabel: "Dị ứng (ngăn cách bằng dấu phẩy)",
-            loadFailed: "Không thể tải thông tin dị ứng",
-            updateFailed: "Cập nhật thất bại",
-            routeHint: "nên bật API PUT /residents/:id/drug-allergies trên backend để lưu đúng cột drugAllergies.",
-            colRecordStatus: "Dị ứng",
-            statusRecorded: "Đã ghi ({{count}})",
-            statusNotRecorded: "Chưa ghi",
-            filterRecord: "Hồ sơ"
+            title: "Allergy Management",
+            subtitle: "Record and update residents' allergies for safe prescribing and care.",
+            detailTitle: "Allergy details",
+            editTitle: "Update allergies",
+            saveSuccess: "Allergies updated.",
+            currentData: "Current data",
+            noAllergyData: "No allergy data recorded.",
+            allergiesPlaceholder: "e.g. Penicillin, Sulfonamide, Aspirin",
+            requireOneAllergy: "Enter at least one allergy",
+            allergiesLabel: "Allergies (comma-separated)",
+            loadFailed: "Failed to load allergy information",
+            updateFailed: "Update failed",
+            routeHint: "Enable API PUT /residents/:id/drug-allergies on backend to save drugAllergies column.",
+            colRecordStatus: "Allergies",
+            statusRecorded: "Recorded ({{count}})",
+            statusNotRecorded: "Not recorded",
+            filterRecord: "Record"
           }
         }
       },
@@ -4249,32 +4178,6 @@ const resources = {
             skipped: "Bỏ qua"
           }
         },
-        assignedResidents: {
-          title: "Cư dân phụ trách",
-          subtitle: "Danh sách cư dân được phân công cho bạn. Xem chi tiết để biết dị ứng, bệnh nền và thông tin chăm sóc.",
-          searchLabel: "Tìm theo tên hoặc mã",
-          searchPlaceholder: "Nhập tên hoặc mã cư dân...",
-          emptyFiltered: "Không tìm thấy cư dân phù hợp",
-          emptyList: "Chưa có cư dân trong danh sách phụ trách",
-          detailTitle: "Chi tiết cư dân",
-          detailSubtitle: "Thông tin đầy đủ về cư dân",
-          backToList: "Quay lại danh sách",
-          viewDetail: "Chi tiết",
-          hasMedicalAlerts: "Có cảnh báo y tế",
-          drugAllergies: "Dị ứng",
-          otherAllergies: "Dị ứng khác",
-          chronicConditions: "Bệnh nền",
-          bloodType: "Nhóm máu",
-          initialHealth: "Tình trạng ban đầu",
-          admittedAt: "Ngày nhập viện",
-          allergiesDrug: "Thuốc",
-          allergiesOther: "Khác",
-          activityScheduleLabel: "Lịch hoạt động",
-          noScheduledActivities: "Không có lịch hoạt động",
-          activityDefault: "Hoạt động",
-          loadFailed: "Không tải được danh sách cư dân",
-          detailLoadFailed: "Không tải được thông tin cư dân"
-        },
         mealPlans: {
           title: "Kế hoạch bữa ăn",
           tabSchedule: "Lịch giờ ăn",
@@ -4285,11 +4188,9 @@ const resources = {
           tabSpecialDietsShort: "Chế độ đặc biệt",
           sourceTemplate: "Template",
           sourceManual: "Thủ công",
-          sourceCatalog: "Danh mục",
           sourcePattern: "Mẫu",
           yesterday: "Hôm qua",
           tomorrow: "Ngày mai",
-          in7Days: "+7 ngày",
           saveDraft: "Lưu bản nháp",
           updateDraft: "Cập nhật bản nháp",
           reset: "Làm mới",
@@ -4375,11 +4276,6 @@ const resources = {
             emptyDetailMeals: 'Lịch chưa có chi tiết món ăn',
             duplicateMealType: 'Mỗi cư dân chỉ được có một bữa cùng loại (sáng/trưa/tối) trong thực đơn này.',
             duplicateMealTime: 'Mỗi cư dân không thể có hai bữa cùng giờ {{time}} trong thực đơn này.',
-            selectDish: '— Chọn món —',
-            customDish: 'Nhập món khác...',
-            dishOption: '{{name}} — {{calories}} kcal',
-            noDishCatalog: 'Chưa có món trong danh mục — liên hệ Admin hoặc nhập tay.',
-            dishUnavailable: 'Món danh mục không còn khả dụng (hiển thị tên đã lưu)',
           
           },
           specialTab: {
@@ -4616,11 +4512,7 @@ const resources = {
           activityModalSubtitle: "Lịch hoạt động của {{name}}",
           activityDefault: "Hoạt động",
           loadFailed: "Không tải được danh sách cư dân",
-          detailLoadFailed: "Không tải được thông tin cư dân",
-          viewDetail: "Chi tiết",
-          backToList: "Quay lại danh sách",
-          detailSubtitle: "Thông tin đầy đủ về cư dân",
-          hasMedicalAlerts: "Có cảnh báo y tế"
+          detailLoadFailed: "Không tải được thông tin cư dân"
         },
         dailyCareSchedule: {
           title: "Lịch chăm sóc hằng ngày",
@@ -5111,6 +5003,7 @@ const resources = {
         errorLoadFailed: "Không thể tải thông tin cơ sở vật chất. Vui lòng thử lại sau."
       },
       admin: {
+
         mealIntake: {
           title: "Danh sách ghi nhận bữa ăn",
           subtitle: "Chỉ xem — toàn bộ ghi nhận bữa ăn",
@@ -6326,12 +6219,10 @@ const resources = {
             colFrom: "Từ ngày",
             colTo: "Đến ngày",
             colDays: "Số ngày",
-            colPeriod: "Thời gian nghỉ",
             colReason: "Lý do",
             colReplacement: "Người thế ca",
             colSubmitted: "Ngày gửi",
             colReviewNote: "Ghi chú / Lý do từ chối",
-            viewDetail: "Chi tiết",
             emptyList: "Không có đơn nghỉ phép nào",
             approve: "Duyệt",
             reject: "Từ chối",
@@ -6372,12 +6263,6 @@ const resources = {
               shiftsReassigned: "Đã chuyển {{count}} ca làm việc.",
               tasksReassigned: "Đã chuyển {{count}} nhiệm vụ chăm sóc.",
               shiftFallback: "Ca"
-            },
-            detail: {
-              title: "Chi tiết đơn nghỉ phép",
-              subtitle: "Thông tin đầy đủ và thao tác duyệt đơn",
-              backToList: "Quay lại danh sách",
-              actionsTitle: "Thao tác duyệt"
             }
           }
         }
