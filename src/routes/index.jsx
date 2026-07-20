@@ -44,6 +44,7 @@ import MyShiftsPage from '../pages/shared/MyShiftsPage';
 import AdminProfile from '../pages/admin/AdminProfile';
 import AdminAccountsPage from '../pages/admin/AdminAccountsPage';
 import AdminAdmissionRequestsPage from '../pages/admin/AdminAdmissionRequestsPage';
+import AdminConsultationRequestsPage from '../pages/admin/AdminConsultationRequestsPage';
 import AdminTourRequestsPage from '../pages/admin/AdminTourRequestsPage';
 import ServicePackagesPage from '../pages/admin/ServicePackagesPage';
 import PharmacyPage from '../pages/pharmacist/PharmacyPage';
@@ -160,6 +161,7 @@ function AppRoutes() {
         <Route path="notifications" element={<NotificationsPage role="admin" />} />
         <Route path="accounts" element={<AdminAccountsPage />} />
         <Route path="admission-requests" element={<AdminAdmissionRequestsPage />} />
+        <Route path="consultation-requests" element={<AdminConsultationRequestsPage />} />
         <Route path="appointments" element={<CareAppointmentsPage />} />
         <Route path="tour-requests" element={<AdminTourRequestsPage />} />
         <Route path="service-packages" element={<ServicePackagesPage />} />
