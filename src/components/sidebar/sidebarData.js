@@ -70,6 +70,7 @@ export const sidebarData = [
     icon: ClipboardList,
     children: [
       { title: 'sidebar.admissionRequests', icon: UserPlus, path: '/admin/admission-requests' },
+      { title: 'sidebar.consultationRequests', icon: MessageSquare, path: '/admin/consultation-requests' },
       { title: 'sidebar.tourRequests', icon: Compass, path: '/admin/tour-requests' },
       { title: 'sidebar.servicePackages', icon: Package, path: '/admin/service-packages' },
     ],
