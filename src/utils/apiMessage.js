@@ -53,8 +53,13 @@ export function resolveApiError(err, t, fallbackKey) {
   }
 
   const key = `apiErrors.${data.errorCode}`;
-  const translated = t(key, data.params || {});
-  if (translated && translated !== key) return translated;
+  let translated = t(key, data.params || {});
+  if (translated && translated !== key) {
+    if (/\{\{\s*\w+\s*\}\}/.test(translated)) {
+      return data?.message || fallback;
+    }
+    return translated;
+  }
   return data.message || fallback;
 }
 

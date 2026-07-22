@@ -775,6 +775,11 @@ export default function ServicePackagesPage() {
                     <option value="premium">Cao cấp</option>
                     <option value="vip">VIP</option>
                   </select>
+                  <small style={{ color: '#0f766e', fontSize: '11.5px', marginTop: '4px', display: 'block', fontWeight: 500 }}>
+                    {formTier === 'vip' && '🏥 Loại phòng: ICU / Isolation'}
+                    {formTier === 'premium' && '🌟 Loại phòng: Premium'}
+                    {(formTier === 'standard' || formTier === 'basic') && '🏠 Loại phòng: Standard'}
+                  </small>
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
