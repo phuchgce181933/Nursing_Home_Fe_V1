@@ -18,9 +18,12 @@ import { useTranslation } from 'react-i18next';
 import admissionService from '../../services/admission.service';
 import medicationService from '../../services/medication.service';
 import paymentService from '../../services/payment.service';
+import servicePackageService from '../../services/servicePackage.service';
+import { resolveApiError } from '../../utils/apiMessage';
 import '../../styles/admin/AdminContractManagementPage.css';
 
-const getContractStatusClass = (startDate, endDate) => {
+const getContractStatusClass = (startDate, endDate, contractStatus) => {
+  if (contractStatus === 'cancelled') return 'contract-status-cancelled';
   const now = new Date();
   const start = new Date(startDate);
   const end = new Date(endDate);
@@ -34,7 +37,8 @@ const getContractStatusClass = (startDate, endDate) => {
   return 'contract-status-upcoming';
 };
 
-const getContractStatusLabel = (startDate, endDate) => {
+const getContractStatusLabel = (startDate, endDate, contractStatus) => {
+  if (contractStatus === 'cancelled') return 'cancelled';
   const now = new Date();
   const start = new Date(startDate);
   const end = new Date(endDate);
@@ -53,12 +57,16 @@ const getStatusTranslation = (statusKey, t) => {
     active: 'admin.contractManagement.statusActive',
     expired: 'admin.contractManagement.statusExpired',
     upcoming: 'admin.contractManagement.statusUpcoming',
+    cancelled: 'admin.contractManagement.statusCancelled',
   };
-  return t(statusMap[statusKey] || statusKey);
+  return t(statusMap[statusKey] || statusKey, statusKey === 'cancelled' ? 'Đã hủy' : statusKey);
 };
 
-const getContractStatusIcon = (startDate, endDate) => {
-  const status = getContractStatusLabel(startDate, endDate);
+const getContractStatusIcon = (startDate, endDate, contractStatus) => {
+  const status = getContractStatusLabel(startDate, endDate, contractStatus);
+  if (status === 'cancelled') {
+    return <XCircle className="w-5 h-5 text-gray-500" />;
+  }
   if (status === 'active') {
     return <CheckCircle className="w-5 h-5 text-green-600" />;
   }
@@ -93,6 +101,9 @@ export default function AdminContractManagementPage() {
     prescriptionId: null,
   });
   const [isCreatingInvoice, setIsCreatingInvoice] = useState(false);
+  const [renewalConflictMessage, setRenewalConflictMessage] = useState('');
+  const [renewalServiceBlockedMessage, setRenewalServiceBlockedMessage] = useState('');
+  const [renewalMedBlockedMessage, setRenewalMedBlockedMessage] = useState('');
   const [showMedicationModal, setShowMedicationModal] = useState(false);
   const [medPrescriptions, setMedPrescriptions] = useState([]);
   const [medLoading, setMedLoading] = useState(false);
@@ -100,12 +111,22 @@ export default function AdminContractManagementPage() {
   const [medEstimatedCost, setMedEstimatedCost] = useState(null);
   const [medCreatingInvoice, setMedCreatingInvoice] = useState(false);
   const [medError, setMedError] = useState('');
+  const [medConflictMessage, setMedConflictMessage] = useState('');
   const [showExtensionModal, setShowExtensionModal] = useState(false);
   const [extensionData, setExtensionData] = useState({
     newEndDate: '',
     discountPercent: 0,
   });
   const [isExtendingContract, setIsExtendingContract] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancellationReason, setCancellationReason] = useState('');
+  const [isCancellingContract, setIsCancellingContract] = useState(false);
+  const [showPackageModal, setShowPackageModal] = useState(false);
+  const [availablePackages, setAvailablePackages] = useState([]);
+  const [selectedPackageId, setSelectedPackageId] = useState('');
+  const [packageLoading, setPackageLoading] = useState(false);
+  const [isChangingPackage, setIsChangingPackage] = useState(false);
+  const [packageError, setPackageError] = useState('');
 
   const formatDate = (dateStr) => {
     if (!dateStr) return 'N/A';
@@ -129,14 +150,15 @@ export default function AdminContractManagementPage() {
       const response = await admissionService.adminGetAdmissionList({
         page: 1,
         limit: 1000,
-        status: 'checked_in',
+        status: 'contracting,checked_in,cancelled',
       });
 
       // Filter admissions with contracts
-      const contractData = response.data
+      const contractData = (response.data || [])
         .filter((admission) => admission.contractNumber && admission.contractStartDate && admission.contractEndDate)
         .map((admission) => ({
           id: admission._id,
+          contractStatus: admission.contractStatus || (admission.status === 'cancelled' ? 'cancelled' : 'active'),
           residentId: admission.residentId?._id || admission.residentId,
           residentName: admission.residentId?.fullName || admission.applicant?.fullName || 'N/A',
           contractNumber: admission.contractNumber,
@@ -144,13 +166,16 @@ export default function AdminContractManagementPage() {
           endDate: admission.contractEndDate,
           terms: admission.contractTerms,
           signedAt: admission.contractSignedAt,
-          status: getContractStatusLabel(admission.contractStartDate, admission.contractEndDate),
+          status: getContractStatusLabel(admission.contractStartDate, admission.contractEndDate, admission.status),
+          servicePackageId: admission.servicePackageId?._id || admission.servicePackageId || null,
           servicePackageName: admission.servicePackageId?.name || admission.servicePackageId?.packageCode || 'N/A',
           servicePackagePrice: admission.servicePackageId?.monthlyPrice || 0,
           contractDurationMonths: admission.contractDurationMonths || null,
           contractDiscountPercent: admission.contractDiscountPercent || null,
           latestInvoice: admission.latestInvoice || null,
           latestInvoiceStatus: admission.latestInvoice?.status?.toString().toLowerCase?.() || null,
+          latestInvoiceHasServiceCost: ['SERVICE', 'COMBINED'].includes(admission.latestInvoice?.type)
+            && Number(admission.latestInvoice?.careServiceCost || 0) > 0,
         }));
 
       console.log('Contract data fetched:', contractData[0]); // Debug log to check latestInvoice field
@@ -173,7 +198,7 @@ export default function AdminContractManagementPage() {
     // Status filter
     if (statusFilter !== 'all') {
       filtered = filtered.filter((contract) => {
-        const status = getContractStatusLabel(contract.startDate, contract.endDate);
+        const status = getContractStatusLabel(contract.startDate, contract.endDate, contract.contractStatus);
         return status.toLowerCase() === statusFilter.toLowerCase();
       });
     }
@@ -190,6 +215,67 @@ export default function AdminContractManagementPage() {
     setFilteredContracts(filtered);
     setCurrentPage(1);
   }, [contracts, searchTerm, statusFilter]);
+
+  const openPackageChangeModal = async (contract) => {
+    setSelectedContract(contract);
+    setSelectedPackageId(contract.servicePackageId || '');
+    setPackageError('');
+    setShowPackageModal(true);
+    setPackageLoading(true);
+    try {
+      const response = await servicePackageService.getServicePackageList({ isActive: true, page: 1, limit: 100 }, 'admin');
+      setAvailablePackages(Array.isArray(response) ? response : response?.data || []);
+    } catch (err) {
+      setPackageError(err.response?.data?.message || 'Không thể tải danh sách gói dịch vụ.');
+    } finally {
+      setPackageLoading(false);
+    }
+  };
+
+  const handleChangeContractPackage = async () => {
+    if (!selectedContract || !selectedPackageId) {
+      setPackageError('Vui lòng chọn gói dịch vụ mới.');
+      return;
+    }
+    if (selectedPackageId === selectedContract.servicePackageId) {
+      setPackageError('Vui lòng chọn gói dịch vụ khác với gói hiện tại.');
+      return;
+    }
+    try {
+      setIsChangingPackage(true);
+      await admissionService.adminChangeContractServicePackage(selectedContract.id, { servicePackageId: selectedPackageId });
+      setShowPackageModal(false);
+      setSelectedContract(null);
+      await fetchContracts();
+    } catch (err) {
+      setPackageError(err.response?.data?.message || 'Không thể thay đổi gói dịch vụ.');
+    } finally {
+      setIsChangingPackage(false);
+    }
+  };
+
+  const openCancelContractModal = (contract) => {
+    setSelectedContract(contract);
+    setCancellationReason('');
+    setShowCancelModal(true);
+  };
+
+  const handleCancelContract = async () => {
+    const reason = cancellationReason.trim();
+    if (!selectedContract || !reason) return;
+    try {
+      setIsCancellingContract(true);
+      await admissionService.adminCancelContract(selectedContract.id, { cancellationReason: reason });
+      setShowCancelModal(false);
+      setSelectedContract(null);
+      setCancellationReason('');
+      await fetchContracts();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Không thể hủy hợp đồng.');
+    } finally {
+      setIsCancellingContract(false);
+    }
+  };
 
   const totalPages = Math.ceil(filteredContracts.length / itemsPerPage);
   const paginatedContracts = filteredContracts.slice(
@@ -287,6 +373,26 @@ export default function AdminContractManagementPage() {
     if (!selectedContract || !medSelectedId) return alert('Vui lòng chọn đơn thuốc.');
     try {
       setMedCreatingInvoice(true);
+      setMedConflictMessage('');
+      // Check for existing medication invoice for this prescription
+      try {
+        const invResp = await paymentService.listInvoices(selectedContract.residentId);
+        const invList = Array.isArray(invResp) ? invResp : invResp?.data || [];
+        const existingMed = invList.find((inv) => (
+          (String(inv.type || '').toUpperCase() === 'MEDICATION' || String(inv.type || '').toUpperCase() === 'MEDICATIONS')
+          && (String(inv.prescriptionId || '') === String(medSelectedId || ''))
+          && String((inv.status || '').toLowerCase()) !== 'cancelled'
+        ));
+        if (existingMed) {
+          const invNum = existingMed.invoiceNumber || existingMed._id || '';
+          const message = `Đã có hóa đơn thuốc cho đơn này (${invNum}). Không thể tạo thêm.`;
+          setMedConflictMessage(message);
+          alert(message);
+          return;
+        }
+      } catch (checkErr) {
+        console.warn('Không thể kiểm tra hóa đơn hiện có trước khi tạo hóa đơn thuốc:', checkErr);
+      }
       const body = { prescriptionId: medSelectedId };
       if (medEstimatedCost != null) body.medicationCost = medEstimatedCost;
       await paymentService.createInvoice(selectedContract.residentId, body);
@@ -296,7 +402,7 @@ export default function AdminContractManagementPage() {
       await fetchContracts();
     } catch (err) {
       console.error('Error creating medication invoice:', err);
-      alert(t('admin.contractManagement.invoiceCreatedError') + (err.message || ''));
+      alert(resolveApiError(err, t, 'admin.contractManagement.invoiceCreatedError'));
     } finally {
       setMedCreatingInvoice(false);
     }
@@ -392,7 +498,7 @@ export default function AdminContractManagementPage() {
       await fetchContracts();
     } catch (err) {
       console.error('Error extending contract:', err);
-      alert('Lỗi khi gia hạn hợp đồng: ' + (err.message || 'Unknown error'));
+      alert(resolveApiError(err, t, 'admin.contractManagement.extendFailed') || ('Lỗi khi gia hạn hợp đồng: ' + (err.message || 'Unknown error')));
     } finally {
       setIsExtendingContract(false);
     }
@@ -402,6 +508,7 @@ export default function AdminContractManagementPage() {
     setSelectedContract(contract);
     setSelectedPrescription(null);
     setPrescriptionError('');
+    setRenewalConflictMessage('');
 
     // Pre-fill dates based on contract end date + 1 day
     const endDate = new Date(contract.endDate);
@@ -413,6 +520,9 @@ export default function AdminContractManagementPage() {
     // Fetch existing invoices to avoid double-charging for already-paid service periods
     let careServiceCost = (contract.servicePackagePrice || 0) * (contract.contractDurationMonths || 1);
     try {
+      // First fetch active prescription so we can detect existing medication invoices
+      await fetchActivePrescription(contract.residentId);
+
       const invoicesResp = await paymentService.listInvoices(contract.residentId);
       const invoices = Array.isArray(invoicesResp) ? invoicesResp : invoicesResp?.data || [];
       
@@ -428,6 +538,49 @@ export default function AdminContractManagementPage() {
         const totalPaidServiceCost = paidServiceInvoices.reduce((sum, inv) => sum + (inv.careServiceCost || 0), 0);
         // Only charge for periods not yet billed
         careServiceCost = Math.max(0, careServiceCost - totalPaidServiceCost);
+      }
+      // Reset previous messages
+      setRenewalServiceBlockedMessage('');
+      setRenewalMedBlockedMessage('');
+
+      // Detect exact duplicate service invoice for the same billing period
+      try {
+        const startIso = nextStartDate.toISOString().split('T')[0];
+        const endIso = nextEndDate.toISOString().split('T')[0];
+        const duplicateService = invoices.find((inv) => (
+          String((inv.type || '')).toUpperCase() === 'SERVICE' &&
+          (inv.billingPeriodStart === startIso) &&
+          (inv.billingPeriodEnd === endIso) &&
+          String((inv.status || '').toLowerCase()) !== 'cancelled'
+        ));
+        if (duplicateService) {
+          const invNum = duplicateService.invoiceNumber || duplicateService._id || '';
+          const message = `Đã có hóa đơn dịch vụ cho kỳ ${startIso} → ${endIso} (${invNum}). Chi phí dịch vụ chăm sóc (VND) sẽ không được gia hạn.`;
+          setRenewalServiceBlockedMessage(message);
+          // Also set a general conflict so UI can disable if desired
+          setRenewalConflictMessage(message);
+        }
+      } catch (dupErr) {
+        console.warn('Không thể kiểm tra trùng hóa đơn dịch vụ:', dupErr);
+      }
+
+      // Detect existing medication invoice for selected prescription (if any)
+      try {
+        const prescId = selectedPrescription?._id || renewalData?.prescriptionId || null;
+        if (prescId) {
+          const existingMedInv = invoices.find((inv) => (
+            (String(inv.type || '').toUpperCase() === 'MEDICATION' || String(inv.type || '').toUpperCase() === 'MEDICATIONS') &&
+            String(inv.prescriptionId || '') === String(prescId) &&
+            String((inv.status || '').toLowerCase()) !== 'cancelled'
+          ));
+          if (existingMedInv) {
+            const invNum = existingMedInv.invoiceNumber || existingMedInv._id || '';
+            const message = `Đã có hóa đơn thuốc cho đơn thuốc chọn (số: ${invNum}). Chi phí thuốc (VND) sẽ không được gia hạn.`;
+            setRenewalMedBlockedMessage(message);
+          }
+        }
+      } catch (medCheckErr) {
+        console.warn('Không thể kiểm tra hóa đơn thuốc khi tạo hóa đơn gia hạn:', medCheckErr);
       }
     } catch (err) {
       console.warn('Unable to fetch invoices for service cost calculation:', err);
@@ -498,8 +651,8 @@ export default function AdminContractManagementPage() {
       });
       await fetchContracts();
     } catch (err) {
-      alert(t('admin.contractManagement.invoiceCreatedError') + (err.message || 'Unknown error'));
       console.error('Error creating invoice:', err);
+      alert(resolveApiError(err, t, 'admin.contractManagement.invoiceCreatedError'));
     } finally {
       setIsCreatingInvoice(false);
     }
@@ -550,6 +703,7 @@ export default function AdminContractManagementPage() {
             <option value="active">{t('admin.contractManagement.statusActive')}</option>
             <option value="expired">{t('admin.contractManagement.statusExpired')}</option>
             <option value="upcoming">{t('admin.contractManagement.statusUpcoming')}</option>
+            <option value="cancelled">{t('admin.contractManagement.statusCancelled', 'Đã hủy')}</option>
           </select>
         </div>
 
@@ -605,10 +759,10 @@ export default function AdminContractManagementPage() {
                       )}
                     </td>
                     <td>
-                      <div className={`status-badge ${getContractStatusClass(contract.startDate, contract.endDate)}`}>
+                      <div className={`status-badge ${getContractStatusClass(contract.startDate, contract.endDate, contract.contractStatus)}`}>
                         <div className="flex items-center gap-2">
-                          {getContractStatusIcon(contract.startDate, contract.endDate)}
-                          <span>{getStatusTranslation(getContractStatusLabel(contract.startDate, contract.endDate), t)}</span>
+                          {getContractStatusIcon(contract.startDate, contract.endDate, contract.contractStatus)}
+                          <span>{getStatusTranslation(getContractStatusLabel(contract.startDate, contract.endDate, contract.contractStatus), t)}</span>
                         </div>
                       </div>
                     </td>
@@ -619,7 +773,7 @@ export default function AdminContractManagementPage() {
                           <Eye className="w-4 h-4" />
                         </button>
                         {/* Show create-invoice action when there is no invoice or invoice not paid */}
-                        {(!contract.latestInvoice || contract.latestInvoiceStatus !== 'paid') && (
+                        {contract.contractStatus !== 'cancelled' && (!contract.latestInvoice || contract.latestInvoiceStatus !== 'paid') && (
                           <button
                             className="btn-icon-primary btn-create-invoice"
                             title={t('admin.contractManagement.createRenewalInvoice')}
@@ -628,14 +782,35 @@ export default function AdminContractManagementPage() {
                             <Plus className="w-4 h-4" />
                           </button>
                         )}
-                        <button
+                        {contract.contractStatus !== 'cancelled' && <button
                           className="btn-icon-secondary"
                           title="Tạo hóa đơn thuốc"
                           onClick={() => openMedicationInvoiceModal(contract)}
                         >
                           🩺
-                        </button>
-                        {getContractStatusLabel(contract.startDate, contract.endDate) === 'expired' && (
+                        </button>}
+                        {contract.contractStatus !== 'cancelled' && (
+                          <>
+                            <button
+                              className="btn-icon-secondary"
+                              title="Thay đổi gói dịch vụ"
+                              onClick={() => openPackageChangeModal(contract)}
+                              disabled={contract.latestInvoiceHasServiceCost && ['paid', 'partially_paid'].includes(contract.latestInvoiceStatus)}
+                              style={{ opacity: contract.latestInvoiceHasServiceCost && ['paid', 'partially_paid'].includes(contract.latestInvoiceStatus) ? 0.45 : 1 }}
+                            >
+                              <RefreshCw className="w-4 h-4" />
+                            </button>
+                            <button
+                              className="btn-icon-secondary"
+                              title="Hủy hợp đồng"
+                              onClick={() => openCancelContractModal(contract)}
+                              style={{ color: '#dc2626' }}
+                            >
+                              <XCircle className="w-4 h-4" />
+                            </button>
+                          </>
+                        )}
+                        {getContractStatusLabel(contract.startDate, contract.endDate, contract.contractStatus) === 'expired' && contract.contractStatus !== 'cancelled' && (
                           <button
                             className="btn-icon-primary"
                             title="Gia hạn hợp đồng"
@@ -694,19 +869,19 @@ export default function AdminContractManagementPage() {
         <div className="stat-card">
           <h3>{t('admin.contractManagement.activeContracts')}</h3>
           <p className="stat-value text-green-600">
-            {contracts.filter((c) => getContractStatusLabel(c.startDate, c.endDate) === 'active').length}
+            {contracts.filter((c) => getContractStatusLabel(c.startDate, c.endDate, c.contractStatus) === 'active').length}
           </p>
         </div>
         <div className="stat-card">
           <h3>{t('admin.contractManagement.expiredContracts')}</h3>
           <p className="stat-value text-red-600">
-            {contracts.filter((c) => getContractStatusLabel(c.startDate, c.endDate) === 'expired').length}
+            {contracts.filter((c) => getContractStatusLabel(c.startDate, c.endDate, c.contractStatus) === 'expired').length}
           </p>
         </div>
         <div className="stat-card">
           <h3>{t('admin.contractManagement.upcomingContracts')}</h3>
           <p className="stat-value text-blue-600">
-            {contracts.filter((c) => getContractStatusLabel(c.startDate, c.endDate) === 'upcoming').length}
+            {contracts.filter((c) => getContractStatusLabel(c.startDate, c.endDate, c.contractStatus) === 'upcoming').length}
           </p>
         </div>
       </div>
@@ -798,6 +973,9 @@ export default function AdminContractManagementPage() {
                       className="form-input"
                     />
                     <p className="form-note">{t('admin.contractManagement.medicationCostNote')}</p>
+                    {renewalMedBlockedMessage && (
+                      <div className="form-note" style={{ color: '#b91c1c', marginTop: 8 }}>{renewalMedBlockedMessage}</div>
+                    )}
                   </div>
 
                   {/* Computed service fee from package price × duration (read-only) */}
@@ -815,6 +993,9 @@ export default function AdminContractManagementPage() {
                       {renewalData.computedServiceFeeBreakdown?.discountPercent ? (
                         <div className="text-xs text-slate-500 mt-1">(Đã áp dụng giảm giá {renewalData.computedServiceFeeBreakdown.discountPercent}%)</div>
                       ) : null}
+                      {renewalServiceBlockedMessage && (
+                        <div className="form-note" style={{ color: '#b91c1c', marginTop: 8 }}>{renewalServiceBlockedMessage}</div>
+                      )}
                     </div>
                   </div>
 
@@ -871,6 +1052,11 @@ export default function AdminContractManagementPage() {
                       })()}
                     </div>
                   </div>
+                  {renewalConflictMessage && (
+                    <div className="alert alert-error" style={{ marginTop: 12 }}>
+                      {renewalConflictMessage}
+                    </div>
+                  )}
                 </>
               )}
             </div>
@@ -888,7 +1074,7 @@ export default function AdminContractManagementPage() {
               <button
                 className="btn-submit"
                 onClick={handleSubmitRenewalInvoice}
-                disabled={isCreatingInvoice}
+                disabled={isCreatingInvoice || Boolean(renewalConflictMessage)}
               >
                 {isCreatingInvoice ? t('admin.contractManagement.creatingInvoice') : t('admin.contractManagement.createInvoiceButton')}
               </button>
@@ -1008,6 +1194,11 @@ export default function AdminContractManagementPage() {
                     <label>Ước tính chi phí thuốc</label>
                     <div className="form-input readonly">{medEstimatedCost != null ? `${medEstimatedCost.toLocaleString('vi-VN')} VND` : '—'}</div>
                   </div>
+                  {medConflictMessage && (
+                    <div className="alert alert-error" style={{ marginTop: 12 }}>
+                      {medConflictMessage}
+                    </div>
+                  )}
                 </>
               )}
             </div>
@@ -1025,9 +1216,89 @@ export default function AdminContractManagementPage() {
               <button
                 className="btn-submit"
                 onClick={handleCreateMedicationInvoice}
-                disabled={medCreatingInvoice || !medSelectedId}
+                disabled={medCreatingInvoice || !medSelectedId || Boolean(medConflictMessage)}
               >
                 {medCreatingInvoice ? 'Đang tạo...' : 'Tạo hóa đơn'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showPackageModal && (
+        <div className="modal-overlay" onClick={() => setShowPackageModal(false)}>
+          <div className="modal-content" onClick={(event) => event.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Thay đổi gói dịch vụ</h2>
+              <button className="modal-close" onClick={() => setShowPackageModal(false)}>
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="modal-body">
+              {selectedContract && (
+                <p className="form-note" style={{ marginBottom: '16px' }}>
+                  Hợp đồng <strong>{selectedContract.contractNumber}</strong> của cư dân {selectedContract.residentName}.
+                </p>
+              )}
+              {packageError && <div className="alert alert-error">{packageError}</div>}
+              <div className="form-group">
+                <label>Gói dịch vụ mới</label>
+                {packageLoading ? (
+                  <div className="form-note">Đang tải danh sách gói dịch vụ...</div>
+                ) : (
+                  <select
+                    className="form-select"
+                    value={selectedPackageId}
+                    onChange={(event) => setSelectedPackageId(event.target.value)}
+                  >
+                    <option value="">-- Chọn gói dịch vụ --</option>
+                    {availablePackages.map((pkg) => (
+                      <option key={pkg._id} value={pkg._id}>
+                        {pkg.name || pkg.packageCode} - {(pkg.monthlyPrice || 0).toLocaleString('vi-VN')} VND/tháng
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn-cancel" onClick={() => setShowPackageModal(false)}>Đóng</button>
+              <button className="btn-submit" onClick={handleChangeContractPackage} disabled={packageLoading || isChangingPackage || !selectedPackageId}>
+                {isChangingPackage ? 'Đang cập nhật...' : 'Lưu gói dịch vụ'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCancelModal && (
+        <div className="modal-overlay" onClick={() => setShowCancelModal(false)}>
+          <div className="modal-content" onClick={(event) => event.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Hủy hợp đồng</h2>
+              <button className="modal-close" onClick={() => setShowCancelModal(false)}>
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="modal-body">
+              <p className="form-note" style={{ marginBottom: '16px' }}>
+                Bạn đang hủy hợp đồng <strong>{selectedContract?.contractNumber}</strong>. Thao tác này sẽ chuyển trạng thái hợp đồng thành “Đã hủy”.
+              </p>
+              <div className="form-group">
+                <label>Lý do hủy hợp đồng *</label>
+                <textarea
+                  className="form-input"
+                  rows="4"
+                  value={cancellationReason}
+                  onChange={(event) => setCancellationReason(event.target.value)}
+                  placeholder="Nhập lý do hủy hợp đồng..."
+                />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn-cancel" onClick={() => setShowCancelModal(false)}>Đóng</button>
+              <button className="btn-submit" style={{ background: '#dc2626' }} onClick={handleCancelContract} disabled={isCancellingContract || !cancellationReason.trim()}>
+                {isCancellingContract ? 'Đang hủy...' : 'Xác nhận hủy'}
               </button>
             </div>
           </div>

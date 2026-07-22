@@ -230,6 +230,22 @@ const adminCreateContract = async (admissionId, body) => {
   return response.data;
 };
 
+const adminCancelContract = async (admissionId, body) => {
+  const response = await axiosClient.patch(
+    `/admin/admission-requests/${admissionId}/cancel-contract`,
+    body
+  );
+  return response.data;
+};
+
+const adminChangeContractServicePackage = async (admissionId, body) => {
+  const response = await axiosClient.patch(
+    `/admin/admission-requests/${admissionId}/change-contract-service-package`,
+    body
+  );
+  return response.data;
+};
+
 /**
  * Admin | Check-in Resident
  * Check-in nhận phòng cho người bệnh → Status chuyển thành 'checked_in'.
@@ -355,6 +371,8 @@ export default {
   adminAssignConsultant,
   adminAssignServicePackage,
   adminCreateContract,
+  adminCancelContract,
+  adminChangeContractServicePackage,
   adminCheckInResident,
   getStaffList,
   updateAdmissionContractDates,

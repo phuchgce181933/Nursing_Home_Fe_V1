@@ -28,6 +28,28 @@ export default function ActivityParticipationResultsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [residents, setResidents] = useState({});
 
+  const toDateKey = useCallback((value) => {
+    if (!value) return null;
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return null;
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }, []);
+
+  const toDateOnlyISOString = useCallback((value) => {
+    if (!value) return null;
+    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      const [year, month, day] = value.split('-').map(Number);
+      return new Date(Date.UTC(year, month - 1, day)).toISOString();
+    }
+
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return null;
+    return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())).toISOString();
+  }, []);
+
   const buildAttendanceDraftFromActivity = useCallback((activity, targetOccurrenceDate = null) => {
     if (!activity) {
       return {
@@ -36,12 +58,11 @@ export default function ActivityParticipationResultsPage() {
       };
     }
 
-    const keyForDate = (d) => (d ? new Date(d).toISOString().slice(0,10) : null);
-    const targetKey = keyForDate(targetOccurrenceDate);
+    const targetKey = toDateKey(targetOccurrenceDate);
 
     const findForResident = (records = [], residentId) => {
       // prefer record matching target occurrenceDate, then undated
-      const byDate = (records || []).find((r) => r && r.residentId && String(r.residentId) === String(residentId) && r.occurrenceDate && keyForDate(r.occurrenceDate) === targetKey);
+      const byDate = (records || []).find((r) => r && r.residentId && String(r.residentId) === String(residentId) && r.occurrenceDate && toDateKey(r.occurrenceDate) === targetKey);
       if (byDate) return byDate;
       const noDate = (records || []).find((r) => r && r.residentId && String(r.residentId) === String(residentId) && !r.occurrenceDate);
       return noDate || null;
@@ -155,14 +176,12 @@ export default function ActivityParticipationResultsPage() {
     (activity.participationRecords || []).forEach((r) => { if (r?.occurrenceDate) occDates.push(new Date(r.occurrenceDate)); });
     let chosen = null;
     if (occDates.length > 0) {
-      const unique = [...new Set(occDates.map(d => new Date(d).toISOString().slice(0,10)))];
-      const options = unique.map(d => new Date(d + 'T00:00:00.000Z').toISOString());
-      setEditingOccurrenceOptions(options);
-      const max = occDates.reduce((a,b) => (a > b ? a : b));
-      chosen = new Date(max.getFullYear(), max.getMonth(), max.getDate()).toISOString();
+      const unique = [...new Set(occDates.map((d) => toDateKey(d)).filter(Boolean))];
+      setEditingOccurrenceOptions(unique);
+      const max = occDates.reduce((a, b) => (a > b ? a : b));
+      chosen = toDateKey(max);
     } else if (activity.scheduledAt) {
-      const d = new Date(activity.scheduledAt);
-      chosen = new Date(d.getFullYear(), d.getMonth(), d.getDate()).toISOString();
+      chosen = toDateKey(activity.scheduledAt);
     }
 
     setEditingId(activity._id);
@@ -193,7 +212,7 @@ export default function ActivityParticipationResultsPage() {
       };
       // attach occurrenceDate if we have one selected
       if (editingOccurrenceDate) {
-        const occurrenceDateOnly = new Date(editingOccurrenceDate).toISOString();
+        const occurrenceDateOnly = toDateOnlyISOString(editingOccurrenceDate);
         payload.attendanceRecords = payload.attendanceRecords.map((r) => ({ ...r, occurrenceDate: occurrenceDateOnly }));
         payload.participationRecords = payload.participationRecords.map((r) => ({ ...r, occurrenceDate: occurrenceDateOnly }));
       }
@@ -372,9 +391,12 @@ export default function ActivityParticipationResultsPage() {
                           const act = activities.find(a => a._id === editingId);
                           setForm(buildAttendanceDraftFromActivity(act, val));
                         }}>
-                          {editingOccurrenceOptions.map((opt) => (
-                            <option key={opt} value={opt}>{new Date(opt).toLocaleDateString('vi-VN')}</option>
-                          ))}
+                          {editingOccurrenceOptions.map((opt) => {
+                            const rawDate = new Date(`${opt}T00:00:00`);
+                            return (
+                              <option key={opt} value={opt}>{rawDate.toLocaleDateString('vi-VN')}</option>
+                            );
+                          })}
                         </select>
                       </div>
                     )}

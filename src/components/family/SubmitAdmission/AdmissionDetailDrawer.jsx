@@ -135,6 +135,14 @@ const cleanCancellationReason = (reason) => {
     .trim();
 };
 
+const getFamilyInvoiceStatusLabel = (status) => {
+  const normalized = String(status || '').toUpperCase();
+  if (normalized === 'PAID') return 'Đã thanh toán';
+  if (normalized === 'PARTIALLY_PAID') return 'Đã thanh toán một phần';
+  if (normalized === 'CANCELLED') return 'Đã hủy';
+  return 'Chưa thanh toán';
+};
+
 const getCalendarDay = (dateStr) => {
   if (!dateStr) return '';
   try {
@@ -310,17 +318,27 @@ export default function AdmissionDetailDrawer({
   // Helper: add months to a date string (YYYY-MM-DD) and return YYYY-MM-DD
   const addMonthsToDateStr = (dateStr, months) => {
     try {
-      const d = new Date(dateStr);
+      const d = new Date(`${dateStr}T00:00:00`);
+      if (Number.isNaN(d.getTime())) return dateStr;
       const day = d.getDate();
       d.setMonth(d.getMonth() + months);
       // handle month overflow (e.g., Jan 31 + 1 month -> Feb 28/29)
       if (d.getDate() < day) {
         d.setDate(0); // last day of previous month
       }
-      return d.toISOString().split('T')[0];
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const resultDay = String(d.getDate()).padStart(2, '0');
+      return `${d.getFullYear()}-${month}-${resultDay}`;
     } catch (e) {
       return dateStr;
     }
+  };
+
+  const getTodayInputDate = () => {
+    const today = new Date();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${today.getFullYear()}-${month}-${day}`;
   };
 
   // Helper: calculate full months difference between two date-strings (YYYY-MM-DD)
@@ -336,6 +354,16 @@ export default function AdmissionDetailDrawer({
     } catch (err) {
       return null;
     }
+  };
+
+  const minimumContractEndDate = (startStr) => {
+    if (!startStr) return '';
+    const date = new Date(`${startStr}T00:00:00`);
+    if (Number.isNaN(date.getTime())) return '';
+    date.setDate(date.getDate() + 30);
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${date.getFullYear()}-${month}-${day}`;
   };
 
   // Sync handlers for contract date/duration fields
@@ -373,6 +401,16 @@ export default function AdmissionDetailDrawer({
       const end = addMonthsToDateStr(start, months);
       setContractEnd(end);
     }
+  };
+
+  const handleQuickContractPeriod = (months) => {
+    const start = getTodayInputDate();
+    const calculatedEnd = addMonthsToDateStr(start, months);
+    const minimumEnd = minimumContractEndDate(start);
+    setContractStart(start);
+    setContractDurationMonths(String(months));
+    setContractEnd(calculatedEnd < minimumEnd ? minimumEnd : calculatedEnd);
+    setModalError(null);
   };
 
   useEffect(() => {
@@ -735,6 +773,14 @@ export default function AdmissionDetailDrawer({
     if (e) e.preventDefault();
     if (!admissionId) return;
 
+    if (contractStart && contractEnd) {
+      const minimumEnd = minimumContractEndDate(contractStart);
+      if (minimumEnd && contractEnd < minimumEnd) {
+        setModalError('Ngày kết thúc hợp đồng phải cách ngày bắt đầu ít nhất 30 ngày.');
+        return;
+      }
+    }
+
     try {
       setCreatingContract(true);
       await admissionService.adminCreateContract(admissionId, {
@@ -768,6 +814,10 @@ export default function AdmissionDetailDrawer({
   const handleCreateInvoice = async (e) => {
     if (e) e.preventDefault();
     if (!admissionId) return;
+    if (!admission?.contractNumber) {
+      setModalError('Vui lòng tạo hợp đồng trước khi tạo hóa đơn.');
+      return;
+    }
     const residentId = admission?.residentId || admission?.resident?._id;
     if (!residentId) return;
 
@@ -775,6 +825,7 @@ export default function AdmissionDetailDrawer({
       setCreatingInvoice(true);
       // careServiceCost is already computed with discount applied; roomCost is always 0
       await paymentService.createInvoice(residentId, {
+        admissionId,
         roomCost: 0,
         medicationCost: medicationCost || 0,
         careServiceCost: careServiceCost ? parseInt(careServiceCost, 10) : 0,
@@ -1411,11 +1462,14 @@ export default function AdmissionDetailDrawer({
                   {admission.latestInvoice ? (
                     <div className="mt-3 rounded-lg bg-white/80 border border-slate-200 p-3 text-sm">
                       <p className="text-slate-500">Trạng thái hóa đơn gần nhất</p>
-                      <p className="font-semibold text-slate-800">{admission.latestInvoice.status === 'paid' ? 'Đã thanh toán' : admission.latestInvoice.status === 'partially_paid' ? 'Đã thanh toán một phần' : 'Chưa thanh toán'}</p>
+                      <p className="font-semibold text-slate-800">{getFamilyInvoiceStatusLabel(admission.latestInvoice.status)}</p>
+                      {String(admission.latestInvoice.status || '').toUpperCase() === 'CANCELLED' && (
+                        <p className="text-xs text-slate-500 mt-1">Lý do hủy: {admission.latestInvoice.cancellationReason || 'Đã hủy do thay đổi gói dịch vụ.'}</p>
+                      )}
                       {admission.latestInvoice.dueDate && (
                         <p className="text-xs text-slate-500 mt-1">Hạn thanh toán: {new Date(admission.latestInvoice.dueDate).toLocaleDateString('vi-VN')}</p>
                       )}
-                      {admission.latestInvoice.status !== 'paid' && (
+                      {!['PAID', 'CANCELLED'].includes(String(admission.latestInvoice.status || '').toUpperCase()) && (
                         <button
                           type="button"
                           className="button button-primary mt-3"
@@ -1645,17 +1699,6 @@ export default function AdmissionDetailDrawer({
                         style={{ padding: '8px 16px', fontSize: '12px', borderRadius: '10px', boxShadow: 'none', background: '#1B365D' }}
                       >
                         {admission.contractNumber ? 'Sửa hợp đồng' : 'Tạo hợp đồng'}
-                      </button>
-                    )}
-
-                    {isAdminRole && (admission.status === 'contracting' || admission.status === 'checked_in') && (admission.servicePackageId || admission.assignedServicePackage) && !admission.latestInvoice && (
-                      <button
-                        type="button"
-                        onClick={() => setShowInvoiceModal(true)}
-                        className="adm-btn-apply"
-                        style={{ padding: '8px 16px', fontSize: '12px', borderRadius: '10px', boxShadow: 'none', background: '#1B365D' }}
-                      >
-                        Tạo hóa đơn
                       </button>
                     )}
 
@@ -2357,6 +2400,7 @@ export default function AdmissionDetailDrawer({
                     className="adm-filter-input"
                     style={{ paddingLeft: '14px' }}
                     value={contractEnd}
+                    min={minimumContractEndDate(contractStart)}
                     onChange={(e) => handleContractEndChange(e.target.value)}
                   />
                 </div>
@@ -2376,6 +2420,19 @@ export default function AdmissionDetailDrawer({
                     value={contractDurationMonths}
                     onChange={(e) => handleContractDurationChange(e.target.value)}
                   />
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {[{ label: '1 tháng', months: 1 }, { label: '3 tháng', months: 3 }, { label: '6 tháng', months: 6 }, { label: '1 năm', months: 12 }].map((period) => (
+                      <button
+                        key={period.months}
+                        type="button"
+                        className="adm-btn-apply"
+                        style={{ padding: '5px 9px', fontSize: '11px', borderRadius: '7px', boxShadow: 'none', background: '#1B365D' }}
+                        onClick={() => handleQuickContractPeriod(period.months)}
+                      >
+                        {period.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
@@ -2840,7 +2897,8 @@ export default function AdmissionDetailDrawer({
                     <span className="block text-white/45 text-[9px] uppercase tracking-wider font-bold mb-1">Trạng thái hóa đơn</span>
                     {admission.latestInvoice ? (
                       <span className="font-semibold text-[12.5px] text-white/90">
-                        {admission.latestInvoice.status === 'paid' ? 'Đã thanh toán' : admission.latestInvoice.status === 'partially_paid' ? 'Thanh toán một phần' : admission.latestInvoice.status}
+                        {getFamilyInvoiceStatusLabel(admission.latestInvoice.status)}
+                        {String(admission.latestInvoice.status || '').toUpperCase() === 'CANCELLED' ? ` - ${admission.latestInvoice.cancellationReason || 'Đã hủy do thay đổi gói dịch vụ.'}` : ''}
                       </span>
                     ) : (
                       <div className="flex items-center gap-2">

@@ -87,10 +87,32 @@ const getMinDateTimeLocal = () => {
   return localNow.toISOString().slice(0, 16);
 };
 
-const isNursingStaff = (staff) => {
+const ACTIVITY_CATEGORY_OPTIONS = [
+  'Hoạt động chăm sóc cá nhân hằng ngày',
+  'Hoạt động chăm sóc sức khỏe',
+  'Hoạt động ăn uống - dinh dưỡng',
+  'Hoạt động thể chất - phục hồi chức năng',
+  'Hoạt động giải trí',
+  'Hoạt động kích thích nhận thức',
+  'Hoạt động xã hội - giao lưu',
+  'Hoạt động tâm lý - tinh thần',
+  'Hoạt động sự kiện đặc biệt',
+  'Hoạt động với gia đình',
+  'Hoạt động quản lý nội bộ',
+  'Hoạt động xử lý sự cố',
+  'Khác',
+];
+
+const isActivityStaff = (staff) => {
   if (!staff || !staff.role) return false;
   const role = String(staff.role).toLowerCase();
-  return role.includes('nurse') || role.includes('y tá') || role.includes('điều dưỡng');
+  return role.includes('nurse')
+    || role.includes('y tá')
+    || role.includes('điều dưỡng')
+    || role.includes('caregiver')
+    || role.includes('hộ lý')
+    || role.includes('doctor')
+    || role.includes('bác sĩ');
 };
 
 export default function AdminActivitiesPage() {
@@ -122,13 +144,15 @@ export default function AdminActivitiesPage() {
   const [form, setForm] = useState({
     title: '',
     category: '',
+    categoryOther: '',
     description: '',
     startAt: '',
     endAt: '',
     durationMinutes: '',
     dailyDurationMinutes: '30',
     location: '',
-    organizerStaffId: '',
+    organizerStaffIds: [],
+    supportStaffIds: [],
     participantResidentIds: [],
     status: 'draft',
   });
@@ -277,13 +301,15 @@ export default function AdminActivitiesPage() {
     setForm({
       title: '',
       category: '',
+      categoryOther: '',
       description: '',
       startAt: '',
       endAt: '',
       durationMinutes: '',
       dailyDurationMinutes: '30',
       location: '',
-      organizerStaffId: '',
+      organizerStaffIds: [],
+      supportStaffIds: [],
       participantResidentIds: [],
       status: 'draft',
     });
@@ -316,6 +342,32 @@ export default function AdminActivitiesPage() {
     });
   };
 
+  const toggleAllResidents = () => {
+    setForm((prevForm) => {
+      const selected = Array.isArray(prevForm.participantResidentIds)
+        ? prevForm.participantResidentIds.map((id) => String(id))
+        : [];
+      const residentIds = residents
+        .map((resident) => (resident?._id ? String(resident._id) : ''))
+        .filter(Boolean);
+
+      if (residentIds.length === 0) {
+        return prevForm;
+      }
+
+      const allSelected = residentIds.every((residentId) => selected.includes(residentId));
+      if (allSelected) {
+        return {
+          ...prevForm,
+          participantResidentIds: selected.filter((residentId) => !residentIds.includes(residentId)),
+        };
+      }
+
+      const nextSelection = Array.from(new Set([...selected, ...residentIds]));
+      return { ...prevForm, participantResidentIds: nextSelection };
+    });
+  };
+
   const handleResetFilters = () => {
     setSearch('');
     setStatus('');
@@ -330,15 +382,20 @@ export default function AdminActivitiesPage() {
     setIsCreating(true);
     setForm({
       title: activity.title || '',
-      category: activity.category || '',
+      category: activity.category && !ACTIVITY_CATEGORY_OPTIONS.includes(activity.category) ? 'Khác' : (activity.category || ''),
+      categoryOther: activity.category && !ACTIVITY_CATEGORY_OPTIONS.includes(activity.category) ? activity.category : '',
       description: activity.description || '',
       startAt: toInputDateTimeLocal(activity.startAt || activity.scheduledAt),
       endAt: toInputDateTimeLocal(activity.endAt || activity.startAt || activity.scheduledAt),
       durationMinutes: activity.durationMinutes || getAutoDurationMinutes(activity.startAt || activity.scheduledAt, activity.endAt || activity.startAt || activity.scheduledAt) || '',
       dailyDurationMinutes: activity.dailyDurationMinutes || '30',
       location: activity.location || '',
-      organizerStaffId:
-        activity.organizerStaffId?._id || activity.organizerStaffId || '',
+      organizerStaffIds: Array.isArray(activity.organizerStaffIds)
+        ? activity.organizerStaffIds.map((staff) => staff?._id || staff).filter(Boolean)
+        : (activity.organizerStaffId ? [activity.organizerStaffId?._id || activity.organizerStaffId] : []),
+      supportStaffIds: Array.isArray(activity.supportStaffIds)
+        ? activity.supportStaffIds.map((staff) => staff?._id || staff).filter(Boolean)
+        : (activity.supportStaffId ? [activity.supportStaffId?._id || activity.supportStaffId] : []),
       participantResidentIds: Array.isArray(activity.participantResidentIds)
         ? activity.participantResidentIds.map((id) => id.toString())
         : [],
@@ -433,6 +490,34 @@ export default function AdminActivitiesPage() {
     }
   };
 
+  const toggleStaffSelection = (field, staffId) => {
+    setForm((prevForm) => {
+      const currentIds = Array.isArray(prevForm[field]) ? [...prevForm[field]] : [];
+      const nextIds = currentIds.includes(staffId)
+        ? currentIds.filter((id) => id !== staffId)
+        : [...currentIds, staffId];
+      return { ...prevForm, [field]: nextIds };
+    });
+  };
+
+  const toggleRoleGroupSelection = (field, roleKeywords) => {
+    const roleStaffIds = staffOptions
+      .filter((staff) => isActivityStaff(staff) && roleKeywords.some((keyword) => String(staff.role || '').toLowerCase().includes(keyword)))
+      .map((staff) => staff._id)
+      .filter(Boolean);
+
+    if (roleStaffIds.length === 0) return;
+
+    setForm((prevForm) => {
+      const currentIds = Array.isArray(prevForm[field]) ? [...prevForm[field]] : [];
+      const allSelected = roleStaffIds.every((id) => currentIds.includes(id));
+      const nextIds = allSelected
+        ? currentIds.filter((id) => !roleStaffIds.includes(id))
+        : [...new Set([...currentIds, ...roleStaffIds])];
+      return { ...prevForm, [field]: nextIds };
+    });
+  };
+
   const handleSubmit = async (e) => {
     if (e) e.preventDefault();
     setFormError(null);
@@ -442,6 +527,18 @@ export default function AdminActivitiesPage() {
     }
     if (!form.startAt) {
       setFormError('Ngày/giờ bắt đầu là bắt buộc');
+      return;
+    }
+    if (!form.location?.trim()) {
+      setFormError('Địa điểm là bắt buộc');
+      return;
+    }
+    if (!form.category?.trim()) {
+      setFormError('Danh mục hoạt động là bắt buộc');
+      return;
+    }
+    if (form.category === 'Khác' && !form.categoryOther?.trim()) {
+      setFormError('Vui lòng nhập danh mục khác');
       return;
     }
 
@@ -470,17 +567,36 @@ export default function AdminActivitiesPage() {
       return;
     }
 
-    if (form.organizerStaffId) {
-      const organizer = staffOptions.find((s) => s._id === form.organizerStaffId);
-      if (!organizer || !isNursingStaff(organizer)) {
-        setFormError('Nhân viên tổ chức phải là y tá');
+    const organizerStaffIds = Array.isArray(form.organizerStaffIds)
+      ? form.organizerStaffIds.filter(Boolean)
+      : [];
+    if (organizerStaffIds.length === 0) {
+      setFormError('Nhân viên tổ chức là bắt buộc');
+      return;
+    }
+
+    for (const organizerId of organizerStaffIds) {
+      const organizer = staffOptions.find((s) => s._id === organizerId);
+      if (!organizer || !isActivityStaff(organizer)) {
+        setFormError('Nhân viên tổ chức phải là y tá, hộ lý, caregiver hoặc bác sĩ');
+        return;
+      }
+    }
+
+    const supportStaffIds = Array.isArray(form.supportStaffIds)
+      ? form.supportStaffIds.filter(Boolean)
+      : [];
+    for (const supportStaffId of supportStaffIds) {
+      const supportStaff = staffOptions.find((s) => s._id === supportStaffId);
+      if (!supportStaff || !isActivityStaff(supportStaff)) {
+        setFormError('Nhân viên hỗ trợ phải là y tá, hộ lý, caregiver hoặc bác sĩ');
         return;
       }
     }
 
     const payload = {
       title: form.title.trim(),
-      category: form.category.trim() || undefined,
+      category: (form.category === 'Khác' ? form.categoryOther : form.category).trim() || undefined,
       description: form.description.trim() || undefined,
       startAt: toIsoString(form.startAt),
       endAt: form.endAt ? toIsoString(form.endAt) : toIsoString(form.startAt),
@@ -488,7 +604,10 @@ export default function AdminActivitiesPage() {
       dailyDurationMinutes: form.dailyDurationMinutes ? Number(form.dailyDurationMinutes) : 30,
       createRecurring: Boolean(form.endAt && new Date(form.endAt) > new Date(form.startAt) && new Date(form.endAt).getTime() - new Date(form.startAt).getTime() > 24 * 60 * 60 * 1000),
       location: form.location.trim() || undefined,
-      organizerStaffId: form.organizerStaffId ? form.organizerStaffId.trim() : undefined,
+      organizerStaffIds: organizerStaffIds,
+      organizerStaffId: organizerStaffIds[0] || undefined,
+      supportStaffIds: supportStaffIds,
+      supportStaffId: supportStaffIds[0] || undefined,
       participantResidentIds: Array.isArray(form.participantResidentIds)
         ? form.participantResidentIds.filter(Boolean)
         : [],
@@ -637,12 +756,26 @@ export default function AdminActivitiesPage() {
             </div>
             <div className="adm-form-field">
               <label className="text-sm font-semibold">Danh mục</label>
-              <input
-                type="text"
-                className="adm-filter-input"
+              <select
+                className="adm-filter-select"
                 value={form.category}
-                onChange={(e) => setForm({ ...form, category: e.target.value })}
-              />
+                onChange={(e) => setForm({ ...form, category: e.target.value, categoryOther: e.target.value === 'Khác' ? form.categoryOther : '' })}
+              >
+                <option value="">Chọn danh mục</option>
+                {ACTIVITY_CATEGORY_OPTIONS.map((item) => (
+                  <option key={item} value={item}>{item}</option>
+                ))}
+              </select>
+              {form.category === 'Khác' && (
+                <input
+                  type="text"
+                  className="adm-filter-input"
+                  style={{ marginTop: '8px' }}
+                  value={form.categoryOther}
+                  onChange={(e) => setForm({ ...form, categoryOther: e.target.value })}
+                  placeholder="Nhập danh mục khác"
+                />
+              )}
             </div>
             <div className="adm-form-field">
               <label className="text-sm font-semibold">Bắt đầu</label>
@@ -702,24 +835,119 @@ export default function AdminActivitiesPage() {
                 onChange={(e) => setForm({ ...form, location: e.target.value })}
               />
             </div>
-            <div className="adm-form-field">
-              <label className="text-sm font-semibold">Nhân viên tổ chức (Y tá)</label>
-              <select
-                className="adm-filter-select"
-                value={form.organizerStaffId}
-                onChange={(e) => setForm({ ...form, organizerStaffId: e.target.value })}
-                disabled={optionsLoading}
-              >
-                <option value="">Chọn y tá tổ chức</option>
-                {staffOptions.filter(isNursingStaff).map((staff) => (
-                  <option key={staff._id} value={staff._id}>
-                    {staff.fullName || staff.email} {staff.role ? `(${staff.role})` : ''}
-                  </option>
-                ))}
-              </select>
+            <div className="adm-form-field adm-form-field-full">
+              <label className="text-sm font-semibold">Nhân viên tổ chức</label>
+              <div className="adm-participant-chips" style={{ marginBottom: '8px' }}>
+                <label className="adm-participant-chip" style={{ cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={staffOptions.filter((staff) => isActivityStaff(staff) && String(staff.role || '').toLowerCase().includes('doctor') || String(staff.role || '').toLowerCase().includes('bác sĩ')).length > 0 && staffOptions.filter((staff) => isActivityStaff(staff) && (String(staff.role || '').toLowerCase().includes('doctor') || String(staff.role || '').toLowerCase().includes('bác sĩ'))).every((staff) => form.organizerStaffIds.includes(staff._id))}
+                    onChange={() => toggleRoleGroupSelection('organizerStaffIds', ['doctor', 'bác sĩ'])}
+                    style={{ marginRight: '6px' }}
+                  />
+                  Tất cả bác sĩ
+                </label>
+                <label className="adm-participant-chip" style={{ cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={staffOptions.filter((staff) => isActivityStaff(staff) && (String(staff.role || '').toLowerCase().includes('caregiver') || String(staff.role || '').toLowerCase().includes('hộ lý'))).length > 0 && staffOptions.filter((staff) => isActivityStaff(staff) && (String(staff.role || '').toLowerCase().includes('caregiver') || String(staff.role || '').toLowerCase().includes('hộ lý'))).every((staff) => form.organizerStaffIds.includes(staff._id))}
+                    onChange={() => toggleRoleGroupSelection('organizerStaffIds', ['caregiver', 'hộ lý'])}
+                    style={{ marginRight: '6px' }}
+                  />
+                  Tất cả hộ lý
+                </label>
+                <label className="adm-participant-chip" style={{ cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={staffOptions.filter((staff) => isActivityStaff(staff) && (String(staff.role || '').toLowerCase().includes('nurse') || String(staff.role || '').toLowerCase().includes('y tá') || String(staff.role || '').toLowerCase().includes('điều dưỡng'))).length > 0 && staffOptions.filter((staff) => isActivityStaff(staff) && (String(staff.role || '').toLowerCase().includes('nurse') || String(staff.role || '').toLowerCase().includes('y tá') || String(staff.role || '').toLowerCase().includes('điều dưỡng'))).every((staff) => form.organizerStaffIds.includes(staff._id))}
+                    onChange={() => toggleRoleGroupSelection('organizerStaffIds', ['nurse', 'y tá', 'điều dưỡng'])}
+                    style={{ marginRight: '6px' }}
+                  />
+                  Tất cả y tá
+                </label>
+              </div>
+              <div className="adm-participant-picker">
+                {staffOptions.filter(isActivityStaff).map((staff) => {
+                  const checked = form.organizerStaffIds.includes(staff._id);
+                  return (
+                    <label key={staff._id} className={`adm-participant-option${checked ? ' selected' : ''}`}>
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleStaffSelection('organizerStaffIds', staff._id)}
+                        style={{ width: '16px', height: '16px' }}
+                      />
+                      <span>
+                        {staff.fullName || staff.email || 'Nhân viên'} {staff.role ? `(${staff.role})` : ''}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="adm-form-field adm-form-field-full">
+              <label className="text-sm font-semibold">Nhân viên hỗ trợ</label>
+              <div className="adm-participant-chips" style={{ marginBottom: '8px' }}>
+                <label className="adm-participant-chip" style={{ cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={staffOptions.filter((staff) => isActivityStaff(staff) && (String(staff.role || '').toLowerCase().includes('doctor') || String(staff.role || '').toLowerCase().includes('bác sĩ'))).length > 0 && staffOptions.filter((staff) => isActivityStaff(staff) && (String(staff.role || '').toLowerCase().includes('doctor') || String(staff.role || '').toLowerCase().includes('bác sĩ'))).every((staff) => form.supportStaffIds.includes(staff._id))}
+                    onChange={() => toggleRoleGroupSelection('supportStaffIds', ['doctor', 'bác sĩ'])}
+                    style={{ marginRight: '6px' }}
+                  />
+                  Tất cả bác sĩ
+                </label>
+                <label className="adm-participant-chip" style={{ cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={staffOptions.filter((staff) => isActivityStaff(staff) && (String(staff.role || '').toLowerCase().includes('caregiver') || String(staff.role || '').toLowerCase().includes('hộ lý'))).length > 0 && staffOptions.filter((staff) => isActivityStaff(staff) && (String(staff.role || '').toLowerCase().includes('caregiver') || String(staff.role || '').toLowerCase().includes('hộ lý'))).every((staff) => form.supportStaffIds.includes(staff._id))}
+                    onChange={() => toggleRoleGroupSelection('supportStaffIds', ['caregiver', 'hộ lý'])}
+                    style={{ marginRight: '6px' }}
+                  />
+                  Tất cả hộ lý
+                </label>
+                <label className="adm-participant-chip" style={{ cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={staffOptions.filter((staff) => isActivityStaff(staff) && (String(staff.role || '').toLowerCase().includes('nurse') || String(staff.role || '').toLowerCase().includes('y tá') || String(staff.role || '').toLowerCase().includes('điều dưỡng'))).length > 0 && staffOptions.filter((staff) => isActivityStaff(staff) && (String(staff.role || '').toLowerCase().includes('nurse') || String(staff.role || '').toLowerCase().includes('y tá') || String(staff.role || '').toLowerCase().includes('điều dưỡng'))).every((staff) => form.supportStaffIds.includes(staff._id))}
+                    onChange={() => toggleRoleGroupSelection('supportStaffIds', ['nurse', 'y tá', 'điều dưỡng'])}
+                    style={{ marginRight: '6px' }}
+                  />
+                  Tất cả y tá
+                </label>
+              </div>
+              <div className="adm-participant-picker">
+                {staffOptions.filter(isActivityStaff).map((staff) => {
+                  const checked = form.supportStaffIds.includes(staff._id);
+                  return (
+                    <label key={staff._id} className={`adm-participant-option${checked ? ' selected' : ''}`}>
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleStaffSelection('supportStaffIds', staff._id)}
+                        style={{ width: '16px', height: '16px' }}
+                      />
+                      <span>
+                        {staff.fullName || staff.email || 'Nhân viên'} {staff.role ? `(${staff.role})` : ''}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
             </div>
             <div className="adm-form-field adm-form-field-full">
               <label className="text-sm font-semibold">Người tham gia</label>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '8px' }}>
+                <label className="adm-participant-chip" style={{ cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={residents.length > 0 && residents.every((resident) => form.participantResidentIds.includes(resident._id))}
+                    onChange={toggleAllResidents}
+                    style={{ marginRight: '6px' }}
+                  />
+                  Tất cả cư dân
+                </label>
+              </div>
               <input
                 type="text"
                 className="adm-filter-input"

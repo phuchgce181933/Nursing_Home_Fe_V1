@@ -30,6 +30,11 @@ const assignHandlers = async (id, payload) => {
   return response.data;
 };
 
+const getAssignmentConflicts = async (payload = {}) => {
+  const response = await axiosClient.post('/incidents/assignment-conflicts', payload);
+  return response.data;
+};
+
 const updateIncidentResolution = async (id, payload = {}, files = []) => {
   const form = new FormData();
   Object.keys(payload || {}).forEach((key) => {
@@ -59,4 +64,5 @@ export default {
   assignHandlers,
   updateIncidentResolution,
   exportIncidents,
+  getAssignmentConflicts,
 };
