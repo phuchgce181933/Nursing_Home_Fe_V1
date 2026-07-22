@@ -170,20 +170,29 @@ const formatAdmissionReason = (reason) => {
   if (!reason) return 'Chưa ghi nhận';
   const mapping = {
     long_term_care: 'Chăm sóc dài hạn',
+    rehabilitation: 'Phục hồi chức năng & Trị liệu',
+    post_surgery: 'Phục hồi sau phẫu thuật',
+    hospice: 'Chăm sóc giảm nhẹ cuối đời',
     short_term_rehab: 'Phục hồi chức năng ngắn hạn',
     daycare: 'Bán trú',
     palliative_care: 'Chăm sóc giảm nhẹ',
     assisted_living: 'Hỗ trợ sinh hoạt',
     memory_care: 'Chăm sóc đặc biệt trí tuệ',
+    other: 'Lý do khác',
     'chăm sóc dài hạn': 'Chăm sóc dài hạn',
-    'điều trị phục hồi chức năng': 'Phục hồi chức năng',
+    'phục hồi chức năng & trị liệu': 'Phục hồi chức năng & Trị liệu',
+    'phục hồi sau phẫu thuật': 'Phục hồi sau phẫu thuật',
+    'chăm sóc giảm nhẹ cuối đời': 'Chăm sóc giảm nhẹ cuối đời',
+    'điều trị phục hồi chức năng': 'Phục hồi chức năng & Trị liệu',
     'nghỉ dưỡng ngắn hạn': 'Phục hồi chức năng ngắn hạn',
-    'khác': 'Khác'
+    'khác': 'Lý do khác'
   };
-  const normalized = reason.toLowerCase().replace(/_/g, ' ').trim();
-  if (mapping[reason]) return mapping[reason];
+  const key = String(reason).trim();
+  if (mapping[key]) return mapping[key];
+  if (mapping[key.toLowerCase()]) return mapping[key.toLowerCase()];
+  const normalized = key.toLowerCase().replace(/_/g, ' ').trim();
   if (mapping[normalized]) return mapping[normalized];
-  return reason;
+  return key.replace(/_/g, ' ');
 };
 
 const cleanCancellationReason = (reason) => {
@@ -594,7 +603,16 @@ export default function AdmissionDetailDrawer({
         try {
           setLoadingRooms(true);
           const res = await facilityService.listRoomsByFloor(selectedFloorId);
-          setRooms(res || []);
+          const pkgTier = admission?.servicePackageId?.tier || 'standard';
+          const allowedTypes = admission?.servicePackageId?.allowedRoomTypes?.length
+            ? admission.servicePackageId.allowedRoomTypes
+            : (pkgTier === 'vip' ? ['icu', 'isolation'] : pkgTier === 'premium' ? ['premium'] : ['standard']);
+
+          const filtered = (res || []).filter((r) => {
+            if (!allowedTypes || allowedTypes.length === 0) return true;
+            return allowedTypes.includes(r.roomType);
+          });
+          setRooms(filtered);
           setSelectedRoomId('');
           setSelectedBedId('');
           setBeds([]);
@@ -611,7 +629,7 @@ export default function AdmissionDetailDrawer({
       setSelectedBedId('');
       setBeds([]);
     }
-  }, [selectedFloorId]);
+  }, [selectedFloorId, admission?.servicePackageId]);
 
   // Load beds when selectedRoomId changes
   useEffect(() => {
@@ -2706,6 +2724,24 @@ export default function AdmissionDetailDrawer({
                 {modalError}
               </div>
             )}
+
+            {(() => {
+              const pkgTier = admission?.servicePackageId?.tier || 'standard';
+              const pkgName = admission?.servicePackageId?.name || admission?.assignedServicePackage || 'Gói chăm sóc';
+              const allowedTypes = admission?.servicePackageId?.allowedRoomTypes?.length
+                ? admission.servicePackageId.allowedRoomTypes
+                : (pkgTier === 'vip' ? ['icu', 'isolation'] : pkgTier === 'premium' ? ['premium'] : ['standard']);
+              const typeNames = { standard: 'Standard', premium: 'Premium', icu: 'ICU', isolation: 'Isolation' };
+              const allowedStr = allowedTypes.map((t) => typeNames[t] || t).join(' / ');
+
+              return (
+                <div className="bg-amber-50 border border-amber-200 p-2.5 rounded-xl mb-4 text-xs text-amber-900 leading-relaxed font-sans">
+                  <strong>📌 Gói dịch vụ đăng ký:</strong> {pkgName} ({pkgTier.toUpperCase()})
+                  <br />
+                  <strong>🔒 Giới hạn loại phòng nhận:</strong> <span className="font-bold text-amber-950 underline">{allowedStr}</span>
+                </div>
+              );
+            })()}
 
             <form onSubmit={handleCheckInResident}>
               <div className="grid grid-cols-2 gap-3 mb-4">
