@@ -126,6 +126,7 @@ export default function DrugAllergiesPageContent({ i18nNs, canEdit }) {
     setPanelMsg('');
     setFormError('');
     setDetailError('');
+    setEditPopup(false);
     setViewPopup(true);
     loadDetail(residentKey);
   };
@@ -137,6 +138,7 @@ export default function DrugAllergiesPageContent({ i18nNs, canEdit }) {
     setPanelMsg('');
     setFormError('');
     setDetailError('');
+    setViewPopup(false);
     setEditPopup(true);
     loadDetail(residentKey);
   };
@@ -274,7 +276,7 @@ export default function DrugAllergiesPageContent({ i18nNs, canEdit }) {
                       <button
                         type="button"
                         className="resident-icon-btn resident-icon-btn--view"
-                        title={t(k('common.viewResidentDetail'))}
+                        title={t(k('drugAllergies.viewAction'))}
                         onClick={() => openViewPopup(r)}
                       >
                         <FaEye />
@@ -283,7 +285,7 @@ export default function DrugAllergiesPageContent({ i18nNs, canEdit }) {
                         <button
                           type="button"
                           className="resident-icon-btn resident-icon-btn--edit"
-                          title={t(k('common.edit'))}
+                          title={t(k('drugAllergies.editAction'))}
                           onClick={() => openEditPopup(r)}
                         >
                           <FaPen />
@@ -306,7 +308,7 @@ export default function DrugAllergiesPageContent({ i18nNs, canEdit }) {
       </div>
       {viewPopup && (
         <div className="modal-overlay" onClick={() => setViewPopup(false)}>
-          <div className="modal modal--wide" onClick={(e) => e.stopPropagation()}>
+          <div className="modal modal--wide drug-allergies-modal drug-allergies-modal--view" onClick={(e) => e.stopPropagation()}>
             <h2 className="modal__title">{t(k('drugAllergies.detailTitle'))}</h2>
             <ResidentContextBlock
               resident={resident}
@@ -355,25 +357,13 @@ export default function DrugAllergiesPageContent({ i18nNs, canEdit }) {
               <button type="button" className="btn-cancel" onClick={() => setViewPopup(false)}>
                 {t(k('common.close'))}
               </button>
-              {canEdit && selectedSummary && (
-                <button
-                  type="button"
-                  className="btn-save"
-                  onClick={() => {
-                    setViewPopup(false);
-                    openEditPopup(selectedSummary);
-                  }}
-                >
-                  {t(k('initialHealth.updateAction'))}
-                </button>
-              )}
             </div>
           </div>
         </div>
       )}
       {canEdit && editPopup && (
         <div className="modal-overlay" onClick={() => setEditPopup(false)}>
-          <div className="modal modal--wide" onClick={(e) => e.stopPropagation()}>
+          <div className="modal modal--wide drug-allergies-modal drug-allergies-modal--edit" onClick={(e) => e.stopPropagation()}>
             <h2 className="modal__title">{t(k('drugAllergies.editTitle'))}</h2>
             <ResidentContextBlock
               resident={resident}
@@ -414,7 +404,7 @@ export default function DrugAllergiesPageContent({ i18nNs, canEdit }) {
                       {t(k('common.close'))}
                     </button>
                     <button type="submit" className="btn-save" disabled={saving}>
-                      {saving ? t('common.saving') : t(k('initialHealth.updateAction'))}
+                      {saving ? t('common.saving') : t('common.save')}
                     </button>
                   </div>
                 </form>

@@ -11,6 +11,7 @@ import ListPagination from '../../../../components/ui/ListPagination';
 import { ADMIN_LIST_PAGE_SIZE } from '../../../../constants/adminListPage';
 import useDebouncedSearch from '../../../../hooks/useDebouncedSearch';
 import '../../../../styles/admin/residentActionIcons.css';
+import '../../../../styles/admin/FamilyManagementPage.css';
 import { getGenderLabel, getResidencyLabel } from '../_shared/residentLabels';
 
 const emptyContact = () => ({
@@ -54,12 +55,8 @@ function formatRoom(room, t) {
 }
 
 function ContactFormModal({ mode, initial, saving, error, onSave, onClose, relationshipSuggestions, t }) {
-  const [form, setForm] = useState(initial || emptyContact());
+  const [form, setForm] = useState(() => initial || emptyContact());
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
-
-  useEffect(() => {
-    setForm(initial || emptyContact());
-  }, [initial, mode]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -406,7 +403,7 @@ export default function FamilyManagementPage() {
 
       {listError && <div className="resident-page__error">{listError}</div>}
 
-      <div className="resident-page__split">
+      <div className="resident-page__split family-layout">
         <div>
           <div className="resident-page__table">
           <table className="resident-page__table-element">
@@ -491,8 +488,8 @@ export default function FamilyManagementPage() {
 
               {panelMsg && <p className="form-success">{panelMsg}</p>}
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569' }}>
+              <div className="family-contact-toolbar">
+                <span className="family-contact-toolbar__label">
                   {t('admin.residents.family.emergencyContactList')}
                 </span>
                 <button
@@ -572,6 +569,7 @@ export default function FamilyManagementPage() {
 
       {contactModal && (
         <ContactFormModal
+          key={contactModal.mode === 'edit' ? contactModal.contact?._id : 'add'}
           mode={contactModal.mode}
           initial={
             contactModal.mode === 'edit' && contactModal.contact

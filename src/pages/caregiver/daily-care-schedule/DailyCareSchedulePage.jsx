@@ -115,6 +115,7 @@ function DailyCareSchedulePage() {
 
       {taskModal && (
         <CareTaskDetailModal
+          key={`${taskModal.taskId}-${taskModal.mode}`}
           taskId={taskModal.taskId}
           mode={taskModal.mode}
           ns={ns}

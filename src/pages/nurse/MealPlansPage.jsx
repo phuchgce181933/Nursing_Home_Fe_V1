@@ -582,7 +582,7 @@ function MealPlanTab() {
               <WorkDatePicker value={formWorkDate} onChange={handleWorkDateChange} t={t} />
             </div>
             <div className="form-group">
-              <label>{t(`${TAB}.mealTimeSchedule`)}</label>
+              <label>{t(`${TAB}.mealTimeSchedule`)} *</label>
               <select
                 className="mp-schedule-select"
                 value={mealTimeScheduleDayId}
@@ -1633,7 +1633,7 @@ function MealTimeScheduleTab() {
         <>
           <div className="mp-form-grid form-grid">
             <div className="form-group">
-              <label>{t(`${TAB}.workDate`)}</label>
+              <label>{t(`${TAB}.workDate`)} *</label>
               <WorkDatePicker value={formWorkDate} onChange={setFormWorkDate} t={t} />
             </div>
             <div className="form-group">

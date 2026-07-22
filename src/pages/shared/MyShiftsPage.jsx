@@ -17,6 +17,10 @@ import { useAuth } from '../../hooks/useAuth';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import '../../styles/shared/MyShiftsPage.css';
 import { resolveApiError } from '../../utils/apiMessage';
+import {
+  resolveShiftDisplayName,
+  resolveShiftDisplayTimes,
+} from '../../utils/shiftDisplayTimes';
 
 const statusOptions = ['', 'draft', 'published', 'confirmed', 'completed', 'cancelled'];
 
@@ -291,9 +295,8 @@ export default function MyShiftsPage() {
 
               {group.shifts.map((shift, idx) => {
                 const d = parseWorkDate(shift.workDate);
-                const templateName = shift.shiftTemplateId?.name || shift.templateName || t('myShifts.defaultShiftName');
-                const startTime = shift.shiftTemplateId?.startTime || shift.startTime;
-                const endTime = shift.shiftTemplateId?.endTime || shift.endTime;
+                const templateName = resolveShiftDisplayName(shift, t('myShifts.defaultShiftName'));
+                const { startTime, endTime } = resolveShiftDisplayTimes(shift);
 
                 return (
                   <div

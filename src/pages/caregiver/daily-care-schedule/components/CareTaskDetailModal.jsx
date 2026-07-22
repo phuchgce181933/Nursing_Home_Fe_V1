@@ -62,11 +62,22 @@ function CareTaskDetailModal({ taskId, mode = 'view', ns, onClose, onUpdated }) 
   const resident = task?.residentId;
   const roomNum = resident?.roomId?.roomNumber;
   const modalTitle = isViewMode ? t(`${ns}.detailTitle`) : t(`${ns}.updateTitle`);
+  const modalClass = isViewMode
+    ? 'daily-care-page__modal daily-care-page__modal--view'
+    : 'daily-care-page__modal daily-care-page__modal--edit';
+
+  const updateContext =
+    task &&
+    [
+      task.scheduledTime || '—',
+      resident?.fullName || resident?.residentCode || '—',
+      careTaskTypeLabel(task.taskType, t),
+    ].join(' · ');
 
   return (
     <div className="daily-care-page__modal-overlay" onClick={saving ? undefined : onClose}>
       <div
-        className="daily-care-page__modal"
+        className={modalClass}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
@@ -126,48 +137,35 @@ function CareTaskDetailModal({ taskId, mode = 'view', ns, onClose, onUpdated }) 
           )}
           {!loading && task && !isViewMode && (
             <>
-              <div className="daily-care-page__detail-grid daily-care-page__detail-grid--compact">
-                <p>
-                  <strong>{t('common.colResident')}:</strong>{' '}
-                  {resident?.fullName || resident?.residentCode || '—'}
-                </p>
-                <p>
-                  <strong>{t(`${ns}.colTaskType`)}:</strong> {careTaskTypeLabel(task.taskType, t)}
-                </p>
-                <p>
-                  <strong>{t('common.colStatus')}:</strong>{' '}
-                  <span className={`daily-care-page__status daily-care-page__status--${task.status}`}>
-                    {t(`common.careTaskStatus.${task.status}`, { defaultValue: task.status })}
-                  </span>
-                </p>
-              </div>
+              <p className="daily-care-page__update-context">{updateContext}</p>
               <label className="daily-care-page__notes-field">
                 {t(`${ns}.notes`)}
                 <textarea
-                  rows={2}
+                  rows={3}
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   disabled={saving || !nextStatuses.length}
                 />
               </label>
-              {nextStatuses.length > 0 && (
-                <div className="daily-care-page__actions">
-                  {nextStatuses.map((st) => (
-                    <button
-                      key={st}
-                      type="button"
-                      className={st === 'skipped' ? 'btn-secondary' : 'btn-primary'}
-                      disabled={saving}
-                      onClick={() => handleStatus(st)}
-                    >
-                      {saving ? t('common.saving') : t(`${ns}.statusAction.${st}`, { defaultValue: st })}
-                    </button>
-                  ))}
-                </div>
-              )}
               {!nextStatuses.length && (
                 <p className="daily-care-page__hint">{t(`${ns}.taskEndedHint`)}</p>
               )}
+              <div className="daily-care-page__actions">
+                <button type="button" className="btn-secondary" onClick={onClose} disabled={saving}>
+                  {t('common.close')}
+                </button>
+                {nextStatuses.map((st) => (
+                  <button
+                    key={st}
+                    type="button"
+                    className={st === 'skipped' ? 'btn-secondary' : 'btn-primary'}
+                    disabled={saving}
+                    onClick={() => handleStatus(st)}
+                  >
+                    {saving ? t('common.saving') : t(`${ns}.statusAction.${st}`, { defaultValue: st })}
+                  </button>
+                ))}
+              </div>
             </>
           )}
         </div>

@@ -1,5 +1,7 @@
 import { useTranslation } from 'react-i18next';
+import { FaEye, FaPen } from 'react-icons/fa';
 import { careTaskTypeLabel } from '../../../../utils/blockingCareTasks';
+import '../../../../styles/admin/residentActionIcons.css';
 import '../../../../styles/caregiver/DailyCareSchedulePage.css';
 
 function shiftLabel(shift, shiftFallback) {
@@ -59,23 +61,27 @@ function CareTasksTable({ tasks, loading, onView, onQuickStatus, ns = 'caregiver
                       {t(`common.careTaskStatus.${task.status}`, { defaultValue: task.status })}
                     </span>
                   </td>
-                  <td className="daily-care-page__row-actions">
-                    <button
-                      type="button"
-                      className="resident-page__button resident-page__button--ghost"
-                      onClick={() => onView(task)}
-                    >
-                      {t('common.view')}
-                    </button>
-                    {(task.status === 'pending' || task.status === 'in_progress') && (
+                  <td className="resident-action-cell">
+                    <div className="resident-action-group">
                       <button
                         type="button"
-                        className="resident-page__button resident-page__button--primary"
-                        onClick={() => onQuickStatus(task)}
+                        className="resident-icon-btn resident-icon-btn--view"
+                        title={t(`${ns}.viewAction`)}
+                        onClick={() => onView(task)}
                       >
-                        {t(`${ns}.update`)}
+                        <FaEye />
                       </button>
-                    )}
+                      {(task.status === 'pending' || task.status === 'in_progress') && (
+                        <button
+                          type="button"
+                          className="resident-icon-btn resident-icon-btn--edit"
+                          title={t(`${ns}.editAction`)}
+                          onClick={() => onQuickStatus(task)}
+                        >
+                          <FaPen />
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

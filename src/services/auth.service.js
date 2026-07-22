@@ -72,6 +72,10 @@ const createStaffAccount = async (payload) => {
         value.forEach((file) => formData.append('certificationFiles', file));
         return;
       }
+      if (key === 'certificationIssueDates') {
+        formData.append(key, JSON.stringify(value));
+        return;
+      }
       formData.append(key, value);
     });
     data = formData;

@@ -2,6 +2,10 @@ import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ALL_STAFF_ROLE_OPTIONS } from '../../../../constants/rolePolicy';
 import { isValidStaffPhone } from '../../../../utils/staffPhoneValidation';
+import {
+  staffCertificationValidationKey,
+  validateStaffCertifications,
+} from '../../../../utils/staffCertificateValidation';
 
 export default function StaffEditModal({
   loading = false,
@@ -37,12 +41,39 @@ export default function StaffEditModal({
   const handleCertificationChange = (e) => {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
-    set('certificationFiles', [...(form.certificationFiles || []), ...files]);
+    onChange({
+      ...form,
+      certificationEntries: [
+        ...(form.certificationEntries || []),
+        ...files.map((file) => ({ file, issueDate: '' })),
+      ],
+    });
     if (certFileRef.current) certFileRef.current.value = '';
   };
 
+  const handleNewCertIssueDateChange = (index, issueDate) => {
+    onChange({
+      ...form,
+      certificationEntries: (form.certificationEntries || []).map((entry, i) => (
+        i === index ? { ...entry, issueDate } : entry
+      )),
+    });
+  };
+
   const handleRemoveNewCert = (index) => {
-    set('certificationFiles', (form.certificationFiles || []).filter((_, i) => i !== index));
+    onChange({
+      ...form,
+      certificationEntries: (form.certificationEntries || []).filter((_, i) => i !== index),
+    });
+  };
+
+  const handleExistingCertIssueDateChange = (publicId, issueDate) => {
+    onChange({
+      ...form,
+      existingCertDocs: (form.existingCertDocs || []).map((doc) => (
+        doc.publicId === publicId ? { ...doc, issueDate } : doc
+      )),
+    });
   };
 
   const handleRemoveExistingCert = (doc) => {
@@ -54,7 +85,7 @@ export default function StaffEditModal({
     });
   };
 
-  const certFileKey = (file) => `${file.name}-${file.size}-${file.lastModified}`;
+  const certFileKey = (entry) => `${entry.file.name}-${entry.file.size}-${entry.file.lastModified}`;
 
   const handleSave = () => {
     if (phoneError || loading) return;
@@ -62,11 +93,26 @@ export default function StaffEditModal({
       setPhoneError(t('admin.staff.profiles.validation.phoneInvalid'));
       return;
     }
+
+    const effectiveRole = form.role;
+    const allCertDocs = [
+      ...(form.existingCertDocs || []).map((doc) => ({ issueDate: doc.issueDate })),
+      ...(form.certificationEntries || []).map((entry) => ({ issueDate: entry.issueDate })),
+    ];
+    const certErrorKey = validateStaffCertifications(effectiveRole, allCertDocs);
+    if (certErrorKey) {
+      setPhoneError('');
+      onChange({ ...form, certValidationError: staffCertificationValidationKey(certErrorKey, t) });
+      return;
+    }
+
+    onChange({ ...form, certValidationError: '' });
     onSave();
   };
 
   const existingCerts = form.existingCertDocs || [];
-  const newCerts = form.certificationFiles || [];
+  const newCerts = form.certificationEntries || [];
+  const certValidationError = form.certValidationError || '';
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -74,6 +120,7 @@ export default function StaffEditModal({
         <h2 className="modal__title">{t('admin.staff.profiles.editTitle')}</h2>
 
         {error && <p className="form-error">{error}</p>}
+        {certValidationError && <p className="form-error">{certValidationError}</p>}
         {loading && (
           <p className="edit-modal__loading">{t('admin.staff.profiles.loadingProfile')}</p>
         )}
@@ -173,10 +220,25 @@ export default function StaffEditModal({
 
             <div className="form-group form-grid--full">
               <label>{t('admin.staff.profiles.labelCertificationsUpload')}</label>
+              <p style={{ fontSize: '0.75rem', color: '#94a3b8', margin: '0 0 8px' }}>
+                {t('admin.staff.profiles.certIssueDateHint')}
+              </p>
               {existingCerts.length > 0 && (
-                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '0.75rem' }}>
                   {existingCerts.map((doc) => (
-                    <div key={doc.publicId || doc.url} style={{ position: 'relative', display: 'inline-block' }}>
+                    <div
+                      key={doc.publicId || doc.url}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        flexWrap: 'wrap',
+                        padding: '8px 10px',
+                        borderRadius: '8px',
+                        backgroundColor: '#f8fafc',
+                        border: '1px solid #e2e8f0',
+                      }}
+                    >
                       <a
                         href={doc.url}
                         target="_blank"
@@ -189,28 +251,32 @@ export default function StaffEditModal({
                           style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 6, border: '1px solid #e2e8f0' }}
                         />
                       </a>
+                      <span style={{ fontSize: '13px', flex: '1 1 120px' }}>{doc.fileName || t('admin.staff.profiles.labelCertifications')}</span>
+                      <label style={{ fontSize: '12px', color: '#64748b' }}>
+                        {t('admin.staff.profiles.labelCertIssueDate')}
+                        <input
+                          type="date"
+                          value={doc.issueDate || ''}
+                          onChange={(e) => handleExistingCertIssueDateChange(doc.publicId, e.target.value)}
+                          style={{ marginLeft: '6px' }}
+                        />
+                      </label>
                       <button
                         type="button"
                         onClick={() => handleRemoveExistingCert(doc)}
                         aria-label={t('admin.staff.profiles.removeCertFileAria', { name: doc.fileName || '' })}
                         title={t('admin.staff.profiles.removeCertFile')}
                         style={{
-                          position: 'absolute',
-                          top: -6,
-                          right: -6,
-                          width: 20,
-                          height: 20,
-                          borderRadius: '50%',
-                          border: '1px solid #e2e8f0',
-                          background: '#fff',
-                          cursor: 'pointer',
-                          fontSize: '14px',
-                          lineHeight: 1,
-                          display: 'flex',
+                          display: 'inline-flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          color: '#64748b',
                           padding: 0,
+                          border: 'none',
+                          background: 'transparent',
+                          cursor: 'pointer',
+                          fontSize: '16px',
+                          lineHeight: 1,
+                          color: '#64748b',
                         }}
                       >
                         ×
@@ -238,25 +304,34 @@ export default function StaffEditModal({
                 onChange={handleCertificationChange}
               />
               {newCerts.length > 0 && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '0.5rem' }}>
-                  {newCerts.map((file, index) => (
-                    <span
-                      key={certFileKey(file)}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '0.5rem' }}>
+                  {newCerts.map((entry, index) => (
+                    <div
+                      key={certFileKey(entry)}
                       style={{
-                        display: 'inline-flex',
+                        display: 'flex',
                         alignItems: 'center',
-                        gap: '6px',
-                        padding: '6px 10px',
-                        borderRadius: '999px',
-                        backgroundColor: '#e2e8f0',
-                        fontSize: '13px',
+                        gap: '10px',
+                        flexWrap: 'wrap',
+                        padding: '8px 10px',
+                        borderRadius: '8px',
+                        backgroundColor: '#f1f5f9',
                       }}
                     >
-                      {file.name}
+                      <span style={{ fontSize: '13px', flex: '1 1 120px' }}>{entry.file.name}</span>
+                      <label style={{ fontSize: '12px', color: '#64748b' }}>
+                        {t('admin.staff.profiles.labelCertIssueDate')}
+                        <input
+                          type="date"
+                          value={entry.issueDate}
+                          onChange={(e) => handleNewCertIssueDateChange(index, e.target.value)}
+                          style={{ marginLeft: '6px' }}
+                        />
+                      </label>
                       <button
                         type="button"
                         onClick={() => handleRemoveNewCert(index)}
-                        aria-label={t('admin.staff.profiles.removeCertFileAria', { name: file.name })}
+                        aria-label={t('admin.staff.profiles.removeCertFileAria', { name: entry.file.name })}
                         title={t('admin.staff.profiles.removeCertFile')}
                         style={{
                           display: 'inline-flex',
@@ -273,7 +348,7 @@ export default function StaffEditModal({
                       >
                         ×
                       </button>
-                    </span>
+                    </div>
                   ))}
                 </div>
               )}
