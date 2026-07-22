@@ -1279,7 +1279,13 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                   {rooms.map((r) => (
                     <tr key={r._id}>
                       <td style={{ fontWeight: '600' }}>Phòng {r.roomNumber}</td>
-                      <td style={{ textTransform: 'capitalize' }}>{r.roomType}</td>
+                      <td style={{ textTransform: 'capitalize' }}>
+                        {r.roomType === 'standard' ? t('facilities.roomTypeStandard') :
+                         r.roomType === 'premium' ? t('facilities.roomTypePremium') :
+                         r.roomType === 'icu' ? t('facilities.roomTypeIcu') :
+                         r.roomType === 'isolation' ? t('facilities.roomTypeIsolation') :
+                         r.roomType}
+                      </td>
                       <td>{r.capacity} giường</td>
                       <td>{r.occupiedCount || 0}</td>
                       <td>
@@ -2438,10 +2444,10 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                       value={formRoomType}
                       onChange={(e) => setFormRoomType(e.target.value)}
                     >
-                      <option value="standard">Standard</option>
-                      <option value="premium">Premium</option>
-                      <option value="icu">ICU</option>
-                      <option value="isolation">Isolation</option>
+                      <option value="standard">{t('facilities.roomTypeStandard')}</option>
+                      <option value="premium">{t('facilities.roomTypePremium')}</option>
+                      <option value="icu">{t('facilities.roomTypeIcu')}</option>
+                      <option value="isolation">{t('facilities.roomTypeIsolation')}</option>
                     </select>
                   </div>
                   <div className="fac-form-group">
@@ -2516,10 +2522,10 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                       value={formRoomType}
                       onChange={(e) => setFormRoomType(e.target.value)}
                     >
-                      <option value="standard">Standard</option>
-                      <option value="premium">Premium</option>
-                      <option value="icu">ICU</option>
-                      <option value="isolation">Isolation</option>
+                      <option value="standard">{t('facilities.roomTypeStandard')}</option>
+                      <option value="premium">{t('facilities.roomTypePremium')}</option>
+                      <option value="icu">{t('facilities.roomTypeIcu')}</option>
+                      <option value="isolation">{t('facilities.roomTypeIsolation')}</option>
                     </select>
                   </div>
                   <div className="fac-form-group">
@@ -2672,9 +2678,9 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                       value={formBedType}
                       onChange={(e) => setFormBedType(e.target.value)}
                     >
-                      <option value="normal">Normal</option>
-                      <option value="electric">Electric</option>
-                      <option value="icu">ICU</option>
+                      <option value="normal">{t('facilities.bedTypeNormal')}</option>
+                      <option value="electric">{t('facilities.bedTypeElectric')}</option>
+                      <option value="icu">{t('facilities.bedTypeIcu')}</option>
                     </select>
                   </div>
                   <div className="fac-form-group">
@@ -2749,9 +2755,9 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                       value={formBedType}
                       onChange={(e) => setFormBedType(e.target.value)}
                     >
-                      <option value="normal">Normal</option>
-                      <option value="electric">Electric</option>
-                      <option value="icu">ICU</option>
+                      <option value="normal">{t('facilities.bedTypeNormal')}</option>
+                      <option value="electric">{t('facilities.bedTypeElectric')}</option>
+                      <option value="icu">{t('facilities.bedTypeIcu')}</option>
                     </select>
                   </div>
                   <div className="fac-form-group">

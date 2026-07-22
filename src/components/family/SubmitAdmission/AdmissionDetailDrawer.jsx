@@ -24,6 +24,66 @@ import paymentService from '../../../services/payment.service';
 import servicePackageService from '../../../services/servicePackage.service';
 import facilityService from '../../../services/facility.service';
 
+// ─── Helper: Avatar với initials fallback ─────────────────────────────────────
+function PersonAvatar({ name, avatarUrl, size = 52, className = '' }) {
+  const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    setHasError(false);
+  }, [avatarUrl]);
+
+  const initials = (name || '?')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0].toUpperCase())
+    .join('');
+
+  const baseStyle = {
+    width: size,
+    height: size,
+    borderRadius: '50%',
+    flexShrink: 0,
+    border: '2px solid #fff',
+    boxShadow: '0 4px 10px rgba(26,54,93,0.08)',
+    overflow: 'hidden',
+  };
+
+  if (avatarUrl && !hasError) {
+    return (
+      <img
+        src={avatarUrl}
+        alt={name || 'Avatar'}
+        className={className}
+        style={{ ...baseStyle, objectFit: 'cover', display: 'block' }}
+        onError={() => setHasError(true)}
+      />
+    );
+  }
+
+  return (
+    <div
+      className={className}
+      style={{
+        ...baseStyle,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'linear-gradient(135deg, #1b365d 0%, #2d5a9e 100%)',
+        color: '#fff',
+        fontSize: size * 0.34,
+        fontWeight: 700,
+        letterSpacing: '0.02em',
+        userSelect: 'none',
+      }}
+      title={name || ''}
+    >
+      {initials}
+    </div>
+  );
+}
+
 const formatViDate = (dateStr) => {
   if (!dateStr) return 'N/A';
   try {
@@ -1266,15 +1326,10 @@ export default function AdmissionDetailDrawer({
                   <User size={16} /> NGƯỜI LIÊN HỆ CHÍNH
                 </h5>
                 <div className="arh-detail-card__profile" style={{ background: 'rgba(239, 244, 255, 0.4)', border: '1px solid rgba(27, 54, 93, 0.05)', padding: '14px', borderRadius: '12px' }}>
-                  <img
-                    alt="Ảnh người yêu cầu"
-                    className="arh-detail-card__avatar"
-                    src={admission.familyAccount?.avatarUrl || `data:image/svg+xml;utf8,${encodeURIComponent(`
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%2394a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                        <circle cx="12" cy="7" r="4" />
-                      </svg>
-                    `)}`}
+                  <PersonAvatar
+                    name={admission.familyAccount?.fullName || admission.requestedByName || 'Người thân'}
+                    avatarUrl={admission.familyAccount?.avatarUrl}
+                    size={52}
                   />
                   <div className="arh-detail-card__info">
                     <h4 className="arh-detail-card__name">
@@ -1302,16 +1357,10 @@ export default function AdmissionDetailDrawer({
                 </h5>
                 
                 <div className="arh-detail-card__profile" style={{ background: 'rgba(239, 244, 255, 0.4)', border: '1px solid rgba(27, 54, 93, 0.05)', padding: '14px', borderRadius: '12px', display: 'flex', gap: '16px', alignItems: 'center', marginBottom: '16px' }}>
-                  <img
-                    alt="Ảnh người cao tuổi"
-                    className="arh-detail-card__avatar"
-                    style={{ width: '64px', height: '64px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #fff', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}
-                    src={admission.applicant?.avatarUrl || `data:image/svg+xml;utf8,${encodeURIComponent(`
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%2394a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                        <circle cx="12" cy="7" r="4" />
-                      </svg>
-                    `)}`}
+                  <PersonAvatar
+                    name={admission.applicant?.fullName}
+                    avatarUrl={admission.applicant?.avatarUrl}
+                    size={64}
                   />
                   <div>
                     <h4 className="arh-detail-card__name" style={{ fontWeight: 'bold', fontSize: '15px', color: '#1e293b' }}>
