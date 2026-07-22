@@ -10,7 +10,7 @@ export default function AdminConsultationRequestsPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [page, setPage] = useState(1);
-  const [limit] = useState(10);
+  const [limit] = useState(5);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState('');
@@ -293,8 +293,7 @@ export default function AdminConsultationRequestsPage() {
               <thead>
                 <tr>
                   <th>{t('admin.consultationRequests.colName', 'Name')}</th>
-                  <th>{t('admin.consultationRequests.colPhone', 'Phone')}</th>
-                  <th>{t('admin.consultationRequests.colEmail', 'Email')}</th>
+                  <th>{t('admin.consultationRequests.colContact', 'Contact')}</th>
                   <th>{t('admin.consultationRequests.colServiceInterest', 'Service Interest')}</th>
                   <th>{t('admin.consultationRequests.colCreatedAt', 'Created')}</th>
                   <th>{t('admin.consultationRequests.colStatus', 'Status')}</th>
@@ -305,9 +304,13 @@ export default function AdminConsultationRequestsPage() {
                 {data.map((item) => (
                   <tr key={item._id} className="adm-table-row">
                     <td>{item.fullName || '-'}</td>
-                    <td>{item.phone || '-'}</td>
-                    <td>{item.email || '-'}</td>
-                    <td>{item.serviceInterest || item.subject || item.message || '-'}</td>
+                    <td className="adm-contact-cell">
+                      <div>{item.phone || '-'}</div>
+                      <div>{item.email || '-'}</div>
+                    </td>
+                    <td className="adm-service-cell">
+                      {item.serviceInterest || item.subject || item.message || '-'}
+                    </td>
                     <td>{formatDate(item.createdAt)}</td>
                     <td>
                       <span className={`adm-status-badge ${getStatusBadgeClass(item.status)}`}>
@@ -346,49 +349,73 @@ export default function AdminConsultationRequestsPage() {
       </div>
 
       {editingRequest && (
-        <div className="adm-edit-section">
-          <div className="adm-edit-header">
-            <div>
-              <h2>{t('admin.consultationRequests.editTitle', 'Edit Consultation Request')}</h2>
-              <p>{t('admin.consultationRequests.editSubtitle', 'Update status and add admin notes for the selected request.')}</p>
-            </div>
-            <div className="adm-edit-current-status">
-              <span className={`adm-status-badge ${getStatusBadgeClass(editingRequest.status)}`}>
-                {getStatusLabel(editingRequest.status)}
-              </span>
-            </div>
-          </div>
-          <div className="adm-edit-panel">
-            <div className="adm-edit-grid">
-              <div className="adm-edit-field">
-                <label className="adm-edit-label">{t('admin.consultationRequests.fieldStatus', 'Status')}</label>
-                <select className="adm-edit-select" value={editStatus} onChange={(e) => setEditStatus(e.target.value)}>
-                  {getAllowedStatusOptions(editingRequest?.status || editStatus).map((opt) => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
+        <div className="adm-edit-overlay" onClick={() => setEditingRequest(null)}>
+          <div className="adm-edit-section" onClick={(e) => e.stopPropagation()}>
+            <div className="adm-edit-header">
+              <div>
+                <h2>{t('admin.consultationRequests.editTitle', 'Edit Consultation Request')}</h2>
+                <p>{t('admin.consultationRequests.editSubtitle', 'Update status and add admin notes for the selected request.')}</p>
               </div>
-              <div className="adm-edit-field adm-edit-field--notes">
-                <label className="adm-edit-label">{t('admin.consultationRequests.fieldAdminNotes', 'Admin Notes')}</label>
-                <textarea
-                  className="adm-edit-textarea"
-                  value={editNotes}
-                  onChange={(e) => setEditNotes(e.target.value)}
-                  rows={6}
-                />
+              <div className="adm-edit-current-status">
+                <span className={`adm-status-badge ${getStatusBadgeClass(editingRequest.status)}`}>
+                  {getStatusLabel(editingRequest.status)}
+                </span>
               </div>
             </div>
-            <div className="adm-edit-actions">
-              <button type="button" className="adm-btn-apply" disabled={saving || !isEditDirty} onClick={handleSave}>
-                {saving ? t('admin.consultationRequests.saving', 'Saving...') : t('admin.consultationRequests.save', 'Save')}
-              </button>
-              <button type="button" className="adm-btn-clear" disabled={saving} onClick={() => setEditingRequest(null)}>
-                {t('admin.consultationRequests.cancel', 'Cancel')}
-              </button>
+            <div className="adm-edit-panel">
+              <div className="adm-request-detail-summary">
+                <div>
+                  <span>{t('admin.consultationRequests.colName', 'Name')}</span>
+                  <p>{editingRequest.fullName || '-'}</p>
+                </div>
+                <div>
+                  <span>{t('admin.consultationRequests.colPhone', 'Phone')}</span>
+                  <p>{editingRequest.phone || '-'}</p>
+                </div>
+                <div>
+                  <span>{t('admin.consultationRequests.colEmail', 'Email')}</span>
+                  <p>{editingRequest.email || '-'}</p>
+                </div>
+                <div>
+                  <span>{t('admin.consultationRequests.colCreatedAt', 'Created')}</span>
+                  <p>{formatDate(editingRequest.createdAt)}</p>
+                </div>
+                <div className="adm-request-detail-message">
+                  <span>{t('admin.consultationRequests.colMessage', 'Message')}</span>
+                  <p>{editingRequest.message ? editingRequest.message : t('admin.consultationRequests.noMessage', 'No message provided')}</p>
+                </div>
+              </div>
+              <div className="adm-edit-grid">
+                <div className="adm-edit-field">
+                  <label className="adm-edit-label">{t('admin.consultationRequests.fieldStatus', 'Status')}</label>
+                  <select className="adm-edit-select" value={editStatus} onChange={(e) => setEditStatus(e.target.value)}>
+                    {getAllowedStatusOptions(editingRequest?.status || editStatus).map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="adm-edit-field adm-edit-field--notes">
+                  <label className="adm-edit-label">{t('admin.consultationRequests.fieldAdminNotes', 'Admin Notes')}</label>
+                  <textarea
+                    className="adm-edit-textarea"
+                    value={editNotes}
+                    onChange={(e) => setEditNotes(e.target.value)}
+                    rows={6}
+                  />
+                </div>
+              </div>
+              <div className="adm-edit-actions">
+                <button type="button" className="adm-btn-apply" disabled={saving || !isEditDirty} onClick={handleSave}>
+                  {saving ? t('admin.consultationRequests.saving', 'Saving...') : t('admin.consultationRequests.save', 'Save')}
+                </button>
+                <button type="button" className="adm-btn-clear" disabled={saving} onClick={() => setEditingRequest(null)}>
+                  {t('admin.consultationRequests.cancel', 'Cancel')}
+                </button>
+              </div>
+              {!isEditDirty && (
+                <p className="adm-edit-note">{t('admin.consultationRequests.editNoChanges', 'Vui lòng thay đổi trạng thái hoặc ghi chú trước khi lưu.')}</p>
+              )}
             </div>
-            {!isEditDirty && (
-              <p className="adm-edit-note">{t('admin.consultationRequests.editNoChanges', 'Vui lòng thay đổi trạng thái hoặc ghi chú trước khi lưu.')}</p>
-            )}
           </div>
         </div>
       )}
