@@ -774,19 +774,27 @@ export default function CareAppointmentsPage() {
 
       // 2. Call Pre-admission Consultation API if admission request is present (UC-6.16)
       if (admissionId) {
-        await admissionService.medicalRecordConsultation(admissionId, {
-          consultationNotes: wizardValues.consultationNotes.trim() || 'Đã thực hiện thăm khám lâm sàng.',
-          notes: wizardValues.summary.trim() || undefined,
-        });
+        try {
+          await admissionService.medicalRecordConsultation(admissionId, {
+            consultationNotes: wizardValues.consultationNotes.trim() || 'Đã thực hiện thăm khám lâm sàng.',
+            notes: wizardValues.summary.trim() || undefined,
+          });
+        } catch (cErr) {
+          console.warn('Admission consultation step skipped or already completed:', cErr);
+        }
 
         // 3. Evaluate Eligibility if Bác sĩ role (UC-6.19)
         if (userRole === 'doctor') {
-          await admissionService.medicalEvaluateEligibility(admissionId, {
-            eligibilityStatus: wizardValues.eligibilityStatus,
-            assessmentResult: wizardValues.assessmentResult.trim() || 'Đã kiểm tra các chỉ số sinh tồn lâm sàng.',
-            rejectionReason: wizardValues.eligibilityStatus === 'not_eligible' ? (wizardValues.rejectionReason.trim() || undefined) : undefined,
-            notes: wizardValues.summary.trim() || undefined,
-          });
+          try {
+            await admissionService.medicalEvaluateEligibility(admissionId, {
+              eligibilityStatus: wizardValues.eligibilityStatus,
+              assessmentResult: wizardValues.assessmentResult.trim() || 'Đã kiểm tra các chỉ số sinh tồn lâm sàng.',
+              rejectionReason: wizardValues.eligibilityStatus === 'not_eligible' ? (wizardValues.rejectionReason.trim() || undefined) : undefined,
+              notes: wizardValues.summary.trim() || undefined,
+            });
+          } catch (eErr) {
+            console.warn('Admission eligibility step skipped or already completed:', eErr);
+          }
         }
       }
 
