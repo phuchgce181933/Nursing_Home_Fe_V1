@@ -138,9 +138,13 @@ export default function AssignedResidentsListPage({ role, footer }) {
                   <td>{t(`common.gender.${row.gender}`, { defaultValue: row.gender || '—' })}</td>
                   <td className="ar-table__area">{formatResidentAreaLine(row, t) || '—'}</td>
                   <td className="ar-actions-cell" onClick={(e) => e.stopPropagation()}>
-                    <button type="button" className="ar-view-btn" onClick={() => goToDetail(row._id)}>
+                    <button
+                      type="button"
+                      className="ar-view-btn"
+                      title={t('common.viewDetails')}
+                      onClick={() => goToDetail(row._id)}
+                    >
                       <Eye size={14} />
-                      {t(`${ns}.viewDetail`)}
                     </button>
                   </td>
                 </tr>

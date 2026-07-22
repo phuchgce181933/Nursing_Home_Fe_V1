@@ -111,19 +111,25 @@ export default function StaffDetailModal({ staff, onClose, onEdit, canEdit = tru
                       {profile.certificationDocuments?.length > 0 ? (
                         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: 4 }}>
                           {profile.certificationDocuments.map((doc) => (
-                            <a
-                              key={doc.publicId || doc.url}
-                              href={doc.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              title={doc.fileName || ''}
-                            >
-                              <img
-                                src={doc.url}
-                                alt={doc.fileName || ''}
-                                style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 6, border: '1px solid #e2e8f0' }}
-                              />
-                            </a>
+                            <div key={doc.publicId || doc.url} style={{ textAlign: 'center' }}>
+                              <a
+                                href={doc.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title={doc.fileName || ''}
+                              >
+                                <img
+                                  src={doc.url}
+                                  alt={doc.fileName || ''}
+                                  style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 6, border: '1px solid #e2e8f0' }}
+                                />
+                              </a>
+                              {doc.issueDate && (
+                                <div style={{ fontSize: '11px', color: '#64748b', marginTop: 4 }}>
+                                  {t('admin.staff.profiles.labelCertIssueDate')}: {String(doc.issueDate).slice(0, 10)}
+                                </div>
+                              )}
+                            </div>
                           ))}
                         </div>
                       ) : (

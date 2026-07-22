@@ -21,6 +21,10 @@ import StaffCreateModal from './StaffCreateModal';
 import { staffToEditForm } from '../../../../utils/staffFormSnapshot';
 import { resolveApiError } from '../../../../utils/apiMessage';
 import { staffDateOfBirthValidationKey, validateStaffDateOfBirth } from '../../../../utils/staffAgeValidation';
+import {
+  staffCertificationValidationKey,
+  validateStaffCertifications,
+} from '../../../../utils/staffCertificateValidation';
 import './profiles.css';
 
 const emptyEditForm = {
@@ -155,7 +159,7 @@ export default function StaffManagementPage() {
   const handleSaveEdit = async () => {
     if (!editForm.fullName.trim()) { setEditError(t('admin.staff.profiles.fullNameRequired')); return; }
 
-    const effectiveRole = editForm.role !== editStaff.role ? editForm.role : editStaff.role;
+    const effectiveRole = editForm.role;
     const dobErrorKey = validateStaffDateOfBirth(editForm.dateOfBirth, {
       role: effectiveRole,
       gender: editForm.gender,
@@ -165,7 +169,19 @@ export default function StaffManagementPage() {
       return;
     }
 
+    const allCertDocs = [
+      ...(editForm.existingCertDocs || []).map((doc) => ({ issueDate: doc.issueDate })),
+      ...(editForm.certificationEntries || []).map((entry) => ({ issueDate: entry.issueDate })),
+    ];
+    const certErrorKey = validateStaffCertifications(effectiveRole, allCertDocs);
+    if (certErrorKey) {
+      setEditError(staffCertificationValidationKey(certErrorKey, t));
+      return;
+    }
+
     try {
+      const newEntries = editForm.certificationEntries || [];
+      const existingDocs = editForm.existingCertDocs || [];
       const profileBody = {
         fullName: editForm.fullName,
         phone: editForm.phone,
@@ -174,17 +190,21 @@ export default function StaffManagementPage() {
         specialty: editForm.specialty,
         address: editForm.address,
         avatarFile: editForm.avatarFile || undefined,
-        certificationFiles: editForm.certificationFiles?.length ? editForm.certificationFiles : undefined,
+        certificationFiles: newEntries.length ? newEntries.map((entry) => entry.file) : undefined,
+        certificationIssueDates: newEntries.length ? newEntries.map((entry) => entry.issueDate) : undefined,
+        certificationIssueDateUpdates: existingDocs.length
+          ? existingDocs
+            .filter((doc) => doc.publicId)
+            .map((doc) => ({ publicId: doc.publicId, issueDate: doc.issueDate }))
+          : undefined,
         removedCertPublicIds: editForm.removedCertPublicIds?.length ? editForm.removedCertPublicIds : undefined,
       };
       const roleChanged = editForm.role !== editStaff.role;
 
-      await Promise.all([
-        staffService.update(editStaff._id, profileBody),
-        roleChanged
-          ? staffService.updateRole(editStaff._id, { role: editForm.role })
-          : Promise.resolve(),
-      ]);
+      await staffService.update(editStaff._id, profileBody);
+      if (roleChanged) {
+        await staffService.updateRole(editStaff._id, { role: editForm.role });
+      }
       closeEditModal();
       loadStaff();
     } catch (e) {

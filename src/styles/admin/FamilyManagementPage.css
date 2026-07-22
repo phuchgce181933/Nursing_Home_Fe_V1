@@ -1,10 +1,59 @@
 /* Page-specific — shell uses AdminPageShell + ResidentPage.css */
 
 .resident-page .family-layout {
-  display: grid;
-  grid-template-columns: minmax(280px, 1fr) minmax(320px, 1.1fr);
-  gap: 20px;
-  align-items: start;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+}
+
+.resident-page .family-layout > * {
+  min-width: 0;
+}
+
+.resident-page .family-layout .resident-page__table {
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+.resident-page .family-layout .resident-page__table-element {
+  min-width: 420px;
+}
+
+.resident-page .family-layout .resident-action-cell {
+  position: sticky;
+  right: 0;
+  background: #fff;
+}
+
+.resident-page .family-layout .resident-page__table-row.is-selected .resident-action-cell {
+  background: rgba(15, 118, 110, 0.08);
+}
+
+.resident-page .family-layout .resident-page__table-row.is-selected:hover .resident-action-cell {
+  background: rgba(15, 118, 110, 0.12);
+}
+
+.resident-page .family-layout .resident-page__table-row:hover .resident-action-cell {
+  background: #f1f5f9;
+}
+
+.resident-page .family-layout .resident-page__pagination {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.family-contact-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.family-contact-toolbar__label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #475569;
 }
 
 @media (max-width: 1024px) {

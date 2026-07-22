@@ -14,10 +14,18 @@ const getById = (id) =>
  * @param {object} data - { fullName, phone, gender, specialty, address, avatarFile?, password? }
  */
 const update = (id, data) => {
-  const { avatarFile, certificationFiles, removedCertPublicIds, ...rest } = data;
+  const {
+    avatarFile,
+    certificationFiles,
+    certificationIssueDates,
+    certificationIssueDateUpdates,
+    removedCertPublicIds,
+    ...rest
+  } = data;
   const hasRemovals = Array.isArray(removedCertPublicIds) && removedCertPublicIds.length > 0;
+  const hasIssueDateUpdates = Array.isArray(certificationIssueDateUpdates) && certificationIssueDateUpdates.length > 0;
   const hasFiles = avatarFile || (Array.isArray(certificationFiles) && certificationFiles.length > 0);
-  if (hasFiles || hasRemovals) {
+  if (hasFiles || hasRemovals || hasIssueDateUpdates) {
     const form = new FormData();
     Object.entries(rest).forEach(([k, v]) => {
       if (v !== undefined && v !== '') form.append(k, v);
@@ -26,6 +34,12 @@ const update = (id, data) => {
     if (Array.isArray(certificationFiles)) {
       certificationFiles.forEach((file) => form.append('certificationFiles', file));
     }
+    if (Array.isArray(certificationIssueDates) && certificationIssueDates.length) {
+      form.append('certificationIssueDates', JSON.stringify(certificationIssueDates));
+    }
+    if (hasIssueDateUpdates) {
+      form.append('certificationIssueDateUpdates', JSON.stringify(certificationIssueDateUpdates));
+    }
     if (hasRemovals) {
       form.append('removedCertPublicIds', JSON.stringify(removedCertPublicIds));
     }
@@ -33,7 +47,11 @@ const update = (id, data) => {
       headers: { 'Content-Type': 'multipart/form-data' },
     }).then((r) => r.data);
   }
-  return axiosClient.put(`/staff/${id}`, rest).then((r) => r.data);
+  const jsonPayload = { ...rest };
+  if (hasIssueDateUpdates) {
+    jsonPayload.certificationIssueDateUpdates = JSON.stringify(certificationIssueDateUpdates);
+  }
+  return axiosClient.put(`/staff/${id}`, jsonPayload).then((r) => r.data);
 };
 
 const updateRole = (id, data) =>
@@ -50,7 +68,13 @@ const unban = (id) =>
  * @param {object} data - { fullName, email, password, role, phone?, gender?, specialty?, certifications?, username?, avatarFile? }
  */
 const create = (data) => {
-  const { avatarFile, certifications, certificationFiles, ...rest } = data;
+  const {
+    avatarFile,
+    certifications,
+    certificationFiles,
+    certificationIssueDates,
+    ...rest
+  } = data;
   const form = new FormData();
   Object.entries(rest).forEach(([k, v]) => {
     if (v !== undefined && v !== '') form.append(k, v);
@@ -60,6 +84,9 @@ const create = (data) => {
   }
   if (Array.isArray(certificationFiles)) {
     certificationFiles.forEach((file) => form.append('certificationFiles', file));
+  }
+  if (Array.isArray(certificationIssueDates) && certificationIssueDates.length) {
+    form.append('certificationIssueDates', JSON.stringify(certificationIssueDates));
   }
   if (avatarFile) form.append('avatar', avatarFile);
   return axiosClient.post('/auth/create-staff', form, {

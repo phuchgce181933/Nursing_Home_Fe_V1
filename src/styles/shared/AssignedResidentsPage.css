@@ -85,11 +85,9 @@
 .ar-view-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
+  justify-content: center;
+  padding: 6px;
   border-radius: 10px;
-  font-size: 12px;
-  font-weight: 600;
   cursor: pointer;
   border: 1px solid #e2e8f0;
   background: #ffffff;
