@@ -42,10 +42,11 @@ const SERVICES = [
   'Phục hồi chức năng',
   'Tham quan cơ sở',
   'Đăng ký nhập viện',
+  'Khác',
 ];
 
 export default function ContactPage() {
-  const [form, setForm] = useState({ name: '', email: '', phone: '', service: '', message: '' });
+  const [form, setForm] = useState({ name: '', email: '', phone: '', service: '', otherService: '', message: '' });
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
 
@@ -64,7 +65,7 @@ export default function ContactPage() {
 
     const nameRegex = /^[\p{L}\s]+$/u;
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-    const phoneRegex = /^\d{10}$/;
+    const phoneRegex = /^0\d{9}$/;
 
     if (!trimmedName) {
       nextErrors.name = 'Vui lòng nhập họ và tên.';
@@ -81,11 +82,24 @@ export default function ContactPage() {
     if (!trimmedPhone) {
       nextErrors.phone = 'Vui lòng nhập số điện thoại.';
     } else if (!phoneRegex.test(trimmedPhone)) {
-      nextErrors.phone = 'Số điện thoại phải gồm 10 chữ số và không chứa ký tự khác.';
+      nextErrors.phone = 'Số điện thoại phải bắt đầu bằng 0 và gồm 10 chữ số.';
     }
 
     if (!trimmedService) {
       nextErrors.service = 'Vui lòng chọn nhu cầu tư vấn mong muốn.';
+    }
+
+    if (trimmedService === 'Khác') {
+      const trimmedOtherService = form.otherService.trim();
+      if (!trimmedOtherService) {
+        nextErrors.otherService = 'Vui lòng mô tả nhu cầu tư vấn khác.';
+      } else if (trimmedOtherService.length > 50) {
+        nextErrors.otherService = 'Vui lòng nhập tối đa 50 ký tự.';
+      }
+    }
+
+    if (form.message && form.message.trim().length > 200) {
+      nextErrors.message = 'Vui lòng nhập tối đa 200 ký tự.';
     }
 
     return nextErrors;
@@ -106,11 +120,11 @@ export default function ContactPage() {
         fullName: form.name.trim(),
         email: form.email.trim(),
         phone: form.phone.trim(),
-        serviceInterest: form.service,
+        serviceInterest: form.service === 'Khác' ? form.otherService.trim() : form.service,
         message: form.message.trim(),
       });
-      alert('Chúng tôi đã tiếp nhận yêu cầu tư vấn của bạn. Đội ngũ chuyên viên sẽ nhanh chóng xem xét và liên hệ để hỗ trợ trong thời gian sớm nhất..');
-      setForm({ name: '', email: '', phone: '', service: '', message: '' });
+      alert('Chúng tôi đã tiếp nhận yêu cầu tư vấn của bạn. Đội ngũ chuyên viên sẽ nhanh chóng xem xét và liên hệ để hỗ trợ trong thời gian sớm nhất.');
+      setForm({ name: '', email: '', phone: '', service: '', otherService: '', message: '' });
       setErrors({});
     } catch (error) {
       console.error(error);
@@ -224,6 +238,21 @@ export default function ContactPage() {
                 {errors.service && <p className="cp2-form__error">{errors.service}</p>}
               </div>
 
+              {form.service === 'Khác' && (
+                <div className="cp2-form__field">
+                  <strong>Nhu cầu tư vấn khác *</strong>
+                  <input
+                    name="otherService"
+                    type="text"
+                    placeholder="Mô tả nhu cầu tư vấn khác"
+                    value={form.otherService}
+                    maxLength={51}
+                    onChange={handleChange}
+                  />
+                  {errors.otherService && <p className="cp2-form__error">{errors.otherService}</p>}
+                </div>
+              )}
+
               <div className="cp2-form__field">
                 <strong>Lời nhắn</strong>
                 <textarea
@@ -231,8 +260,11 @@ export default function ContactPage() {
                   rows={6}
                   placeholder="Tôi muốn tìm hiểu thêm về..."
                   value={form.message}
+                  maxLength={200}
                   onChange={handleChange}
                 />
+                <p className="cp2-form__hint">Tối đa 200 ký tự. ({form.message.length}/200)</p>
+                {errors.message && <p className="cp2-form__error">{errors.message}</p>}
               </div>
 
               <button type="submit" className="cp2-form__submit" disabled={submitting}>
