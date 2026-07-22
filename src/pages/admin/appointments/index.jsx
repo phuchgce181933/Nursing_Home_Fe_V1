@@ -409,6 +409,11 @@ export default function CareAppointmentsPage() {
       setApptFormError(t('careAppointments.endBeforeStartError'));
       return;
     }
+    const diffMs = end.getTime() - start.getTime();
+    if (diffMs > 24 * 60 * 60 * 1000) {
+      setApptFormError('Khoảng thời gian khám (từ lúc bắt đầu đến lúc kết thúc) không được vượt quá 24 giờ.');
+      return;
+    }
     // On create, or when the start time is actually being changed on edit, block past times
     // client-side too — the backend enforces the same rule (see careAppointmentService.js).
     const originalStartAt = isEditMode && selectedAppt ? new Date(selectedAppt.scheduledStartAt) : null;
