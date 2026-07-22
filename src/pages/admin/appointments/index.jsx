@@ -418,19 +418,15 @@ export default function CareAppointmentsPage() {
       return;
     }
 
-    // ── Validate thêm cho loại "Khám lâm sàng đầu vào" (mirror BE constraints) ──
+    // ── Validate thêm cho loại "Khám lâm sàng đầu vào" ──
     if (formValues.appointmentType === 'Khám lâm sàng đầu vào') {
-      // 1. Start phải diễn ra trong vòng 24h kể từ hiện tại
-      const limit24h = new Date(Date.now() + 24 * 60 * 60 * 1000);
-      if (start > limit24h) {
-        setApptFormError('Lịch khám lâm sàng đầu vào phải diễn ra trong vòng 24 giờ kể từ thời điểm hiện tại.');
-        return;
-      }
+      // 1. Start và End phải cùng ngày
+      const isSameDay =
+        start.getFullYear() === end.getFullYear() &&
+        start.getMonth() === end.getMonth() &&
+        start.getDate() === end.getDate();
 
-      // 2. Start và End phải cùng ngày
-      const startDateStr = start.toLocaleDateString('vi-VN');
-      const endDateStr = end.toLocaleDateString('vi-VN');
-      if (startDateStr !== endDateStr) {
+      if (!isSameDay) {
         setApptFormError('Ngày bắt đầu và ngày kết thúc của lịch khám phải là cùng một ngày.');
         return;
       }
@@ -1339,16 +1335,11 @@ export default function CareAppointmentsPage() {
                   value={formValues.scheduledStartAt}
                   onChange={(e) => setFormValues(prev => ({ ...prev, scheduledStartAt: e.target.value }))}
                   min={!isEditMode ? new Date().toISOString().slice(0, 16) : undefined}
-                  max={
-                    formValues.appointmentType === 'Khám lâm sàng đầu vào'
-                      ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 16)
-                      : undefined
-                  }
                   required
                 />
                 {formValues.appointmentType === 'Khám lâm sàng đầu vào' && (
                   <small style={{ color: '#64748b', fontSize: '12px', marginTop: '4px', display: 'block' }}>
-                    ⏰ Khám lâm sàng đầu vào: giờ bắt đầu phải trong khoảng 08:00 – 16:00, và phải diễn ra trong vòng 24 giờ tới.
+                    ⏰ Khám lâm sàng đầu vào: giờ bắt đầu phải trong khoảng 08:00 – 16:00.
                   </small>
                 )}
               </div>
