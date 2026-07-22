@@ -2801,7 +2801,7 @@ export default function AdmissionDetailDrawer({
                       <option value="">-- Chọn giường --</option>
                       {beds.map((b) => (
                         <option key={b._id} value={b._id}>
-                          Giường {b.bedCode} ({b.bedType})
+                          Giường {b.bedCode}
                         </option>
                       ))}
                     </select>

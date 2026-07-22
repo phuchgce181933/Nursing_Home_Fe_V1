@@ -1519,19 +1519,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
 
                     {/* Body */}
                     <div style={{ padding: '0 14px 14px' }}>
-                      {/* Bed type tag */}
-                      <div style={{ marginBottom: '10px' }}>
-                        <span style={{
-                          fontSize: '11px', fontWeight: '500', color: '#64748b',
-                          background: '#f1f5f9', borderRadius: '6px',
-                          padding: '3px 10px', display: 'inline-block'
-                        }}>
-                          {bedTypeLabel}
-                        </span>
-                      </div>
 
-                      {/* Divider */}
-                      <div style={{ height: '1px', background: '#f1f5f9', margin: '0 0 10px' }} />
 
                       {/* Info rows */}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
@@ -1566,7 +1554,6 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                 <thead>
                   <tr>
                     <th>{t('facilities.colBedCode')}</th>
-                    <th>{t('facilities.colBedType')}</th>
                     <th>{t('facilities.colStatus')}</th>
                     <th>{t('facilities.colCondition')}</th>
                     <th>{t('facilities.colNotes')}</th>
@@ -1577,7 +1564,6 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                   {beds.map((b) => (
                     <tr key={b._id}>
                       <td style={{ fontWeight: '600' }}>{b.bedCode}</td>
-                      <td style={{ textTransform: 'capitalize' }}>{b.bedType}</td>
                       <td>
                         <span className={`fac-badge ${
                           b.status === 'available' ? 'fac-badge--success' :
@@ -2670,31 +2656,17 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                     required
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="fac-form-group">
-                    <label>{t('facilities.fieldBedType')}</label>
-                    <select
-                      className="fac-form-control"
-                      value={formBedType}
-                      onChange={(e) => setFormBedType(e.target.value)}
-                    >
-                      <option value="normal">{t('facilities.bedTypeNormal')}</option>
-                      <option value="electric">{t('facilities.bedTypeElectric')}</option>
-                      <option value="icu">{t('facilities.bedTypeIcu')}</option>
-                    </select>
-                  </div>
-                  <div className="fac-form-group">
-                    <label>Tình Trạng</label>
-                    <select
-                      className="fac-form-control"
-                      value={formBedCondition}
-                      onChange={(e) => setFormBedCondition(e.target.value)}
-                    >
-                      <option value="good">Tốt</option>
-                      <option value="fair">Trung bình</option>
-                      <option value="broken">Hỏng</option>
-                    </select>
-                  </div>
+                <div className="fac-form-group">
+                  <label>Tình Trạng</label>
+                  <select
+                    className="fac-form-control"
+                    value={formBedCondition}
+                    onChange={(e) => setFormBedCondition(e.target.value)}
+                  >
+                    <option value="good">Tốt</option>
+                    <option value="fair">Trung bình</option>
+                    <option value="broken">Hỏng</option>
+                  </select>
                 </div>
                 <div className="fac-form-group">
                   <label>{t('facilities.fieldBedNotes')}</label>
@@ -2747,31 +2719,17 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                     required
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="fac-form-group">
-                    <label>{t('facilities.fieldBedType')}</label>
-                    <select
-                      className="fac-form-control"
-                      value={formBedType}
-                      onChange={(e) => setFormBedType(e.target.value)}
-                    >
-                      <option value="normal">{t('facilities.bedTypeNormal')}</option>
-                      <option value="electric">{t('facilities.bedTypeElectric')}</option>
-                      <option value="icu">{t('facilities.bedTypeIcu')}</option>
-                    </select>
-                  </div>
-                  <div className="fac-form-group">
-                    <label>Tình Trạng</label>
-                    <select
-                      className="fac-form-control"
-                      value={formBedCondition}
-                      onChange={(e) => setFormBedCondition(e.target.value)}
-                    >
-                      <option value="good">Tốt</option>
-                      <option value="fair">Trung bình</option>
-                      <option value="broken">Hỏng</option>
-                    </select>
-                  </div>
+                <div className="fac-form-group">
+                  <label>Tình Trạng</label>
+                  <select
+                    className="fac-form-control"
+                    value={formBedCondition}
+                    onChange={(e) => setFormBedCondition(e.target.value)}
+                  >
+                    <option value="good">Tốt</option>
+                    <option value="fair">Trung bình</option>
+                    <option value="broken">Hỏng</option>
+                  </select>
                 </div>
                 <div className="fac-form-group">
                   <label>{t('facilities.fieldBedStatus')}</label>
