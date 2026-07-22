@@ -31,6 +31,7 @@ export const roleSidebarData = {
     { title: 'sidebar.careTasks', icon: ClipboardList, path: '/doctor/care-tasks' },
     { title: 'sidebar.appointments', icon: Calendar, path: '/doctor/appointments' },
     { title: 'sidebar.mySchedule', icon: CalendarDays, path: '/doctor/schedule' },
+    { title: 'sidebar.activitySchedule', icon: Calendar, path: '/doctor/activity-schedule' },
     { title: 'sidebar.healthMonitoring', icon: HeartPulse, path: '/doctor/health-monitoring' },
     { title: 'sidebar.assignedResidents', icon: Users, path: '/doctor/assigned-residents' },
     { title: 'sidebar.drugAllergies', icon: Pill, path: '/doctor/residents/drug-allergies' },
@@ -73,6 +74,11 @@ export const roleSidebarData = {
       title: 'sidebar.dailyCareSchedule',
       icon: ClipboardList,
       path: '/caregiver/daily-care-schedule',
+    },
+    {
+      title: 'sidebar.activitySchedule',
+      icon: Calendar,
+      path: '/caregiver/activity-schedule',
     },
     {
       title: 'sidebar.mealIntakeNotes',

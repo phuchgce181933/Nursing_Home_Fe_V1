@@ -52,6 +52,18 @@ const getSeverityDisplay = (t) => ({
   critical: t('incidents.severity.critical'),
 });
 
+const getResolutionStatusLabel = (status) => {
+  const normalized = String(status || '').trim().toLowerCase().replace(/[-\s]+/g, '_');
+  const labels = {
+    in_progress: 'Đang tiến hành',
+    pending: 'Đang chờ xử lý',
+    resolved: 'Đã giải quyết',
+    completed: 'Đã hoàn tất',
+    closed: 'Đã đóng',
+  };
+  return labels[normalized] || status || '—';
+};
+
 function formatDate(value) {
   if (!value) return '—';
   return new Date(value).toLocaleString('vi-VN');
@@ -93,19 +105,24 @@ function IncidentManagementPage() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailIncident, setDetailIncident] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState(null);
   const [assignHandlersOpen, setAssignHandlersOpen] = useState(false);
   const [selectedHandlers, setSelectedHandlers] = useState([]);
   const [assigningHandlers, setAssigningHandlers] = useState(false);
   const [drawerJustOpened, setDrawerJustOpened] = useState(false);
   const [resolutionForm, setResolutionForm] = useState(null);
   const [resolutionFiles, setResolutionFiles] = useState([]);
+  const [resolutionFilePreviews, setResolutionFilePreviews] = useState([]);
   const [savingResolution, setSavingResolution] = useState(false);
+
+  const noResidentSelected = resolutionForm?.medical?.residentCondition === 'NoResident';
   const [clinicalServices, setClinicalServices] = useState([]);
   const [selectedClinicalServices, setSelectedClinicalServices] = useState({});
   const [medSuggestions] = useState(["Paracetamol", "Amoxicillin", "Ibuprofen", "Metformin", "Aspirin", "Omeprazole"]);
   const [medSuggestionOpenIndex, setMedSuggestionOpenIndex] = useState(-1);
   const immediateActionOptions = ['Lau sàn', 'Hỗ trợ cư dân', 'Gọi bác sĩ', 'Liên hệ gia đình', 'Chuyển viện', 'Khác'];
   const [staffAvailabilityMap, setStaffAvailabilityMap] = useState({});
+  const [assignmentConflicts, setAssignmentConflicts] = useState({});
 
   const isAdmin = String(user?.role || '').toLowerCase() === 'admin';
   const isCaregiver = String(user?.role || '').toLowerCase() === 'caregiver';
@@ -122,6 +139,55 @@ function IncidentManagementPage() {
     const role = staff?.role ? ` — ${staff.role.toUpperCase()}` : '';
     const email = staff?.email ? ` • ${staff.email}` : '';
     return `${name}${role}${email}`;
+  };
+
+  useEffect(() => {
+    // generate object URLs for image previews for resolution files
+    let mounted = true;
+    if (!resolutionFiles || !resolutionFiles.length) {
+      setResolutionFilePreviews([]);
+      return () => { mounted = false; };
+    }
+    const previews = resolutionFiles.map((file) => {
+      try {
+        const url = URL.createObjectURL(file);
+        return { file, url };
+      } catch (e) {
+        return { file, url: null };
+      }
+    });
+    if (mounted) setResolutionFilePreviews(previews);
+    return () => {
+      mounted = false;
+      (previews || []).forEach((p) => { if (p && p.url) URL.revokeObjectURL(p.url); });
+    };
+  }, [resolutionFiles]);
+
+  const handleResolutionFilesChange = (filesArray) => {
+    // revoke previous previews
+    (resolutionFilePreviews || []).forEach((p) => { if (p && p.url) { try { URL.revokeObjectURL(p.url); } catch (e) {} } });
+    const previews = (filesArray || []).map((file) => {
+      try { return { file, url: URL.createObjectURL(file) }; }
+      catch (e) { return { file, url: null }; }
+    });
+    setResolutionFiles(filesArray || []);
+    setResolutionFilePreviews(previews);
+  };
+
+  const removeResolutionFile = (index) => {
+    setResolutionFiles((prev) => {
+      const next = [...prev];
+      const removed = next.splice(index, 1);
+      return next;
+    });
+    setResolutionFilePreviews((prev) => {
+      const next = [...(prev || [])];
+      const removed = next.splice(index, 1);
+      if (removed && removed[0] && removed[0].url) {
+        try { URL.revokeObjectURL(removed[0].url); } catch (e) {}
+      }
+      return next;
+    });
   };
 
   useEffect(() => {
@@ -290,10 +356,117 @@ function IncidentManagementPage() {
 
   const getStaffAvailabilityLabel = (staff) => {
     const availability = getStaffAvailability(staff);
-    if (!availability) return '—';
+    const staffId = getStaffSelectionId(staff);
+    const conflict = assignmentConflicts[staffId];
+
+    if (!availability) {
+      if (conflict && Array.isArray(conflict.reasons) && conflict.reasons.length) {
+        return `${conflict.reasons.join(' · ')}`;
+      }
+      return '—';
+    }
+
     const status = availability.availabilityStatus || availability.readinessLabelVi || '—';
     const isOnDuty = availability.isOnShift || availability.onShift || availability.availabilityStatus === 'On Duty';
-    return isOnDuty ? `Đang đi làm · ${status}` : `Không trực · ${status}`;
+    const baseLabel = isOnDuty ? `Đang đi làm · ${status}` : `Không trực · ${status}`;
+
+    const formatConflictDetails = (conf) => {
+      if (!conf) return '';
+      const parts = [];
+      // Prefer full lists if available
+      // Show only tasks/appointments on the incident day when available
+      if (Array.isArray(conf.careTasksForDayTimes) && conf.careTasksForDayTimes.length) {
+        parts.push(`Nhiệm vụ trong ngày: ${conf.careTasksForDayTimes.join(', ')}`);
+      } else if (Array.isArray(conf.allCareTaskTimes) && conf.allCareTaskTimes.length) {
+        parts.push(`Nhiệm vụ: ${conf.allCareTaskTimes.join(', ')}`);
+      }
+
+      if (Array.isArray(conf.appointmentTimesForDay) && conf.appointmentTimesForDay.length) {
+        const formattedAppts = conf.appointmentTimesForDay.map((a) => {
+          try {
+            const d = new Date(a);
+            return d.toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+          } catch (e) {
+            return String(a);
+          }
+        });
+        parts.push(`Lịch khám trong ngày: ${formattedAppts.join(', ')}`);
+      } else if (Array.isArray(conf.allAppointmentTimes) && conf.allAppointmentTimes.length) {
+        const formattedAppts = conf.allAppointmentTimes.map((a) => {
+          try {
+            const d = new Date(a);
+            return d.toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
+          } catch (e) {
+            return String(a);
+          }
+        });
+        parts.push(`Lịch khám: ${formattedAppts.join(', ')}`);
+      }
+      // Fallback to human reasons if arrays missing
+      if (parts.length === 0 && Array.isArray(conf.reasons) && conf.reasons.length) {
+        parts.push(conf.reasons.join(', '));
+      }
+      return parts.join(' · ');
+    };
+
+    const conflictDetails = formatConflictDetails(conflict);
+    if (conflictDetails) return `${baseLabel} · ${conflictDetails}`;
+
+    return baseLabel;
+  };
+
+  const getStaffConflictBadge = (staff) => {
+    const staffId = getStaffSelectionId(staff);
+    const conflict = assignmentConflicts[staffId];
+    if (!conflict) return null;
+    if (!conflict.canAssign) {
+      return <span className="ic-availability ic-availability--conflict">Không thể chỉ định · {conflict.reasons.join(' · ')}</span>;
+    }
+    return null;
+  };
+
+  const isStaffConflicted = (staff) => {
+    const staffId = getStaffSelectionId(staff);
+    const conflict = assignmentConflicts[staffId];
+    if (!conflict) return false;
+    if (conflict.canAssign) return false;
+
+    // If incident time not set, treat as conflicted
+    if (!form.incidentAt) return true;
+
+    const incidentDate = new Date(form.incidentAt);
+    if (Number.isNaN(incidentDate.getTime())) return true;
+
+    const parseTaskTimeToDate = (timeStr) => {
+      if (!timeStr) return null;
+      // timeStr expected like '14:00' or '8:30'
+      const datePart = (form.incidentAt && form.incidentAt.split('T')[0]) || new Date().toISOString().slice(0, 10);
+      const normalized = timeStr.length === 5 ? timeStr : String(timeStr).slice(0,5);
+      const candidate = new Date(`${datePart}T${normalized}:00`);
+      return Number.isNaN(candidate.getTime()) ? null : candidate;
+    };
+
+    const times = [];
+    const careTimes = conflict.allCareTaskTimes || conflict.careTaskTimes || [];
+    careTimes.forEach((t) => {
+      const d = parseTaskTimeToDate(t);
+      if (d) times.push(d);
+    });
+    const apptTimes = conflict.allAppointmentTimes || conflict.appointmentTimes || [];
+    apptTimes.forEach((a) => {
+      try {
+        const d = new Date(a);
+        if (!Number.isNaN(d.getTime())) times.push(d);
+      } catch (e) {
+        // ignore
+      }
+    });
+
+    if (times.length === 0) return true;
+
+    // If ALL times are strictly before the incidentDate, then allow selection (not conflicted)
+    const allBefore = times.every((d) => d.getTime() < incidentDate.getTime());
+    return !allBefore;
   };
 
   const getReporterStaffSelectionId = (incident) => {
@@ -400,6 +573,39 @@ function IncidentManagementPage() {
     if (!user) return;
     loadIncidents();
   }, [user, search, statusFilter, page, pageSize, isAdmin, isCaregiver]);
+
+  useEffect(() => {
+    if (!isAdmin || !staffAccounts.length || !form.incidentAt) {
+      setAssignmentConflicts({});
+      return;
+    }
+
+    let active = true;
+    const loadConflicts = async () => {
+      try {
+        const staffProfileIds = staffAccounts
+          .map((staff) => getStaffSelectionId(staff))
+          .filter(Boolean);
+        if (!staffProfileIds.length) {
+          if (active) setAssignmentConflicts({});
+          return;
+        }
+        const response = await incidentService.getAssignmentConflicts({
+          incidentAt: form.incidentAt,
+          residentIds: form.residentIds,
+          staffProfileIds,
+        });
+        if (!active) return;
+        console.debug('[DEBUG] assignmentConflicts response', response);
+        setAssignmentConflicts(response?.conflicts || {});
+      } catch (error) {
+        if (active) setAssignmentConflicts({});
+      }
+    };
+
+    loadConflicts();
+    return () => { active = false; };
+  }, [isAdmin, staffAccounts, form.incidentAt, form.residentIds]);
 
   useEffect(() => {
     if (!isAdmin || !staffAccounts.length) {
@@ -547,6 +753,7 @@ function IncidentManagementPage() {
     setDetailOpen(true);
     setDetailLoading(true);
     setDetailIncident(null);
+    setDetailError(null);
     try {
       const data = await incidentService.getIncident(incidentId);
       setDetailIncident(data);
@@ -563,9 +770,9 @@ function IncidentManagementPage() {
       });
       setResolutionFiles([]);
     } catch (error) {
-      setMessageType('error');
-      setMessage(error?.response?.data?.message || t('incidents.error.loadFailed'));
-      setDetailOpen(false);
+      const msg = error?.response?.data?.message || t('incidents.error.loadFailed');
+      setDetailError(msg);
+      setDetailIncident(null);
     } finally {
       setDetailLoading(false);
     }
@@ -688,7 +895,7 @@ function IncidentManagementPage() {
 
       {/* ── Toast ──────────────────────────────────────────── */}
       {message && (
-        <div className={`ic-toast ic-toast--${messageType}`}>
+        <div className={`ic-toast ic-toast--${messageType}${drawerOpen || detailOpen ? ' ic-toast--floating' : ''}`}>
           {messageType === 'success' ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
           {message}
         </div>
@@ -891,17 +1098,21 @@ function IncidentManagementPage() {
       {/* ── Detail drawer ─────────────────────────────────── */}
       {detailOpen && (
         <>
-          <div className="ic-drawer-overlay" onClick={() => { setDetailOpen(false); setDetailIncident(null); }} />
+          <div className="ic-drawer-overlay" onClick={() => { setDetailOpen(false); setDetailIncident(null); setDetailError(null); }} />
           <div className="ic-drawer">
             <div className="ic-drawer__header">
               <h2 className="ic-drawer__title">{t('incidents.detail.title')}</h2>
-              <button type="button" className="ic-drawer__close" onClick={() => { setDetailOpen(false); setDetailIncident(null); }}>
+              <button type="button" className="ic-drawer__close" onClick={() => { setDetailOpen(false); setDetailIncident(null); setDetailError(null); }}>
                 <X size={20} />
               </button>
             </div>
             <div className="ic-drawer__body">
               {detailLoading ? (
                 <LoadingSpinner label={t('incidents.loading')} />
+              ) : detailError ? (
+                <div style={{ padding: 12, border: '1px solid #ffdddd', background: '#fff6f6', color: '#b00020', borderRadius: 6 }}>
+                  <strong>Lỗi:</strong> {detailError}
+                </div>
               ) : detailIncident ? (
                 <>
                   <div className="ic-form-grid">
@@ -1051,6 +1262,7 @@ function IncidentManagementPage() {
                             </div>
                           </div>
 
+                          {!noResidentSelected && (
                           <div className="ic-field ic-form-full">
                             <label className="ic-field__label">Chăm sóc y tế</label>
                             <div style={{ marginBottom: 8 }}>
@@ -1144,6 +1356,7 @@ function IncidentManagementPage() {
                               </div>
                             </div>
                           </div>
+                          )}
 
                           <div className="ic-field ic-form-full">
                             <label className="ic-field__label">Kết quả giải quyết *</label>
@@ -1152,7 +1365,24 @@ function IncidentManagementPage() {
 
                           <div className="ic-field">
                             <label className="ic-field__label">Đính kèm</label>
-                            <input type="file" multiple onChange={(e) => setResolutionFiles(Array.from(e.target.files || []))} />
+                            <input type="file" multiple onChange={(e) => handleResolutionFilesChange(Array.from(e.target.files || []))} />
+                            {resolutionFilePreviews && resolutionFilePreviews.length > 0 && (
+                              <div className="ic-attachments">
+                                {resolutionFilePreviews.map((p, idx) => (
+                                  <div key={idx} className="ic-attachment">
+                                    <div className="ic-attachment__thumb">
+                                      {p && p.url && p.file && p.file.type && p.file.type.startsWith('image/') ? (
+                                        <img src={p.url} alt={p.file.name} className="ic-attachment__img" />
+                                      ) : (
+                                        <div className="ic-attachment__placeholder">{p.file?.name || '—'}</div>
+                                      )}
+                                      <button type="button" className="ic-attachment__remove" onClick={() => removeResolutionFile(idx)} title="Xóa tệp">✕</button>
+                                    </div>
+                                    <div className="ic-attachment__name" title={p.file?.name}>{p.file?.name}</div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                           </div>
 
                           <div className="ic-field ic-form-full">
@@ -1215,7 +1445,7 @@ function IncidentManagementPage() {
                       <div>
                         {detailIncident.resolution ? (
                           <div>
-                            <div><strong>Trạng thái giải quyết:</strong> {detailIncident.resolution.status || '—'}</div>
+                            <div><strong>Trạng thái giải quyết:</strong> {getResolutionStatusLabel(detailIncident.resolution.status)}</div>
                             <div><strong>Phương pháp:</strong> {detailIncident.resolution.method || '—'}</div>
                             <div><strong>Nguyên nhân chính:</strong> {detailIncident.resolution.rootCause || '—'}</div>
                             <div><strong>Hành động ngay lập tức:</strong> {(detailIncident.resolution.immediateActions || []).join(', ') || '—'}</div>
@@ -1224,11 +1454,23 @@ function IncidentManagementPage() {
                             <div><strong>Thời gian hoàn thành:</strong> {detailIncident.resolution.completedAt ? new Date(detailIncident.resolution.completedAt).toLocaleString('vi-VN') : '—'}</div>
                             <div style={{ marginTop: 8 }}>
                               <strong>File đính kèm:</strong>
-                              <ul>
-                                {(detailIncident.resolution.attachments || []).map((att) => (
-                                  <li key={att.fileUrl}><a href={att.fileUrl} target="_blank" rel="noreferrer">{att.fileName || att.fileUrl}</a></li>
-                                ))}
-                              </ul>
+                              <div className="ic-detail-attachments">
+                                {(detailIncident.resolution.attachments || []).map((att) => {
+                                  const isImage = att.mimeType ? String(att.mimeType).startsWith('image/') : String(att.fileUrl || '').match(/\.(jpg|jpeg|png|webp|gif)(\?|$)/i);
+                                  return (
+                                    <div key={att.fileUrl} className="ic-detail-attachment">
+                                      {isImage ? (
+                                        <a href={att.fileUrl} target="_blank" rel="noreferrer">
+                                          <img src={att.fileUrl} alt={att.fileName || 'attachment'} className="ic-detail-attachment__img" />
+                                        </a>
+                                      ) : (
+                                        <div><a href={att.fileUrl} target="_blank" rel="noreferrer">{att.fileName || att.fileUrl}</a></div>
+                                      )}
+                                      <div className="ic-detail-attachment__name">{att.fileName || att.fileUrl}</div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
                             </div>
                           </div>
                         ) : (
@@ -1394,17 +1636,21 @@ function IncidentManagementPage() {
                           const staffId = getStaffSelectionId(staff);
                           const isChecked = form.assignedStaffIds.includes(staffId);
                           const availabilityLabel = getStaffAvailabilityLabel(staff);
+                          const conflictBadge = getStaffConflictBadge(staff);
+                          const conflicted = isStaffConflicted(staff);
+                          const itemClassName = `ic-multi-select-item${conflicted ? ' ic-multi-select-item--disabled' : ''}`;
                           return (
-                            <label key={staff._id} className="ic-multi-select-item">
+                            <label key={staff._id} className={itemClassName}>
                               <input
                                 type="checkbox"
                                 checked={isChecked}
                                 onChange={() => toggleAssignedStaff(staff)}
-                                disabled={optionsLoading}
+                                disabled={optionsLoading || conflicted}
                               />
                               <div className="ic-multi-select-item__label">
                                 <span className="ic-multi-select-item__name">{formatStaffLabel(staff)}</span>
                                 <span className={availabilityLabel.includes('Đang đi làm') ? 'ic-availability ic-availability--on' : 'ic-availability ic-availability--off'}>{availabilityLabel}</span>
+                                {conflictBadge}
                               </div>
                             </label>
                           );
@@ -1460,11 +1706,14 @@ function IncidentManagementPage() {
                       staffAccounts.map((staff) => {
                         const availabilityLabel = getStaffAvailabilityLabel(staff);
                         const staffId = getStaffSelectionId(staff);
+                        const conflicted = isStaffConflicted(staff);
+                        const itemClassName = `ic-multi-select-item${conflicted ? ' ic-multi-select-item--disabled' : ''}`;
                         return (
-                          <label key={staffId || staff._id || staff.id} className="ic-multi-select-item">
+                          <label key={staffId || staff._id || staff.id} className={itemClassName}>
                             <input
                               type="checkbox"
                               checked={selectedHandlers.includes(staffId)}
+                              disabled={conflicted}
                               onChange={(e) => {
                                 if (e.target.checked) {
                                   setSelectedHandlers([...selectedHandlers, staffId]);

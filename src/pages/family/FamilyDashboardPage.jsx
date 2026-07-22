@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AlertTriangle, CheckCircle, CreditCard, Package, Users, Wallet, PlusCircle, Bell, Search, ChevronDown } from 'lucide-react';
+import { AlertTriangle, Users, Wallet, PlusCircle, Bell, Search, ChevronDown } from 'lucide-react';
 import notificationsService from '../../services/notifications.service';
 import '../../styles/family/NotificationPage.css';
 import { useNavigate } from 'react-router-dom';
@@ -38,9 +38,17 @@ const getInitials = (name) => {
 const INVOICE_STATUS_LABELS = {
   PAID: 'Đã thanh toán',
   PARTIALLY_PAID: 'Thanh toán một phần',
+  CANCELLED: 'Đã hủy',
 };
 
 const getInvoiceStatusLabel = (status) => INVOICE_STATUS_LABELS[status] || 'Chưa thanh toán';
+
+const matchesInvoiceFilter = (invoice, filter) => {
+  const status = String(invoice?.status || '').toUpperCase();
+  if (filter === 'all') return true;
+  if (filter === 'paid') return status === 'PAID';
+  return !['PAID', 'CANCELLED'].includes(status);
+};
 
 const INVOICE_GROUPS = [
   { key: 'service', label: 'Hóa đơn dịch vụ', icon: '📋', theme: 'service', match: (inv) => inv.type === 'SERVICE' || !inv.type },
@@ -76,6 +84,7 @@ function FamilyDashboardPage() {
   const [bellItems, setBellItems] = useState([]);
   const [bellTab, setBellTab] = useState('all');
   const [residentSearch, setResidentSearch] = useState('');
+  const [invoiceFilter, setInvoiceFilter] = useState('unpaid');
   const [expandedResidentIds, setExpandedResidentIds] = useState(new Set());
   const [expandedInvoiceIds, setExpandedInvoiceIds] = useState(new Set());
   const navigate = useNavigate();
@@ -312,8 +321,8 @@ function FamilyDashboardPage() {
 
   const handleOpenPaymentModal = (resident) => {
     const invoices = invoicesList[resident._id] || [];
-    const serviceInvoices = invoices.filter(inv => (inv.type === 'SERVICE' || !inv.type) && inv.status !== 'PAID');
-    const medicationInvoices = invoices.filter(inv => inv.type === 'MEDICATION' && inv.status !== 'PAID');
+    const serviceInvoices = invoices.filter(inv => (inv.type === 'SERVICE' || !inv.type) && !['PAID', 'CANCELLED'].includes(String(inv.status || '').toUpperCase()));
+    const medicationInvoices = invoices.filter(inv => inv.type === 'MEDICATION' && !['PAID', 'CANCELLED'].includes(String(inv.status || '').toUpperCase()));
 
     if (serviceInvoices.length === 0 && medicationInvoices.length === 0) {
       setError('Không có hóa đơn chưa thanh toán để thanh toán.');
@@ -424,6 +433,10 @@ function FamilyDashboardPage() {
         (resident.residentCode || '').toLowerCase().includes(residentSearchQuery)
       )
     : residents;
+  const visibleResidentCount = filteredResidents.filter((resident) => {
+    if (invoiceFilter === 'all') return true;
+    return (invoicesList[resident._id] || []).some((invoice) => matchesInvoiceFilter(invoice, invoiceFilter));
+  }).length;
 
   return (
     <div className="page-family-dashboard">
@@ -588,7 +601,15 @@ function FamilyDashboardPage() {
               onChange={(event) => setResidentSearch(event.target.value)}
             />
           </div>
-          <span className="family-resident-count">{filteredResidents.length}/{residents.length} cư dân</span>
+          <label className="family-invoice-filter">
+            <span>Lọc hóa đơn</span>
+            <select value={invoiceFilter} onChange={(event) => setInvoiceFilter(event.target.value)}>
+              <option value="unpaid">Chưa thanh toán</option>
+              <option value="paid">Đã thanh toán</option>
+              <option value="all">Tất cả</option>
+            </select>
+          </label>
+          <span className="family-resident-count">{visibleResidentCount}/{residents.length} cư dân</span>
         </div>
       )}
 
@@ -599,8 +620,13 @@ function FamilyDashboardPage() {
           </div>
         )}
         {filteredResidents.map((resident) => {
-          const invoices = invoicesList[resident._id] || [];
+          const allInvoices = invoicesList[resident._id] || [];
+          const invoices = allInvoices.filter((invoice) => matchesInvoiceFilter(invoice, invoiceFilter));
+          if (invoiceFilter !== 'all' && invoices.length === 0) return null;
           const hasServicePackage = Boolean(resident.servicePackage);
+          const hasUnpaidServiceInvoice = allInvoices.some((invoice) =>
+            (invoice.type === 'SERVICE' || !invoice.type) && matchesInvoiceFilter(invoice, 'unpaid')
+          );
           const latestInvoice = invoices[0] || null;
 
           return (
@@ -617,6 +643,7 @@ function FamilyDashboardPage() {
               onOpenCheckout={handleOpenCheckout}
               onPayWithWallet={handlePayWithWallet}
               onCreateInvoice={handleCreateInvoice}
+              hasUnpaidServiceInvoice={hasUnpaidServiceInvoice}
               creatingInvoiceFor={creatingInvoiceFor}
               isWalletPaymentProcessing={isWalletPaymentProcessing}
               walletLoading={walletLoading}
@@ -665,9 +692,9 @@ function ResidentListItem({
   resident, invoices, latestInvoice, hasServicePackage,
   isExpanded, onToggle, expandedInvoiceIds, onToggleInvoice,
   onOpenCheckout, onPayWithWallet, onCreateInvoice,
-  creatingInvoiceFor, isWalletPaymentProcessing, walletLoading,
+  hasUnpaidServiceInvoice, creatingInvoiceFor, isWalletPaymentProcessing, walletLoading,
 }) {
-  const unpaidCount = invoices.filter((inv) => inv.status !== 'PAID').length;
+  const unpaidCount = invoices.filter((inv) => !['PAID', 'CANCELLED'].includes(String(inv.status || '').toUpperCase())).length;
 
   return (
     <article className={`family-resident-row ${isExpanded ? 'family-resident-row--open' : ''}`}>
@@ -682,17 +709,6 @@ function ResidentListItem({
         </span>
         <span className="family-resident-row__invoice-count">
           {invoices.length} hóa đơn{unpaidCount > 0 ? ` · ${unpaidCount} chưa thanh toán` : ''}
-        </span>
-        <span className="status-pill">
-          {latestInvoice ? (
-            latestInvoice.status === 'PAID' ? (
-              <span className="status-paid"><CheckCircle size={16} /> Đã thanh toán</span>
-            ) : (
-              <span className="status-due"><CreditCard size={16} /> Chưa thanh toán</span>
-            )
-          ) : (
-            <span className="status-empty"><Package size={16} /> Chưa có hóa đơn</span>
-          )}
         </span>
         <ChevronDown size={18} className="family-resident-row__chevron" />
       </button>
@@ -736,6 +752,14 @@ function ResidentListItem({
             {latestInvoice && latestInvoice.status === 'PAID' ? (
               <button type="button" className="button button-secondary" disabled>
                 Đã thanh toán hết
+              </button>
+            ) : latestInvoice && latestInvoice.status === 'CANCELLED' ? (
+              <button type="button" className="button button-secondary" disabled>
+                Hóa đơn đã hủy
+              </button>
+            ) : hasUnpaidServiceInvoice ? (
+              <button type="button" className="button button-secondary" disabled>
+                Đã có hóa đơn chưa thanh toán
               </button>
             ) : hasServicePackage && PACKAGE_PRICES[resident.servicePackage] ? (
               <button
@@ -799,6 +823,7 @@ function InvoiceRow({ invoice, theme, resident, isExpanded, onToggle, onOpenChec
   const invoiceStatus = invoice?.status?.toString().toUpperCase?.();
   const invoiceTotalAmount = invoice?.totalAmount ?? invoice?.total ?? 0;
   const isPaid = invoiceStatus === 'PAID';
+  const isCancelled = invoiceStatus === 'CANCELLED';
   const costFields = INVOICE_COST_FIELDS_BY_THEME[theme] || [];
 
   return (
@@ -808,7 +833,7 @@ function InvoiceRow({ invoice, theme, resident, isExpanded, onToggle, onOpenChec
         <span className="family-invoice-row__due">
           {invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString('vi-VN') : '-'}
         </span>
-        <span className={`family-invoice-row__status ${isPaid ? 'is-paid' : 'is-due'}`}>
+        <span className={`family-invoice-row__status ${isPaid ? 'is-paid' : isCancelled ? 'is-cancelled' : 'is-due'}`}>
           {getInvoiceStatusLabel(invoiceStatus)}
         </span>
         <span className="family-invoice-row__total">{formatMoney(invoiceTotalAmount)}</span>
@@ -840,7 +865,13 @@ function InvoiceRow({ invoice, theme, resident, isExpanded, onToggle, onOpenChec
             <strong>Tổng:</strong>
             <span>{formatMoney(invoiceTotalAmount)}</span>
           </div>
-          {!isPaid && (
+          {isCancelled && (
+            <div className="info-row" style={{ marginTop: '8px', color: '#64748b' }}>
+              <strong>Lý do hủy:</strong>
+              <span>{invoice.cancellationReason || 'Đã hủy do thay đổi gói dịch vụ.'}</span>
+            </div>
+          )}
+          {!isPaid && !isCancelled && (
             <div style={{ marginTop: '8px', display: 'flex', gap: '8px' }}>
               <button
                 type="button"

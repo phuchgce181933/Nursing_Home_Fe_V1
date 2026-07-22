@@ -277,6 +277,12 @@ table td {
   border: 1px solid #bfdbfe;
 }
 
+.contract-status-cancelled {
+  background-color: #f1f5f9;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+}
+
 /* Action Buttons */
 .btn-icon-primary {
   display: inline-flex;
