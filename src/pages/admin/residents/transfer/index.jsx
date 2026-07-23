@@ -256,7 +256,7 @@ export default function TransferResidentPage() {
       setLoadError(resolveApiError(e, t, 'admin.residents.transfer.loadTargetFailed'));
       setTargetsData(null);
       clearTargetSelections();
-      if (status === 404 || status === 400) setShowRouteHint(true);
+      if (status === 404) setShowRouteHint(true);
     } finally {
       if (
         requestFloorId === floorIdRef.current &&

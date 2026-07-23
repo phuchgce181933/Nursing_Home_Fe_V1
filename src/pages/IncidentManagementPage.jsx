@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Download,
   PlusCircle,
   Search,
+  Paperclip,
   AlertTriangle,
   ShieldAlert,
   Eye,
@@ -114,6 +115,8 @@ function IncidentManagementPage() {
   const [resolutionFiles, setResolutionFiles] = useState([]);
   const [resolutionFilePreviews, setResolutionFilePreviews] = useState([]);
   const [savingResolution, setSavingResolution] = useState(false);
+  const [reopenForm, setReopenForm] = useState(null);
+  const attachmentInputRef = useRef(null);
 
   const noResidentSelected = resolutionForm?.medical?.residentCondition === 'NoResident';
   const [clinicalServices, setClinicalServices] = useState([]);
@@ -139,6 +142,12 @@ function IncidentManagementPage() {
     const role = staff?.role ? ` — ${staff.role.toUpperCase()}` : '';
     const email = staff?.email ? ` • ${staff.email}` : '';
     return `${name}${role}${email}`;
+  };
+
+  const getTodayLocalDateString = () => {
+    const now = new Date();
+    const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+    return local.toISOString().slice(0, 10);
   };
 
   useEffect(() => {
@@ -172,6 +181,10 @@ function IncidentManagementPage() {
     });
     setResolutionFiles(filesArray || []);
     setResolutionFilePreviews(previews);
+  };
+
+  const handleAttachmentButtonClick = () => {
+    attachmentInputRef.current?.click();
   };
 
   const removeResolutionFile = (index) => {
@@ -391,16 +404,6 @@ function IncidentManagementPage() {
           }
         });
         parts.push(`Lịch khám trong ngày: ${formattedAppts.join(', ')}`);
-      } else if (Array.isArray(conf.allAppointmentTimes) && conf.allAppointmentTimes.length) {
-        const formattedAppts = conf.allAppointmentTimes.map((a) => {
-          try {
-            const d = new Date(a);
-            return d.toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
-          } catch (e) {
-            return String(a);
-          }
-        });
-        parts.push(`Lịch khám: ${formattedAppts.join(', ')}`);
       }
       // Fallback to human reasons if arrays missing
       if (parts.length === 0 && Array.isArray(conf.reasons) && conf.reasons.length) {
@@ -616,7 +619,7 @@ function IncidentManagementPage() {
     let active = true;
     const loadAvailability = async () => {
       try {
-        const today = new Date().toISOString().slice(0, 10);
+        const today = getTodayLocalDateString();
         const roles = ['nurse', 'doctor', 'caregiver', 'pharmacist'];
         const availabilityResponses = await Promise.all(
           roles.map((role) => staffService.getAvailability({ role, date: today }).catch(() => []))
@@ -723,6 +726,27 @@ function IncidentManagementPage() {
     }
   };
 
+  const handleReopen = async (newAssignedStaffIds = []) => {
+    if (!detailIncident?._id) return;
+    setDetailLoading(true);
+    try {
+      const payload = {
+        assignedStaffIds: newAssignedStaffIds && newAssignedStaffIds.length > 0 ? newAssignedStaffIds : detailIncident.assignedStaffIds || [],
+      };
+      await incidentService.reopenIncident(detailIncident._id, payload);
+      setMessageType('success');
+      setMessage('Đã mở lại sự cố');
+      setReopenForm(null);
+      await loadIncidents();
+      await handleViewDetail(detailIncident._id);
+    } catch (error) {
+      setMessageType('error');
+      setMessage(error?.response?.data?.message || 'Mở lại sự cố thất bại');
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
   const handleStatusUpdate = async (incidentId, status) => {
     setIsSaving(true);
     setMessage('');
@@ -759,13 +783,13 @@ function IncidentManagementPage() {
       setDetailIncident(data);
       // Initialize resolution form from incident
       setResolutionForm({
-        status: data?.resolution?.status || 'In Progress',
         method: data?.resolution?.method || '',
         rootCause: data?.resolution?.rootCause || '',
         detailedCause: data?.resolution?.detailedCause || '',
         immediateActions: data?.resolution?.immediateActions || [],
         medical: data?.resolution?.medical || { medications: [], procedures: [], residentCondition: '', needFollowUp: false },
-        result: data?.resolution?.result || '',
+        severityAssessment: data?.resolution?.severityAssessment || '',
+        escalationRequested: data?.resolution?.escalationRequested || false,
         notes: data?.resolution?.notes || '',
       });
       setResolutionFiles([]);
@@ -1002,13 +1026,29 @@ function IncidentManagementPage() {
                   return (
                     <tr key={incident._id}>
                       <td>
-                        <div className="ic-table-title">{incident.incidentType}</div>
+                        <div className="ic-table-title">
+                          {incident.incidentType}
+                          {incident.resolution?.escalationRequested && (
+                            <span style={{ marginLeft: 8, display: 'inline-block', background: '#fee2e2', color: '#dc2626', padding: '2px 8px', borderRadius: 4, fontSize: '0.7rem', fontWeight: 600 }}>🔴 CHUYỂN CẤP</span>
+                          )}
+                        </div>
                         <div className="ic-table-subtext">{incident.location || '—'}</div>
                       </td>
                       <td>
-                        <div className="ic-table-title">
+                        <div className="ic-table-title" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                           {Array.isArray(incident.residentIds) && incident.residentIds.length > 0
-                            ? incident.residentIds.map((resident) => resident?.fullName || resident).join(', ')
+                            ? (
+                                <>
+                                  {incident.residentIds.slice(0, 2).map((resident) => (
+                                    <div key={resident?._id || resident} style={{ fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                      {resident?.fullName || resident}
+                                    </div>
+                                  ))}
+                                  {incident.residentIds.length > 2 && (
+                                    <div style={{ fontSize: '0.9rem', color: '#64748b', fontStyle: 'italic' }}>... +{incident.residentIds.length - 2}</div>
+                                  )}
+                                </>
+                              )
                             : incident.residentId?.fullName || incident.residentId || t('incidents.unknownResident')}
                         </div>
                         <div className="ic-table-subtext">{incident.reporterName || incident.reporterEmail || t('incidents.unknown')}</div>
@@ -1113,56 +1153,136 @@ function IncidentManagementPage() {
                 <div style={{ padding: 12, border: '1px solid #ffdddd', background: '#fff6f6', color: '#b00020', borderRadius: 6 }}>
                   <strong>Lỗi:</strong> {detailError}
                 </div>
+              ) : reopenForm ? (
+                <div>
+                  <h3 style={{ marginBottom: 16 }}>Mở lại sự cố - Chỉ định nhân viên</h3>
+                  <div className="ic-field ic-form-full" style={{ marginBottom: 16 }}>
+                    <label className="ic-field__label">Nhân viên xử lý *</label>
+                    <div className="ic-field--multi-select">
+                      <div className="ic-multi-select-filters" style={{ marginBottom: 10 }}>
+                        <input
+                          type="text"
+                          className="ic-multi-select-search"
+                          placeholder="Tìm nhân viên..."
+                          onChange={(e) => {
+                            const query = e.target.value.toLowerCase();
+                            const filtered = staffAccounts.filter(
+                              (staff) => !reopenForm.selectedStaffIds?.includes(getStaffSelectionId(staff)) &&
+                                formatStaffLabel(staff).toLowerCase().includes(query)
+                            );
+                            setReopenForm((s) => ({ ...s, filteredStaff: filtered }));
+                          }}
+                        />
+                      </div>
+                      <div className="ic-multi-select-list">
+                        {(reopenForm.filteredStaff || staffAccounts).map((staff) => {
+                          const staffId = getStaffSelectionId(staff);
+                          const availabilityLabel = getStaffAvailabilityLabel(staff);
+                          return (
+                            <label key={staffId || staff._id} className="ic-multi-select-item">
+                              <input
+                                type="checkbox"
+                                checked={(reopenForm.selectedStaffIds || []).includes(staffId)}
+                                onChange={(e) => {
+                                  const next = e.target.checked
+                                    ? [...(reopenForm.selectedStaffIds || []), staffId]
+                                    : (reopenForm.selectedStaffIds || []).filter((id) => id !== staffId);
+                                  setReopenForm((s) => ({ ...s, selectedStaffIds: next }));
+                                }}
+                              />
+                              <div className="ic-multi-select-item__label">
+                                <span className="ic-multi-select-item__name">{formatStaffLabel(staff)}</span>
+                                <span className={availabilityLabel.includes('Đang đi làm') ? 'ic-availability ic-availability--on' : 'ic-availability ic-availability--off'}>{availabilityLabel}</span>
+                              </div>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button type="button" className="ic-btn ic-btn--secondary" onClick={() => setReopenForm(null)}>Hủy</button>
+                    <button type="button" className="ic-btn ic-btn--primary" onClick={() => handleReopen(reopenForm.selectedStaffIds)}>
+                      Xác nhận mở lại
+                    </button>
+                  </div>
+                </div>
               ) : detailIncident ? (
                 <>
                   <div className="ic-form-grid">
                     <div className="ic-field">
                       <label className="ic-field__label">{t('incidents.form.incidentType')}</label>
-                      <div className="ic-field__input" style={{ minHeight: 40, display: 'flex', alignItems: 'center' }}>{detailIncident.incidentType}</div>
+                      <div className="ic-field__input ic-field__input--display">{detailIncident.incidentType}</div>
                     </div>
                     <div className="ic-field">
                       <label className="ic-field__label">{t('incidents.form.severity')}</label>
-                      <div className="ic-field__input" style={{ minHeight: 40, display: 'flex', alignItems: 'center' }}>{SEVERITY_DISPLAY[detailIncident.severity] || detailIncident.severity}</div>
+                      <div className="ic-field__input ic-field__input--display">
+                        <span className={`ic-severity ic-severity--${detailIncident.severity}`}>{SEVERITY_DISPLAY[detailIncident.severity] || detailIncident.severity}</span>
+                      </div>
                     </div>
                     <div className="ic-field">
                       <label className="ic-field__label">{t('incidents.form.status')}</label>
-                      <div className="ic-field__input" style={{ minHeight: 40, display: 'flex', alignItems: 'center' }}>{STATUS_DISPLAY[detailIncident.status] || detailIncident.status}</div>
+                      <div className="ic-field__input ic-field__input--display">
+                        <span className={`ic-badge ic-badge--${detailIncident.status}`}>{STATUS_DISPLAY[detailIncident.status] || detailIncident.status}</span>
+                      </div>
                     </div>
                     <div className="ic-field">
                       <label className="ic-field__label">{t('incidents.form.incidentAt')}</label>
-                      <div className="ic-field__input" style={{ minHeight: 40, display: 'flex', alignItems: 'center' }}>{formatDate(detailIncident.incidentAt)}</div>
+                      <div className="ic-field__input ic-field__input--display">{formatDate(detailIncident.incidentAt)}</div>
                     </div>
                     <div className="ic-field">
                       <label className="ic-field__label">{t('incidents.form.location')}</label>
-                      <div className="ic-field__input" style={{ minHeight: 40, display: 'flex', alignItems: 'center' }}>{detailIncident.location || '—'}</div>
+                      <div className="ic-field__input ic-field__input--display">{detailIncident.location || '—'}</div>
                     </div>
                     <div className="ic-field">
                       <label className="ic-field__label">{t('incidents.form.resident')}</label>
-                      <div className="ic-field__input" style={{ minHeight: 40, display: 'flex', alignItems: 'center' }}>
+                      <div className="ic-field__input ic-field__input--display">
                         {Array.isArray(detailIncident.residentIds) && detailIncident.residentIds.length > 0
-                          ? detailIncident.residentIds.map((resident) => resident?.fullName || resident).join(', ')
+                          ? (
+                              <>
+                                {detailIncident.residentIds.slice(0, 3).map((resident) => (
+                                  <div key={resident?._id || resident} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>
+                                    {resident?.fullName || resident}
+                                  </div>
+                                ))}
+                                {detailIncident.residentIds.length > 3 && (
+                                  <div style={{ color: '#64748b', fontStyle: 'italic' }}>... +{detailIncident.residentIds.length - 3} cư dân khác</div>
+                                )}
+                              </>
+                            )
                           : detailIncident.residentId?.fullName || detailIncident.residentId || t('incidents.unknownResident')}
                       </div>
                     </div>
                     <div className="ic-field">
                       <label className="ic-field__label">{t('incidents.form.assignedStaff')}</label>
-                      <div className="ic-field__input" style={{ minHeight: 40, display: 'flex', alignItems: 'center' }}>
+                      <div className="ic-field__input ic-field__input--display">
                         {Array.isArray(detailIncident.assignedStaffIds) && detailIncident.assignedStaffIds.length > 0
-                          ? detailIncident.assignedStaffIds.map((staff) => staff?.userId?.fullName || staff?.fullName || staff?.userId?.email || staff?.email || '—').join(', ')
+                          ? (
+                              <>
+                                {detailIncident.assignedStaffIds.slice(0, 3).map((staff) => (
+                                  <div key={staff?._id || staff?.userId?._id || staff?.userId} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>
+                                    {staff?.userId?.fullName || staff?.fullName || staff?.userId?.email || staff?.email || '—'}
+                                  </div>
+                                ))}
+                                {detailIncident.assignedStaffIds.length > 3 && (
+                                  <div style={{ color: '#64748b', fontStyle: 'italic' }}>... +{detailIncident.assignedStaffIds.length - 3} nhân viên khác</div>
+                                )}
+                              </>
+                            )
                           : '—'}
                       </div>
                     </div>
                     <div className="ic-field ic-form-full">
                       <label className="ic-field__label">{t('incidents.form.description')}</label>
-                      <div className="ic-field__textarea" style={{ minHeight: 100, whiteSpace: 'pre-wrap' }}>{detailIncident.description || '—'}</div>
+                      <div className="ic-field__textarea ic-field__textarea--display" style={{ minHeight: 100, whiteSpace: 'pre-wrap' }}>{detailIncident.description || '—'}</div>
                     </div>
                     <div className="ic-field">
                       <label className="ic-field__label">{t('incidents.reporter')}</label>
-                      <div className="ic-field__input" style={{ minHeight: 40, display: 'flex', alignItems: 'center' }}>{detailIncident.reporterName || detailIncident.reporterEmail || t('incidents.unknown')}</div>
+                      <div className="ic-field__input ic-field__input--display">{detailIncident.reporterName || detailIncident.reporterEmail || t('incidents.unknown')}</div>
                     </div>
                     <div className="ic-field">
                       <label className="ic-field__label">{t('incidents.reporterRole')}</label>
-                      <div className="ic-field__input" style={{ minHeight: 40, display: 'flex', alignItems: 'center' }}>{detailIncident.reporterRole || '—'}</div>
+                      <div className="ic-field__input ic-field__input--display">{detailIncident.reporterRole || '—'}</div>
                     </div>
                   </div>
                   {/* Assign Handlers Button for Admins */}
@@ -1186,15 +1306,6 @@ function IncidentManagementPage() {
                     {detailIncident.status === 'investigating' ? (
                       resolutionForm ? (
                         <div>
-                          <div className="ic-field">
-                            <label className="ic-field__label">Trạng thái giải quyết *</label>
-                            <select className="ic-field__select" value={resolutionForm.status} onChange={(e) => setResolutionForm((s) => ({ ...s, status: e.target.value }))}>
-                              <option value="In Progress">Đang tiến hành</option>
-                              <option value="Resolved">Đã giải quyết</option>
-                              <option value="Escalated">Đã nâng cấp</option>
-                            </select>
-                          </div>
-
                           <div className="ic-field">
                             <label className="ic-field__label">Phương pháp giải quyết *</label>
                             <input className="ic-field__input" value={resolutionForm.method} onChange={(e) => setResolutionForm((s) => ({ ...s, method: e.target.value }))} />
@@ -1262,110 +1373,47 @@ function IncidentManagementPage() {
                             </div>
                           </div>
 
-                          {!noResidentSelected && (
                           <div className="ic-field ic-form-full">
-                            <label className="ic-field__label">Chăm sóc y tế</label>
-                            <div style={{ marginBottom: 8 }}>
-                              <button type="button" className="ic-btn ic-btn--secondary" onClick={() => {
-                                setResolutionForm((s) => ({ ...s, medical: { ...s.medical, medications: [...(s.medical?.medications || []), { name: '', dose: '', time: '' }] } }));
-                              }}>+ Thêm thuốc</button>
-                            </div>
-                            {(resolutionForm.medical?.medications || []).map((med, idx) => (
-                            <div key={idx} style={{ display: 'flex', gap: 8, marginBottom: 6, alignItems: 'center' }}>
-                              <div style={{ position: 'relative', flex: 1 }}>
-                                <input placeholder="Tên thuốc" value={med.name} onChange={(e) => {
-                                  const next = [...resolutionForm.medical.medications]; next[idx].name = e.target.value; setResolutionForm((s) => ({ ...s, medical: { ...s.medical, medications: next } }));
-                                  setMedSuggestionOpenIndex(idx);
-                                }} onFocus={() => setMedSuggestionOpenIndex(idx)} />
-                                {medSuggestionOpenIndex === idx && med.name && (
-                                  <ul style={{ position: 'absolute', left: 0, right: 0, background: '#fff', border: '1px solid #ddd', zIndex: 10, maxHeight: 120, overflow: 'auto', marginTop: 4, padding: 6, borderRadius: 4 }}>
-                                    {medSuggestions.filter(s => s.toLowerCase().includes(med.name.toLowerCase())).map((sug) => (
-                                      <li key={sug} style={{ padding: 6, cursor: 'pointer' }} onMouseDown={(ev) => { ev.preventDefault(); const next = [...resolutionForm.medical.medications]; next[idx].name = sug; setResolutionForm((s) => ({ ...s, medical: { ...s.medical, medications: next } })); setMedSuggestionOpenIndex(-1); }}>{sug}</li>
-                                    ))}
-                                  </ul>
-                                )}
+                            <label className="ic-field__label">Đánh giá mức độ nghiêm trọng *</label>
+                            <select className="ic-field__select" value={resolutionForm.severityAssessment} onChange={(e) => setResolutionForm((s) => ({ ...s, severityAssessment: e.target.value }))}>
+                              <option value="">-- Chọn mức độ --</option>
+                              <option value="Thấp">Thấp</option>
+                              <option value="Trung bình">Trung bình</option>
+                              <option value="Cao">Cao</option>
+                              <option value="Khẩn cấp">Khẩn cấp</option>
+                            </select>
+                            {resolutionForm.severityAssessment && (
+                              <div className="ic-severity-description">
+                                {resolutionForm.severityAssessment === 'Thấp' && 'Không ảnh hưởng nhiều, xử lý thông thường'}
+                                {resolutionForm.severityAssessment === 'Trung bình' && 'Ảnh hưởng đến cư dân hoặc hoạt động'}
+                                {resolutionForm.severityAssessment === 'Cao' && 'Cần xử lý ưu tiên'}
+                                {resolutionForm.severityAssessment === 'Khẩn cấp' && 'Đe dọa tính mạng hoặc an toàn'}
                               </div>
-                              <input placeholder="Liều" value={med.dose} onChange={(e) => {
-                                const next = [...resolutionForm.medical.medications]; next[idx].dose = e.target.value; setResolutionForm((s) => ({ ...s, medical: { ...s.medical, medications: next } }));
-                              }} style={{ width: 120 }} />
-                              <input placeholder="Thời gian" value={med.time} onChange={(e) => {
-                                const next = [...resolutionForm.medical.medications]; next[idx].time = e.target.value; setResolutionForm((s) => ({ ...s, medical: { ...s.medical, medications: next } }));
-                              }} style={{ width: 120 }} />
-                              <button type="button" className="ic-btn ic-btn--danger" onClick={() => {
-                                const next = [...(resolutionForm.medical?.medications || [])]; next.splice(idx, 1); setResolutionForm((s) => ({ ...s, medical: { ...s.medical, medications: next } }));
-                              }} style={{ background: '#ff6b6b', color: '#fff', border: 'none', padding: '6px 8px', borderRadius: 4 }}>Xóa</button>
-                            </div>
-                            ))}
-
-                            <div style={{ marginTop: 8 }}>
-                              {(clinicalServices.length > 0 ? clinicalServices : []).map((svc) => {
-                                const selected = !!selectedClinicalServices[svc._id];
-                                return (
-                                  <div key={svc._id} style={{ display: 'grid', gap: 6, marginBottom: 6 }}>
-                                    <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                                      <input type="checkbox" checked={selected || (resolutionForm.medical?.procedures || []).includes(svc.serviceName)} onChange={(e) => {
-                                        const procs = resolutionForm.medical?.procedures || [];
-                                        if (e.target.checked) {
-                                          // add procedure name
-                                          setResolutionForm((s) => ({ ...s, medical: { ...s.medical, procedures: [...procs, svc.serviceName] } }));
-                                          setSelectedClinicalServices((prev) => ({ ...prev, [svc._id]: { ...svc, fieldValues: {} } }));
-                                        } else {
-                                          setResolutionForm((s) => ({ ...s, medical: { ...s.medical, procedures: procs.filter((p) => p !== svc.serviceName) } }));
-                                          setSelectedClinicalServices((prev) => { const copy = { ...prev }; delete copy[svc._id]; return copy; });
-                                        }
-                                      }} />
-                                      <span>{svc.serviceName}</span>
-                                    </label>
-
-                                    {selected && svc.fields && svc.fields.length > 0 && (
-                                      <div style={{ padding: '8px 12px', border: '1px solid #eef2f7', borderRadius: 6, marginLeft: 20 }}>
-                                        <div style={{ fontWeight: 700, marginBottom: 6 }}>{svc.serviceName} — Thông tin</div>
-                                        {svc.fields.map((field) => {
-                                          const value = getSelectedClinicalServiceFieldValue(svc._id, field.fieldCode);
-                                          return (
-                                            <div key={field.fieldCode} style={{ marginBottom: 8 }}>
-                                              <label style={{ display: 'block', marginBottom: 6 }}>{field.label}{field.required ? ' *' : ''}</label>
-                                              {field.type === 'NUMBER' ? (
-                                                <input type="number" className="ic-field__input" placeholder={field.placeholder || ''} value={value} onChange={(e) => setSelectedClinicalServiceFieldValue(svc._id, field.fieldCode, e.target.value)} />
-                                              ) : field.type === 'DROPDOWN' ? (
-                                                <select className="ic-field__select" value={value} onChange={(e) => setSelectedClinicalServiceFieldValue(svc._id, field.fieldCode, e.target.value)}>
-                                                  <option value="">-- Chọn --</option>
-                                                  {(Array.isArray(field.options) ? field.options : []).map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                                                </select>
-                                              ) : (
-                                                <input type="text" className="ic-field__input" placeholder={field.placeholder || ''} value={value} onChange={(e) => setSelectedClinicalServiceFieldValue(svc._id, field.fieldCode, e.target.value)} />
-                                              )}
-                                            </div>
-                                          );
-                                        })}
-                                      </div>
-                                    )}
-                                  </div>
-                                );
-                              })}
-                              {(resolutionForm.medical?.procedures || []).includes('Khác') && (
-                                <input className="ic-field__input" placeholder="Mô tả dịch vụ khác" value={resolutionForm.medical?.proceduresOther || ''} onChange={(e) => setResolutionForm((s) => ({ ...s, medical: { ...s.medical, proceduresOther: e.target.value } }))} />
-                              )}
-                            </div>
-
-                            <div style={{ marginTop: 8 }}>
-                              <label className="ic-field__label">Cần theo dõi</label>
-                              <div>
-                                <label style={{ marginRight: 12 }}><input type="radio" name="followup" checked={resolutionForm.medical?.needFollowUp === true} onChange={() => setResolutionForm((s) => ({ ...s, medical: { ...s.medical, needFollowUp: true } }))} /> Có</label>
-                                <label><input type="radio" name="followup" checked={resolutionForm.medical?.needFollowUp === false} onChange={() => setResolutionForm((s) => ({ ...s, medical: { ...s.medical, needFollowUp: false } }))} /> Không</label>
-                              </div>
-                            </div>
+                            )}
                           </div>
-                          )}
 
-                          <div className="ic-field ic-form-full">
-                            <label className="ic-field__label">Kết quả giải quyết *</label>
-                            <textarea className="ic-field__textarea" rows={3} value={resolutionForm.result} onChange={(e) => setResolutionForm((s) => ({ ...s, result: e.target.value }))} />
+                          <div className="ic-field">
+                            <label style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer' }}>
+                              <input type="checkbox" checked={resolutionForm.escalationRequested || false} onChange={(e) => setResolutionForm((s) => ({ ...s, escalationRequested: e.target.checked }))} />
+                              <span>Yêu cầu chuyển cấp</span>
+                            </label>
                           </div>
 
                           <div className="ic-field">
                             <label className="ic-field__label">Đính kèm</label>
-                            <input type="file" multiple onChange={(e) => handleResolutionFilesChange(Array.from(e.target.files || []))} />
+                            <div className="ic-attachment-picker">
+                              <button type="button" className="ic-btn ic-btn--secondary ic-btn--upload" onClick={handleAttachmentButtonClick}>
+                                <Paperclip size={16} />
+                                {resolutionFiles.length > 0 ? `Đã chọn ${resolutionFiles.length} tệp` : 'Chọn tệp đính kèm'}
+                              </button>
+                              <input
+                                ref={attachmentInputRef}
+                                type="file"
+                                multiple
+                                className="ic-attachment-input"
+                                onChange={(e) => handleResolutionFilesChange(Array.from(e.target.files || []))}
+                              />
+                            </div>
                             {resolutionFilePreviews && resolutionFilePreviews.length > 0 && (
                               <div className="ic-attachments">
                                 {resolutionFilePreviews.map((p, idx) => (
@@ -1390,9 +1438,9 @@ function IncidentManagementPage() {
                             <textarea className="ic-field__textarea" rows={2} value={resolutionForm.notes} onChange={(e) => setResolutionForm((s) => ({ ...s, notes: e.target.value }))} />
                           </div>
 
-                          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                            <button type="button" className="ic-btn ic-btn--secondary" onClick={() => { setResolutionForm(null); setResolutionFiles([]); }}>{t('incidents.form.cancel') || 'Hủy'}</button>
-                            <button type="button" className="ic-btn ic-btn--secondary" disabled={savingResolution} onClick={async () => {
+                          <div className="ic-resolution-actions">
+                            <button type="button" className="ic-btn ic-btn--secondary" onClick={() => { setResolutionForm(null); setResolutionFiles([]); setSelectedClinicalServices({}); }}>{t('incidents.form.cancel') || 'Hủy'}</button>
+                            <button type="button" className="ic-btn ic-btn--secondary ic-btn--action" disabled={savingResolution} onClick={async () => {
                               // Save draft
                               setSavingResolution(true);
                               try {
@@ -1413,10 +1461,10 @@ function IncidentManagementPage() {
                                 setMessageType('error'); setMessage(err?.response?.data?.message || 'Lưu nháp thất bại');
                               } finally { setSavingResolution(false); }
                             }}>{t('incidents.form.saveDraft') || 'Lưu nháp'}</button>
-                            <button type="button" className="ic-btn ic-btn--primary" disabled={savingResolution} onClick={async () => {
+                            <button type="button" className="ic-btn ic-btn--primary ic-btn--action" disabled={savingResolution} onClick={async () => {
                               // Mark as resolved
-                              if (!resolutionForm.result || !resolutionForm.method || !resolutionForm.rootCause) {
-                                setMessageType('error'); setMessage('Vui lòng điền đầy đủ: Phương pháp, Nguyên nhân chính và Kết quả');
+                              if (!resolutionForm.severityAssessment || !resolutionForm.method || !resolutionForm.rootCause) {
+                                setMessageType('error'); setMessage('Vui lòng điền đầy đủ: Phương pháp, Nguyên nhân chính và Đánh giá mức độ');
                                 return;
                               }
                               setSavingResolution(true);
@@ -1445,11 +1493,82 @@ function IncidentManagementPage() {
                       <div>
                         {detailIncident.resolution ? (
                           <div>
-                            <div><strong>Trạng thái giải quyết:</strong> {getResolutionStatusLabel(detailIncident.resolution.status)}</div>
-                            <div><strong>Phương pháp:</strong> {detailIncident.resolution.method || '—'}</div>
-                            <div><strong>Nguyên nhân chính:</strong> {detailIncident.resolution.rootCause || '—'}</div>
-                            <div><strong>Hành động ngay lập tức:</strong> {(detailIncident.resolution.immediateActions || []).join(', ') || '—'}</div>
-                            <div><strong>Kết quả:</strong> {detailIncident.resolution.result || '—'}</div>
+                            {detailIncident.resolution.escalationRequested && (
+                              <div style={{ marginBottom: 16, padding: 12, background: '#fee2e2', border: '2px solid #dc2626', borderRadius: 6, color: '#7f1d1d' }}>
+                                <div style={{ fontWeight: 600, marginBottom: 4 }}>🔴 Nhân viên yêu cầu chuyển cấp</div>
+                                <div style={{ fontSize: '0.9rem' }}>Vui lòng đánh giá lại tình huống và quyết định xử lý tiếp theo</div>
+                              </div>
+                            )}
+                            <div style={{ marginBottom: 12, padding: 12, background: '#f3f4f6', borderRadius: 6 }}>
+                              <div style={{ marginBottom: 8 }}>
+                                <strong>Phương pháp:</strong> 
+                                <span style={{ marginLeft: 8, color: detailIncident.resolution.method ? '#333' : '#ef4444', fontWeight: detailIncident.resolution.method ? '400' : '600' }}>
+                                  {detailIncident.resolution.method || 'chưa rõ'}
+                                </span>
+                              </div>
+                              <div style={{ marginBottom: 8 }}>
+                                <strong>Nguyên nhân chính:</strong>
+                                <span style={{ marginLeft: 8, color: detailIncident.resolution.rootCause ? '#333' : '#ef4444', fontWeight: detailIncident.resolution.rootCause ? '400' : '600' }}>
+                                  {detailIncident.resolution.rootCause || 'Unknown'}
+                                </span>
+                              </div>
+                              <div style={{ marginBottom: 8 }}>
+                                <strong>Hành động ngay lập tức:</strong>
+                                <span style={{ marginLeft: 8, color: (detailIncident.resolution.immediateActions || []).length > 0 ? '#333' : '#9ca3af' }}>
+                                  {(detailIncident.resolution.immediateActions || []).length > 0 
+                                    ? (detailIncident.resolution.immediateActions || []).map((action, idx) => (
+                                        <span key={idx} style={{ display: 'inline-block', background: '#dbeafe', color: '#1e40af', padding: '2px 8px', borderRadius: 4, marginRight: 4, marginBottom: 4 }}>
+                                          {action}
+                                        </span>
+                                      ))
+                                    : '—'
+                                  }
+                                </span>
+                              </div>
+                              <div>
+                                <strong>Mức độ nghiêm trọng:</strong>
+                                <span style={{ marginLeft: 8 }}>
+                                  {detailIncident.resolution.severityAssessment ? (
+                                    <span style={{ 
+                                      display: 'inline-block',
+                                      padding: '4px 8px',
+                                      borderRadius: 4,
+                                      background: detailIncident.resolution.severityAssessment === 'Thấp' 
+                                        ? '#dbeafe' 
+                                        : detailIncident.resolution.severityAssessment === 'Trung bình'
+                                        ? '#fed7aa'
+                                        : detailIncident.resolution.severityAssessment === 'Cao'
+                                        ? '#fecaca'
+                                        : '#fca5a5',
+                                      color: detailIncident.resolution.severityAssessment === 'Thấp'
+                                        ? '#1e40af'
+                                        : detailIncident.resolution.severityAssessment === 'Trung bình'
+                                        ? '#9a3412'
+                                        : detailIncident.resolution.severityAssessment === 'Cao'
+                                        ? '#991b1b'
+                                        : '#7f1d1d',
+                                      fontWeight: 600
+                                    }}>
+                                      {detailIncident.resolution.severityAssessment}
+                                      {detailIncident.resolution.severityAssessment === 'Thấp' 
+                                        ? ' - Không ảnh hưởng nhiều, xử lý thông thường' 
+                                        : detailIncident.resolution.severityAssessment === 'Trung bình'
+                                        ? ' - Ảnh hưởng đến cư dân hoặc hoạt động'
+                                        : detailIncident.resolution.severityAssessment === 'Cao'
+                                        ? ' - Cần xử lý ưu tiên'
+                                        : ' - Đe dọa tính mạng hoặc an toàn'}
+                                    </span>
+                                  ) : '—'}
+                                </span>
+                              </div>
+                            </div>
+                            {detailIncident.resolution.escalationRequested && detailIncident.status === 'resolved' && (
+                              <div style={{ marginBottom: 16 }}>
+                                <button type="button" className="ic-btn ic-btn--primary" onClick={() => setReopenForm({ selectedStaffIds: [], filteredStaff: staffAccounts })}>
+                                  ↻ Mở lại sự cố và chỉ định người xử lý
+                                </button>
+                              </div>
+                            )}
                             <div><strong>Ghi chú:</strong> {detailIncident.resolution.notes || '—'}</div>
                             <div><strong>Thời gian hoàn thành:</strong> {detailIncident.resolution.completedAt ? new Date(detailIncident.resolution.completedAt).toLocaleString('vi-VN') : '—'}</div>
                             <div style={{ marginTop: 8 }}>
@@ -1559,6 +1678,32 @@ function IncidentManagementPage() {
 
                 <div className="ic-field ic-field--multi-select">
                   <label className="ic-field__label">{t('incidents.form.resident')}</label>
+                  
+                  {/* Display selected residents as tags */}
+                  {form.residentIds.length > 0 && (
+                    <div className="ic-selected-tags">
+                      {form.residentIds.map((residentId) => {
+                        const resident = residents.find((r) => r._id === residentId);
+                        if (!resident) return null;
+                        return (
+                          <div key={residentId} className="ic-tag">
+                            <span className="ic-tag__name" title={formatResidentLabel(resident)}>
+                              {formatResidentLabel(resident)}
+                            </span>
+                            <button
+                              type="button"
+                              className="ic-tag__remove"
+                              onClick={() => toggleResident(residentId)}
+                              title={t('incidents.form.removeResident') || 'Xóa'}
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  
                   <div className="ic-multi-select-filters">
                     <select
                       className="ic-field__select"
@@ -1607,6 +1752,32 @@ function IncidentManagementPage() {
                 {canAssignHandlers && (
                   <div className="ic-field ic-field--multi-select">
                     <label className="ic-field__label">{t('incidents.form.assignedStaff')}</label>
+                    
+                    {/* Display selected staff as tags */}
+                    {form.assignedStaffIds.length > 0 && (
+                      <div className="ic-selected-tags">
+                        {form.assignedStaffIds.map((staffId) => {
+                          const staff = staffAccounts.find((s) => getStaffSelectionId(s) === staffId);
+                          if (!staff) return null;
+                          return (
+                            <div key={staffId} className="ic-tag">
+                              <span className="ic-tag__name" title={formatStaffLabel(staff)}>
+                                {formatStaffLabel(staff)}
+                              </span>
+                              <button
+                                type="button"
+                                className="ic-tag__remove"
+                                onClick={() => toggleAssignedStaff(staff)}
+                                title={t('incidents.form.removeStaff') || 'Xóa'}
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    
                     <div className="ic-multi-select-filters">
                       <select
                         className="ic-field__select"

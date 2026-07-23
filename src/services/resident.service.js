@@ -760,8 +760,8 @@ export const RESIDENT_DRUG_ALLERGIES_ROUTE_HINT =
   'Đặt GET /residents/drug-allergies trước /:residentId và mount PUT|POST /:id/drug-allergies.';
 
 export const RESIDENT_TRANSFER_ROUTE_HINT =
-  'Backend chưa có route chuyển phòng cư dân (/transfer-room). ' +
-  'Cập nhật backend và khởi động lại API để dùng tính năng chuyển phòng.';
+  'Route chuyển phòng cư dân đang có vấn đề khi gọi tới API /residents/:id/transfer-room. ' +
+  'Kiểm tra quyền truy cập, dữ liệu đầu vào (targetRoomId/targetBedId), và khởi động lại API nếu server đang chạy phiên bản cũ.';
 
 const getPreExistingConditionsFallback = async (residentId) => {
   const r = await getResidentDetailRaw(residentId);
@@ -947,6 +947,11 @@ const updateDrugAllergies = async (residentId, body) => {
 };
 
 /** GET /api/residents/:id/transfer-room/targets?floorId= */
+const adminReleaseResident = async (residentId) => {
+  const response = await axiosClient.patch(`/admin/residents/${residentId}/release`);
+  return response.data;
+};
+
 const getTransferTargets = (residentId, params) =>
   axiosClient.get(`/residents/${residentId}/transfer-room/targets`, { params }).then((r) => r.data);
 
@@ -998,6 +1003,7 @@ const residentService = {
   updatePreExistingConditions,
   getDrugAllergies,
   updateDrugAllergies,
+  adminReleaseResident,
   getTransferTargets,
   transferResidentToRoom,
 };

@@ -24,6 +24,8 @@ const CATEGORIES = [
   { value: 'NUTRITION', label: 'Đánh giá dinh dưỡng' },
 ];
 
+const SERVICE_NAME_REGEX = /^[A-Za-zÀ-ỹ0-9\s(),.+\/\-]+$/;
+
 export default function AdminClinicalServicesPage() {
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -195,6 +197,10 @@ export default function AdminClinicalServicesPage() {
       setError('Vui lòng nhập tên dịch vụ.');
       return;
     }
+    if (!SERVICE_NAME_REGEX.test(formData.serviceName.trim())) {
+      setError('Tên dịch vụ chỉ được chứa chữ, số, khoảng trắng và ký tự (),.+/-');
+      return;
+    }
     if (!formData.category) {
       setError('Vui lòng chọn danh mục.');
       return;
@@ -292,6 +298,24 @@ export default function AdminClinicalServicesPage() {
     }
   };
 
+  const handleReopen = async (service) => {
+    if (!window.confirm('Bạn có chắc muốn mở lại dịch vụ này không?')) return;
+
+    try {
+      setError('');
+      await clinicalServiceService.updateService(service._id, {
+        ...service,
+        active: true,
+      });
+      setSuccess('Mở lại dịch vụ thành công!');
+      loadServices();
+      setTimeout(() => setSuccess(''), 1500);
+    } catch (err) {
+      console.error(err);
+      setError(err.response?.data?.message || 'Không thể mở lại dịch vụ.');
+    }
+  };
+
   const filteredServices = services.filter((s) => {
     const matchSearch =
       s.serviceCode?.toLowerCase().includes(search.toLowerCase()) ||
@@ -371,12 +395,13 @@ export default function AdminClinicalServicesPage() {
                   onChange={(e) =>
                     setFormData((prev) => {
                       const nextName = e.target.value;
+                      const normalizedName = nextName.replace(/[^A-Za-zÀ-ỹ0-9\s(),.+\/\-]/g, '');
                       // If creating new and serviceCode is empty or was auto-generated from category, update it
                       const shouldUpdateCode = !editingId && (!prev.serviceCode || (prev.category && prev.serviceCode.startsWith(prev.category + '_')));
                       return {
                         ...prev,
-                        serviceName: nextName,
-                        serviceCode: shouldUpdateCode ? generateServiceCode(prev.category, nextName) : prev.serviceCode,
+                        serviceName: normalizedName,
+                        serviceCode: shouldUpdateCode ? generateServiceCode(prev.category, normalizedName) : prev.serviceCode,
                       };
                     })
                   }
@@ -723,6 +748,7 @@ export default function AdminClinicalServicesPage() {
               <th>Mã dịch vụ</th>
               <th>Tên dịch vụ</th>
               <th>Danh mục</th>
+              <th>Ngày tạo</th>
               <th>Đơn giá</th>
               <th>Trạng thái</th>
               <th>Hành động</th>
@@ -731,13 +757,13 @@ export default function AdminClinicalServicesPage() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan="6" style={{ textAlign: 'center', padding: '20px' }}>
+                <td colSpan="7" style={{ textAlign: 'center', padding: '20px' }}>
                   Đang tải...
                 </td>
               </tr>
             ) : filteredServices.length === 0 ? (
               <tr>
-                <td colSpan="6" style={{ textAlign: 'center', padding: '20px' }}>
+                <td colSpan="7" style={{ textAlign: 'center', padding: '20px' }}>
                   Không có dịch vụ nào.
                 </td>
               </tr>
@@ -751,6 +777,7 @@ export default function AdminClinicalServicesPage() {
                     </td>
                     <td>{service.serviceName}</td>
                     <td>{category?.label || service.category}</td>
+                    <td>{service.createdAt ? new Date(service.createdAt).toLocaleDateString('vi-VN') : '---'}</td>
                     <td style={{ fontWeight: '600', color: '#059669' }}>
                       {new Intl.NumberFormat('vi-VN', {
                         style: 'currency',
@@ -778,13 +805,23 @@ export default function AdminClinicalServicesPage() {
                       >
                         <Edit2 size={14} />
                       </button>
-                      <button
-                        className="adm-btn-small adm-btn-danger"
-                        onClick={() => handleDelete(service._id)}
-                        title="Xóa"
-                      >
-                        <Trash2 size={14} />
-                      </button>
+                      {service.active ? (
+                        <button
+                          className="adm-btn-small adm-btn-danger"
+                          onClick={() => handleDelete(service._id)}
+                          title="Xóa"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      ) : (
+                        <button
+                          className="adm-btn-small adm-btn-secondary"
+                          onClick={() => handleReopen(service)}
+                          title="Mở lại"
+                        >
+                          Mở lại
+                        </button>
+                      )}
                     </td>
                   </tr>
                 );
