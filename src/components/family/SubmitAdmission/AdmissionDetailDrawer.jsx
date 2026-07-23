@@ -1712,6 +1712,17 @@ export default function AdmissionDetailDrawer({
                       </button>
                     )}
 
+                    {isDoctorOrNurseRole && ['new_request', 'consulting'].includes(admission.status) && !scheduledDate && (
+                      <button
+                        type="button"
+                        onClick={() => setShowScheduleModal(true)}
+                        className="adm-btn-apply"
+                        style={{ padding: '8px 16px', fontSize: '12px', borderRadius: '10px', boxShadow: 'none', background: '#2563eb' }}
+                      >
+                        Lên lịch khám
+                      </button>
+                    )}
+
                     {isDoctorRole && ['new_request', 'consulting', 'assessing', 'contracting'].includes(admission.status) && (
                       <button
                         type="button"

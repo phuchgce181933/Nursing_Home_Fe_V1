@@ -757,6 +757,7 @@ export default function HealthMonitoringPage() {
   const [formError, setFormError] = useState(null);
   const [formSuccess, setFormSuccess] = useState(false);
   const [expandedSections, setExpandedSections] = useState({});
+  const [expandedServiceDetails, setExpandedServiceDetails] = useState({});
 
   // clinical services + selected services for billing
   const [clinicalServices, setClinicalServices] = useState([]);
@@ -764,6 +765,10 @@ export default function HealthMonitoringPage() {
 
   const getSelectedServiceFieldValue = (serviceId, fieldCode) => {
     return selectedServices[serviceId]?.fieldValues?.[fieldCode] ?? '';
+  };
+
+  const getSelectedServiceFieldFiles = (serviceId, fieldCode) => {
+    return selectedServices[serviceId]?.fieldFiles?.[fieldCode] || [];
   };
 
   const setSelectedServiceFieldValue = (serviceId, fieldCode, value) => {
@@ -777,6 +782,31 @@ export default function HealthMonitoringPage() {
         [serviceId]: {
           ...svc,
           fieldValues: nextFieldValues,
+        },
+      };
+    });
+  };
+
+  const setSelectedServiceFieldFiles = (serviceId, fieldCode, files) => {
+    const filesWithPreview = (files || []).map((file) => {
+      if (!file) return file;
+      if (typeof file === 'object' && file instanceof File) {
+        return Object.assign(file, {
+          preview: file.preview || URL.createObjectURL(file),
+        });
+      }
+      return file;
+    });
+    setSelectedServices((prev) => {
+      const svc = prev[serviceId];
+      if (!svc) return prev;
+      const nextFieldFiles = { ...(svc.fieldFiles || {}) };
+      nextFieldFiles[fieldCode] = filesWithPreview;
+      return {
+        ...prev,
+        [serviceId]: {
+          ...svc,
+          fieldFiles: nextFieldFiles,
         },
       };
     });
@@ -817,6 +847,28 @@ export default function HealthMonitoringPage() {
     return false;
   };
 
+  const isServiceFieldValueAbnormal = (field, value) => {
+    return isFieldValueOutOfRange(field, value);
+  };
+
+  const isSelectedServiceAbnormal = (selectedService) => {
+    if (!selectedService || !selectedService.serviceId || !selectedService.fieldValues) return false;
+    const serviceDef = clinicalServices.find((svc) => String(svc._id) === String(selectedService.serviceId));
+    if (!serviceDef || !Array.isArray(serviceDef.fields)) return false;
+    return serviceDef.fields.some((field) => {
+      if (field.type !== 'NUMBER') return false;
+      const value = selectedService.fieldValues[field.fieldCode];
+      return isServiceFieldValueAbnormal(field, value);
+    });
+  };
+
+  const isRecordAbnormal = (record) => {
+    if (!record) return false;
+    if (record.abnormalFlag === true) return true;
+    if (!Array.isArray(record.selectedServices)) return false;
+    return record.selectedServices.some(isSelectedServiceAbnormal);
+  };
+
   const getServiceFieldHint = (field, value) => {
     if (!field) return '';
     if (field.type === 'NUMBER') {
@@ -853,9 +905,7 @@ export default function HealthMonitoringPage() {
           if (Number.isNaN(parsed)) {
             return `Trường "${field.label}" phải là số hợp lệ.`;
           }
-          if (isFieldValueOutOfRange(field, value)) {
-            return `Trường "${field.label}" của dịch vụ "${service.serviceName}" nằm ngoài khoảng ${field.min ?? '-'}–${field.max ?? '-'}.`;
-          }
+          // Abnormal values are allowed and only shown as warnings.
         }
         if (field.type === 'DROPDOWN' && field.required) {
           if (!field.options?.includes(String(value))) {
@@ -1100,12 +1150,13 @@ export default function HealthMonitoringPage() {
       
       // Billing: include only selected clinical services (doctor flow)
       const services = Object.values(selectedServices || {}).map(s => ({
-        serviceId: s._id,
+        serviceId: s.serviceId || s._id,
         serviceCode: s.serviceCode,
         serviceName: s.serviceName,
         quantity: Number(s.quantity) || 1,
         unitPrice: Number(s.unitPrice) || 0,
         fieldValues: s.fieldValues || {},
+        fieldFiles: s.fieldFiles || {},
       }));
       if (services.length) {
         const fieldValidationError = validateSelectedServiceFields();
@@ -1135,7 +1186,33 @@ export default function HealthMonitoringPage() {
       }
 
       console.log('[HealthMonitoring] Saving vital signs with body:', body);
-      await medicalRecordService.recordVitals(selectedResident._id, body);
+      const formData = new FormData();
+      const bodyPayload = { ...body };
+      if (Array.isArray(bodyPayload.selectedServices)) {
+        bodyPayload.selectedServices = bodyPayload.selectedServices.map((service) => {
+          const { fieldFiles, ...rest } = service;
+          return rest;
+        });
+      }
+      Object.entries(bodyPayload).forEach(([key, value]) => {
+        if (value === undefined || value === null) return;
+        if (typeof value === 'object' && !(value instanceof File) && !(value instanceof Blob)) {
+          formData.append(key, JSON.stringify(value));
+        } else {
+          formData.append(key, String(value));
+        }
+      });
+      if (Array.isArray(body.selectedServices)) {
+        body.selectedServices.forEach((service) => {
+          const filesMap = service.fieldFiles || {};
+          Object.entries(filesMap).forEach(([fieldCode, files]) => {
+            (files || []).forEach((file) => {
+              formData.append(`serviceFile_${service.serviceId}_${fieldCode}`, file);
+            });
+          });
+        });
+      }
+      await medicalRecordService.recordVitals(selectedResident._id, formData);
       setFormSuccess(true);
       setForm(emptyForm);
       // Reload history and resident list to update abnormal badge
@@ -1162,43 +1239,140 @@ export default function HealthMonitoringPage() {
 
   // ─── Latest record for alert banner ───
   const latestRecord = records[0] ?? selectedResident?._latestRecord ?? null;
-  const hasAbnormal = latestRecord?.abnormalFlag === true;
+  const hasAbnormal = isRecordAbnormal(latestRecord);
 
-  const renderServiceSummary = (services) => {
+  const isImageUrl = (value) => {
+    return typeof value === 'string' && /\.(jpg|jpeg|png|webp|gif|bmp|svg)(\?|$)/i.test(value.trim()) && /^https?:\/\//i.test(value.trim());
+  };
+
+  const renderFieldValue = (value) => {
+    if (Array.isArray(value)) {
+      const allImageUrls = value.every((item) => isImageUrl(item));
+      if (allImageUrls) {
+        return <span>{`${value.length} ảnh`}</span>;
+      }
+      return <span>{value.map((item) => String(item)).join(', ')}</span>;
+    }
+    if (isImageUrl(value)) {
+      return <span>Ảnh</span>;
+    }
+    return <span>{String(value)}</span>;
+  };
+
+  const getServicePreviewKey = (recordId, svc) => `${recordId || 'record'}|${svc.serviceId || svc.serviceCode || 'unknown'}|${svc.serviceName || 'service'}|${svc.quantity || 1}|${svc.unitPrice || 0}`;
+
+  const renderServiceImagePreview = (fieldValues, serviceKey, expanded) => {
+    if (!fieldValues || typeof fieldValues !== 'object') return null;
+    const urls = [];
+    for (const value of Object.values(fieldValues)) {
+      if (Array.isArray(value)) {
+        value.forEach((item) => { if (isImageUrl(item)) urls.push(item); });
+      } else if (isImageUrl(value)) {
+        urls.push(value);
+      }
+    }
+    if (urls.length === 0) return null;
+
+    if (!expanded) return null;
+
+    return (
+      <div style={{ display: 'grid', gap: 8, marginBottom: 8 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(90px,1fr))', gap: 8 }}>
+          {urls.map((url, idx) => (
+            <a
+              key={idx}
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ display: 'block', border: '1px solid #e2e8f0', borderRadius: 10, overflow: 'hidden', background: '#fff', minHeight: 90 }}
+            >
+              <img src={url} alt={`service-preview-${idx}`} style={{ width: '100%', height: 90, objectFit: 'cover', display: 'block' }} />
+            </a>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  const renderServiceSummary = (services, recordId) => {
     if (!Array.isArray(services) || services.length === 0) {
       return <span style={{ color: '#cbd5e1' }}>—</span>;
     }
     return (
       <div style={{ display: 'grid', gap: 8, fontSize: 12, color: '#334155' }}>
-        {services.map((svc) => (
-          <details
-            key={`${svc.serviceId || svc.serviceCode}-${svc.serviceName}-${svc.quantity}-${svc.unitPrice}`}
-            style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: 10, background: '#f8fafc' }}
-          >
-            <summary style={{ fontWeight: 700, cursor: 'pointer', outline: 'none' }}>
-              {svc.serviceName || svc.serviceCode || 'Dịch vụ'}
-              {svc.quantity ? ` × ${svc.quantity}` : ''}
-              {svc.unitPrice != null ? ` · ${formatMoney((svc.unitPrice || 0) * (svc.quantity || 1))}` : ''}
-            </summary>
-            <div style={{ marginTop: 8, display: 'grid', gap: 6, color: '#334155' }}>
-              <div><strong>Mã dịch vụ:</strong> {svc.serviceCode || 'N/A'}</div>
-              <div><strong>Đơn giá:</strong> {formatMoney(svc.unitPrice)}</div>
-              <div><strong>Số lượng:</strong> {svc.quantity || 1}</div>
-              {svc.fieldValues && Object.keys(svc.fieldValues).length > 0 && (
-                <div style={{ marginTop: 6 }}>
-                  <div style={{ fontWeight: 700, marginBottom: 4 }}>Thông số chi tiết</div>
-                  <div style={{ display: 'grid', gap: 4, paddingLeft: 8 }}>
-                    {Object.entries(svc.fieldValues).map(([field, value]) => (
-                      <div key={field} style={{ fontSize: 11, color: '#475569' }}>
-                        <span style={{ color: '#0f172a' }}>{field}</span>: {String(value)}
+        {services.map((svc) => {
+          const serviceAbnormal = isSelectedServiceAbnormal(svc);
+          const serviceKey = getServicePreviewKey(recordId, svc);
+          const expanded = !!expandedServiceDetails[serviceKey];
+          const imageUrls = [];
+          for (const value of Object.values(svc.fieldValues || {})) {
+            if (Array.isArray(value)) {
+              value.forEach((item) => { if (isImageUrl(item) && !imageUrls.includes(item)) imageUrls.push(item); });
+            } else if (isImageUrl(value) && !imageUrls.includes(value)) {
+              imageUrls.push(value);
+            }
+          }
+          const imageLabel = imageUrls.length > 0 ? `${imageUrls.length} ảnh` : null;
+          return (
+            <div
+              key={serviceKey}
+              style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: 10, background: '#f8fafc' }}
+            >
+              <button
+                type="button"
+                onClick={() => setExpandedServiceDetails((prev) => ({ ...prev, [serviceKey]: !prev[serviceKey] }))}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  width: '100%',
+                  background: 'transparent',
+                  border: 'none',
+                  padding: 0,
+                  color: '#0f172a',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+              >
+                <div style={{ display: 'grid', gap: 4, alignItems: 'center', width: '100%' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontWeight: 700 }}>
+                    <span>{svc.serviceName || svc.serviceCode || 'Dịch vụ'}</span>
+                    {serviceAbnormal && <span className="hm-badge-warn" style={{ fontSize: 11, padding: '2px 6px' }}>Bất thường</span>}
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, color: '#475569', fontSize: 12 }}>
+                    <span>{svc.serviceCode || 'N/A'}</span>
+                    <span>{svc.quantity ? `× ${svc.quantity}` : ''}</span>
+                    <span>{svc.unitPrice != null ? formatMoney((svc.unitPrice || 0) * (svc.quantity || 1)) : ''}</span>
+                    {imageLabel ? <span>{imageLabel}</span> : null}
+                  </div>
+                </div>
+                <span style={{ fontSize: 12, color: '#2563eb' }}>{expanded ? 'Ẩn' : 'Chi tiết'}</span>
+              </button>
+              {expanded && (
+                <div style={{ marginTop: 10, display: 'grid', gap: 8, color: '#334155' }}>
+                  {renderServiceImagePreview(svc.fieldValues, serviceKey, expanded)}
+                  <div style={{ display: 'grid', gap: 6 }}>
+                    <div><strong>Đơn giá:</strong> {formatMoney(svc.unitPrice)}</div>
+                    <div><strong>Số lượng:</strong> {svc.quantity || 1}</div>
+                    {svc.fieldValues && Object.keys(svc.fieldValues).length > 0 && (
+                      <div style={{ marginTop: 6 }}>
+                        <div style={{ fontWeight: 700, marginBottom: 4 }}>Thông số chi tiết</div>
+                        <div style={{ display: 'grid', gap: 8, paddingLeft: 8 }}>
+                          {Object.entries(svc.fieldValues).map(([field, value]) => (
+                            <div key={field} style={{ fontSize: 11, color: '#475569' }}>
+                              <div style={{ color: '#0f172a', fontWeight: 600 }}>{field}</div>
+                              <div style={{ marginTop: 4 }}>{renderFieldValue(value)}</div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    ))}
+                    )}
                   </div>
                 </div>
               )}
             </div>
-          </details>
-        ))}
+          );
+        })}
       </div>
     );
   };
@@ -1471,7 +1645,7 @@ export default function HealthMonitoringPage() {
                                 <td>{renderVal('oxygenSaturation',       rec.oxygenSaturation)}</td>
                                 <td>{rec.bloodSugar != null ? `${rec.bloodSugar} mmol/L` : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
                                 <td>{rec.weightKg != null ? `${rec.weightKg} kg` : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
-                                <td>{renderServiceSummary(rec.selectedServices)}</td>
+                                <td>{renderServiceSummary(rec.selectedServices, rec._id)}</td>
                                 <td>
                                   {rec.abnormalFlag
                                     ? <span className="hm-badge-warn"><AlertTriangle size={10} /> Bất thường</span>
@@ -1554,7 +1728,7 @@ export default function HealthMonitoringPage() {
                           <div className="hm-form-group full">
                             <div className="hm-form-label">Dịch vụ khám gần nhất</div>
                             <div style={{ padding: '10px 12px', background: '#ffffff', borderRadius: 8, border: '1px solid #e2e8f0' }}>
-                              {renderServiceSummary(latestRecord.selectedServices)}
+                              {renderServiceSummary(latestRecord.selectedServices, latestRecord?._id)}
                             </div>
                           </div>
                         </div>
@@ -1650,7 +1824,12 @@ export default function HealthMonitoringPage() {
                                         });
                                       }} />
                                       <div>
-                                        <div style={{ fontWeight: 700 }}>{svc.serviceName}</div>
+                                        <div style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                          {svc.serviceName}
+                                          {selected && isSelectedServiceAbnormal(selectedServices[svc._id]) && (
+                                            <span className="hm-badge-warn" style={{ fontSize: 11, padding: '2px 6px' }}>Bất thường</span>
+                                          )}
+                                        </div>
                                         <div style={{ fontSize: 12, color: '#64748b' }}>{svc.category} · {formatMoney(svc.unitPrice)}</div>
                                       </div>
                                     </div>
@@ -1681,21 +1860,33 @@ export default function HealthMonitoringPage() {
                                               {field.label}{field.required ? ' *' : ''}
                                             </label>
                                             {field.type === 'IMAGE' ? (
-                                              <input
-                                                type="text"
-                                                className={`hm-form-input${outOfRange ? ' is-warn' : ''}`}
-                                                placeholder={field.placeholder || 'URL ảnh hoặc danh sách URL, phân tách bằng dấu phẩy'}
-                                                value={value}
-                                                onChange={(e) => setSelectedServiceFieldValue(svc._id, field.fieldCode, e.target.value)}
-                                              />
+                                              <>
+                                                <input
+                                                  type="file"
+                                                  accept="image/*"
+                                                  multiple
+                                                  className="hm-form-input"
+                                                  onChange={(e) => {
+                                                    const files = Array.from(e.target.files || []);
+                                                    setSelectedServiceFieldFiles(svc._id, field.fieldCode, files);
+                                                  }}
+                                                />
+                                                {getSelectedServiceFieldFiles(svc._id, field.fieldCode).length > 0 && (
+                                                  <div style={{ marginTop: 8, display: 'grid', gap: 6 }}>
+                                                    {getSelectedServiceFieldFiles(svc._id, field.fieldCode).map((file, idx) => (
+                                                      <div key={idx} style={{ fontSize: 12, color: '#334155' }}>
+                                                        {file.name}
+                                                      </div>
+                                                    ))}
+                                                  </div>
+                                                )}
+                                              </>
                                             ) : field.type === 'NUMBER' ? (
                                               <input
                                                 type="number"
                                                 className={`hm-form-input${outOfRange ? ' is-warn' : ''}`}
                                                 placeholder={field.placeholder || 'Nhập giá trị số'}
                                                 value={value}
-                                                min={field.min !== undefined && field.min !== null ? field.min : undefined}
-                                                max={field.max !== undefined && field.max !== null ? field.max : undefined}
                                                 step="any"
                                                 onChange={(e) => setSelectedServiceFieldValue(svc._id, field.fieldCode, e.target.value)}
                                               />
@@ -1719,11 +1910,18 @@ export default function HealthMonitoringPage() {
                                                 onChange={(e) => setSelectedServiceFieldValue(svc._id, field.fieldCode, e.target.value)}
                                               />
                                             )}
-                                            {field.type === 'IMAGE' && value && (
-                                              <div style={{ marginTop: 6, display: 'grid', gap: 6 }}>
-                                                {String(value).split(',').map((url, idx) => url.trim()).filter(Boolean).map((url, idx) => (
-                                                  <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                                    <span style={{ fontSize: 12, color: '#334155' }}>{url}</span>
+                                            {field.type === 'IMAGE' && getSelectedServiceFieldFiles(svc._id, field.fieldCode).length > 0 && (
+                                              <div style={{ marginTop: 6, display: 'grid', gap: 10 }}>
+                                                {getSelectedServiceFieldFiles(svc._id, field.fieldCode).map((file, idx) => (
+                                                  <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: 6, maxWidth: 280 }}>
+                                                    {file.preview ? (
+                                                      <img
+                                                        src={file.preview}
+                                                        alt={file.name || `preview-${idx}`}
+                                                        style={{ width: '100%', maxHeight: 180, objectFit: 'cover', borderRadius: 8, border: '1px solid #e2e8f0' }}
+                                                      />
+                                                    ) : null}
+                                                    <span style={{ fontSize: 12, color: '#334155', wordBreak: 'break-word' }}>{file.name}</span>
                                                   </div>
                                                 ))}
                                               </div>

@@ -20,6 +20,11 @@ const updateIncidentStatus = async (id, payload) => {
   return response.data;
 };
 
+const reopenIncident = async (id, payload = {}) => {
+  const response = await axiosClient.patch(`/incidents/${id}/reopen`, payload);
+  return response.data;
+};
+
 const exportIncidents = async (params = {}) => {
   const response = await axiosClient.get('/incidents/export', { params, responseType: 'text' });
   return response.data;
@@ -61,6 +66,7 @@ export default {
   getIncident,
   createIncident,
   updateIncidentStatus,
+  reopenIncident,
   assignHandlers,
   updateIncidentResolution,
   exportIncidents,
