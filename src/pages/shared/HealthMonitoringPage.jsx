@@ -19,6 +19,7 @@ import {
   Wind,
   Scale,
   Wallet,
+  RotateCcw,
 } from 'lucide-react';
 import medicalRecordService from '../../services/medicalRecord.service';
 import clinicalServiceService from '../../services/clinicalService.service';
@@ -1044,44 +1045,66 @@ export default function HealthMonitoringPage() {
   const validateVitalsForm = () => {
     const { bloodPressureSystolic, bloodPressureDiastolic, pulse, temperatureCelsius, oxygenSaturation, bloodSugar, weightKg, heightCm } = form;
 
-    if (bloodPressureSystolic !== '') {
-      const bps = parseInt(bloodPressureSystolic, 10);
-      if (isNaN(bps) || bps < 0 || bps > 300) return 'Huyết áp tâm thu phải là số dương hợp lệ (từ 0 đến 300).';
+    const vitalFields = [
+      bloodPressureSystolic,
+      bloodPressureDiastolic,
+      pulse,
+      temperatureCelsius,
+      oxygenSaturation,
+      bloodSugar,
+    ];
+
+    if (vitalFields.some(val => val === '' || val === null || val === undefined)) {
+      return 'Vui lòng nhập đầy đủ cả 6 chỉ số sinh tồn (hoặc bấm nút "Dùng lại chỉ số cũ" để điền tự động). Không được để trống chỉ số khi cập nhật.';
     }
-    if (bloodPressureDiastolic !== '') {
-      const bpd = parseInt(bloodPressureDiastolic, 10);
-      if (isNaN(bpd) || bpd < 0 || bpd > 300) return 'Huyết áp tâm trương phải là số dương hợp lệ (từ 0 đến 300).';
+
+    const bps = parseInt(bloodPressureSystolic, 10);
+    if (isNaN(bps) || bps < 0 || bps > 300) return 'Huyết áp tâm thu phải là số hợp lệ từ 0 đến 300.';
+
+    const bpd = parseInt(bloodPressureDiastolic, 10);
+    if (isNaN(bpd) || bpd < 0 || bpd > 300) return 'Huyết áp tâm trương phải là số hợp lệ từ 0 đến 300.';
+
+    if (bps <= bpd) {
+      return 'Huyết áp tâm thu phải lớn hơn huyết áp tâm trương.';
     }
-    if (bloodPressureSystolic !== '' && bloodPressureDiastolic !== '') {
-      if (parseInt(bloodPressureSystolic, 10) <= parseInt(bloodPressureDiastolic, 10)) {
-        return 'Huyết áp tâm thu phải lớn hơn huyết áp tâm trương.';
-      }
-    }
-    if (pulse !== '') {
-      const p = parseInt(pulse, 10);
-      if (isNaN(p) || p < 0 || p > 300) return 'Nhịp tim phải là số dương hợp lệ.';
-    }
-    if (temperatureCelsius !== '') {
-      const t = parseFloat(temperatureCelsius);
-      if (isNaN(t) || t < 30 || t > 45) return 'Nhiệt độ cơ thể phải từ 30°C đến 45°C.';
-    }
-    if (oxygenSaturation !== '') {
-      const spo2 = parseInt(oxygenSaturation, 10);
-      if (isNaN(spo2) || spo2 < 0 || spo2 > 100) return 'SpO₂ phải từ 0% đến 100%.';
-    }
-    if (bloodSugar !== '') {
-      const bs = parseFloat(bloodSugar);
-      if (isNaN(bs) || bs < 0 || bs > 1000) return 'Đường huyết phải là số dương hợp lệ.';
-    }
+
+    const p = parseInt(pulse, 10);
+    if (isNaN(p) || p < 0 || p > 300) return 'Nhịp tim phải là số hợp lệ từ 0 đến 300.';
+
+    const t = parseFloat(temperatureCelsius);
+    if (isNaN(t) || t < 30 || t > 45) return 'Nhiệt độ cơ thể phải là số hợp lệ từ 30°C đến 45°C.';
+
+    const spo2 = parseInt(oxygenSaturation, 10);
+    if (isNaN(spo2) || spo2 < 0 || spo2 > 100) return 'SpO₂ phải từ 0% đến 100%.';
+
+    const bs = parseFloat(bloodSugar);
+    if (isNaN(bs) || bs < 0 || bs > 1000) return 'Đường huyết phải là số hợp lệ từ 0 đến 1000.';
+
     if (weightKg !== '') {
       const w = parseFloat(weightKg);
-      if (isNaN(w) || w < 0 || w > 500) return 'Cân nặng phải là số dương hợp lệ.';
+      if (isNaN(w) || w < 0 || w > 500) return 'Cân nặng phải là số hợp lệ từ 0 đến 500.';
     }
     if (heightCm !== '') {
       const h = parseFloat(heightCm);
-      if (isNaN(h) || h < 0 || h > 300) return 'Chiều cao phải là số dương hợp lệ.';
+      if (isNaN(h) || h < 0 || h > 300) return 'Chiều cao phải là số hợp lệ từ 0 đến 300.';
     }
     return null;
+  };
+
+  const handleCopyLatestVitals = () => {
+    if (!latestRecord) return;
+    setForm((prev) => ({
+      ...prev,
+      bloodPressureSystolic: latestRecord.bloodPressureSystolic != null ? String(latestRecord.bloodPressureSystolic) : prev.bloodPressureSystolic,
+      bloodPressureDiastolic: latestRecord.bloodPressureDiastolic != null ? String(latestRecord.bloodPressureDiastolic) : prev.bloodPressureDiastolic,
+      pulse: latestRecord.pulse != null ? String(latestRecord.pulse) : prev.pulse,
+      temperatureCelsius: latestRecord.temperatureCelsius != null ? String(latestRecord.temperatureCelsius) : prev.temperatureCelsius,
+      oxygenSaturation: latestRecord.oxygenSaturation != null ? String(latestRecord.oxygenSaturation) : prev.oxygenSaturation,
+      bloodSugar: latestRecord.bloodSugar != null ? String(latestRecord.bloodSugar) : prev.bloodSugar,
+      weightKg: latestRecord.weightKg != null ? String(latestRecord.weightKg) : prev.weightKg,
+      heightCm: latestRecord.heightCm != null ? String(latestRecord.heightCm) : prev.heightCm,
+      bloodType: latestRecord.bloodType || prev.bloodType,
+    }));
   };
 
   const handleSubmitVitals = async (e) => {
@@ -1102,16 +1125,16 @@ export default function HealthMonitoringPage() {
 
     try {
       const body = {};
-      if (form.bloodPressureSystolic !== '') body.bloodPressureSystolic  = parseInt(form.bloodPressureSystolic, 10);
+      if (form.bloodPressureSystolic !== '') body.bloodPressureSystolic = parseInt(form.bloodPressureSystolic, 10);
       if (form.bloodPressureDiastolic !== '') body.bloodPressureDiastolic = parseInt(form.bloodPressureDiastolic, 10);
-      if (form.pulse !== '')                body.pulse                 = parseInt(form.pulse, 10);
-      if (form.temperatureCelsius !== '')   body.temperatureCelsius    = parseFloat(form.temperatureCelsius);
-      if (form.oxygenSaturation !== '')     body.oxygenSaturation      = parseInt(form.oxygenSaturation, 10);
-      if (form.bloodSugar !== '')           body.bloodSugar            = parseFloat(form.bloodSugar);
-      if (form.weightKg !== '')             body.weightKg              = parseFloat(form.weightKg);
-      if (form.heightCm !== '')             body.heightCm              = parseFloat(form.heightCm);
+      if (form.pulse !== '') body.pulse = parseInt(form.pulse, 10);
+      if (form.temperatureCelsius !== '') body.temperatureCelsius = parseFloat(form.temperatureCelsius);
+      if (form.oxygenSaturation !== '') body.oxygenSaturation = parseInt(form.oxygenSaturation, 10);
+      if (form.bloodSugar !== '') body.bloodSugar = parseFloat(form.bloodSugar);
+      if (form.weightKg !== '') body.weightKg = parseFloat(form.weightKg);
+      if (form.heightCm !== '') body.heightCm = parseFloat(form.heightCm);
       if (form.bloodType && form.bloodType !== 'unknown') body.bloodType = form.bloodType;
-      if (form.summary.trim())               body.summary               = form.summary.trim();
+      if (form.summary.trim()) body.summary = form.summary.trim();
       
       // Physical Examination - object
       const peHasData = Object.values(form.physicalExamination || {}).some(v => v && String(v).trim());
@@ -1172,15 +1195,14 @@ export default function HealthMonitoringPage() {
         console.log('[HealthMonitoring] No services selected');
       }
 
-      // Check if at least one vital sign or check-up detail has been entered
-      const hasAnyData = [
-        form.bloodPressureSystolic, form.bloodPressureDiastolic, form.pulse,
-        form.temperatureCelsius, form.oxygenSaturation, form.bloodSugar,
-        form.weightKg, form.heightCm, form.bloodType, form.summary
-      ].some(v => v !== '') || peHasData || labHasData || urHasData || ecgHasData || imgHasData || cogHasData || funcHasData || nutHasData || services.length > 0;
+      // Check if at least vital sign indicators exist (either entered or copied from latest record)
+      const hasVitalSigns = [
+        body.bloodPressureSystolic, body.bloodPressureDiastolic, body.pulse,
+        body.temperatureCelsius, body.oxygenSaturation, body.bloodSugar, body.weightKg
+      ].some(v => v != null);
 
-      if (!hasAnyData) {
-        setFormError('Vui lòng nhập ít nhất một chỉ số sức khỏe hoặc kết quả khám lâm sàng.');
+      if (!hasVitalSigns) {
+        setFormError('Vui lòng nhập chỉ số sinh tồn hoặc bấm nút "Dùng lại chỉ số cũ". Không được để trống chỉ số sinh tồn.');
         setFormSaving(false);
         return;
       }
@@ -1391,7 +1413,7 @@ export default function HealthMonitoringPage() {
     const t = THRESHOLDS[key];
     if (!t) return `${t?.unit || ''}`;
     const warn = val !== '' && isAbnormal(key, val);
-    if (warn) return `⚠ Ngoài ngưỡng bình thường (${t.min}–${t.max} ${t.unit})`;
+    if (warn) return `⚠ Ngoài ngưỡng bình thường (${t.min}–${t.max} ${t.unit}) · Hợp lệ & Được phép lưu (Tự động ghi nhận cảnh báo bất thường)`;
     return `Bình thường: ${t.min}–${t.max} ${t.unit}`;
   };
 
@@ -1735,8 +1757,19 @@ export default function HealthMonitoringPage() {
                       </div>
                     )}
                     <div className="hm-form-section">
-                      <div className="hm-form-section-title">
-                        <Thermometer size={15} /> Chỉ số sinh tồn (Vital Signs)
+                      <div className="hm-form-section-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                        <span><Thermometer size={15} style={{ verticalAlign: 'middle', marginRight: 4 }} /> Chỉ số sinh tồn (Vital Signs)</span>
+                        {latestRecord && (
+                          <button
+                            type="button"
+                            className="hm-btn hm-btn-ghost"
+                            style={{ padding: '4px 10px', fontSize: '12px', height: 'auto', fontWeight: 600, color: '#2563eb', border: '1px solid #bfdbfe', background: '#eff6ff' }}
+                            onClick={handleCopyLatestVitals}
+                            title="Điền tự động các chỉ số sinh tồn từ lần khám gần nhất"
+                          >
+                            <RotateCcw size={13} style={{ marginRight: 4 }} /> Dùng lại chỉ số cũ
+                          </button>
+                        )}
                       </div>
                       <div className="hm-form-grid">
                         {[
@@ -1752,7 +1785,7 @@ export default function HealthMonitoringPage() {
                           return (
                             <div key={key} className="hm-form-group">
                               <label className="hm-form-label" htmlFor={`hm-input-${key}`}>
-                                {label} <span>{THRESHOLDS[key] ? `(${THRESHOLDS[key].unit})` : ''}</span>
+                                {label} <span style={{ color: '#ef4444' }}>*</span> <span>{THRESHOLDS[key] ? `(${THRESHOLDS[key].unit})` : ''}</span>
                               </label>
                               <input
                                 id={`hm-input-${key}`}
