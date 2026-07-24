@@ -378,6 +378,16 @@ export default function AdminInvoiceManagementPage() {
                 <span className="adm-detail-label">Tổng tiền</span>
                 <span className="adm-detail-value">{selectedInvoice.totalAmount?.toLocaleString('vi-VN')}₫</span>
               </div>
+              <div className="adm-detail-item">
+                <span className="adm-detail-label">Phương án thanh toán</span>
+                <span className="adm-detail-value">{selectedInvoice.paymentPlan === 'HALF_NOW' ? '50% trước, còn lại theo tháng' : 'Thanh toán 1 lần'}</span>
+              </div>
+              {selectedInvoice.remainingAmount > 0 && (
+                <div className="adm-detail-item">
+                  <span className="adm-detail-label">Số tiền còn lại</span>
+                  <span className="adm-detail-value">{selectedInvoice.remainingAmount?.toLocaleString('vi-VN')}₫</span>
+                </div>
+              )}
               <div className="adm-detail-item adm-detail-item--full">
                 <span className="adm-detail-label">Chi phí chi tiết</span>
                 <span className="adm-detail-value">
@@ -391,10 +401,6 @@ export default function AdminInvoiceManagementPage() {
               <div className="adm-detail-item">
                 <span className="adm-detail-label">Hạn thanh toán</span>
                 <span className="adm-detail-value">{formattedDate(selectedInvoice.dueDate)}</span>
-              </div>
-              <div className="adm-detail-item adm-detail-item--full">
-                <span className="adm-detail-label">Ghi chú</span>
-                <span className="adm-detail-value">{selectedInvoice.note || '-'}</span>
               </div>
             </div>
           </div>

@@ -180,6 +180,12 @@ export default function CareAppointmentsPage() {
   const [wizardStep, setWizardStep] = useState(1);
   const [activeAdmission, setActiveAdmission] = useState(null);
   const [loadingAdmission, setLoadingAdmission] = useState(false);
+  // Realtime field-level errors for step 2
+  const [step2FieldErrors, setStep2FieldErrors] = useState({});
+  // Snapshot of old vitals loaded from API — used as fallback when a field is left blank
+  const [prefilledVitals, setPrefilledVitals] = useState(null);
+  // Track which step-2 fields the doctor has actually touched/changed
+  const [step2Touched, setStep2Touched] = useState({});
 
   const initialWizardValues = {
     heightCm: '',
@@ -403,6 +409,11 @@ export default function CareAppointmentsPage() {
       setApptFormError(t('careAppointments.endBeforeStartError'));
       return;
     }
+    const diffMs = end.getTime() - start.getTime();
+    if (diffMs > 24 * 60 * 60 * 1000) {
+      setApptFormError('Khoảng thời gian khám (từ lúc bắt đầu đến lúc kết thúc) không được vượt quá 24 giờ.');
+      return;
+    }
     // On create, or when the start time is actually being changed on edit, block past times
     // client-side too — the backend enforces the same rule (see careAppointmentService.js).
     const originalStartAt = isEditMode && selectedAppt ? new Date(selectedAppt.scheduledStartAt) : null;
@@ -412,19 +423,15 @@ export default function CareAppointmentsPage() {
       return;
     }
 
-    // ── Validate thêm cho loại "Khám lâm sàng đầu vào" (mirror BE constraints) ──
+    // ── Validate thêm cho loại "Khám lâm sàng đầu vào" ──
     if (formValues.appointmentType === 'Khám lâm sàng đầu vào') {
-      // 1. Start phải diễn ra trong vòng 24h kể từ hiện tại
-      const limit24h = new Date(Date.now() + 24 * 60 * 60 * 1000);
-      if (start > limit24h) {
-        setApptFormError('Lịch khám lâm sàng đầu vào phải diễn ra trong vòng 24 giờ kể từ thời điểm hiện tại.');
-        return;
-      }
+      // 1. Start và End phải cùng ngày
+      const isSameDay =
+        start.getFullYear() === end.getFullYear() &&
+        start.getMonth() === end.getMonth() &&
+        start.getDate() === end.getDate();
 
-      // 2. Start và End phải cùng ngày
-      const startDateStr = start.toLocaleDateString('vi-VN');
-      const endDateStr = end.toLocaleDateString('vi-VN');
-      if (startDateStr !== endDateStr) {
+      if (!isSameDay) {
         setApptFormError('Ngày bắt đầu và ngày kết thúc của lịch khám phải là cùng một ngày.');
         return;
       }
@@ -550,18 +557,24 @@ export default function CareAppointmentsPage() {
           console.error('Failed to load vitals history:', vErr);
         }
 
+        // Save snapshot of old vitals for fallback logic
+        setPrefilledVitals(vitals);
+        // Reset touched state whenever wizard opens fresh
+        setStep2Touched({});
+        setStep2FieldErrors({});
+
         if (res?.data && res.data.length > 0) {
           const adm = res.data[0];
           setActiveAdmission(adm);
           setWizardValues({
-            heightCm: vitals?.heightCm || '',
-            weightKg: vitals?.weightKg || '',
-            bloodPressureSystolic: vitals?.bloodPressureSystolic || '',
-            bloodPressureDiastolic: vitals?.bloodPressureDiastolic || '',
-            pulse: vitals?.pulse || '',
-            temperatureCelsius: vitals?.temperatureCelsius || '',
-            oxygenSaturation: vitals?.oxygenSaturation || '',
-            bloodSugar: vitals?.bloodSugar || '',
+            heightCm: vitals?.heightCm != null ? String(vitals.heightCm) : '',
+            weightKg: vitals?.weightKg != null ? String(vitals.weightKg) : '',
+            bloodPressureSystolic: vitals?.bloodPressureSystolic != null ? String(vitals.bloodPressureSystolic) : '',
+            bloodPressureDiastolic: vitals?.bloodPressureDiastolic != null ? String(vitals.bloodPressureDiastolic) : '',
+            pulse: vitals?.pulse != null ? String(vitals.pulse) : '',
+            temperatureCelsius: vitals?.temperatureCelsius != null ? String(vitals.temperatureCelsius) : '',
+            oxygenSaturation: vitals?.oxygenSaturation != null ? String(vitals.oxygenSaturation) : '',
+            bloodSugar: vitals?.bloodSugar != null ? String(vitals.bloodSugar) : '',
             bloodType: adm.applicant?.bloodType || vitals?.bloodType || 'unknown',
             summary: vitals?.summary || adm.applicant?.initialHealthCondition || '',
             consultationNotes: adm.consultationNotes || '',
@@ -571,6 +584,7 @@ export default function CareAppointmentsPage() {
           });
         } else {
           setActiveAdmission(null);
+          setPrefilledVitals(null);
           setWizardValues(initialWizardValues);
         }
         setWizardStep(1);
@@ -611,51 +625,103 @@ export default function CareAppointmentsPage() {
     }
   };
 
+  // ── Validate một field đơn lẻ (dùng cho realtime + batch) ──────────────────
+  const validateSingleField = (field, value, allValues) => {
+    const vals = allValues || wizardValues;
+    switch (field) {
+      case 'heightCm': {
+        if (!value && !prefilledVitals?.heightCm) return 'Chiều cao là bắt buộc.';
+        if (value) {
+          const h = parseFloat(value);
+          if (isNaN(h) || h <= 0 || h > 300) return 'Chiều cao phải là số dương hợp lệ (1–300 cm).';
+        }
+        return null;
+      }
+      case 'weightKg': {
+        if (!value && !prefilledVitals?.weightKg) return 'Cân nặng là bắt buộc.';
+        if (value) {
+          const w = parseFloat(value);
+          if (isNaN(w) || w <= 0 || w > 500) return 'Cân nặng phải là số dương hợp lệ (1–500 kg).';
+        }
+        return null;
+      }
+      case 'temperatureCelsius': {
+        if (!value && !prefilledVitals?.temperatureCelsius) return 'Nhiệt độ cơ thể là bắt buộc.';
+        if (value) {
+          const t = parseFloat(value);
+          if (isNaN(t) || t < 30 || t > 45) return 'Nhiệt độ phải nằm trong khoảng 30–45 °C.';
+        }
+        return null;
+      }
+      case 'bloodPressureSystolic': {
+        const bpd = vals.bloodPressureDiastolic;
+        if (value || bpd) {
+          if (!value) return 'Cần nhập huyết áp Systolic khi đã nhập Diastolic.';
+          const sys = parseInt(value, 10);
+          if (isNaN(sys) || sys <= 0 || sys > 300) return 'Huyết áp Systolic phải từ 1–300 mmHg.';
+          if (bpd) {
+            const dia = parseInt(bpd, 10);
+            if (!isNaN(dia) && sys <= dia) return 'Huyết áp Systolic phải lớn hơn Diastolic.';
+          }
+        }
+        return null;
+      }
+      case 'bloodPressureDiastolic': {
+        const bps = vals.bloodPressureSystolic;
+        if (value || bps) {
+          if (!value) return 'Cần nhập huyết áp Diastolic khi đã nhập Systolic.';
+          const dia = parseInt(value, 10);
+          if (isNaN(dia) || dia <= 0 || dia > 300) return 'Huyết áp Diastolic phải từ 1–300 mmHg.';
+          if (bps) {
+            const sys = parseInt(bps, 10);
+            if (!isNaN(sys) && sys <= dia) return 'Huyết áp Systolic phải lớn hơn Diastolic.';
+          }
+        }
+        return null;
+      }
+      case 'pulse': {
+        if (value) {
+          const p = parseInt(value, 10);
+          if (isNaN(p) || p <= 0 || p > 300) return 'Nhịp tim phải từ 1–300 lần/phút.';
+        }
+        return null;
+      }
+      case 'oxygenSaturation': {
+        if (value) {
+          const spo2 = parseInt(value, 10);
+          if (isNaN(spo2) || spo2 < 0 || spo2 > 100) return 'SpO₂ phải từ 0–100%.';
+        }
+        return null;
+      }
+      case 'bloodSugar': {
+        if (value) {
+          const bs = parseFloat(value);
+          if (isNaN(bs) || bs <= 0 || bs > 1000) return 'Đường huyết phải là số dương hợp lệ.';
+        }
+        return null;
+      }
+      default:
+        return null;
+    }
+  };
+
+  // Validate tất cả field step 2, trả về object lỗi { field: message }
+  const validateStep2All = (vals) => {
+    const v = vals || wizardValues;
+    const fields = ['heightCm', 'weightKg', 'temperatureCelsius', 'bloodPressureSystolic', 'bloodPressureDiastolic', 'pulse', 'oxygenSaturation', 'bloodSugar'];
+    const errors = {};
+    for (const f of fields) {
+      const err = validateSingleField(f, v[f], v);
+      if (err) errors[f] = err;
+    }
+    return errors;
+  };
+
+  // Legacy single-string validator kept for form submission (backward-compat)
   const validateStep2 = () => {
-    const { heightCm, weightKg, temperatureCelsius, bloodPressureSystolic, bloodPressureDiastolic, pulse, oxygenSaturation, bloodSugar } = wizardValues;
-
-    if (!heightCm) return 'Chiều cao là bắt buộc.';
-    const h = parseFloat(heightCm);
-    if (isNaN(h) || h <= 0 || h > 300) return 'Chiều cao phải là số dương hợp lệ.';
-
-    if (!weightKg) return 'Cân nặng là bắt buộc.';
-    const w = parseFloat(weightKg);
-    if (isNaN(w) || w <= 0 || w > 500) return 'Cân nặng phải là số dương hợp lệ.';
-
-    if (!temperatureCelsius) return 'Nhiệt độ cơ thể là bắt buộc.';
-    const t = parseFloat(temperatureCelsius);
-    if (isNaN(t) || t < 30 || t > 45) return 'Nhiệt độ cơ thể phải nằm trong khoảng 30°C đến 45°C.';
-
-    if (bloodPressureSystolic || bloodPressureDiastolic) {
-      if (!bloodPressureSystolic || !bloodPressureDiastolic) {
-        return 'Vui lòng nhập đầy đủ cả chỉ số huyết áp tối đa (Systolic) và tối thiểu (Diastolic).';
-      }
-      const sys = parseInt(bloodPressureSystolic, 10);
-      const dia = parseInt(bloodPressureDiastolic, 10);
-      if (isNaN(sys) || sys <= 0 || sys > 300 || isNaN(dia) || dia <= 0 || dia > 300) {
-        return 'Chỉ số huyết áp phải là số dương hợp lệ.';
-      }
-      if (sys <= dia) {
-        return 'Huyết áp tối đa phải lớn hơn huyết áp tối thiểu.';
-      }
-    }
-
-    if (pulse) {
-      const p = parseInt(pulse, 10);
-      if (isNaN(p) || p <= 0 || p > 300) return 'Nhịp tim phải là số dương hợp lệ.';
-    }
-
-    if (oxygenSaturation) {
-      const spo2 = parseInt(oxygenSaturation, 10);
-      if (isNaN(spo2) || spo2 < 0 || spo2 > 100) return 'Chỉ số SpO₂ phải từ 0% đến 100%.';
-    }
-
-    if (bloodSugar) {
-      const bs = parseFloat(bloodSugar);
-      if (isNaN(bs) || bs <= 0 || bs > 1000) return 'Chỉ số đường huyết phải là số dương hợp lệ.';
-    }
-
-    return null;
+    const errors = validateStep2All();
+    const firstKey = Object.keys(errors)[0];
+    return firstKey ? errors[firstKey] : null;
   };
 
   // Handle clinical wizard form submission (vital signs + consultation + eligibility assessment)
@@ -663,9 +729,11 @@ export default function CareAppointmentsPage() {
     if (e) e.preventDefault();
     if (!selectedAppt) return;
 
-    const valErr = validateStep2();
-    if (valErr) {
-      setStatusError(valErr);
+    // Re-validate all step-2 fields before final submit
+    const allErrors = validateStep2All();
+    if (Object.keys(allErrors).length > 0) {
+      setStep2FieldErrors(allErrors);
+      setStatusError(Object.values(allErrors)[0]);
       setWizardStep(2);
       return;
     }
@@ -673,41 +741,60 @@ export default function CareAppointmentsPage() {
     setUpdatingStatus(true);
     setStatusError(null);
 
+    // ── Helper: resolve value or fall back to old vitals ────────────────────
+    // If user left a field empty, use the old value instead of saving null/undefined
+    const resolveNum = (field, parseFn, currentVal) => {
+      if (currentVal !== '' && currentVal != null) return parseFn(currentVal);
+      const old = prefilledVitals?.[field];
+      return old != null ? old : undefined;
+    };
+
     try {
       const residentId = selectedAppt.residentId?._id || selectedAppt.residentId;
       const admissionId = activeAdmission?._id;
 
       // 1. Save vital signs (UC-9)
+      // For each numeric field: use entered value, OR fall back to old vitals value, OR omit
       const vitalsBody = {
-        heightCm: wizardValues.heightCm ? parseFloat(wizardValues.heightCm) : undefined,
-        weightKg: wizardValues.weightKg ? parseFloat(wizardValues.weightKg) : undefined,
-        bloodPressureSystolic: wizardValues.bloodPressureSystolic ? parseInt(wizardValues.bloodPressureSystolic, 10) : undefined,
-        bloodPressureDiastolic: wizardValues.bloodPressureDiastolic ? parseInt(wizardValues.bloodPressureDiastolic, 10) : undefined,
-        pulse: wizardValues.pulse ? parseInt(wizardValues.pulse, 10) : undefined,
-        temperatureCelsius: wizardValues.temperatureCelsius ? parseFloat(wizardValues.temperatureCelsius) : undefined,
-        oxygenSaturation: wizardValues.oxygenSaturation ? parseInt(wizardValues.oxygenSaturation, 10) : undefined,
-        bloodSugar: wizardValues.bloodSugar ? parseFloat(wizardValues.bloodSugar) : undefined,
+        heightCm:              resolveNum('heightCm',              parseFloat, wizardValues.heightCm),
+        weightKg:              resolveNum('weightKg',              parseFloat, wizardValues.weightKg),
+        bloodPressureSystolic: resolveNum('bloodPressureSystolic', (v) => parseInt(v, 10), wizardValues.bloodPressureSystolic),
+        bloodPressureDiastolic:resolveNum('bloodPressureDiastolic',(v) => parseInt(v, 10), wizardValues.bloodPressureDiastolic),
+        pulse:                 resolveNum('pulse',                 (v) => parseInt(v, 10), wizardValues.pulse),
+        temperatureCelsius:    resolveNum('temperatureCelsius',    parseFloat, wizardValues.temperatureCelsius),
+        oxygenSaturation:      resolveNum('oxygenSaturation',      (v) => parseInt(v, 10), wizardValues.oxygenSaturation),
+        bloodSugar:            resolveNum('bloodSugar',            parseFloat, wizardValues.bloodSugar),
         bloodType: wizardValues.bloodType !== 'unknown' ? wizardValues.bloodType : undefined,
         summary: wizardValues.summary.trim() || undefined,
       };
+      // Remove undefined keys to keep payload clean
+      Object.keys(vitalsBody).forEach(k => vitalsBody[k] === undefined && delete vitalsBody[k]);
 
       await medicalRecordService.recordVitals(residentId, vitalsBody);
 
       // 2. Call Pre-admission Consultation API if admission request is present (UC-6.16)
       if (admissionId) {
-        await admissionService.medicalRecordConsultation(admissionId, {
-          consultationNotes: wizardValues.consultationNotes.trim() || 'Đã thực hiện thăm khám lâm sàng.',
-          notes: wizardValues.summary.trim() || undefined,
-        });
+        try {
+          await admissionService.medicalRecordConsultation(admissionId, {
+            consultationNotes: wizardValues.consultationNotes.trim() || 'Đã thực hiện thăm khám lâm sàng.',
+            notes: wizardValues.summary.trim() || undefined,
+          });
+        } catch (cErr) {
+          console.warn('Admission consultation step skipped or already completed:', cErr);
+        }
 
         // 3. Evaluate Eligibility if Bác sĩ role (UC-6.19)
         if (userRole === 'doctor') {
-          await admissionService.medicalEvaluateEligibility(admissionId, {
-            eligibilityStatus: wizardValues.eligibilityStatus,
-            assessmentResult: wizardValues.assessmentResult.trim() || 'Đã kiểm tra các chỉ số sinh tồn lâm sàng.',
-            rejectionReason: wizardValues.eligibilityStatus === 'not_eligible' ? (wizardValues.rejectionReason.trim() || undefined) : undefined,
-            notes: wizardValues.summary.trim() || undefined,
-          });
+          try {
+            await admissionService.medicalEvaluateEligibility(admissionId, {
+              eligibilityStatus: wizardValues.eligibilityStatus,
+              assessmentResult: wizardValues.assessmentResult.trim() || 'Đã kiểm tra các chỉ số sinh tồn lâm sàng.',
+              rejectionReason: wizardValues.eligibilityStatus === 'not_eligible' ? (wizardValues.rejectionReason.trim() || undefined) : undefined,
+              notes: wizardValues.summary.trim() || undefined,
+            });
+          } catch (eErr) {
+            console.warn('Admission eligibility step skipped or already completed:', eErr);
+          }
         }
       }
 
@@ -1261,16 +1348,11 @@ export default function CareAppointmentsPage() {
                   value={formValues.scheduledStartAt}
                   onChange={(e) => setFormValues(prev => ({ ...prev, scheduledStartAt: e.target.value }))}
                   min={!isEditMode ? new Date().toISOString().slice(0, 16) : undefined}
-                  max={
-                    formValues.appointmentType === 'Khám lâm sàng đầu vào'
-                      ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 16)
-                      : undefined
-                  }
                   required
                 />
                 {formValues.appointmentType === 'Khám lâm sàng đầu vào' && (
                   <small style={{ color: '#64748b', fontSize: '12px', marginTop: '4px', display: 'block' }}>
-                    ⏰ Khám lâm sàng đầu vào: giờ bắt đầu phải trong khoảng 08:00 – 16:00, và phải diễn ra trong vòng 24 giờ tới.
+                    ⏰ Khám lâm sàng đầu vào: giờ bắt đầu phải trong khoảng 08:00 – 16:00.
                   </small>
                 )}
               </div>
@@ -1538,102 +1620,199 @@ export default function CareAppointmentsPage() {
               {/* STEP 2: Record Vitals & Indicators */}
               {wizardStep === 2 && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    <div className="cap-form-group" style={{ marginBottom: 0 }}>
-                      <label className="cap-form-label">Chiều cao (cm) *</label>
-                      <input
-                        type="number"
-                        className="cap-form-input"
-                        placeholder="Ví dụ: 165"
-                        value={wizardValues.heightCm}
-                        onChange={(e) => setWizardValues(prev => ({ ...prev, heightCm: e.target.value }))}
-                        required
-                        min="0"
-                        disabled={selectedAppt?.status === 'completed'}
-                      />
+
+                  {/* Info banner: prefilled from old vitals */}
+                  {prefilledVitals && (
+                    <div style={{
+                      backgroundColor: '#eff6ff', border: '1px solid #bfdbfe',
+                      borderRadius: 8, padding: '10px 14px',
+                      fontSize: 12, color: '#1e40af', display: 'flex', gap: 8, alignItems: 'flex-start'
+                    }}>
+                      <span style={{ fontSize: 16, flexShrink: 0 }}>ℹ️</span>
+                      <span>
+                        Các chỉ số dưới đây được <strong>điền sẵn từ lần đo gần nhất</strong>.
+                        Nếu bạn xóa trắng một ô, hệ thống sẽ <strong>giữ lại giá trị cũ</strong> khi lưu.
+                        Hãy cập nhật giá trị mới nếu có thay đổi.
+                      </span>
                     </div>
-                    <div className="cap-form-group" style={{ marginBottom: 0 }}>
-                      <label className="cap-form-label">Cân nặng (kg) *</label>
-                      <input
-                        type="number"
-                        className="cap-form-input"
-                        placeholder="Ví dụ: 60"
-                        value={wizardValues.weightKg}
-                        onChange={(e) => setWizardValues(prev => ({ ...prev, weightKg: e.target.value }))}
-                        required
-                        min="0"
-                        disabled={selectedAppt?.status === 'completed'}
-                      />
-                    </div>
-                    <div className="cap-form-group" style={{ marginBottom: 0 }}>
-                      <label className="cap-form-label">Huyết áp Systolic (Tối đa)</label>
-                      <input
-                        type="number"
-                        className="cap-form-input"
-                        placeholder="Ví dụ: 120"
-                        value={wizardValues.bloodPressureSystolic}
-                        onChange={(e) => setWizardValues(prev => ({ ...prev, bloodPressureSystolic: e.target.value }))}
-                        disabled={selectedAppt?.status === 'completed'}
-                      />
-                    </div>
-                    <div className="cap-form-group" style={{ marginBottom: 0 }}>
-                      <label className="cap-form-label">Huyết áp Diastolic (Tối thiểu)</label>
-                      <input
-                        type="number"
-                        className="cap-form-input"
-                        placeholder="Ví dụ: 80"
-                        value={wizardValues.bloodPressureDiastolic}
-                        onChange={(e) => setWizardValues(prev => ({ ...prev, bloodPressureDiastolic: e.target.value }))}
-                        disabled={selectedAppt?.status === 'completed'}
-                      />
-                    </div>
-                    <div className="cap-form-group" style={{ marginBottom: 0 }}>
-                      <label className="cap-form-label">Nhịp tim (lần/phút)</label>
-                      <input
-                        type="number"
-                        className="cap-form-input"
-                        placeholder="Ví dụ: 75"
-                        value={wizardValues.pulse}
-                        onChange={(e) => setWizardValues(prev => ({ ...prev, pulse: e.target.value }))}
-                        disabled={selectedAppt?.status === 'completed'}
-                      />
-                    </div>
-                    <div className="cap-form-group" style={{ marginBottom: 0 }}>
-                      <label className="cap-form-label">Nhiệt độ (°C) *</label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        className="cap-form-input"
-                        placeholder="Ví dụ: 36.5"
-                        value={wizardValues.temperatureCelsius}
-                        onChange={(e) => setWizardValues(prev => ({ ...prev, temperatureCelsius: e.target.value }))}
-                        required
-                        disabled={selectedAppt?.status === 'completed'}
-                      />
-                    </div>
-                    <div className="cap-form-group" style={{ marginBottom: 0 }}>
-                      <label className="cap-form-label">Nồng độ Oxy SPO2 (%)</label>
-                      <input
-                        type="number"
-                        className="cap-form-input"
-                        placeholder="Ví dụ: 98"
-                        value={wizardValues.oxygenSaturation}
-                        onChange={(e) => setWizardValues(prev => ({ ...prev, oxygenSaturation: e.target.value }))}
-                        disabled={selectedAppt?.status === 'completed'}
-                      />
-                    </div>
-                    <div className="cap-form-group" style={{ marginBottom: 0 }}>
-                      <label className="cap-form-label">Đường huyết (mg/dL)</label>
-                      <input
-                        type="number"
-                        className="cap-form-input"
-                        placeholder="Ví dụ: 100"
-                        value={wizardValues.bloodSugar}
-                        onChange={(e) => setWizardValues(prev => ({ ...prev, bloodSugar: e.target.value }))}
-                        disabled={selectedAppt?.status === 'completed'}
-                      />
-                    </div>
-                  </div>
+                  )}
+
+                  {/* Helper to render a single vitals input with realtime validation */}
+                  {(() => {
+                    const handleVitalsChange = (field, value) => {
+                      setWizardValues(prev => {
+                        const next = { ...prev, [field]: value };
+                        // Realtime validate this field (and cross-validate BP pair)
+                        const err = validateSingleField(field, value, next);
+                        const pairField = field === 'bloodPressureSystolic' ? 'bloodPressureDiastolic'
+                          : field === 'bloodPressureDiastolic' ? 'bloodPressureSystolic' : null;
+                        setStep2FieldErrors(prevErr => {
+                          const updated = { ...prevErr };
+                          if (err) updated[field] = err; else delete updated[field];
+                          // Re-validate paired BP field
+                          if (pairField) {
+                            const pairErr = validateSingleField(pairField, next[pairField], next);
+                            if (pairErr) updated[pairField] = pairErr; else delete updated[pairField];
+                          }
+                          return updated;
+                        });
+                        setStep2Touched(prev2 => ({ ...prev2, [field]: true }));
+                        return next;
+                      });
+                    };
+
+                    const inputStyle = (field) => ({
+                      borderColor: step2FieldErrors[field] ? '#ef4444' : undefined,
+                      boxShadow: step2FieldErrors[field] ? '0 0 0 2px rgba(239,68,68,0.15)' : undefined,
+                    });
+
+                    const oldHint = (field) => {
+                      if (!wizardValues[field] && prefilledVitals?.[field] != null) {
+                        return (
+                          <span style={{ fontSize: 11, color: '#64748b', fontStyle: 'italic' }}>
+                            ← Sẽ giữ giá trị cũ: <strong>{prefilledVitals[field]}</strong>
+                          </span>
+                        );
+                      }
+                      return null;
+                    };
+
+                    return (
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+
+                        {/* Chiều cao */}
+                        <div className="cap-form-group" style={{ marginBottom: 0 }}>
+                          <label className="cap-form-label">Chiều cao (cm) *</label>
+                          <input
+                            type="number" className="cap-form-input"
+                            placeholder="Ví dụ: 165"
+                            value={wizardValues.heightCm}
+                            onChange={(e) => handleVitalsChange('heightCm', e.target.value)}
+                            min="0"
+                            disabled={selectedAppt?.status === 'completed'}
+                            style={inputStyle('heightCm')}
+                          />
+                          {step2FieldErrors.heightCm
+                            ? <span style={{ fontSize: 11, color: '#ef4444' }}>{step2FieldErrors.heightCm}</span>
+                            : oldHint('heightCm')}
+                        </div>
+
+                        {/* Cân nặng */}
+                        <div className="cap-form-group" style={{ marginBottom: 0 }}>
+                          <label className="cap-form-label">Cân nặng (kg) *</label>
+                          <input
+                            type="number" className="cap-form-input"
+                            placeholder="Ví dụ: 60"
+                            value={wizardValues.weightKg}
+                            onChange={(e) => handleVitalsChange('weightKg', e.target.value)}
+                            min="0"
+                            disabled={selectedAppt?.status === 'completed'}
+                            style={inputStyle('weightKg')}
+                          />
+                          {step2FieldErrors.weightKg
+                            ? <span style={{ fontSize: 11, color: '#ef4444' }}>{step2FieldErrors.weightKg}</span>
+                            : oldHint('weightKg')}
+                        </div>
+
+                        {/* Huyết áp Systolic */}
+                        <div className="cap-form-group" style={{ marginBottom: 0 }}>
+                          <label className="cap-form-label">Huyết áp Systolic (Tối đa)</label>
+                          <input
+                            type="number" className="cap-form-input"
+                            placeholder="Ví dụ: 120"
+                            value={wizardValues.bloodPressureSystolic}
+                            onChange={(e) => handleVitalsChange('bloodPressureSystolic', e.target.value)}
+                            disabled={selectedAppt?.status === 'completed'}
+                            style={inputStyle('bloodPressureSystolic')}
+                          />
+                          {step2FieldErrors.bloodPressureSystolic
+                            ? <span style={{ fontSize: 11, color: '#ef4444' }}>{step2FieldErrors.bloodPressureSystolic}</span>
+                            : oldHint('bloodPressureSystolic')}
+                        </div>
+
+                        {/* Huyết áp Diastolic */}
+                        <div className="cap-form-group" style={{ marginBottom: 0 }}>
+                          <label className="cap-form-label">Huyết áp Diastolic (Tối thiểu)</label>
+                          <input
+                            type="number" className="cap-form-input"
+                            placeholder="Ví dụ: 80"
+                            value={wizardValues.bloodPressureDiastolic}
+                            onChange={(e) => handleVitalsChange('bloodPressureDiastolic', e.target.value)}
+                            disabled={selectedAppt?.status === 'completed'}
+                            style={inputStyle('bloodPressureDiastolic')}
+                          />
+                          {step2FieldErrors.bloodPressureDiastolic
+                            ? <span style={{ fontSize: 11, color: '#ef4444' }}>{step2FieldErrors.bloodPressureDiastolic}</span>
+                            : oldHint('bloodPressureDiastolic')}
+                        </div>
+
+                        {/* Nhịp tim */}
+                        <div className="cap-form-group" style={{ marginBottom: 0 }}>
+                          <label className="cap-form-label">Nhịp tim (lần/phút)</label>
+                          <input
+                            type="number" className="cap-form-input"
+                            placeholder="Ví dụ: 75"
+                            value={wizardValues.pulse}
+                            onChange={(e) => handleVitalsChange('pulse', e.target.value)}
+                            disabled={selectedAppt?.status === 'completed'}
+                            style={inputStyle('pulse')}
+                          />
+                          {step2FieldErrors.pulse
+                            ? <span style={{ fontSize: 11, color: '#ef4444' }}>{step2FieldErrors.pulse}</span>
+                            : oldHint('pulse')}
+                        </div>
+
+                        {/* Nhiệt độ */}
+                        <div className="cap-form-group" style={{ marginBottom: 0 }}>
+                          <label className="cap-form-label">Nhiệt độ (°C) *</label>
+                          <input
+                            type="number" step="0.1" className="cap-form-input"
+                            placeholder="Ví dụ: 36.5"
+                            value={wizardValues.temperatureCelsius}
+                            onChange={(e) => handleVitalsChange('temperatureCelsius', e.target.value)}
+                            disabled={selectedAppt?.status === 'completed'}
+                            style={inputStyle('temperatureCelsius')}
+                          />
+                          {step2FieldErrors.temperatureCelsius
+                            ? <span style={{ fontSize: 11, color: '#ef4444' }}>{step2FieldErrors.temperatureCelsius}</span>
+                            : oldHint('temperatureCelsius')}
+                        </div>
+
+                        {/* SpO2 */}
+                        <div className="cap-form-group" style={{ marginBottom: 0 }}>
+                          <label className="cap-form-label">Nồng độ Oxy SpO₂ (%)</label>
+                          <input
+                            type="number" className="cap-form-input"
+                            placeholder="Ví dụ: 98"
+                            value={wizardValues.oxygenSaturation}
+                            onChange={(e) => handleVitalsChange('oxygenSaturation', e.target.value)}
+                            disabled={selectedAppt?.status === 'completed'}
+                            style={inputStyle('oxygenSaturation')}
+                          />
+                          {step2FieldErrors.oxygenSaturation
+                            ? <span style={{ fontSize: 11, color: '#ef4444' }}>{step2FieldErrors.oxygenSaturation}</span>
+                            : oldHint('oxygenSaturation')}
+                        </div>
+
+                        {/* Đường huyết */}
+                        <div className="cap-form-group" style={{ marginBottom: 0 }}>
+                          <label className="cap-form-label">Đường huyết (mg/dL)</label>
+                          <input
+                            type="number" className="cap-form-input"
+                            placeholder="Ví dụ: 100"
+                            value={wizardValues.bloodSugar}
+                            onChange={(e) => handleVitalsChange('bloodSugar', e.target.value)}
+                            disabled={selectedAppt?.status === 'completed'}
+                            style={inputStyle('bloodSugar')}
+                          />
+                          {step2FieldErrors.bloodSugar
+                            ? <span style={{ fontSize: 11, color: '#ef4444' }}>{step2FieldErrors.bloodSugar}</span>
+                            : oldHint('bloodSugar')}
+                        </div>
+
+                      </div>
+                    );
+                  })()}
 
                   <div className="cap-form-group">
                     <label className="cap-form-label">Nhóm máu</label>
@@ -1675,11 +1854,14 @@ export default function CareAppointmentsPage() {
                       type="button"
                       className="cap-modal-btn-submit"
                       onClick={() => {
-                        const err = validateStep2();
-                        if (err) {
-                          setStatusError(err);
+                        // Validate tất cả field cùng lúc, hiện lỗi inline
+                        const allErrs = validateStep2All();
+                        setStep2FieldErrors(allErrs);
+                        if (Object.keys(allErrs).length > 0) {
+                          setStatusError(Object.values(allErrs)[0]);
                         } else {
                           setStatusError(null);
+                          setStep2FieldErrors({});
                           setWizardStep(3);
                         }
                       }}
