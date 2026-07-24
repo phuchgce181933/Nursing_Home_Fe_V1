@@ -2,6 +2,7 @@ const PHONE_INVALID_DETAIL = 'phone must be exactly 10 digits starting with 0 (e
 
 const STAFF_VALIDATION_DETAIL_I18N = {
   [PHONE_INVALID_DETAIL]: 'admin.staff.profiles.validation.phoneInvalid',
+  'dateOfBirth is required': 'admin.staff.profiles.validation.dateOfBirthRequired',
   'staff must be at least 18 years old': 'admin.staff.profiles.validation.dateOfBirthMinAge',
   'dateOfBirth is not a valid date': 'admin.staff.profiles.validation.dateOfBirthInvalid',
   'dateOfBirth cannot be in the future': 'admin.staff.profiles.validation.dateOfBirthInvalid',
@@ -24,6 +25,67 @@ const VALIDATION_ERROR_CODES = new Set([
   'STAFF_VALIDATION_FAILED',
   'RESIDENT_VALIDATION_FAILED',
 ]);
+
+const MEAL_TYPE_ALIASES = {
+  breakfast: 'breakfast',
+  lunch: 'lunch',
+  dinner: 'dinner',
+  'bữa sáng': 'breakfast',
+  'bua sang': 'breakfast',
+  'bữa trưa': 'lunch',
+  'bua trua': 'lunch',
+  'bữa tối': 'dinner',
+  'bua toi': 'dinner',
+};
+
+function normalizeMealApiParams(params, t) {
+  if (!params || typeof params !== 'object') return params;
+  const next = { ...params };
+  if (next.mealType) {
+    const alias = MEAL_TYPE_ALIASES[String(next.mealType).trim().toLowerCase()];
+    next.mealType = alias
+      ? t(`common.mealType.${alias}`, { defaultValue: next.mealType })
+      : next.mealType;
+  }
+  return next;
+}
+
+function translateMealPublishConflictLine(line, t) {
+  const trimmed = String(line || '').trim().replace(/\.$/, '');
+  if (!trimmed) return null;
+
+  const mealTypeMatch = trimmed.match(
+    /^(?:Cư dân|Resident) (?:đã có|already has) (.+?) (?:trong ngày này|on this date) \((.+?) - (\d{4}-\d{2}-\d{2}), (?:đã đăng|published)\)$/i
+  );
+  if (mealTypeMatch) {
+    const [, rawMealType, planTitle, workDate] = mealTypeMatch;
+    const alias = MEAL_TYPE_ALIASES[String(rawMealType).trim().toLowerCase()];
+    const mealType = alias ? t(`common.mealType.${alias}`) : rawMealType;
+    return t('apiErrors.MEAL_PLAN_PUBLISH_DUPLICATE_MEAL_TYPE', { mealType, planTitle, workDate });
+  }
+
+  const mealTimeMatch = trimmed.match(
+    /^(?:Cư dân|Resident) (?:đã có bữa lúc|already has a meal at) (\d{2}:\d{2}) (?:trong ngày này|on this date) \((.+?) - (\d{4}-\d{2}-\d{2}), (?:đã đăng|published)\)$/i
+  );
+  if (mealTimeMatch) {
+    const [, mealTime, planTitle, workDate] = mealTimeMatch;
+    return t('apiErrors.MEAL_PLAN_PUBLISH_DUPLICATE_MEAL_TIME', { mealTime, planTitle, workDate });
+  }
+
+  return null;
+}
+
+function translateMealPublishConflictMessage(message, t) {
+  if (!message || typeof message !== 'string') return null;
+  const chunks = message
+    .split(/\.\s+(?=Cư dân|Resident)/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const lines = (chunks.length ? chunks : [message.trim()])
+    .map((part) => translateMealPublishConflictLine(part, t))
+    .filter(Boolean);
+  return lines.length ? lines.join(' ') : null;
+}
 
 function translateValidationPart(part, t, errorCode) {
   const trimmed = part.trim();
@@ -53,8 +115,13 @@ export function resolveApiError(err, t, fallbackKey) {
   }
 
   const key = `apiErrors.${data.errorCode}`;
-  const translated = t(key, data.params || {});
+  const params = normalizeMealApiParams(data.params, t);
+  const translated = t(key, params);
   if (translated && translated !== key) return translated;
+
+  const mealConflict = translateMealPublishConflictMessage(data.message, t);
+  if (mealConflict) return mealConflict;
+
   return data.message || fallback;
 }
 

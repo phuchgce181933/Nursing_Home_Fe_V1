@@ -44,6 +44,54 @@ export function floorLabel(floor, t) {
   return null;
 }
 
+export function buildingLabel(building, t) {
+  if (!building) return null;
+  const name = building?.name || building?.code || (typeof building === 'string' ? building : null);
+  if (!name) return null;
+  const tt = resolveT(t);
+  const buildingWord = tt('admin.residents.common.building');
+  const b = String(name).trim();
+  if (new RegExp(`^${buildingWord}\\b`, 'i').test(b) || /^tòa\b/i.test(b)) return b;
+  return `${buildingWord} ${b}`;
+}
+
+export function resolveFloorBuilding(floor, buildingById) {
+  if (!floor || typeof floor !== 'object') return null;
+  if (floor.building) return floor.building;
+  const building = floor.buildingId;
+  if (!building) return null;
+  if (typeof building === 'object') return building;
+  return buildingById?.get?.(String(building)) || null;
+}
+
+export function formatFloorWithBuilding(floor, t, { floorById, buildingById } = {}) {
+  if (!floor) return null;
+
+  let resolved = floor;
+  if (typeof floor === 'string') {
+    resolved = floorById?.get?.(floor) || floor;
+    if (typeof resolved === 'string') return resolved;
+  } else if (typeof floor === 'object' && floor._id && floorById?.get) {
+    const enriched = floorById.get(String(floor._id));
+    if (enriched) {
+      resolved = {
+        ...floor,
+        buildingId: enriched.buildingId ?? floor.buildingId,
+        building: enriched.building ?? floor.building,
+        name: floor.name ?? enriched.name,
+        floorNumber: floor.floorNumber ?? enriched.floorNumber,
+      };
+    }
+  }
+
+  const building = resolveFloorBuilding(resolved, buildingById);
+  const buildingPart = buildingLabel(building, t);
+  const floorPart = floorLabel(resolved, t) || resolved.name || null;
+
+  if (buildingPart && floorPart) return `${buildingPart} · ${floorPart}`;
+  return floorPart || buildingPart || null;
+}
+
 export function bedLabel(bed) {
   if (!bed?.bedCode) return null;
   return bed.bedType ? `${bed.bedCode} (${bed.bedType})` : bed.bedCode;

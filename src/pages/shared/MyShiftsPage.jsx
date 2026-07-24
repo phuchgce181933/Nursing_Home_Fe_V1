@@ -18,11 +18,16 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import '../../styles/shared/MyShiftsPage.css';
 import { resolveApiError } from '../../utils/apiMessage';
 import {
+  getPostShiftCompleteMinutesRemaining,
+  isWithinPostShiftCompleteWindow,
+  toVNDateString,
+} from '../../utils/dateUtils';
+import {
   resolveShiftDisplayName,
   resolveShiftDisplayTimes,
 } from '../../utils/shiftDisplayTimes';
 
-const statusOptions = ['', 'draft', 'published', 'confirmed', 'completed', 'cancelled'];
+const statusOptions = ['', 'published', 'confirmed', 'completed', 'cancelled'];
 
 function formatTime(val) {
   if (!val) return '—';
@@ -64,7 +69,6 @@ export default function MyShiftsPage() {
 
   const STATUS_PILL_LABELS = {
     '': t('myShifts.filterAll'),
-    draft: t('myShifts.statusDraft'),
     published: t('myShifts.statusPublished'),
     confirmed: t('myShifts.statusConfirmed'),
     completed: t('myShifts.statusCompleted'),
@@ -87,6 +91,8 @@ export default function MyShiftsPage() {
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('success');
   const [confirming, setConfirming] = useState(null);
+  const [completing, setCompleting] = useState(null);
+  const [tickNow, setTickNow] = useState(() => new Date());
 
   const defaultRange = useMemo(() => getDefaultDateRange(), []);
   const [fromDate, setFromDate] = useState(defaultRange.fromDate);
@@ -121,6 +127,11 @@ export default function MyShiftsPage() {
     loadShifts();
   }, [user, fromDate, toDate, statusFilter]);
 
+  useEffect(() => {
+    const timer = setInterval(() => setTickNow(new Date()), 30000);
+    return () => clearInterval(timer);
+  }, []);
+
   /* ── Confirm handler ───────────────────────────────────────── */
   const handleConfirm = async (shiftId) => {
     setConfirming(shiftId);
@@ -136,6 +147,35 @@ export default function MyShiftsPage() {
     } finally {
       setConfirming(null);
     }
+  };
+
+  const handleComplete = async (shiftId) => {
+    setCompleting(shiftId);
+    setMessage('');
+    try {
+      await shiftService.completeShift(shiftId);
+      setMessageType('success');
+      setMessage(t('myShifts.completeSuccess'));
+      loadShifts();
+    } catch (err) {
+      setMessageType('error');
+      setMessage(resolveApiError(err, t, 'myShifts.completeError'));
+    } finally {
+      setCompleting(null);
+    }
+  };
+
+  const canCompleteShift = (shift, startTime, endTime) => {
+    if (shift.status !== 'confirmed') return false;
+    const workDateStr = toVNDateString(shift.workDate);
+    if (!workDateStr) return false;
+    return isWithinPostShiftCompleteWindow(workDateStr, startTime, endTime, tickNow);
+  };
+
+  const getCompleteMinutesRemaining = (shift, startTime, endTime) => {
+    const workDateStr = toVNDateString(shift.workDate);
+    if (!workDateStr) return 0;
+    return getPostShiftCompleteMinutesRemaining(workDateStr, startTime, endTime, tickNow);
   };
 
   /* ── Stats ───────────────────────────────────────────────── */
@@ -356,6 +396,25 @@ export default function MyShiftsPage() {
                             <CheckCircle2 size={14} />
                             {confirming === shift._id ? t('myShifts.confirming') : t('myShifts.confirmShift')}
                           </button>
+                        </div>
+                      )}
+
+                      {canCompleteShift(shift, startTime, endTime) && (
+                        <div className="ms-shift-card__actions">
+                          <button
+                            type="button"
+                            className="ms-btn ms-btn--primary ms-btn--small"
+                            disabled={completing === shift._id}
+                            onClick={() => handleComplete(shift._id)}
+                          >
+                            <Award size={14} />
+                            {completing === shift._id ? t('myShifts.completing') : t('myShifts.completeShift')}
+                          </button>
+                          <span className="ms-shift-card__window-hint">
+                            {t('myShifts.completeWindowRemaining', {
+                              minutes: getCompleteMinutesRemaining(shift, startTime, endTime),
+                            })}
+                          </span>
                         </div>
                       )}
                     </div>

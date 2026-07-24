@@ -67,6 +67,35 @@ const getShiftEndDateTime = (workDateStr, startTime, endTime) => {
   return buildTaskDateTime(endDateStr, endTime);
 };
 
+export { getShiftEndDateTime };
+
+const POST_SHIFT_COMPLETE_GRACE_MS = 15 * 60 * 1000;
+
+export const isWithinPostShiftCompleteWindow = (
+  workDateStr,
+  startTime,
+  endTime,
+  now = new Date()
+) => {
+  const endAt = getShiftEndDateTime(workDateStr, startTime, endTime);
+  if (!endAt) return false;
+  const deadline = new Date(endAt.getTime() + POST_SHIFT_COMPLETE_GRACE_MS);
+  return now >= endAt && now <= deadline;
+};
+
+export const getPostShiftCompleteMinutesRemaining = (
+  workDateStr,
+  startTime,
+  endTime,
+  now = new Date()
+) => {
+  const endAt = getShiftEndDateTime(workDateStr, startTime, endTime);
+  if (!endAt) return 0;
+  const deadline = new Date(endAt.getTime() + POST_SHIFT_COMPLETE_GRACE_MS);
+  if (now < endAt || now > deadline) return 0;
+  return Math.max(1, Math.ceil((deadline - now) / 60000));
+};
+
 /** True when shift end instant (VN) is at or before now. */
 export const isShiftEnded = (workDateStr, startTime, endTime, now = new Date()) => {
   const endAt = getShiftEndDateTime(workDateStr, startTime, endTime);

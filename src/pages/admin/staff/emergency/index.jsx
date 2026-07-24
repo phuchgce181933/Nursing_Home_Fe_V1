@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Eye } from 'lucide-react';
 import staffService from '../../../../services/staff.service';
 import ListPagination from '../../../../components/ui/ListPagination';
 import useClientPagination from '../../../../hooks/useClientPagination';
@@ -12,7 +13,7 @@ import {
   formatResponsibleFloorLabels,
 } from '../../../../utils/staffAvailabilityDisplay';
 import facilityService from '../../../../services/facility.service';
-import { floorLabel } from '../../../../components/facility/FloorRoomSelect';
+import { formatFloorWithBuilding } from '../../../../utils/residentArea';
 import EmergencyStaffDetailModal from './EmergencyStaffDetailModal';
 import AdminPageShell from '../../../../components/admin/AdminPageShell';
 import '../../../../styles/admin/EmergencyAvailabilityPage.css';
@@ -76,6 +77,7 @@ export default function EmergencyAvailabilityPage() {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [liveConnected, setLiveConnected] = useState(false);
   const [floorOptions, setFloorOptions] = useState([]);
+  const [buildingOptions, setBuildingOptions] = useState([]);
   const [detailPerson, setDetailPerson] = useState(null);
 
   const timerRef = useRef(null);
@@ -84,11 +86,40 @@ export default function EmergencyAvailabilityPage() {
 
   const isToday = checkDate === getLocalDateString();
 
+  const floorById = useMemo(() => {
+    const map = new Map();
+    for (const floor of floorOptions) {
+      if (floor?._id) map.set(String(floor._id), floor);
+    }
+    return map;
+  }, [floorOptions]);
+
+  const buildingById = useMemo(() => {
+    const map = new Map();
+    for (const building of buildingOptions) {
+      if (building?._id) map.set(String(building._id), building);
+    }
+    return map;
+  }, [buildingOptions]);
+
+  const areaLookup = useMemo(
+    () => ({ floorById, buildingById }),
+    [floorById, buildingById]
+  );
+
   useEffect(() => {
-    facilityService
-      .listFloors({ activeOnly: true })
-      .then((data) => setFloorOptions(Array.isArray(data) ? data : []))
-      .catch(() => setFloorOptions([]));
+    Promise.all([
+      facilityService.listFloors({ activeOnly: true }),
+      facilityService.listBuildings({ activeOnly: true }),
+    ])
+      .then(([floors, buildings]) => {
+        setFloorOptions(Array.isArray(floors) ? floors : []);
+        setBuildingOptions(Array.isArray(buildings) ? buildings : []);
+      })
+      .catch(() => {
+        setFloorOptions([]);
+        setBuildingOptions([]);
+      });
   }, []);
 
   const applyPayload = useCallback((res) => {
@@ -299,7 +330,7 @@ export default function EmergencyAvailabilityPage() {
         >
           <option value="">{t('admin.staff.emergency.allFloors')}</option>
           {floorOptions.map((f) => (
-            <option key={f._id} value={f._id}>{floorLabel(f)}</option>
+            <option key={f._id} value={f._id}>{formatFloorWithBuilding(f, t, areaLookup)}</option>
           ))}
         </select>
         <button type="button" className="refresh-btn" onClick={loadFromApi}>
@@ -316,7 +347,6 @@ export default function EmergencyAvailabilityPage() {
               <th>{t('admin.staff.emergency.colName')}</th>
               <th>{t('common.colRole')}</th>
               <th>{t('admin.staff.emergency.colFloors')}</th>
-              <th>{t('admin.staff.emergency.colTasks')}</th>
               <th>{t('admin.staff.emergency.colReadiness')}</th>
               <th>{t('common.colActions')}</th>
             </tr>
@@ -324,20 +354,17 @@ export default function EmergencyAvailabilityPage() {
           <tbody>
             {loading && !data.length && (
               <tr>
-                <td colSpan={6} className="empty-state">{t('common.loading')}</td>
+                <td colSpan={5} className="empty-state">{t('common.loading')}</td>
               </tr>
             )}
             {!loading && filtered.length === 0 && (
               <tr>
-                <td colSpan={6} className="empty-state">{t('admin.staff.emergency.emptyFiltered')}</td>
+                <td colSpan={5} className="empty-state">{t('admin.staff.emergency.emptyFiltered')}</td>
               </tr>
             )}
             {paginatedStaff.map((person) => {
               const cfg = resolveReadiness(person, t);
-              const floorLabelText = formatResponsibleFloorLabels(person, t);
-              const taskLabel = person.hasTasks
-                ? t('admin.staff.emergency.hasTasks')
-                : '—';
+              const floorLabelText = formatResponsibleFloorLabels(person, t, areaLookup);
 
               return (
                 <tr key={person._id}>
@@ -356,11 +383,6 @@ export default function EmergencyAvailabilityPage() {
                     {floorLabelText}
                   </td>
                   <td>
-                    <span className={person.hasTasks ? 'task-active' : 'task-inactive'}>
-                      {taskLabel}
-                    </span>
-                  </td>
-                  <td>
                     <span className={`avail-badge avail-badge--${cfg.badge}`}>
                       <span className={`avail-dot avail-dot--${cfg.dot}`} />
                       {cfg.label}
@@ -371,8 +393,10 @@ export default function EmergencyAvailabilityPage() {
                       type="button"
                       className="emergency-detail-btn"
                       onClick={() => setDetailPerson(person)}
+                      aria-label={t('admin.staff.emergency.detail')}
+                      title={t('admin.staff.emergency.detail')}
                     >
-                      {t('admin.staff.emergency.detail')}
+                      <Eye size={16} />
                     </button>
                   </td>
                 </tr>
@@ -396,6 +420,7 @@ export default function EmergencyAvailabilityPage() {
           person={detailPerson}
           readinessConfig={resolveReadiness(detailPerson, t)}
           checkDateLabel={formatCheckDate(checkDate, i18n.language)}
+          floorById={areaLookup}
           onClose={() => setDetailPerson(null)}
         />
       )}

@@ -142,6 +142,8 @@ export const roleSidebarData = {
 
   pharmacist: [
     { title: 'sidebar.pharmacyOverview', icon: LayoutDashboard, path: '/pharmacist/overview' },
+    { title: 'sidebar.myShifts', icon: Calendar, path: '/pharmacist/my-shifts' },
+    { title: 'sidebar.staffLeave', icon: CalendarOff, path: '/pharmacist/leave' },
     { title: 'sidebar.myProfile', icon: UserCircle, path: '/pharmacist/profile' },
     { title: 'sidebar.medication', icon: Pill, path: '/pharmacist/medications' },
     { title: 'sidebar.pharmacySuppliers', icon: Truck, path: '/pharmacist/suppliers' },

@@ -43,6 +43,24 @@
   background: #bfdbfe;
 }
 
+.resident-icon-btn--skip {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.resident-icon-btn--skip:hover {
+  background: #fde68a;
+}
+
+.resident-icon-btn--delete {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.resident-icon-btn--delete:hover {
+  background: #fecaca;
+}
+
 .resident-icon-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;

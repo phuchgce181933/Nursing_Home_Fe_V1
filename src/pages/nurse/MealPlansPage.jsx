@@ -103,7 +103,6 @@ function MealPlanTab() {
   const [dishCatalog, setDishCatalog] = useState([]);
   const [error, setError] = useState('');
   const suppressScheduleLoadRef = useRef(false);
-  const coverageByResident = useNutritionCoverage(formWorkDate, residents);
 
   const hasSelectedSchedule = Boolean(mealTimeScheduleDayId);
 
@@ -112,6 +111,15 @@ function MealPlanTab() {
     const allowed = new Set(scheduleResidentIds);
     return residents.filter((r) => allowed.has(String(r._id)));
   }, [residents, hasSelectedSchedule, scheduleResidentIds]);
+
+  const coverageByResident = useNutritionCoverage(formWorkDate, selectableResidents);
+
+  useEffect(() => {
+    if (!Object.keys(coverageByResident).length) return;
+    setSelectedResidents((prev) =>
+      prev.filter((id) => !getResidentCoverage(coverageByResident, id, 'mealPlan').published)
+    );
+  }, [coverageByResident]);
 
   const resolveMealTime = (residentId, mealType) => {
     const rid = String(residentId || '');
@@ -166,27 +174,6 @@ function MealPlanTab() {
       setLoading(false);
     }
   };
-
-  const loadPublishedMealTimes = useCallback(() => {
-    if (!mealTimeScheduleDayId) {
-      setPublishedTimes({ byResident: {}, source: 'system_default' });
-      return;
-    }
-    mealTimeScheduleService
-      .getPublishedTimes({
-        workDate: formWorkDate,
-        residentIds: selectedResidents.join(','),
-      })
-      .then((data) => {
-        setPublishedTimes({
-          byResident: data?.byResident || {},
-          source: data?.source || 'system_default',
-        });
-      })
-      .catch(() => {
-        setPublishedTimes({ byResident: {}, source: 'system_default' });
-      });
-  }, [formWorkDate, selectedResidents, mealTimeScheduleDayId]);
 
   const syncScheduleContext = useCallback(
     async (scheduleId, { preserveSelections = false } = {}) => {
@@ -281,10 +268,6 @@ function MealPlanTab() {
     }
     loadPublishedSchedules(formWorkDate);
   }, [formWorkDate, loadPublishedSchedules]);
-
-  useEffect(() => {
-    loadPublishedMealTimes();
-  }, [loadPublishedMealTimes]);
 
   const handleWorkDateChange = (nextDate) => {
     setFormWorkDate(nextDate);
@@ -623,15 +606,17 @@ function MealPlanTab() {
                 : t(`${TAB}.residentsLabel`)} *
             </label>
             <div className="mp-resident-grid">
-              {(hasSelectedSchedule ? selectableResidents : residents).map((r) => {
+              {hasSelectedSchedule ? (
+                selectableResidents.map((r) => {
                 const id = String(r._id);
                 const checked = selectedResidents.includes(id);
-                const disabled = !hasSelectedSchedule;
                 const planCoverage = getResidentCoverage(coverageByResident, id, 'mealPlan');
+                const covered = planCoverage.published;
+                const disabled = covered;
                 return (
                   <label
                     key={id}
-                    className={`mp-resident-item${disabled ? ' mp-resident-item--disabled' : ''}${planCoverage.published ? ' mp-resident-item--covered' : ''}`}
+                    className={`mp-resident-item${disabled ? ' mp-resident-item--disabled' : ''}${covered ? ' mp-resident-item--covered' : ''}`}
                   >
                     <input
                       type="checkbox"
@@ -653,7 +638,14 @@ function MealPlanTab() {
                     />
                   </label>
                 );
-              })}
+              })
+              ) : (
+                <p className="mp-hint mp-hint--inline">
+                  {publishedSchedules.length
+                    ? t(`${TAB}.selectScheduleHint`)
+                    : t(`${TAB}.noPublishedScheduleHint`)}
+                </p>
+              )}
             </div>
           </div>
 

@@ -158,7 +158,7 @@ export default function StaffEditModal({
             </div>
 
             <div className="form-group">
-              <label>{t('admin.staff.profiles.labelDateOfBirth')}</label>
+              <label>{t('admin.staff.profiles.labelDateOfBirthRequired')}</label>
               <input
                 type="date"
                 value={form.dateOfBirth || ''}

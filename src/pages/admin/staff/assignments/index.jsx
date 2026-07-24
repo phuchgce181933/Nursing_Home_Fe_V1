@@ -1,933 +1,37 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { resolveApiError, resolveApiSuccess } from '../../../../utils/apiMessage';
 import staffService from '../../../../services/staff.service';
 import careTaskService from '../../../../services/careTask.service';
-import facilityService from '../../../../services/facility.service';
 import ListPagination from '../../../../components/ui/ListPagination';
 import useDebouncedSearch from '../../../../hooks/useDebouncedSearch';
 import useClientPagination from '../../../../hooks/useClientPagination';
-import { floorLabel, roomLabel } from '../../../../components/facility/FloorRoomSelect';
-import {
-  canAssignAreas,
-  canAssignResidents,
-  canReceiveCareTask,
-  NON_ASSIGNABLE_ROLES,
-} from '../../../../utils/staffAssignable';
+import { canReceiveCareTask } from '../../../../utils/staffAssignable';
 import { isStaffOnLeaveForAssignment } from '../../../../utils/leaveUtils';
-import { getApiErrorPayload, blockingCareTasksMessage } from '../../../../utils/blockingCareTasks';
-import BlockingCareTasksAlert from '../../../../components/staff/BlockingCareTasksAlert';
 import AdminPageShell from '../../../../components/admin/AdminPageShell';
-import { filterShiftsNotEnded, todayVN } from '../../../../utils/dateUtils';
+import { useAuth } from '../../../../hooks/useAuth';
+import { todayVN } from '../../../../utils/dateUtils';
+import { findStaffDutyGapConflict } from '../../../../utils/careTaskValidation';
+import {
+  ASSIGNMENT_TABS,
+  TASK_TYPE_VALUES,
+  CARE_LEVEL_VALUES,
+  buildShiftTimeLabel,
+  careLevelLabel,
+  filterAssignableStaff,
+  filterEligibleShifts,
+  formatAssignmentDate,
+  getAssignmentBasePath,
+  isStaffVisibleForAreaResidentTabs,
+  residentPickerLabel,
+  roleLabel,
+  shiftStatusLabel,
+  taskTypeLabel,
+} from './assignmentHelpers';
+import { Alert, AssignmentDeleteIconButton, AssignmentSkipIconButton, useMinuteNow } from './assignmentShared';
 import '../../../../styles/admin/StaffAssignmentPage.css';
-
-const TASK_TYPE_VALUES = [
-  'morning_care',
-  'medication',
-  'physical_therapy',
-  'meal_assistance',
-  'evening_check',
-  'emergency_response',
-];
-const CARE_LEVEL_VALUES = ['low', 'medium', 'high'];
-const CARE_LEVEL_EMOJI = { low: '🟢', medium: '🟠', high: '🔴' };
-
-const dateLocale = (language) => (language === 'vi' ? 'vi-VN' : 'en-US');
-
-const taskTypeLabel = (t, value) =>
-  t(`admin.staff.assignments.taskTypes.${value}`, { defaultValue: value });
-
-const careLevelLabel = (t, value) => {
-  const emoji = CARE_LEVEL_EMOJI[value] || '';
-  const label = t(`common.careLevel.${value}`, { defaultValue: value });
-  return emoji ? `${emoji} ${label}` : label;
-};
-
-const roleLabel = (t, role) => t(`common.roles.${role}`, { defaultValue: role });
-
-const shiftStatusLabel = (t, status) =>
-  t(`common.shiftStatus.${status}`, { defaultValue: status });
-
-const filterAssignableStaff = (list) =>
-  (list || []).filter(
-    (s) => !NON_ASSIGNABLE_ROLES.includes(String(s.role || '').toLowerCase())
-  );
-
-const ELIGIBLE_SHIFT_STATUSES = ['published', 'confirmed'];
-
-const filterEligibleShifts = (shifts) =>
-  (shifts || []).filter((s) => ELIGIBLE_SHIFT_STATUSES.includes(s.status));
-
-const buildShiftTimeLabel = (shifts) =>
-  shifts.length ? shifts.map((s) => `${s.startTime} – ${s.endTime}`).join(', ') : '';
-
-const resolveShiftSummaryForDisplay = (summary, assignmentDate, now = new Date()) => {
-  if (!summary) return null;
-  const active = filterShiftsNotEnded(
-    filterEligibleShifts(summary.shiftsOnDate),
-    assignmentDate,
-    now
-  );
-  return {
-    ...summary,
-    shiftsOnDate: active,
-    hasShiftOnDate: active.length > 0,
-    shiftTimeLabel: buildShiftTimeLabel(active),
-  };
-};
-
-const hasActiveShiftOnDate = (staff, assignmentDate, displayNow) => {
-  const resolved = resolveShiftSummaryForDisplay(staff?.shiftSummary, assignmentDate, displayNow);
-  return Boolean(resolved?.hasShiftOnDate);
-};
-
-/** Re-render every minute when viewing today so ended shifts disappear without reload. */
-function useMinuteNow(enabled) {
-  const [now, setNow] = useState(() => new Date());
-  useEffect(() => {
-    if (!enabled) return undefined;
-    const id = setInterval(() => setNow(new Date()), 60_000);
-    return () => clearInterval(id);
-  }, [enabled]);
-  return now;
-}
-
-function formatAssignmentDate(iso, language) {
-  if (!iso) return '';
-  const d = new Date(`${iso}T00:00:00`);
-  return d.toLocaleDateString(dateLocale(language), {
-    weekday: 'short',
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  });
-}
-
-function NonAssignableBadge() {
-  const { t } = useTranslation();
-  return <span className="shift-badge shift-badge--muted">{t('admin.staff.assignments.badges.nonAssignable')}</span>;
-}
-
-/** Badge ca trong ngày (từ shiftSummary trên GET /api/staff?assignmentDate=) */
-function ShiftSummaryBadge({ summary, assignmentDate, displayNow, assignable = true }) {
-  const { t } = useTranslation();
-  if (!assignable) return <NonAssignableBadge />;
-  if (!summary) return <span className="shift-badge shift-badge--muted">—</span>;
-  const resolved = resolveShiftSummaryForDisplay(summary, assignmentDate, displayNow);
-  if (resolved.onLeave) return <span className="shift-badge shift-badge--leave">{t('admin.staff.assignments.badges.onLeave')}</span>;
-  if (resolved.hasShiftOnDate) {
-    const shifts = resolved.shiftsOnDate || [];
-    return (
-      <div className="shift-badge-group">
-        {shifts.map((sh) => (
-          <span
-            key={sh._id}
-            className="shift-badge shift-badge--on"
-            title={[sh.name, `${sh.startTime} – ${sh.endTime}`].filter(Boolean).join(' · ')}
-          >
-            {sh.startTime} – {sh.endTime}
-          </span>
-        ))}
-      </div>
-    );
-  }
-  return <span className="shift-badge shift-badge--off">{t('admin.staff.assignments.badges.noShift')}</span>;
-}
-
-/** Chi tiết ca trong panel phải — dùng shiftSummary.shiftsOnDate */
-function ShiftDetailPanel({ summary, assignmentDate, displayNow }) {
-  const { t, i18n } = useTranslation();
-  if (!summary) return null;
-  const resolved = resolveShiftSummaryForDisplay(summary, assignmentDate, displayNow);
-  const dateLabel = assignmentDate || resolved.assignmentDate;
-  return (
-    <div className="shift-detail-panel">
-      <div className="shift-detail-panel__title">
-        {t('admin.staff.assignments.shiftDetail.title', {
-          date: formatAssignmentDate(dateLabel, i18n.language),
-        })}
-      </div>
-      {resolved.onLeave && (
-        <p className="shift-detail-panel__hint shift-detail-panel__hint--warn">
-          {t('admin.staff.assignments.shiftDetail.onLeaveHint')}
-        </p>
-      )}
-      {!resolved.onLeave && resolved.shiftsOnDate?.length > 0 ? (
-        <ul className="shift-detail-panel__list">
-          {resolved.shiftsOnDate.map((sh) => (
-            <li key={sh._id} className="shift-detail-panel__item">
-              <span className="shift-detail-panel__name">{sh.name}</span>
-              <span className="shift-detail-panel__time">{sh.startTime} – {sh.endTime}</span>
-              <span className={`shift-status-tag shift-status-tag--${sh.status}`}>
-                {shiftStatusLabel(t, sh.status)}
-              </span>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        !resolved.onLeave && (
-          <p className="shift-detail-panel__hint">{t('admin.staff.assignments.shiftDetail.noShiftsHint')}</p>
-        )
-      )}
-    </div>
-  );
-}
-
-// ── Alert helper ──────────────────────────────────────────────────────────────
-function Alert({ type, msg }) {
-  if (!msg) return null;
-  const styles = {
-    success: { background: '#dcfce7', border: '1px solid #86efac', color: '#15803d' },
-    error:   { background: '#fef2f2', border: '1px solid #fca5a5', color: '#dc2626' },
-    warning: { background: '#fffbeb', border: '1px solid #fde68a', color: '#92400e' },
-  };
-  return (
-    <div style={{ ...styles[type], borderRadius: 8, padding: '8px 14px', marginBottom: 10, fontSize: '0.875rem' }}>
-      {msg}
-    </div>
-  );
-}
-
-// ── Tab 1: Area Assignment ────────────────────────────────────────────────────
-function AreaTab({ staff, staffPool, loading, assignmentDate, displayNow, onStaffUpdated, staffPagination }) {
-  const { t } = useTranslation();
-  const [selected, setSelected]         = useState(null);
-  const [selectedFloorIds, setSelectedFloorIds] = useState([]);
-  const [selectedRoomIds, setSelectedRoomIds]   = useState([]);
-  const [floors, setFloors]             = useState([]);
-  const [rooms, setRooms]               = useState([]);
-  const [loadingFloors, setLoadingFloors] = useState(true);
-  const [loadingRooms, setLoadingRooms]   = useState(false);
-  const [saving, setSaving]               = useState(false);
-  const [success, setSuccess]           = useState('');
-  const [error, setError]               = useState('');
-  const [blockingTasks, setBlockingTasks] = useState([]);
-  const [infos, setInfos]               = useState([]);
-
-  const floorLabelMap = useMemo(
-    () => Object.fromEntries(floors.map((f) => [f._id, floorLabel(f)])),
-    [floors]
-  );
-
-  useEffect(() => {
-    facilityService
-      .listFloors({ activeOnly: true })
-      .then((data) => setFloors(Array.isArray(data) ? data : []))
-      .catch(() => setFloors([]))
-      .finally(() => setLoadingFloors(false));
-  }, []);
-
-  useEffect(() => {
-    if (!selectedFloorIds.length) {
-      setRooms([]);
-      return undefined;
-    }
-    let cancelled = false;
-    setLoadingRooms(true);
-    Promise.all(selectedFloorIds.map((id) => facilityService.listRoomsByFloor(id)))
-      .then((results) => {
-        if (cancelled) return;
-        setRooms(results.flat());
-      })
-      .catch(() => {
-        if (!cancelled) setRooms([]);
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingRooms(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedFloorIds]);
-
-  const resolveAreaLabel = (area) => {
-    if (typeof area === 'object' && area !== null) {
-      return floorLabel(area);
-    }
-    return floorLabelMap[area] || area;
-  };
-
-  const toggleFloor = (id) => {
-    setSelectedFloorIds((prev) => {
-      const removing = prev.includes(id);
-      const next = removing ? prev.filter((x) => x !== id) : [...prev, id];
-      if (removing) {
-        setSelectedRoomIds((roomPrev) =>
-          roomPrev.filter((rid) => {
-            const room = rooms.find((r) => r._id === rid);
-            return !room || String(room.floorId) !== String(id);
-          })
-        );
-      }
-      return next;
-    });
-  };
-
-  const toggleRoom = (id) => {
-    setSelectedRoomIds((prev) =>
-      (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id])
-    );
-  };
-
-  useEffect(() => {
-    setSelected(null);
-    setSelectedFloorIds([]);
-    setSelectedRoomIds([]);
-    setSuccess('');
-    setError('');
-    setBlockingTasks([]);
-    setInfos([]);
-  }, [assignmentDate]);
-
-  useEffect(() => {
-    if (!selected) return;
-    const stillInPool = staffPool?.some((s) => s._id === selected._id);
-    if (!stillInPool || !hasActiveShiftOnDate(selected, assignmentDate, displayNow)) {
-      setSelected(null);
-      setSelectedFloorIds([]);
-      setSelectedRoomIds([]);
-      setSuccess('');
-      setError('');
-      setBlockingTasks([]);
-      setInfos([]);
-    }
-  }, [staffPool, selected, assignmentDate, displayNow]);
-
-  const handleSelect = (s) => {
-    if (!canAssignAreas(s) || isStaffOnLeaveForAssignment(s)) return;
-    setSelected(s);
-    setSuccess('');
-    setError('');
-    setBlockingTasks([]);
-    setInfos([]);
-    const { floorIds, roomIds } = areaIdsFromProfile(s.staffProfile);
-    setSelectedFloorIds(floorIds);
-    setSelectedRoomIds(roomIds);
-  };
-
-  const handleSave = async () => {
-    if (!selected) return;
-    setSaving(true);
-    setError('');
-    setBlockingTasks([]);
-    setSuccess('');
-    setInfos([]);
-    try {
-      const res = await staffService.assignAreas(selected._id, {
-        floorIds: selectedFloorIds,
-        roomIds: selectedRoomIds,
-      });
-      setSuccess(t('admin.staff.assignments.area.areaUpdated'));
-      const hints = res.info || res.warnings || [];
-      if (hints.length) setInfos(hints);
-
-      if (res.staffProfile) {
-        const { floorIds, roomIds } = areaIdsFromProfile(res.staffProfile);
-        setSelected((prev) =>
-          prev ? { ...prev, staffProfile: res.staffProfile } : prev
-        );
-        setSelectedFloorIds(floorIds);
-        setSelectedRoomIds(roomIds);
-      }
-
-      const pruned = res.residentsPruned;
-      if (pruned?.count > 0) {
-        const names = (pruned.removed || [])
-          .map((r) => {
-            const room = r.roomNumber ? `${t('admin.staff.assignments.residents.roomPrefix')}${r.roomNumber}` : '';
-            const label = r.fullName || r.residentCode || '';
-            return [label, room].filter(Boolean).join(' · ');
-          })
-          .filter(Boolean)
-          .join(', ');
-        setInfos((prev) => [
-          ...prev,
-          t('admin.staff.assignments.area.residentsPruned', {
-            count: pruned.count,
-            names: names ? t('admin.staff.assignments.area.residentsPrunedNames', { names }) : '',
-          }),
-        ]);
-      }
-
-      await onStaffUpdated?.();
-    } catch (e) {
-      const { message, blockingTasks: blocked } = getApiErrorPayload(e, t('common.saveFailed'));
-      setBlockingTasks(blocked);
-      setError(blocked.length ? blockingCareTasksMessage(message) : message);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="assignment-tab-layout">
-      {/* Staff list */}
-      <div className="data-table-wrap assignment-table-wrap">
-        <table className="data-table assignment-table">
-          <colgroup>
-            <col className="assignment-col assignment-col--name" />
-            <col className="assignment-col assignment-col--role" />
-            <col className="assignment-col assignment-col--shift" />
-            <col className="assignment-col assignment-col--area" />
-            <col className="assignment-col assignment-col--action" />
-          </colgroup>
-          <thead>
-            <tr>
-              <th>{t('admin.staff.assignments.area.colStaff')}</th>
-              <th title={t('admin.staff.assignments.area.colRole')}>{t('admin.staff.assignments.area.colRole')}</th>
-              <th title={t('admin.staff.assignments.area.colShift')}>{t('admin.staff.assignments.area.colShift')}</th>
-              <th title={t('admin.staff.assignments.area.colArea')}>{t('admin.staff.assignments.area.colArea')}</th>
-              <th aria-label={t('common.colActions')} />
-            </tr>
-          </thead>
-          <tbody>
-            {loading && <tr><td colSpan={5} className="empty-state">{t('admin.staff.assignments.area.loading')}</td></tr>}
-            {!loading && staff.length === 0 && (
-              <tr><td colSpan={5} className="empty-state">{t('admin.staff.assignments.area.emptyStaff')}</td></tr>
-            )}
-            {!loading && staff.map((s) => {
-              const areas = s.staffProfile?.responsibleAreaIds || [];
-              return (
-                <tr key={s._id} style={{ background: selected?._id === s._id ? '#eff6ff' : undefined }}>
-                  <td className="assignment-table__cell--name">{s.fullName}</td>
-                  <td>{roleLabel(t, s.role)}</td>
-                  <td className="assignment-table__cell--badges">
-                    <ShiftSummaryBadge
-                      summary={s.shiftSummary}
-                      assignmentDate={assignmentDate}
-                      displayNow={displayNow}
-                      assignable={canAssignAreas(s)}
-                    />
-                  </td>
-                  <td className="assignment-table__cell--badges">
-                    {areas.length ? (
-                      <div className="assignment-cell-badges">
-                        {areas.map((a) => (
-                          <span key={typeof a === 'object' ? a._id : a} className="area-badge">
-                            {resolveAreaLabel(a)}
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <span className="assignment-table__empty">{t('admin.staff.assignments.badges.notAssigned')}</span>
-                    )}
-                  </td>
-                  <td className="assignment-table__cell--actions">
-                    {canAssignAreas(s) ? (
-                      isStaffOnLeaveForAssignment(s) ? (
-                        <span className="shift-badge shift-badge--leave">{t('admin.staff.assignments.badges.onLeave')}</span>
-                      ) : (
-                        <button
-                          className="btn btn--sm btn--edit"
-                          onClick={() => handleSelect(s)}
-                          disabled={!s.staffProfile}
-                          title={!s.staffProfile ? t('admin.staff.assignments.area.noProfile') : undefined}
-                        >
-                          {t('admin.staff.assignments.area.selectStaff')}
-                        </button>
-                      )
-                    ) : (
-                      <NonAssignableBadge />
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-        {!loading && staff.length > 0 && staffPagination && (
-          <ListPagination
-            page={staffPagination.page}
-            totalPages={staffPagination.totalPages}
-            total={staffPagination.total}
-            onPageChange={staffPagination.onPageChange}
-          />
-        )}
-      </div>
-
-      {/* Edit panel */}
-      <div className="assignment-panel">
-        {!selected ? (
-          <div className="empty-state">{t('admin.staff.assignments.area.emptyPanel')}</div>
-        ) : !canAssignAreas(selected) ? (
-          <div className="empty-state empty-state--warn">
-            {t('admin.staff.assignments.area.adminManagerWarn')}
-          </div>
-        ) : !selected.staffProfile ? (
-          <div className="empty-state empty-state--warn">{t('admin.staff.assignments.area.noProfileWarn')}</div>
-        ) : isStaffOnLeaveForAssignment(selected) ? (
-          <div className="empty-state empty-state--warn">
-            {t('admin.staff.assignments.area.onLeaveWarn')}
-          </div>
-        ) : (
-          <>
-            <div style={{ fontWeight: 600, fontSize: '1rem', marginBottom: 14 }}>
-              {t('admin.staff.assignments.area.panelTitle', { name: selected.fullName })}
-            </div>
-            <Alert type="success" msg={success} />
-            {blockingTasks.length > 0 ? (
-              <BlockingCareTasksAlert
-                message={error}
-                tasks={blockingTasks}
-                hint={t('admin.staff.assignments.careTaskTabHint')}
-              />
-            ) : (
-              <Alert type="error" msg={error} />
-            )}
-            {infos.map((msg, i) => <Alert key={i} type="warning" msg={`ℹ️ ${msg}`} />)}
-
-            <ShiftDetailPanel
-              summary={selected.shiftSummary}
-              assignmentDate={assignmentDate}
-              displayNow={displayNow}
-            />
-
-            <p style={{ fontSize: '0.78rem', color: '#64748b', marginBottom: 12, lineHeight: 1.45 }}>
-              {t('admin.staff.assignments.area.masterDataHint')}
-            </p>
-
-            <div className="form-group" style={{ marginBottom: 14 }}>
-              <label>{t('admin.staff.assignments.area.floorsLabel')}</label>
-              {loadingFloors ? (
-                <p className="field-hint">{t('admin.staff.assignments.area.loadingFloors')}</p>
-              ) : (
-                <div className="area-multi-select">
-                  {floors.length === 0 && <p className="field-hint">{t('admin.staff.assignments.area.noFloors')}</p>}
-                  {floors.map((f) => (
-                    <label key={f._id} className="area-multi-select__item">
-                      <input
-                        type="checkbox"
-                        checked={selectedFloorIds.includes(f._id)}
-                        onChange={() => toggleFloor(f._id)}
-                      />
-                      <span>{floorLabel(f)}</span>
-                    </label>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="form-group" style={{ marginBottom: 20 }}>
-              <label>{t('admin.staff.assignments.area.roomsLabel')}</label>
-              {!selectedFloorIds.length ? (
-                <p className="field-hint">{t('admin.staff.assignments.area.selectFloorFirst')}</p>
-              ) : loadingRooms ? (
-                <p className="field-hint">{t('admin.staff.assignments.area.loadingRooms')}</p>
-              ) : (
-                <div className="area-multi-select">
-                  {rooms.length === 0 && <p className="field-hint">{t('admin.staff.assignments.area.noRooms')}</p>}
-                  {rooms.map((r) => (
-                    <label key={r._id} className="area-multi-select__item">
-                      <input
-                        type="checkbox"
-                        checked={selectedRoomIds.includes(r._id)}
-                        onChange={() => toggleRoom(r._id)}
-                      />
-                      <span>{roomLabel(r)}</span>
-                    </label>
-                  ))}
-                </div>
-              )}
-            </div>
-            <button className="btn btn--primary" onClick={handleSave} disabled={saving}>
-              {saving ? t('common.saving') : t('admin.staff.assignments.area.saveArea')}
-            </button>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function assignedResidentIdsFromProfile(profile) {
-  return (profile?.assignedResidentIds || []).map((r) =>
-    String(typeof r === 'object' ? r._id : r)
-  );
-}
-
-function areaIdsFromProfile(profile) {
-  const floorIds = (profile?.responsibleAreaIds || []).map((f) =>
-    String(typeof f === 'object' ? f._id : f)
-  );
-  const roomIds = (profile?.responsibleRoomIds || []).map((r) =>
-    String(typeof r === 'object' ? r._id : r)
-  );
-  return { floorIds, roomIds };
-}
-
-function residentPickerLabel(r, t) {
-  const room = r.roomId;
-  const roomNum = typeof room === 'object' ? room?.roomNumber : '';
-  const code = r.residentCode ? ` (${r.residentCode})` : '';
-  const roomPrefix = t('admin.staff.assignments.residents.roomPrefix');
-  return `${r.fullName || t('admin.staff.assignments.residents.defaultResidentLabel')}${code}${roomNum ? ` · ${roomPrefix}${roomNum}` : ''}`;
-}
-
-// ── Tab 2: Resident Assignment ────────────────────────────────────────────────
-function ResidentTab({ staff, staffPool, loading, assignmentDate, displayNow, onStaffUpdated, staffPagination }) {
-  const { t, i18n } = useTranslation();
-  const [selected, setSelected]           = useState(null);
-  const [selectedResidentIds, setSelectedResidentIds] = useState([]);
-  const [residentOptions, setResidentOptions] = useState([]);
-  const [loadingResidents, setLoadingResidents] = useState(false);
-  const [residentHint, setResidentHint]   = useState('');
-  const [residentFilterMode, setResidentFilterMode] = useState(null);
-  const [residentSearch, setResidentSearch] = useState('');
-  const [saving, setSaving]               = useState(false);
-  const [success, setSuccess]             = useState('');
-  const [error, setError]                 = useState('');
-  const [blockingTasks, setBlockingTasks] = useState([]);
-
-  useEffect(() => {
-    setSelected(null);
-    setResidentOptions([]);
-    setSelectedResidentIds([]);
-    setBlockingTasks([]);
-    setSuccess('');
-    setError('');
-    setResidentHint('');
-    setResidentSearch('');
-  }, [assignmentDate]);
-
-  useEffect(() => {
-    if (!selected) return;
-    const stillInPool = staffPool?.some((s) => s._id === selected._id);
-    if (!stillInPool || !hasActiveShiftOnDate(selected, assignmentDate, displayNow)) {
-      setSelected(null);
-      setResidentOptions([]);
-      setSelectedResidentIds([]);
-      setBlockingTasks([]);
-      setSuccess('');
-      setError('');
-      setResidentHint('');
-      setResidentSearch('');
-    }
-  }, [staffPool, selected, assignmentDate, displayNow]);
-
-  const areaScopeKey = useMemo(() => {
-    if (!selected?._id) return '';
-    const p = staff.find((s) => s._id === selected._id)?.staffProfile || selected.staffProfile;
-    if (!p) return '';
-    const rooms = (p.responsibleRoomIds || []).map((r) => String(r._id || r)).sort().join(',');
-    const floors = (p.responsibleAreaIds || []).map((f) => String(f._id || f)).sort().join(',');
-    if (!rooms && !floors) return '_none_';
-    return `${rooms}|${floors}`;
-  }, [selected?._id, staff]);
-
-  const loadResidentsForStaff = async (member) => {
-    if (!member?._id) return;
-    if (!member.staffProfile) {
-      setResidentOptions([]);
-      setResidentFilterMode(null);
-      setResidentHint(t('admin.staff.assignments.residents.noProfileHint'));
-      return;
-    }
-
-    setLoadingResidents(true);
-    setResidentHint('');
-    setResidentFilterMode(null);
-    try {
-      const res = await staffService.listResidentsAvailable(member._id, {
-        status: 'admitted',
-      });
-      const list = Array.isArray(res.data) ? res.data : [];
-      setResidentFilterMode(res.filterMode || null);
-      setResidentOptions(
-        [...list].sort((a, b) =>
-          (a.fullName || '').localeCompare(b.fullName || '', i18n.language === 'vi' ? 'vi' : 'en')
-        )
-      );
-      if (res.message) {
-        setResidentHint(resolveApiSuccess(res, t));
-      } else if (!list.length) {
-        setResidentHint(
-          res.filterMode === 'rooms'
-            ? t('admin.staff.assignments.residents.noResidentsRooms')
-            : t('admin.staff.assignments.residents.noResidentsFloors')
-        );
-      }
-    } catch (e) {
-      setResidentOptions([]);
-      setResidentFilterMode(null);
-      setResidentHint(resolveApiError(e, t, 'admin.staff.assignments.residents.loadResidentsFailed'));
-    } finally {
-      setLoadingResidents(false);
-    }
-  };
-
-  const handleSelect = (s) => {
-    if (!canAssignResidents(s) || isStaffOnLeaveForAssignment(s)) return;
-    setSelected(s);
-    setSuccess('');
-    setError('');
-    setBlockingTasks([]);
-    setSelectedResidentIds(assignedResidentIdsFromProfile(s.staffProfile));
-    setResidentSearch('');
-  };
-
-  const syncAssignedResidents = async (member) => {
-    try {
-      const res = await staffService.listAssignedResidents(member._id);
-      const assigned = Array.isArray(res.data) ? res.data : [];
-      const ids = assigned.map((r) => String(r._id));
-      setSelectedResidentIds(ids);
-      setSelected((prev) =>
-        prev?._id === member._id
-          ? {
-              ...prev,
-              staffProfile: {
-                ...prev.staffProfile,
-                assignedResidentIds: assigned,
-              },
-            }
-          : prev
-      );
-      return assigned;
-    } catch {
-      const ids = assignedResidentIdsFromProfile(member.staffProfile);
-      setSelectedResidentIds(ids);
-      return null;
-    }
-  };
-
-  useEffect(() => {
-    if (!selected?._id) return undefined;
-    let cancelled = false;
-    const fresh = staff.find((s) => s._id === selected._id) || selected;
-
-    (async () => {
-      setSelected((prev) => (prev?._id === fresh._id ? { ...fresh } : prev));
-      await syncAssignedResidents(fresh);
-      if (!cancelled) await loadResidentsForStaff(fresh);
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [selected?._id, areaScopeKey]);
-
-  const toggleResident = (id) => {
-    const sid = String(id);
-    setSelectedResidentIds((prev) =>
-      prev.includes(sid) ? prev.filter((x) => x !== sid) : [...prev, sid]
-    );
-  };
-
-  const filteredResidents = useMemo(() => {
-    const q = residentSearch.trim().toLowerCase();
-    if (!q) return residentOptions;
-    return residentOptions.filter((r) => {
-      const name = (r.fullName || '').toLowerCase();
-      const code = (r.residentCode || '').toLowerCase();
-      const room = r.roomId?.roomNumber?.toLowerCase?.() || '';
-      return name.includes(q) || code.includes(q) || room.includes(q);
-    });
-  }, [residentOptions, residentSearch]);
-
-  const handleSave = async () => {
-    if (!selected) return;
-    if (!selected.staffProfile) {
-      setError(t('admin.staff.assignments.residents.noProfileWarn'));
-      return;
-    }
-    setSaving(true);
-    setError('');
-    setBlockingTasks([]);
-    setSuccess('');
-    try {
-      const res = await staffService.assignResidents(selected._id, {
-        residentIds: selectedResidentIds,
-      });
-      setSuccess(t('admin.staff.assignments.residents.residentsUpdated'));
-      if (res.staffProfile) {
-        setSelected((prev) =>
-          prev ? { ...prev, staffProfile: res.staffProfile } : prev
-        );
-        setSelectedResidentIds(assignedResidentIdsFromProfile(res.staffProfile));
-      }
-      await onStaffUpdated?.();
-    } catch (e) {
-      const { message, blockingTasks: blocked } = getApiErrorPayload(e, t('common.saveFailed'));
-      setBlockingTasks(blocked);
-      setError(blocked.length ? blockingCareTasksMessage(message) : message);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="assignment-tab-layout">
-      <div className="data-table-wrap assignment-table-wrap">
-        <table className="data-table assignment-table">
-          <colgroup>
-            <col className="assignment-col assignment-col--name" />
-            <col className="assignment-col assignment-col--role" />
-            <col className="assignment-col assignment-col--shift" />
-            <col className="assignment-col assignment-col--area" />
-            <col className="assignment-col assignment-col--action" />
-          </colgroup>
-          <thead>
-            <tr>
-              <th>{t('admin.staff.assignments.area.colStaff')}</th>
-              <th title={t('admin.staff.assignments.area.colRole')}>{t('admin.staff.assignments.area.colRole')}</th>
-              <th title={t('admin.staff.assignments.area.colShift')}>{t('admin.staff.assignments.area.colShift')}</th>
-              <th title={t('admin.staff.assignments.residents.colResidents')}>{t('admin.staff.assignments.residents.colResidents')}</th>
-              <th aria-label={t('common.colActions')} />
-            </tr>
-          </thead>
-          <tbody>
-            {loading && <tr><td colSpan={5} className="empty-state">{t('admin.staff.assignments.area.loading')}</td></tr>}
-            {!loading && staff.length === 0 && (
-              <tr><td colSpan={5} className="empty-state">{t('admin.staff.assignments.area.emptyStaff')}</td></tr>
-            )}
-            {!loading && staff.map((s) => {
-              const residents = s.staffProfile?.assignedResidentIds || [];
-              return (
-                <tr key={s._id} style={{ background: selected?._id === s._id ? '#eff6ff' : undefined }}>
-                  <td className="assignment-table__cell--name">{s.fullName}</td>
-                  <td>{roleLabel(t, s.role)}</td>
-                  <td className="assignment-table__cell--badges">
-                    <ShiftSummaryBadge
-                      summary={s.shiftSummary}
-                      assignmentDate={assignmentDate}
-                      displayNow={displayNow}
-                      assignable={canAssignResidents(s)}
-                    />
-                  </td>
-                  <td>
-                    {residents.length
-                      ? <span className="assignment-table__count">{t('admin.staff.assignments.residents.residentCount', { count: residents.length })}</span>
-                      : <span className="assignment-table__empty">{t('admin.staff.assignments.residents.notAssigned')}</span>}
-                  </td>
-                  <td className="assignment-table__cell--actions">
-                    {canAssignResidents(s) ? (
-                      isStaffOnLeaveForAssignment(s) ? (
-                        <span className="shift-badge shift-badge--leave">{t('admin.staff.assignments.badges.onLeave')}</span>
-                      ) : (
-                        <button
-                          className="btn btn--sm btn--edit"
-                          onClick={() => handleSelect(s)}
-                          disabled={!s.staffProfile}
-                          title={!s.staffProfile ? t('admin.staff.assignments.area.noProfile') : undefined}
-                        >
-                          {t('admin.staff.assignments.area.selectStaff')}
-                        </button>
-                      )
-                    ) : (
-                      <NonAssignableBadge />
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-        {!loading && staff.length > 0 && staffPagination && (
-          <ListPagination
-            page={staffPagination.page}
-            totalPages={staffPagination.totalPages}
-            total={staffPagination.total}
-            onPageChange={staffPagination.onPageChange}
-          />
-        )}
-      </div>
-
-      <div className="assignment-panel">
-        {!selected ? (
-          <div className="empty-state">{t('admin.staff.assignments.residents.emptyPanel')}</div>
-        ) : !canAssignResidents(selected) ? (
-          <div className="empty-state empty-state--warn">
-            {t('admin.staff.assignments.residents.adminManagerWarn')}
-          </div>
-        ) : !selected.staffProfile ? (
-          <div className="empty-state empty-state--warn">{t('admin.staff.assignments.residents.noProfileWarn')}</div>
-        ) : isStaffOnLeaveForAssignment(selected) ? (
-          <div className="empty-state empty-state--warn">
-            {t('admin.staff.assignments.residents.onLeaveWarn')}
-          </div>
-        ) : (
-          <>
-            <div style={{ fontWeight: 600, fontSize: '1rem', marginBottom: 14 }}>
-              {t('admin.staff.assignments.residents.panelTitle', { name: selected.fullName })}
-            </div>
-            <Alert type="success" msg={success} />
-            {blockingTasks.length > 0 ? (
-              <BlockingCareTasksAlert
-                message={error}
-                tasks={blockingTasks}
-                hint={t('admin.staff.assignments.careTaskTabHint')}
-              />
-            ) : (
-              <Alert type="error" msg={error} />
-            )}
-            <ShiftDetailPanel
-              summary={selected.shiftSummary}
-              assignmentDate={assignmentDate}
-              displayNow={displayNow}
-            />
-
-            <p style={{ fontSize: '0.78rem', color: '#64748b', marginBottom: 12, lineHeight: 1.45 }}>
-              {residentFilterMode === 'rooms'
-                ? t('admin.staff.assignments.residents.filterRoomsHint')
-                : residentFilterMode === 'floors'
-                  ? t('admin.staff.assignments.residents.filterFloorsHint')
-                  : t('admin.staff.assignments.residents.filterDefaultHint')}
-              {' '}{t('admin.staff.assignments.residents.clearAllHint')}
-            </p>
-
-            {residentHint && (
-              <p className="field-hint field-hint--warn" style={{ marginBottom: 10 }}>{residentHint}</p>
-            )}
-
-            <div className="form-group" style={{ marginBottom: 12 }}>
-              <label>{t('admin.staff.assignments.residents.searchLabel')}</label>
-              <input
-                type="search"
-                value={residentSearch}
-                onChange={(e) => setResidentSearch(e.target.value)}
-                placeholder={t('admin.staff.assignments.residents.searchPlaceholder')}
-                disabled={loadingResidents || !residentOptions.length}
-              />
-            </div>
-
-            <div className="form-group" style={{ marginBottom: 16 }}>
-              <label>
-                {t('admin.staff.assignments.residents.selectResidents', { count: selectedResidentIds.length })}
-              </label>
-              {loadingResidents ? (
-                <p className="field-hint">{t('admin.staff.assignments.residents.loadingResidents')}</p>
-              ) : (
-                <div className="area-multi-select resident-picker">
-                  {filteredResidents.length === 0 && !residentHint && (
-                    <p className="field-hint">{t('admin.staff.assignments.residents.noMatchingResidents')}</p>
-                  )}
-                  {filteredResidents.map((r) => (
-                    <label key={r._id} className="area-multi-select__item">
-                      <input
-                        type="checkbox"
-                        checked={selectedResidentIds.includes(String(r._id))}
-                        onChange={() => toggleResident(r._id)}
-                      />
-                      <span>{residentPickerLabel(r, t)}</span>
-                    </label>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <button
-              className="btn btn--primary"
-              onClick={handleSave}
-              disabled={saving || loadingResidents}
-            >
-              {saving ? t('common.saving') : t('admin.staff.assignments.residents.saveResidents')}
-            </button>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
+import { AreaTab, ResidentTab } from './AssignmentListTabs';
 
 // ── Tab 3: Care Tasks ───────────────────────────────────────────────────────
 /** Admin/manager may only skip (not in_progress/completed) */
@@ -1215,6 +319,17 @@ function CareTaskTab({ staff }) {
       );
       return;
     }
+    const gapConflictTime = findStaffDutyGapConflict(
+      scheduledTimeTrimmed,
+      tasks,
+      form.staffProfileId
+    );
+    if (gapConflictTime) {
+      setSaveErr(
+        t('admin.staff.assignments.tasks.dutyGapTooSmallError', { conflictTime: gapConflictTime })
+      );
+      return;
+    }
     setSaving(true);
     try {
       const payload = {
@@ -1495,19 +610,20 @@ function CareTaskTab({ staff }) {
                       <small className="field-hint" style={{ display: 'block' }}>{t('admin.staff.assignments.tasks.shiftMissed')}</small>
                     )}
                   </td>
-                  <td className="assignment-table__cell--actions">
-                    <div className="assignment-action-group">
+                  <td className="assignment-table__cell--actions resident-action-cell">
+                    <div className="resident-action-group assignment-action-group">
                     {next.map((s) => (
-                      <button
+                      <AssignmentSkipIconButton
                         key={s}
-                        className="btn btn--sm btn--edit"
+                        title={taskStatusLabel(t, s)}
                         onClick={() => handleStatus(task._id, s)}
-                      >
-                        {taskStatusLabel(t, s)}
-                      </button>
+                      />
                     ))}
                     {task.status === 'pending' && (
-                      <button className="btn btn--sm btn--delete" onClick={() => handleDelete(task._id)}>{t('common.delete')}</button>
+                      <AssignmentDeleteIconButton
+                        title={t('common.delete')}
+                        onClick={() => handleDelete(task._id)}
+                      />
                     )}
                     </div>
                   </td>
@@ -1539,21 +655,62 @@ const TABS = (t) => [
 
 export default function StaffAssignmentPage() {
   const { t, i18n } = useTranslation();
+  const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const tabs = TABS(t);
-  const [activeTab, setActiveTab] = useState('area');
-  const [assignmentDate, setAssignmentDate] = useState(() => todayVN());
-  const [allStaff, setAllStaff]   = useState([]);
-  const [loading, setLoading]     = useState(false);
+  const basePath = getAssignmentBasePath(user?.role);
+
+  const tabFromUrl = searchParams.get('tab');
+  const activeTab = ASSIGNMENT_TABS.includes(tabFromUrl) ? tabFromUrl : 'area';
+
+  const dateFromUrl = searchParams.get('date');
+  const assignmentDate = dateFromUrl && dateFromUrl >= todayVN() ? dateFromUrl : todayVN();
+
+  const [allStaff, setAllStaff] = useState([]);
+  const [loading, setLoading] = useState(false);
   const { search: staffSearch, setSearch: setStaffSearch, debouncedSearch: debouncedStaffSearch } = useDebouncedSearch();
   const displayNow = useMinuteNow(assignmentDate === todayVN());
 
+  const updateSearchParams = useCallback(
+    (updates) => {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        Object.entries(updates).forEach(([key, value]) => {
+          if (value == null || value === '') next.delete(key);
+          else next.set(key, value);
+        });
+        return next;
+      }, { replace: true });
+    },
+    [setSearchParams]
+  );
+
+  useEffect(() => {
+    const minDate = todayVN();
+    const normalizedDate = assignmentDate < minDate ? minDate : assignmentDate;
+    const normalizedTab = ASSIGNMENT_TABS.includes(tabFromUrl) ? tabFromUrl : 'area';
+    if (normalizedDate !== dateFromUrl || normalizedTab !== tabFromUrl) {
+      updateSearchParams({ tab: normalizedTab, date: normalizedDate });
+    }
+  }, [assignmentDate, dateFromUrl, tabFromUrl, updateSearchParams]);
+
+  const setActiveTab = (tab) => {
+    updateSearchParams({ tab, date: assignmentDate });
+  };
+
+  const setAssignmentDate = (date) => {
+    const minDate = todayVN();
+    const nextDate = date < minDate ? minDate : date;
+    updateSearchParams({ tab: activeTab, date: nextDate });
+  };
+
   const filteredStaff = useMemo(() => {
-    const withShift = allStaff.filter((s) =>
-      hasActiveShiftOnDate(s, assignmentDate, displayNow)
+    const visible = allStaff.filter((s) =>
+      isStaffVisibleForAreaResidentTabs(s, assignmentDate, displayNow)
     );
     const q = debouncedStaffSearch.trim().toLowerCase();
-    if (!q) return withShift;
-    return withShift.filter(
+    if (!q) return visible;
+    return visible.filter(
       (s) =>
         (s.fullName || '').toLowerCase().includes(q)
         || (s.staffProfile?.staffCode || '').toLowerCase().includes(q)
@@ -1574,11 +731,6 @@ export default function StaffAssignmentPage() {
     total: staffTotal,
     onPageChange: setStaffPage,
   };
-
-  useEffect(() => {
-    const minDate = todayVN();
-    if (assignmentDate < minDate) setAssignmentDate(minDate);
-  }, [assignmentDate]);
 
   const loadStaff = useCallback(async () => {
     setLoading(true);
@@ -1640,26 +792,24 @@ export default function StaffAssignmentPage() {
       </div>
 
       <div className="tab-content">
-        {activeTab === 'area'      && (
+        {activeTab === 'area' && (
           <AreaTab
             staff={paginatedStaff}
-            staffPool={filteredStaff}
             loading={loading}
             assignmentDate={assignmentDate}
             displayNow={displayNow}
-            onStaffUpdated={loadStaff}
             staffPagination={staffPagination}
+            basePath={basePath}
           />
         )}
         {activeTab === 'residents' && (
           <ResidentTab
             staff={paginatedStaff}
-            staffPool={filteredStaff}
             loading={loading}
             assignmentDate={assignmentDate}
             displayNow={displayNow}
-            onStaffUpdated={loadStaff}
             staffPagination={staffPagination}
+            basePath={basePath}
           />
         )}
         {activeTab === 'tasks'     && (

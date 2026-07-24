@@ -36,6 +36,8 @@ import TransferResidentPage from '../pages/admin/residents/transfer';
 import StaffProfilesPage from '../pages/admin/staff/profiles';
 import ShiftManagementPage from '../pages/admin/staff/shifts';
 import StaffAssignmentPage from '../pages/admin/staff/assignments';
+import AreaAssignmentDetailPage from '../pages/admin/staff/assignments/AreaAssignmentDetailPage';
+import ResidentAssignmentDetailPage from '../pages/admin/staff/assignments/ResidentAssignmentDetailPage';
 import EmergencyAvailabilityPage from '../pages/admin/staff/emergency';
 import LeaveRequestAdminPage from '../pages/admin/staff/leave-requests';
 import LeaveRequestDetailPage from '../pages/admin/staff/leave-requests/LeaveRequestDetailPage';
@@ -152,6 +154,8 @@ function AppRoutes() {
         <Route path="staff/profiles" element={<StaffProfilesPage />} />
         <Route path="staff/shifts" element={<ShiftManagementPage />} />
         <Route path="staff/assignments" element={<StaffAssignmentPage />} />
+        <Route path="staff/assignments/area/:staffId" element={<AreaAssignmentDetailPage />} />
+        <Route path="staff/assignments/residents/:staffId" element={<ResidentAssignmentDetailPage />} />
         <Route path="staff/emergency" element={<EmergencyAvailabilityPage />} />
         <Route path="staff/leave-requests" element={<LeaveRequestAdminPage />} />
         <Route path="staff/leave-requests/:id" element={<LeaveRequestDetailPage />} />
@@ -203,6 +207,8 @@ function AppRoutes() {
         <Route path="staff/profiles" element={<ManagerStaffProfilesPage />} />
         <Route path="staff/shifts" element={<ManagerShiftManagementPage />} />
         <Route path="staff/assignments" element={<ManagerStaffAssignmentPage />} />
+        <Route path="staff/assignments/area/:staffId" element={<AreaAssignmentDetailPage />} />
+        <Route path="staff/assignments/residents/:staffId" element={<ResidentAssignmentDetailPage />} />
         <Route path="staff/emergency" element={<ManagerEmergencyAvailabilityPage />} />
         <Route path="staff/leave-requests" element={<ManagerLeaveRequestAdminPage />} />
         <Route path="staff/leave-requests/:id" element={<LeaveRequestDetailPage />} />
@@ -308,6 +314,8 @@ function AppRoutes() {
       >
         <Route index element={<Navigate to="overview" replace />} />
         <Route path="overview" element={<PharmacyPage defaultTab="overview" />} />
+        <Route path="my-shifts" element={<MyShiftsPage />} />
+        <Route path="leave" element={<LeaveRequestPage />} />
         <Route path="profile" element={<PharmacistProfile />} />
         <Route path="medications" element={<PharmacyPage defaultTab="medications" />} />
         <Route path="suppliers" element={<PharmacyPage defaultTab="suppliers" />} />

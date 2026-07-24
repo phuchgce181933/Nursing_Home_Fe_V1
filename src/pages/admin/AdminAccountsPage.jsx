@@ -324,7 +324,7 @@ function AdminAccountsPage() {
               </label>
 
               <label className="profile-form__field">
-                <span className="profile-form__label">Ngày sinh</span>
+                <span className="profile-form__label">{t('admin.staff.profiles.labelDateOfBirthRequired')}</span>
                 <input
                   className="profile-form__input"
                   type="date"
