@@ -1,6 +1,7 @@
 const STAFF_DOB_GENDERS = ['male', 'female'];
 
 const ERROR_KEYS = {
+  required: 'dateOfBirthRequired',
   invalid: 'dateOfBirthInvalid',
   genderRequired: 'genderRequiredForDob',
   minAge: 'dateOfBirthMinAge',
@@ -11,7 +12,7 @@ const ERROR_KEYS = {
  * Returns an i18n key under admin.staff.profiles.validation, or null if valid.
  */
 export const validateStaffDateOfBirth = (dob, { gender } = {}) => {
-  if (!dob) return null;
+  if (!dob) return ERROR_KEYS.required;
 
   const d = new Date(dob);
   if (Number.isNaN(d.getTime()) || d > new Date()) {

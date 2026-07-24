@@ -331,10 +331,16 @@
 }
 .ms-shift-card__actions {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
   margin-top: 4px;
   padding-top: 10px;
   border-top: 1px solid #f1f5f9;
+}
+.ms-shift-card__window-hint {
+  font-size: 0.82rem;
+  color: #64748b;
 }
 
 /* ── Date group header ──────────────────────────────────────── */

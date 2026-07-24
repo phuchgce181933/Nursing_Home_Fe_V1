@@ -141,7 +141,8 @@ export default function AssignedResidentsListPage({ role, footer }) {
                     <button
                       type="button"
                       className="ar-view-btn"
-                      title={t('common.viewDetails')}
+                      title={t(`${ns}.viewDetail`)}
+                      aria-label={t(`${ns}.viewDetail`)}
                       onClick={() => goToDetail(row._id)}
                     >
                       <Eye size={14} />

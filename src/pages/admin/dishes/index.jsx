@@ -160,12 +160,8 @@ export default function AdminDishesPage() {
     if (!window.confirm(t(`${NS}.confirmDelete`))) return;
     try {
       setPageError('');
-      const result = await dishService.deleteDish(id);
-      if (result?.data?.deactivated) {
-        setSuccess(t(`${NS}.deactivateSuccess`));
-      } else {
-        setSuccess(t(`${NS}.deleteSuccess`));
-      }
+      await dishService.deleteDish(id);
+      setSuccess(t(`${NS}.deleteSuccess`));
       await loadDishes();
       setTimeout(() => setSuccess(''), 1500);
     } catch (err) {

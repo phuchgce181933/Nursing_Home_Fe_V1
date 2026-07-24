@@ -14,36 +14,7 @@ import {
   formatConditions,
   formatAdmittedAt,
 } from './assignedResidentHelpers';
-import { pickDrugAllergiesList } from '../../../utils/residentArea';
 import '../../../styles/shared/AssignedResidentsPage.css';
-
-function ResidentWarning({ resident, t, ns }) {
-  if (!resident) return null;
-  const drug = pickDrugAllergiesList(resident);
-  const food = (resident.allergies || []).filter(Boolean);
-  const conditions = resident.chronicConditions || [];
-  if (!drug.length && !food.length && !conditions.length) return null;
-
-  return (
-    <div className="ar-detail-warning">
-      {drug.length > 0 && (
-        <p>
-          <strong>{t(`${ns}.drugAllergies`)}:</strong> {drug.join(', ')}
-        </p>
-      )}
-      {food.length > 0 && (
-        <p>
-          <strong>{t(`${ns}.otherAllergies`)}:</strong> {food.join(', ')}
-        </p>
-      )}
-      {conditions.length > 0 && (
-        <p>
-          <strong>{t(`${ns}.chronicConditions`)}:</strong> {conditions.join(', ')}
-        </p>
-      )}
-    </div>
-  );
-}
 
 export default function AssignedResidentDetailPage({ role }) {
   const { t, i18n } = useTranslation();
@@ -92,7 +63,6 @@ export default function AssignedResidentDetailPage({ role }) {
 
       {!loading && resident && (
         <div className="ar-detail-card">
-          <ResidentWarning resident={resident} t={t} ns={ns} />
           <ResidentContextBlock resident={resident} showGender showStatus />
 
           <div className="ar-detail-grid">

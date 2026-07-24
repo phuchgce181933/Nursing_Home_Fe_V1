@@ -19,6 +19,7 @@ export default function EmergencyStaffDetailModal({
   person,
   readinessConfig,
   checkDateLabel,
+  floorById: areaLookup,
   onClose,
 }) {
   const { t } = useTranslation();
@@ -108,7 +109,9 @@ export default function EmergencyStaffDetailModal({
               </a>
             </DetailRow>
           )}
-          <DetailRow label={t('admin.staff.emergency.detailModal.floors')}>{formatResponsibleFloorLabels(person, t)}</DetailRow>
+          <DetailRow label={t('admin.staff.emergency.detailModal.floors')}>
+            {formatResponsibleFloorLabels(person, t, areaLookup)}
+          </DetailRow>
           <DetailRow label={t('admin.staff.emergency.detailModal.currentShift')}>{formatShiftLine()}</DetailRow>
           <DetailRow label={t('admin.staff.emergency.detailModal.tasks')}>
             <span className={person.hasTasks ? 'task-active' : 'task-inactive'}>

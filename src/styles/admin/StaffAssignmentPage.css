@@ -1,26 +1,41 @@
 /* Shell/tabs/tables: ResidentPage.css */
 
-.assignment-tab-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 24px;
-  align-items: start;
-}
-
-.assignment-tab-layout > * {
-  min-width: 0;
-}
-
-.assignment-tab-layout > .assignment-table-wrap {
-  contain: inline-size;
-}
-
 .assignment-panel {
   background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
   padding: 20px;
   min-width: 0;
+}
+
+.assignment-detail-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 8px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  color: #475569;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.assignment-detail-back:hover {
+  background: #f8fafc;
+}
+
+.assignment-detail-panel {
+  max-width: 960px;
+}
+
+.resident-page .ar-table-row--clickable {
+  cursor: pointer;
+}
+
+.resident-page .ar-table-row--clickable:hover {
+  background: #f8fafc;
 }
 
 .assignment-table-wrap {
@@ -115,6 +130,61 @@
 .assignment-table__count {
   color: #1d4ed8;
   font-weight: 600;
+}
+
+.assignment-table__count-btn {
+  padding: 0;
+  border: none;
+  background: none;
+  color: #1d4ed8;
+  font-weight: 600;
+  font-size: inherit;
+  font-family: inherit;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.assignment-table__count-btn:hover {
+  text-decoration: underline;
+}
+
+.assigned-residents-view-modal {
+  max-width: 640px;
+  width: calc(100% - 32px);
+}
+
+.assigned-residents-view-modal__header {
+  margin-bottom: 16px;
+}
+
+.assigned-residents-view-modal__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.assigned-residents-view-modal__count {
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+.assigned-residents-view-modal__body {
+  margin-bottom: 8px;
+}
+
+.assigned-residents-view-modal__table th,
+.assigned-residents-view-modal__table td {
+  font-size: 0.875rem;
+}
+
+.assignment-table__cell--actions .assignment-action-group {
+  justify-content: flex-end;
+}
+
+.assignment-table__cell--actions .resident-action-group {
+  justify-content: center;
 }
 
 .assignment-cell-badges,

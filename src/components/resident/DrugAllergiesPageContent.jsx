@@ -150,10 +150,6 @@ export default function DrugAllergiesPageContent({ i18nNs, canEdit }) {
       return;
     }
     const drugAllergies = parseCommaList(drugAllergiesInput);
-    if (!drugAllergies.length) {
-      setFormError(t(k('drugAllergies.requireOneAllergy')));
-      return;
-    }
 
     setSaving(true);
     setPanelMsg('');
@@ -232,6 +228,7 @@ export default function DrugAllergiesPageContent({ i18nNs, canEdit }) {
       </div>
 
       {listError && <div className="resident-page__error">{listError}</div>}
+      {panelMsg && <p className="form-success">{panelMsg}</p>}
       {showRouteHint && (
         <p className="resident-page__hint-box">⚠️ {RESIDENT_DRUG_ALLERGIES_ROUTE_HINT}</p>
       )}
@@ -332,7 +329,7 @@ export default function DrugAllergiesPageContent({ i18nNs, canEdit }) {
               </div>
             ) : (
               <>
-                <div className="drug-allergies-current">
+                <div className="drug-allergies-current drug-allergies-current--readonly">
                   <h3>{t(k('drugAllergies.currentData'))}</h3>
                   {savedDrugAllergies.length ? (
                     <ul>
@@ -387,7 +384,6 @@ export default function DrugAllergiesPageContent({ i18nNs, canEdit }) {
               </div>
             ) : (
               <>
-                {panelMsg && <p className="form-success">{panelMsg}</p>}
                 {formError && <p className="form-error">{formError}</p>}
                 <form onSubmit={handleSave}>
                   <div className="form-group">
@@ -398,13 +394,16 @@ export default function DrugAllergiesPageContent({ i18nNs, canEdit }) {
                       placeholder={t(k('drugAllergies.allergiesPlaceholder'))}
                       rows={5}
                     />
+                    <p className="field-hint">{t(k('drugAllergies.allergiesOptionalHint'))}</p>
                   </div>
                   <div className="modal__actions">
                     <button type="button" className="btn-cancel" onClick={() => setEditPopup(false)}>
-                      {t(k('common.close'))}
+                      {t(k('common.cancel'), { defaultValue: t('common.cancel') })}
                     </button>
                     <button type="submit" className="btn-save" disabled={saving}>
-                      {saving ? t('common.saving') : t('common.save')}
+                      {saving
+                        ? t('common.saving')
+                        : t(k('drugAllergies.updateAction'), { defaultValue: t(k('initialHealth.updateAction')) })}
                     </button>
                   </div>
                 </form>

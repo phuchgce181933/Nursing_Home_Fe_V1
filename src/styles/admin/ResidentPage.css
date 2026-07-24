@@ -1118,6 +1118,16 @@
   margin-bottom: 6px;
 }
 
+.resident-page .form-group label.form-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 0;
+  font-weight: 500;
+  color: #334155;
+  cursor: pointer;
+}
+
 .resident-page .form-group input,
 .resident-page .form-group select,
 .resident-page .form-group textarea {
@@ -1128,6 +1138,13 @@
   background: #f8fafc;
   font-size: 14px;
   box-sizing: border-box;
+}
+
+.resident-page .form-group input[type="checkbox"],
+.resident-page .form-group input[type="radio"] {
+  width: auto;
+  padding: 0;
+  flex-shrink: 0;
 }
 
 .resident-page .form-group textarea {
