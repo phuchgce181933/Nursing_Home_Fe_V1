@@ -2,6 +2,11 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import authService from '../../services/auth.service';
 import { resolveApiError } from '../../utils/apiMessage';
+import { staffDateOfBirthValidationKey, validateStaffDateOfBirth } from '../../utils/staffAgeValidation';
+import {
+  staffCertificationValidationKey,
+  validateStaffCertifications,
+} from '../../utils/staffCertificateValidation';
 
 const initialCreateForm = {
   fullName: '',
@@ -38,13 +43,14 @@ function AdminAccountsPage() {
   const [pagination, setPagination] = useState({ page: 1, totalPages: 1, total: 0, limit: 20 });
   const [filters, setFilters] = useState({ search: '', role: '', isActive: '' });
   const [createForm, setCreateForm] = useState(initialCreateForm);
-  const [certificationFiles, setCertificationFiles] = useState([]);
+  const [certificationEntries, setCertificationEntries] = useState([]);
   const [editUser, setEditUser] = useState(null);
   const [editForm, setEditForm] = useState(initialEditForm);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('success');
+  const [createFieldErrors, setCreateFieldErrors] = useState({});
 
   const loadAccounts = async (page = 1) => {
     setLoading(true);
@@ -99,19 +105,49 @@ function AdminAccountsPage() {
     event.preventDefault();
     setSubmitting(true);
     setMessage('');
+    setCreateFieldErrors({});
+
+    const dobErrorKey = validateStaffDateOfBirth(createForm.dateOfBirth, {
+      role: createForm.role,
+      gender: createForm.gender,
+    });
+    if (dobErrorKey) {
+      setCreateFieldErrors({
+        dateOfBirth: staffDateOfBirthValidationKey(dobErrorKey, t),
+      });
+      setSubmitting(false);
+      return;
+    }
+
+    const certErrorKey = validateStaffCertifications(
+      createForm.role,
+      certificationEntries.map((entry) => ({ issueDate: entry.issueDate }))
+    );
+    if (certErrorKey) {
+      setCreateFieldErrors({
+        certifications: staffCertificationValidationKey(certErrorKey, t),
+      });
+      setSubmitting(false);
+      return;
+    }
 
     try {
       const payload = {
         ...createForm,
         dateOfBirth: createForm.dateOfBirth || undefined,
-        certificationFiles: certificationFiles.length ? certificationFiles : undefined,
+        certificationFiles: certificationEntries.length
+          ? certificationEntries.map((entry) => entry.file)
+          : undefined,
+        certificationIssueDates: certificationEntries.length
+          ? certificationEntries.map((entry) => entry.issueDate)
+          : undefined,
       };
 
       await authService.createStaffAccount(payload);
       setMessageType('success');
       setMessage('Tạo tài khoản nhân viên thành công.');
       setCreateForm(initialCreateForm);
-      setCertificationFiles([]);
+      setCertificationEntries([]);
       await loadAccounts(1);
     } catch (error) {
       setMessageType('error');
@@ -288,13 +324,25 @@ function AdminAccountsPage() {
               </label>
 
               <label className="profile-form__field">
-                <span className="profile-form__label">Ngày sinh</span>
+                <span className="profile-form__label">{t('admin.staff.profiles.labelDateOfBirthRequired')}</span>
                 <input
                   className="profile-form__input"
                   type="date"
                   value={createForm.dateOfBirth}
-                  onChange={(event) => setCreateForm((current) => ({ ...current, dateOfBirth: event.target.value }))}
+                  onChange={(event) => {
+                    setCreateForm((current) => ({ ...current, dateOfBirth: event.target.value }));
+                    if (createFieldErrors.dateOfBirth) {
+                      setCreateFieldErrors((current) => {
+                        const next = { ...current };
+                        delete next.dateOfBirth;
+                        return next;
+                      });
+                    }
+                  }}
                 />
+                {createFieldErrors.dateOfBirth && (
+                  <span style={{ color: '#dc2626', fontSize: '0.85rem' }}>{createFieldErrors.dateOfBirth}</span>
+                )}
               </label>
 
               <label className="profile-form__field">
@@ -325,19 +373,75 @@ function AdminAccountsPage() {
                 />
               </label>
 
-              <label className="profile-form__field">
+              <label className="profile-form__field" style={{ gridColumn: '1 / -1' }}>
                 <span className="profile-form__label">Chứng chỉ (ảnh)</span>
+                <p style={{ fontSize: '0.75rem', color: '#94a3b8', margin: '0 0 8px' }}>
+                  Bắt buộc với bác sĩ và y tá. Mỗi chứng chỉ phải được cấp trong vòng 5 năm gần nhất.
+                </p>
                 <input
                   className="profile-form__input"
                   type="file"
                   accept="image/*"
                   multiple
-                  onChange={(event) => setCertificationFiles(Array.from(event.target.files || []))}
+                  onChange={(event) => {
+                    const files = Array.from(event.target.files || []);
+                    if (!files.length) return;
+                    setCertificationEntries((prev) => [
+                      ...prev,
+                      ...files.map((file) => ({ file, issueDate: '' })),
+                    ]);
+                    event.target.value = '';
+                  }}
                 />
-                {certificationFiles.length > 0 && (
-                  <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
-                    {certificationFiles.length} ảnh đã chọn
-                  </span>
+                {createFieldErrors.certifications && (
+                  <span style={{ color: '#dc2626', fontSize: '0.85rem' }}>{createFieldErrors.certifications}</span>
+                )}
+                {certificationEntries.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
+                    {certificationEntries.map((entry, index) => (
+                      <div
+                        key={`${entry.file.name}-${entry.file.size}-${entry.file.lastModified}`}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px',
+                          flexWrap: 'wrap',
+                          padding: '8px 10px',
+                          borderRadius: '8px',
+                          backgroundColor: '#f1f5f9',
+                        }}
+                      >
+                        <span style={{ fontSize: '13px', flex: '1 1 120px' }}>{entry.file.name}</span>
+                        <label style={{ fontSize: '12px', color: '#64748b' }}>
+                          Ngày cấp chứng chỉ
+                          <input
+                            type="date"
+                            value={entry.issueDate}
+                            onChange={(e) => {
+                              const issueDate = e.target.value;
+                              setCertificationEntries((prev) => prev.map((item, i) => (
+                                i === index ? { ...item, issueDate } : item
+                              )));
+                            }}
+                            style={{ marginLeft: '6px' }}
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setCertificationEntries((prev) => prev.filter((_, i) => i !== index))}
+                          style={{
+                            border: 'none',
+                            background: 'transparent',
+                            cursor: 'pointer',
+                            fontSize: '16px',
+                            color: '#64748b',
+                          }}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </label>
             </div>

@@ -20,6 +20,7 @@ import {
   Wind,
   Scale,
   Wallet,
+  RotateCcw,
 } from 'lucide-react';
 import medicalRecordService from '../../services/medicalRecord.service';
 import clinicalServiceService from '../../services/clinicalService.service';
@@ -771,16 +772,175 @@ export default function HealthMonitoringPage() {
   const [fieldErrors, setFieldErrors] = useState({});
   const [formSuccess, setFormSuccess] = useState(false);
   const [expandedSections, setExpandedSections] = useState({});
+  const [expandedServiceDetails, setExpandedServiceDetails] = useState({});
 
   // clinical services + selected services for billing
   const [clinicalServices, setClinicalServices] = useState([]);
   const [selectedServices, setSelectedServices] = useState({});
 
+  const getSelectedServiceFieldValue = (serviceId, fieldCode) => {
+    return selectedServices[serviceId]?.fieldValues?.[fieldCode] ?? '';
+  };
+
+  const getSelectedServiceFieldFiles = (serviceId, fieldCode) => {
+    return selectedServices[serviceId]?.fieldFiles?.[fieldCode] || [];
+  };
+
+  const setSelectedServiceFieldValue = (serviceId, fieldCode, value) => {
+    setSelectedServices((prev) => {
+      const svc = prev[serviceId];
+      if (!svc) return prev;
+      const nextFieldValues = { ...(svc.fieldValues || {}) };
+      nextFieldValues[fieldCode] = value;
+      return {
+        ...prev,
+        [serviceId]: {
+          ...svc,
+          fieldValues: nextFieldValues,
+        },
+      };
+    });
+  };
+
+  const setSelectedServiceFieldFiles = (serviceId, fieldCode, files) => {
+    const filesWithPreview = (files || []).map((file) => {
+      if (!file) return file;
+      if (typeof file === 'object' && file instanceof File) {
+        return Object.assign(file, {
+          preview: file.preview || URL.createObjectURL(file),
+        });
+      }
+      return file;
+    });
+    setSelectedServices((prev) => {
+      const svc = prev[serviceId];
+      if (!svc) return prev;
+      const nextFieldFiles = { ...(svc.fieldFiles || {}) };
+      nextFieldFiles[fieldCode] = filesWithPreview;
+      return {
+        ...prev,
+        [serviceId]: {
+          ...svc,
+          fieldFiles: nextFieldFiles,
+        },
+      };
+    });
+  };
+
+  const getFieldThresholds = (field, gender) => {
+    const normalizedGender = gender === 'male' || gender === 'M' || gender === 'nam' ? 'male' : gender === 'female' || gender === 'F' || gender === 'nữ' || gender === 'nu' ? 'female' : null;
+    if (field?.type !== 'NUMBER') return { min: null, max: null, isGenderSpecific: false, genderLabel: '' };
+
+    if (normalizedGender === 'male') {
+      const maleMin = field.maleMin !== undefined && field.maleMin !== null && field.maleMin !== '' ? Number(field.maleMin) : null;
+      const maleMax = field.maleMax !== undefined && field.maleMax !== null && field.maleMax !== '' ? Number(field.maleMax) : null;
+      if (maleMin !== null || maleMax !== null) {
+        return { min: maleMin, max: maleMax, isGenderSpecific: true, genderLabel: 'Nam' };
+      }
+    }
+
+    if (normalizedGender === 'female') {
+      const femaleMin = field.femaleMin !== undefined && field.femaleMin !== null && field.femaleMin !== '' ? Number(field.femaleMin) : null;
+      const femaleMax = field.femaleMax !== undefined && field.femaleMax !== null && field.femaleMax !== '' ? Number(field.femaleMax) : null;
+      if (femaleMin !== null || femaleMax !== null) {
+        return { min: femaleMin, max: femaleMax, isGenderSpecific: true, genderLabel: 'Nữ' };
+      }
+    }
+
+    const min = field.min !== undefined && field.min !== null && field.min !== '' ? Number(field.min) : null;
+    const max = field.max !== undefined && field.max !== null && field.max !== '' ? Number(field.max) : null;
+    return { min, max, isGenderSpecific: false, genderLabel: '' };
+  };
+
+  const isFieldValueOutOfRange = (field, value) => {
+    if (!field || field.type !== 'NUMBER' || value === undefined || value === null || String(value).trim() === '') return false;
+    const parsed = Number(value);
+    if (Number.isNaN(parsed)) return false;
+    const { min, max } = getFieldThresholds(field, selectedResident?.gender);
+    if (min !== null && parsed < min) return true;
+    if (max !== null && parsed > max) return true;
+    return false;
+  };
+
+  const isServiceFieldValueAbnormal = (field, value) => {
+    return isFieldValueOutOfRange(field, value);
+  };
+
+  const isSelectedServiceAbnormal = (selectedService) => {
+    if (!selectedService || !selectedService.serviceId || !selectedService.fieldValues) return false;
+    const serviceDef = clinicalServices.find((svc) => String(svc._id) === String(selectedService.serviceId));
+    if (!serviceDef || !Array.isArray(serviceDef.fields)) return false;
+    return serviceDef.fields.some((field) => {
+      if (field.type !== 'NUMBER') return false;
+      const value = selectedService.fieldValues[field.fieldCode];
+      return isServiceFieldValueAbnormal(field, value);
+    });
+  };
+
+  const isRecordAbnormal = (record) => {
+    if (!record) return false;
+    if (record.abnormalFlag === true) return true;
+    if (!Array.isArray(record.selectedServices)) return false;
+    return record.selectedServices.some(isSelectedServiceAbnormal);
+  };
+
+  const getServiceFieldHint = (field, value) => {
+    if (!field) return '';
+    if (field.type === 'NUMBER') {
+      const { min, max, isGenderSpecific, genderLabel } = getFieldThresholds(field, selectedResident?.gender);
+      if (value === '' || value === undefined || value === null) {
+        return min !== null && max !== null
+          ? `${isGenderSpecific ? `${genderLabel}: ` : ''}Nhập số trong khoảng ${min} - ${max}`
+          : 'Nhập giá trị số phù hợp';
+      }
+      if (Number.isNaN(Number(value))) return 'Giá trị phải là số hợp lệ.';
+      if (isFieldValueOutOfRange(field, value)) {
+        return `⚠ Ngoài ngưỡng ${isGenderSpecific ? `${genderLabel}: ` : ''}${min ?? '-'} đến ${max ?? '-'}.`;
+      }
+      return min !== null && max !== null ? `${isGenderSpecific ? `${genderLabel}: ` : ''}Bình thường: ${min}–${max}` : 'Giá trị hợp lệ.';
+    }
+    if (field.type === 'DROPDOWN') {
+      return field.options?.length ? `Chọn một trong: ${field.options.join(', ')}` : '';
+    }
+    return '';
+  };
+
+  const validateSelectedServiceFields = () => {
+    for (const service of Object.values(selectedServices)) {
+      if (!Array.isArray(service.fields)) continue;
+      for (const field of service.fields) {
+        const value = selectedServices[service._id]?.fieldValues?.[field.fieldCode];
+        if (field.required) {
+          if (value === undefined || value === null || String(value).trim() === '') {
+            return `Trường "${field.label}" của dịch vụ "${service.serviceName}" là bắt buộc.`;
+          }
+        }
+        if (field.type === 'NUMBER' && value !== undefined && value !== null && String(value).trim() !== '') {
+          const parsed = Number(value);
+          if (Number.isNaN(parsed)) {
+            return `Trường "${field.label}" phải là số hợp lệ.`;
+          }
+          // Abnormal values are allowed and only shown as warnings.
+        }
+        if (field.type === 'DROPDOWN' && field.required) {
+          if (!field.options?.includes(String(value))) {
+            return `Vui lòng chọn giá trị hợp lệ cho trường "${field.label}" của dịch vụ "${service.serviceName}".`;
+          }
+        }
+      }
+    }
+    return null;
+  };
+
   // ── Biểu đồ ──
   const [chartMetric, setChartMetric] = useState('bloodPressureSystolic');
 
-  // ── Tab ──
   const [activeTab, setActiveTab] = useState('history');
+
+  useEffect(() => {
+    setFormError(null);
+    setFormSuccess(false);
+  }, [activeTab]);
 
   // ── Stats tổng hợp ──
   const stats = useMemo(() => {
@@ -923,8 +1083,24 @@ export default function HealthMonitoringPage() {
     return { errors, general: Object.keys(errors).length ? 'Vui lòng kiểm tra lại các chỉ số được đánh dấu.' : null };
   };
 
+  const handleCopyLatestVitals = () => {
+    if (!latestRecord) return;
+    setForm((prev) => ({
+      ...prev,
+      bloodPressureSystolic: latestRecord.bloodPressureSystolic != null ? String(latestRecord.bloodPressureSystolic) : prev.bloodPressureSystolic,
+      bloodPressureDiastolic: latestRecord.bloodPressureDiastolic != null ? String(latestRecord.bloodPressureDiastolic) : prev.bloodPressureDiastolic,
+      pulse: latestRecord.pulse != null ? String(latestRecord.pulse) : prev.pulse,
+      temperatureCelsius: latestRecord.temperatureCelsius != null ? String(latestRecord.temperatureCelsius) : prev.temperatureCelsius,
+      oxygenSaturation: latestRecord.oxygenSaturation != null ? String(latestRecord.oxygenSaturation) : prev.oxygenSaturation,
+      bloodSugar: latestRecord.bloodSugar != null ? String(latestRecord.bloodSugar) : prev.bloodSugar,
+      weightKg: latestRecord.weightKg != null ? String(latestRecord.weightKg) : prev.weightKg,
+      heightCm: latestRecord.heightCm != null ? String(latestRecord.heightCm) : prev.heightCm,
+      bloodType: latestRecord.bloodType || prev.bloodType,
+    }));
+  };
+
   const handleSubmitVitals = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     if (!selectedResident) return;
     const { errors, general } = validateVitalsForm();
     setFieldErrors(errors);
@@ -935,18 +1111,19 @@ export default function HealthMonitoringPage() {
     setFormSaving(true);
     setFormError(null);
     setFormSuccess(false);
+
     try {
       const body = {};
-      if (form.bloodPressureSystolic !== '') body.bloodPressureSystolic  = parseInt(form.bloodPressureSystolic, 10);
+      if (form.bloodPressureSystolic !== '') body.bloodPressureSystolic = parseInt(form.bloodPressureSystolic, 10);
       if (form.bloodPressureDiastolic !== '') body.bloodPressureDiastolic = parseInt(form.bloodPressureDiastolic, 10);
-      if (form.pulse !== '')                body.pulse                 = parseInt(form.pulse, 10);
-      if (form.temperatureCelsius !== '')   body.temperatureCelsius    = parseFloat(form.temperatureCelsius);
-      if (form.oxygenSaturation !== '')     body.oxygenSaturation      = parseInt(form.oxygenSaturation, 10);
-      if (form.bloodSugar !== '')           body.bloodSugar            = parseFloat(form.bloodSugar);
-      if (form.weightKg !== '')             body.weightKg              = parseFloat(form.weightKg);
-      if (form.heightCm !== '')             body.heightCm              = parseFloat(form.heightCm);
+      if (form.pulse !== '') body.pulse = parseInt(form.pulse, 10);
+      if (form.temperatureCelsius !== '') body.temperatureCelsius = parseFloat(form.temperatureCelsius);
+      if (form.oxygenSaturation !== '') body.oxygenSaturation = parseInt(form.oxygenSaturation, 10);
+      if (form.bloodSugar !== '') body.bloodSugar = parseFloat(form.bloodSugar);
+      if (form.weightKg !== '') body.weightKg = parseFloat(form.weightKg);
+      if (form.heightCm !== '') body.heightCm = parseFloat(form.heightCm);
       if (form.bloodType && form.bloodType !== 'unknown') body.bloodType = form.bloodType;
-      if (form.summary.trim())               body.summary               = form.summary.trim();
+      if (form.summary.trim()) body.summary = form.summary.trim();
       
       // Physical Examination - object
       const peHasData = Object.values(form.physicalExamination || {}).some(v => v && String(v).trim());
@@ -985,18 +1162,52 @@ export default function HealthMonitoringPage() {
       
       // Billing: include only selected clinical services (doctor flow)
       const services = Object.values(selectedServices || {}).map(s => ({
-        serviceId: s._id,
+        serviceId: s.serviceId || s._id,
         serviceCode: s.serviceCode,
         serviceName: s.serviceName,
         quantity: Number(s.quantity) || 1,
         unitPrice: Number(s.unitPrice) || 0,
+        fieldValues: s.fieldValues || {},
+        fieldFiles: s.fieldFiles || {},
       }));
       if (services.length) {
+        const fieldValidationError = validateSelectedServiceFields();
+        if (fieldValidationError) {
+          setFormError(fieldValidationError);
+          setFormSaving(false);
+          return;
+        }
         body.selectedServices = services;
         body.consentToPayment = true;
       }
 
-      await medicalRecordService.recordVitals(selectedResident._id, body);
+      const formData = new FormData();
+      const bodyPayload = { ...body };
+      if (Array.isArray(bodyPayload.selectedServices)) {
+        bodyPayload.selectedServices = bodyPayload.selectedServices.map((service) => {
+          const { fieldFiles, ...rest } = service;
+          return rest;
+        });
+      }
+      Object.entries(bodyPayload).forEach(([key, value]) => {
+        if (value === undefined || value === null) return;
+        if (typeof value === 'object' && !(value instanceof File) && !(value instanceof Blob)) {
+          formData.append(key, JSON.stringify(value));
+        } else {
+          formData.append(key, String(value));
+        }
+      });
+      if (Array.isArray(body.selectedServices)) {
+        body.selectedServices.forEach((service) => {
+          const filesMap = service.fieldFiles || {};
+          Object.entries(filesMap).forEach(([fieldCode, files]) => {
+            (files || []).forEach((file) => {
+              formData.append(`serviceFile_${service.serviceId}_${fieldCode}`, file);
+            });
+          });
+        });
+      }
+      await medicalRecordService.recordVitals(selectedResident._id, formData);
       setFormSuccess(true);
       setForm(emptyForm);
       setFieldErrors({});
@@ -1027,7 +1238,143 @@ export default function HealthMonitoringPage() {
 
   // ─── Latest record for alert banner ───
   const latestRecord = records[0] ?? selectedResident?._latestRecord ?? null;
-  const hasAbnormal = latestRecord?.abnormalFlag === true;
+  const hasAbnormal = isRecordAbnormal(latestRecord);
+
+  const isImageUrl = (value) => {
+    return typeof value === 'string' && /\.(jpg|jpeg|png|webp|gif|bmp|svg)(\?|$)/i.test(value.trim()) && /^https?:\/\//i.test(value.trim());
+  };
+
+  const renderFieldValue = (value) => {
+    if (Array.isArray(value)) {
+      const allImageUrls = value.every((item) => isImageUrl(item));
+      if (allImageUrls) {
+        return <span>{`${value.length} ảnh`}</span>;
+      }
+      return <span>{value.map((item) => String(item)).join(', ')}</span>;
+    }
+    if (isImageUrl(value)) {
+      return <span>Ảnh</span>;
+    }
+    return <span>{String(value)}</span>;
+  };
+
+  const getServicePreviewKey = (recordId, svc) => `${recordId || 'record'}|${svc.serviceId || svc.serviceCode || 'unknown'}|${svc.serviceName || 'service'}|${svc.quantity || 1}|${svc.unitPrice || 0}`;
+
+  const renderServiceImagePreview = (fieldValues, serviceKey, expanded) => {
+    if (!fieldValues || typeof fieldValues !== 'object') return null;
+    const urls = [];
+    for (const value of Object.values(fieldValues)) {
+      if (Array.isArray(value)) {
+        value.forEach((item) => { if (isImageUrl(item)) urls.push(item); });
+      } else if (isImageUrl(value)) {
+        urls.push(value);
+      }
+    }
+    if (urls.length === 0) return null;
+
+    if (!expanded) return null;
+
+    return (
+      <div style={{ display: 'grid', gap: 8, marginBottom: 8 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(90px,1fr))', gap: 8 }}>
+          {urls.map((url, idx) => (
+            <a
+              key={idx}
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ display: 'block', border: '1px solid #e2e8f0', borderRadius: 10, overflow: 'hidden', background: '#fff', minHeight: 90 }}
+            >
+              <img src={url} alt={`service-preview-${idx}`} style={{ width: '100%', height: 90, objectFit: 'cover', display: 'block' }} />
+            </a>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  const renderServiceSummary = (services, recordId) => {
+    if (!Array.isArray(services) || services.length === 0) {
+      return <span style={{ color: '#cbd5e1' }}>—</span>;
+    }
+    return (
+      <div style={{ display: 'grid', gap: 8, fontSize: 12, color: '#334155' }}>
+        {services.map((svc) => {
+          const serviceAbnormal = isSelectedServiceAbnormal(svc);
+          const serviceKey = getServicePreviewKey(recordId, svc);
+          const expanded = !!expandedServiceDetails[serviceKey];
+          const imageUrls = [];
+          for (const value of Object.values(svc.fieldValues || {})) {
+            if (Array.isArray(value)) {
+              value.forEach((item) => { if (isImageUrl(item) && !imageUrls.includes(item)) imageUrls.push(item); });
+            } else if (isImageUrl(value) && !imageUrls.includes(value)) {
+              imageUrls.push(value);
+            }
+          }
+          const imageLabel = imageUrls.length > 0 ? `${imageUrls.length} ảnh` : null;
+          return (
+            <div
+              key={serviceKey}
+              style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: 10, background: '#f8fafc' }}
+            >
+              <button
+                type="button"
+                onClick={() => setExpandedServiceDetails((prev) => ({ ...prev, [serviceKey]: !prev[serviceKey] }))}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  width: '100%',
+                  background: 'transparent',
+                  border: 'none',
+                  padding: 0,
+                  color: '#0f172a',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+              >
+                <div style={{ display: 'grid', gap: 4, alignItems: 'center', width: '100%' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontWeight: 700 }}>
+                    <span>{svc.serviceName || svc.serviceCode || 'Dịch vụ'}</span>
+                    {serviceAbnormal && <span className="hm-badge-warn" style={{ fontSize: 11, padding: '2px 6px' }}>Bất thường</span>}
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, color: '#475569', fontSize: 12 }}>
+                    <span>{svc.serviceCode || 'N/A'}</span>
+                    <span>{svc.quantity ? `× ${svc.quantity}` : ''}</span>
+                    <span>{svc.unitPrice != null ? formatMoney((svc.unitPrice || 0) * (svc.quantity || 1)) : ''}</span>
+                    {imageLabel ? <span>{imageLabel}</span> : null}
+                  </div>
+                </div>
+                <span style={{ fontSize: 12, color: '#2563eb' }}>{expanded ? 'Ẩn' : 'Chi tiết'}</span>
+              </button>
+              {expanded && (
+                <div style={{ marginTop: 10, display: 'grid', gap: 8, color: '#334155' }}>
+                  {renderServiceImagePreview(svc.fieldValues, serviceKey, expanded)}
+                  <div style={{ display: 'grid', gap: 6 }}>
+                    <div><strong>Đơn giá:</strong> {formatMoney(svc.unitPrice)}</div>
+                    <div><strong>Số lượng:</strong> {svc.quantity || 1}</div>
+                    {svc.fieldValues && Object.keys(svc.fieldValues).length > 0 && (
+                      <div style={{ marginTop: 6 }}>
+                        <div style={{ fontWeight: 700, marginBottom: 4 }}>Thông số chi tiết</div>
+                        <div style={{ display: 'grid', gap: 8, paddingLeft: 8 }}>
+                          {Object.entries(svc.fieldValues).map(([field, value]) => (
+                            <div key={field} style={{ fontSize: 11, color: '#475569' }}>
+                              <div style={{ color: '#0f172a', fontWeight: 600 }}>{field}</div>
+                              <div style={{ marginTop: 4 }}>{renderFieldValue(value)}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
 
   // ─── Render value with abnormal highlight ───
   const renderVal = (key, val) => {
@@ -1043,7 +1390,7 @@ export default function HealthMonitoringPage() {
     const t = THRESHOLDS[key];
     if (!t) return `${t?.unit || ''}`;
     const warn = val !== '' && isAbnormal(key, val);
-    if (warn) return `⚠ Ngoài ngưỡng bình thường (${t.min}–${t.max} ${t.unit})`;
+    if (warn) return `⚠ Ngoài ngưỡng bình thường (${t.min}–${t.max} ${t.unit}) · Hợp lệ & Được phép lưu (Tự động ghi nhận cảnh báo bất thường)`;
     return `Bình thường: ${t.min}–${t.max} ${t.unit}`;
   };
 
@@ -1282,6 +1629,7 @@ export default function HealthMonitoringPage() {
                               <th>SpO₂</th>
                               <th>Đường huyết</th>
                               <th>Cân nặng</th>
+                              <th>Dịch vụ khám</th>
                               <th>Trạng thái</th>
                             </tr>
                           </thead>
@@ -1296,6 +1644,7 @@ export default function HealthMonitoringPage() {
                                 <td>{renderVal('oxygenSaturation',       rec.oxygenSaturation)}</td>
                                 <td>{rec.bloodSugar != null ? `${rec.bloodSugar} mmol/L` : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
                                 <td>{rec.weightKg != null ? `${rec.weightKg} kg` : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
+                                <td>{renderServiceSummary(rec.selectedServices, rec._id)}</td>
                                 <td>
                                   {rec.abnormalFlag
                                     ? <span className="hm-badge-warn"><AlertTriangle size={10} /> Bất thường</span>
@@ -1359,9 +1708,59 @@ export default function HealthMonitoringPage() {
                     </AnimatePresence>
 
                     {/* Vital Signs */}
+                    {latestRecord && (
+                      <div className="hm-form-section" style={{ background: '#f8fafc', border: '1px solid #dbeafe', marginBottom: 18 }}>
+                        <div className="hm-form-section-title">
+                          <ClipboardList size={15} /> Thông số cũ từ lần khám gần nhất
+                        </div>
+                        <div className="hm-form-grid">
+                          <div className="hm-form-group">
+                            <div className="hm-form-label">HA tâm thu / tâm trương</div>
+                            <div className="hm-form-value">{renderVal('bloodPressureSystolic', latestRecord.bloodPressureSystolic)} / {renderVal('bloodPressureDiastolic', latestRecord.bloodPressureDiastolic)}</div>
+                          </div>
+                          <div className="hm-form-group">
+                            <div className="hm-form-label">Nhịp tim</div>
+                            <div className="hm-form-value">{renderVal('pulse', latestRecord.pulse)}</div>
+                          </div>
+                          <div className="hm-form-group">
+                            <div className="hm-form-label">Nhiệt độ</div>
+                            <div className="hm-form-value">{renderVal('temperatureCelsius', latestRecord.temperatureCelsius)}</div>
+                          </div>
+                          <div className="hm-form-group">
+                            <div className="hm-form-label">SpO₂</div>
+                            <div className="hm-form-value">{renderVal('oxygenSaturation', latestRecord.oxygenSaturation)}</div>
+                          </div>
+                          <div className="hm-form-group">
+                            <div className="hm-form-label">Đường huyết</div>
+                            <div className="hm-form-value">{latestRecord.bloodSugar != null ? `${latestRecord.bloodSugar} mmol/L` : <span style={{ color: '#64748b' }}>—</span>}</div>
+                          </div>
+                          <div className="hm-form-group">
+                            <div className="hm-form-label">Cân nặng</div>
+                            <div className="hm-form-value">{latestRecord.weightKg != null ? `${latestRecord.weightKg} kg` : <span style={{ color: '#64748b' }}>—</span>}</div>
+                          </div>
+                          <div className="hm-form-group full">
+                            <div className="hm-form-label">Dịch vụ khám gần nhất</div>
+                            <div style={{ padding: '10px 12px', background: '#ffffff', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                              {renderServiceSummary(latestRecord.selectedServices, latestRecord?._id)}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                     <div className="hm-form-section">
-                      <div className="hm-form-section-title">
-                        <Thermometer size={15} /> Chỉ số sinh tồn (Vital Signs)
+                      <div className="hm-form-section-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                        <span><Thermometer size={15} style={{ verticalAlign: 'middle', marginRight: 4 }} /> Chỉ số sinh tồn (Vital Signs)</span>
+                        {latestRecord && (
+                          <button
+                            type="button"
+                            className="hm-btn hm-btn-ghost"
+                            style={{ padding: '4px 10px', fontSize: '12px', height: 'auto', fontWeight: 600, color: '#2563eb', border: '1px solid #bfdbfe', background: '#eff6ff' }}
+                            onClick={handleCopyLatestVitals}
+                            title="Điền tự động các chỉ số sinh tồn từ lần khám gần nhất"
+                          >
+                            <RotateCcw size={13} style={{ marginRight: 4 }} /> Dùng lại chỉ số cũ
+                          </button>
+                        )}
                       </div>
                       <div className="hm-form-grid">
                         {[
@@ -1378,7 +1777,7 @@ export default function HealthMonitoringPage() {
                           return (
                             <div key={key} className="hm-form-group">
                               <label className="hm-form-label" htmlFor={`hm-input-${key}`}>
-                                {label} <span>{THRESHOLDS[key] ? `(${THRESHOLDS[key].unit})` : ''}</span>
+                                {label} <span style={{ color: '#ef4444' }}>*</span> <span>{THRESHOLDS[key] ? `(${THRESHOLDS[key].unit})` : ''}</span>
                               </label>
                               <input
                                 id={`hm-input-${key}`}
@@ -1438,245 +1837,145 @@ export default function HealthMonitoringPage() {
 
                     <div className="hm-form-section" style={{ marginTop: '18px' }}>
                       <div className="hm-form-section-title">
-                        <ClipboardList size={15} /> Khám lâm sàng & cận lâm sàng chi tiết
-                      </div>
-
-                      {/* Physical Examination */}
-                      <div style={{ marginTop: 12, padding: 10, border: '1px solid #e6eef6', borderRadius: 6 }}>
-                        <div style={{ fontWeight: 700, marginBottom: 10, cursor: 'pointer' }} onClick={() => setExpandedSections(prev => ({ ...prev, physicalExamination: !prev.physicalExamination }))}>
-                          ▼ Khám thực thể
-                        </div>
-                        {expandedSections.physicalExamination && (
-                          <div className="hm-form-grid">
-                            {['general', 'cardiovascular', 'respiratory', 'abdominal', 'neurological', 'musculoskeletal', 'skin', 'other', 'summary'].map(field => (
-                              <div key={field} className="hm-form-group">
-                                <label className="hm-form-label">{getFieldLabel(field)}</label>
-                                <input type="text" className="hm-form-input" placeholder={`Nhập ${field}...`} value={form.physicalExamination[field] || ''} onChange={(e) => setForm(prev => ({ ...prev, physicalExamination: { ...prev.physicalExamination, [field]: e.target.value } }))} />
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Laboratory Test Results */}
-                      <div style={{ marginTop: 12, padding: 10, border: '1px solid #e6eef6', borderRadius: 6 }}>
-                        <div style={{ fontWeight: 700, marginBottom: 10, cursor: 'pointer' }} onClick={() => setExpandedSections(prev => ({ ...prev, laboratoryTestResults: !prev.laboratoryTestResults }))}>
-                          ▼ Kết quả xét nghiệm
-                        </div>
-                        {expandedSections.laboratoryTestResults && (
-                          <div>
-                            {(form.laboratoryTestResults || []).map((item, idx) => (
-                              <div key={idx} style={{ marginBottom: 10, padding: 8, background: '#f8fafc', borderRadius: 4 }}>
-                                <input type="text" placeholder="Tên xét nghiệm" className="hm-form-input" value={item.testName || ''} onChange={(e) => {
-                                  const updated = [...(form.laboratoryTestResults || [])];
-                                  updated[idx].testName = e.target.value;
-                                  setForm(prev => ({ ...prev, laboratoryTestResults: updated }));
-                                }} />
-                                <input type="text" placeholder="Kết quả" className="hm-form-input" value={item.result || ''} onChange={(e) => {
-                                  const updated = [...(form.laboratoryTestResults || [])];
-                                  updated[idx].result = e.target.value;
-                                  setForm(prev => ({ ...prev, laboratoryTestResults: updated }));
-                                }} />
-                                <button type="button" onClick={() => {
-                                  const updated = form.laboratoryTestResults.filter((_, i) => i !== idx);
-                                  setForm(prev => ({ ...prev, laboratoryTestResults: updated }));
-                                }} style={{ background: '#ef4444', color: '#fff', padding: '4px 8px', borderRadius: 4 }}>Xóa</button>
-                              </div>
-                            ))}
-                            <button type="button" onClick={() => setForm(prev => ({ ...prev, laboratoryTestResults: [...(prev.laboratoryTestResults || []), { testName: '', result: '', unit: '', referenceRange: '', notes: '' }] }))} style={{ background: '#3b82f6', color: '#fff', padding: '6px 12px', borderRadius: 4 }}>+ Thêm xét nghiệm</button>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Urinalysis Results */}
-                      <div style={{ marginTop: 12, padding: 10, border: '1px solid #e6eef6', borderRadius: 6 }}>
-                        <div style={{ fontWeight: 700, marginBottom: 10, cursor: 'pointer' }} onClick={() => setExpandedSections(prev => ({ ...prev, urinalysisResults: !prev.urinalysisResults }))}>
-                          ▼ Kết quả nước tiểu
-                        </div>
-                        {expandedSections.urinalysisResults && (
-                          <div className="hm-form-grid">
-                            {['appearance', 'color', 'pH', 'specificGravity', 'protein', 'glucose', 'ketones', 'blood', 'leukocyteEsterase', 'nitrites', 'urobilinogen', 'bilirubin', 'microscopy', 'notes'].map(field => (
-                              <div key={field} className="hm-form-group">
-                                <label className="hm-form-label">{getFieldLabel(field)}</label>
-                                <input type={field === 'pH' || field === 'specificGravity' ? 'number' : 'text'} className="hm-form-input" step="0.01" placeholder={`Nhập ${field}...`} value={form.urinalysisResults[field] || ''} onChange={(e) => setForm(prev => ({ ...prev, urinalysisResults: { ...prev.urinalysisResults, [field]: e.target.value } }))} />
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* ECG Results */}
-                      <div style={{ marginTop: 12, padding: 10, border: '1px solid #e6eef6', borderRadius: 6 }}>
-                        <div style={{ fontWeight: 700, marginBottom: 10, cursor: 'pointer' }} onClick={() => setExpandedSections(prev => ({ ...prev, ecgResults: !prev.ecgResults }))}>
-                          ▼ Kết quả ECG
-                        </div>
-                        {expandedSections.ecgResults && (
-                          <div className="hm-form-grid">
-                            {['heartRate', 'rhythm', 'prInterval', 'qrsDuration', 'qtInterval', 'axis', 'interpretation', 'notes'].map(field => (
-                              <div key={field} className="hm-form-group">
-                                <label className="hm-form-label">{getFieldLabel(field)}</label>
-                                <input type={field === 'heartRate' ? 'number' : 'text'} className="hm-form-input" placeholder={`Nhập ${field}...`} value={form.ecgResults[field] || ''} onChange={(e) => setForm(prev => ({ ...prev, ecgResults: { ...prev.ecgResults, [field]: e.target.value } }))} />
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Imaging Results */}
-                      <div style={{ marginTop: 12, padding: 10, border: '1px solid #e6eef6', borderRadius: 6 }}>
-                        <div style={{ fontWeight: 700, marginBottom: 10, cursor: 'pointer' }} onClick={() => setExpandedSections(prev => ({ ...prev, imagingResults: !prev.imagingResults }))}>
-                          ▼ Kết quả hình ảnh
-                        </div>
-                        {expandedSections.imagingResults && (
-                          <div>
-                            {(form.imagingResults || []).map((item, idx) => (
-                              <div key={idx} style={{ marginBottom: 10, padding: 8, background: '#f8fafc', borderRadius: 4 }}>
-                                <input type="text" placeholder="Phương thức" className="hm-form-input" value={item.modality || ''} onChange={(e) => {
-                                  const updated = [...(form.imagingResults || [])];
-                                  updated[idx].modality = e.target.value;
-                                  setForm(prev => ({ ...prev, imagingResults: updated }));
-                                }} />
-                                <input type="text" placeholder="Vị trí" className="hm-form-input" value={item.bodyPart || ''} onChange={(e) => {
-                                  const updated = [...(form.imagingResults || [])];
-                                  updated[idx].bodyPart = e.target.value;
-                                  setForm(prev => ({ ...prev, imagingResults: updated }));
-                                }} />
-                                <input type="text" placeholder="Tìm thấy" className="hm-form-input" value={item.finding || ''} onChange={(e) => {
-                                  const updated = [...(form.imagingResults || [])];
-                                  updated[idx].finding = e.target.value;
-                                  setForm(prev => ({ ...prev, imagingResults: updated }));
-                                }} />
-                                <textarea placeholder="Kết luận" className="hm-form-textarea" value={item.impression || ''} onChange={(e) => {
-                                  const updated = [...(form.imagingResults || [])];
-                                  updated[idx].impression = e.target.value;
-                                  setForm(prev => ({ ...prev, imagingResults: updated }));
-                                }} />
-                                <button type="button" onClick={() => {
-                                  const updated = form.imagingResults.filter((_, i) => i !== idx);
-                                  setForm(prev => ({ ...prev, imagingResults: updated }));
-                                }} style={{ background: '#ef4444', color: '#fff', padding: '4px 8px', borderRadius: 4 }}>Xóa</button>
-                              </div>
-                            ))}
-                            <button type="button" onClick={() => setForm(prev => ({ ...prev, imagingResults: [...(prev.imagingResults || []), { modality: '', bodyPart: '', finding: '', impression: '', imageUrls: [], cloudinaryPublicIds: [], notes: '' }] }))} style={{ background: '#3b82f6', color: '#fff', padding: '6px 12px', borderRadius: 4 }}>+ Thêm hình ảnh</button>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Cognitive Function */}
-                      <div style={{ marginTop: 12, padding: 10, border: '1px solid #e6eef6', borderRadius: 6 }}>
-                        <div style={{ fontWeight: 700, marginBottom: 10, cursor: 'pointer' }} onClick={() => setExpandedSections(prev => ({ ...prev, cognitiveFunction: !prev.cognitiveFunction }))}>
-                          ▼ Tình trạng nhận thức
-                        </div>
-                        {expandedSections.cognitiveFunction && (
-                          <div className="hm-form-grid">
-                            {['assessmentTool', 'score', 'orientation', 'memory', 'attention', 'language', 'executiveFunction', 'notes'].map(field => (
-                              <div key={field} className="hm-form-group">
-                                <label className="hm-form-label">{getFieldLabel(field)}</label>
-                                <input type="text" className="hm-form-input" placeholder={`Nhập ${field}...`} value={form.cognitiveFunction[field] || ''} onChange={(e) => setForm(prev => ({ ...prev, cognitiveFunction: { ...prev.cognitiveFunction, [field]: e.target.value } }))} />
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Functional Status */}
-                      <div style={{ marginTop: 12, padding: 10, border: '1px solid #e6eef6', borderRadius: 6 }}>
-                        <div style={{ fontWeight: 700, marginBottom: 10, cursor: 'pointer' }} onClick={() => setExpandedSections(prev => ({ ...prev, functionalStatus: !prev.functionalStatus }))}>
-                          ▼ Tình trạng chức năng
-                        </div>
-                        {expandedSections.functionalStatus && (
-                          <div className="hm-form-grid">
-                            {['mobility', 'transfers', 'adls', 'iadls', 'assistanceRequired', 'notes'].map(field => (
-                              <div key={field} className="hm-form-group">
-                                <label className="hm-form-label">{getFieldLabel(field)}</label>
-                                <input type="text" className="hm-form-input" placeholder={`Nhập ${field}...`} value={form.functionalStatus[field] || ''} onChange={(e) => setForm(prev => ({ ...prev, functionalStatus: { ...prev.functionalStatus, [field]: e.target.value } }))} />
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Fall Risk */}
-                      <div style={{ marginTop: 12, padding: 10, border: '1px solid #e6eef6', borderRadius: 6 }}>
-                        <div style={{ fontWeight: 700, marginBottom: 10, cursor: 'pointer' }} onClick={() => setExpandedSections(prev => ({ ...prev, fallRisk: !prev.fallRisk }))}>
-                          ▼ Nguy cơ té ngã
-                        </div>
-                        {expandedSections.fallRisk && (
-                          <div className="hm-form-grid">
-                            <div className="hm-form-group">
-                              <label className="hm-form-label">Mức độ nguy cơ</label>
-                              <select className="hm-form-select" value={form.fallRisk?.level || 'low'} onChange={(e) => setForm(prev => ({ ...prev, fallRisk: { ...prev.fallRisk, level: e.target.value } }))}>
-                                <option value="low">Thấp</option>
-                                <option value="medium">Vừa</option>
-                                <option value="high">Cao</option>
-                              </select>
-                            </div>
-                            <div className="hm-form-group">
-                              <label className="hm-form-label">
-                                <input type="checkbox" checked={form.fallRisk?.historyOfFalls || false} onChange={(e) => setForm(prev => ({ ...prev, fallRisk: { ...prev.fallRisk, historyOfFalls: e.target.checked } }))} />
-                                Tiền sử té ngã
-                              </label>
-                            </div>
-                            {['gait', 'balance', 'medications', 'vision', 'cognition', 'notes'].map(field => (
-                              <div key={field} className="hm-form-group">
-                                <label className="hm-form-label">{getFieldLabel(field)}</label>
-                                <input type="text" className="hm-form-input" placeholder={`Nhập ${field}...`} value={form.fallRisk[field] || ''} onChange={(e) => setForm(prev => ({ ...prev, fallRisk: { ...prev.fallRisk, [field]: e.target.value } }))} />
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Nutritional Status */}
-                      <div style={{ marginTop: 12, padding: 10, border: '1px solid #e6eef6', borderRadius: 6 }}>
-                        <div style={{ fontWeight: 700, marginBottom: 10, cursor: 'pointer' }} onClick={() => setExpandedSections(prev => ({ ...prev, nutritionalStatus: !prev.nutritionalStatus }))}>
-                          ▼ Tình trạng dinh dưỡng
-                        </div>
-                        {expandedSections.nutritionalStatus && (
-                          <div className="hm-form-grid">
-                            {['bmi', 'weightChange', 'appetite', 'dietType', 'swallowing', 'proteinIntake', 'hydration', 'notes'].map(field => (
-                              <div key={field} className="hm-form-group">
-                                <label className="hm-form-label">{getFieldLabel(field)}</label>
-                                <input type={field === 'bmi' ? 'number' : 'text'} className="hm-form-input" step="0.1" placeholder={`Nhập ${field}...`} value={form.nutritionalStatus[field] || ''} onChange={(e) => setForm(prev => ({ ...prev, nutritionalStatus: { ...prev.nutritionalStatus, [field]: e.target.value } }))} />
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="hm-form-section" style={{ marginTop: '18px' }}>
-                      <div className="hm-form-section-title">
                         <ClipboardList size={15} /> Dịch vụ lâm sàng & Cận lâm sàng
                       </div>
                       <div className="hm-form-grid">
                         <div className="hm-form-group full">
-                          <div style={{ maxHeight: 220, overflowY: 'auto', border: '1px solid #e6eef6', padding: 8, borderRadius: 6 }}>
+                          <div style={{ border: '1px solid #e6eef6', padding: 8, borderRadius: 6 }}>
                             {clinicalServices.length === 0 && <div style={{ color: '#64748b' }}>Không có dịch vụ nào.</div>}
                             {clinicalServices.map((svc) => {
                               const selected = !!selectedServices[svc._id];
                               return (
-                                <div key={svc._id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 4px', borderBottom: '1px solid #f1f5f9' }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                    <input type="checkbox" checked={selected} onChange={() => {
-                                      setSelectedServices(prev => {
-                                        const copy = { ...prev };
-                                        if (copy[svc._id]) delete copy[svc._id];
-                                        else copy[svc._id] = { ...svc, quantity: 1 };
-                                        return copy;
-                                      });
-                                    }} />
-                                    <div>
-                                      <div style={{ fontWeight: 700 }}>{svc.serviceName}</div>
-                                      <div style={{ fontSize: 12, color: '#64748b' }}>{svc.category} · {formatMoney(svc.unitPrice)}</div>
-                                    </div>
-                                  </div>
-                                  {selected && (
+                                <div key={svc._id} style={{ display: 'grid', gap: 6 }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 4px', borderBottom: '1px solid #f1f5f9' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                      <input type="number" min="1" value={selectedServices[svc._id]?.quantity || 1} onChange={(e) => {
-                                        const q = parseInt(e.target.value || '1', 10) || 1;
-                                        setSelectedServices(prev => ({ ...prev, [svc._id]: { ...prev[svc._id], quantity: q } }));
-                                      }} style={{ width: 80 }} />
+                                      <input type="checkbox" checked={selected} onChange={() => {
+                                        setSelectedServices(prev => {
+                                          const copy = { ...prev };
+                                          if (copy[svc._id]) {
+                                            delete copy[svc._id];
+                                          } else {
+                                            copy[svc._id] = { ...svc, quantity: 1, fieldValues: {} };
+                                          }
+                                          return copy;
+                                        });
+                                      }} />
+                                      <div>
+                                        <div style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                          {svc.serviceName}
+                                          {selected && isSelectedServiceAbnormal(selectedServices[svc._id]) && (
+                                            <span className="hm-badge-warn" style={{ fontSize: 11, padding: '2px 6px' }}>Bất thường</span>
+                                          )}
+                                        </div>
+                                        <div style={{ fontSize: 12, color: '#64748b' }}>{svc.category} · {formatMoney(svc.unitPrice)}</div>
+                                      </div>
+                                    </div>
+                                    {selected && (
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                          <span>Số lượng:</span>
+                                          <input type="number" min="1" value={selectedServices[svc._id]?.quantity || 1} onChange={(e) => {
+                                            const q = parseInt(e.target.value || '1', 10) || 1;
+                                            setSelectedServices(prev => ({ ...prev, [svc._id]: { ...prev[svc._id], quantity: q } }));
+                                          }} style={{ width: 80 }} />
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {selected && svc.fields && svc.fields.length > 0 && (
+                                    <div className="hm-service-fields-panel hm-service-fields-grid">
+                                      <div className="hm-service-fields-heading" style={{ marginBottom: 6, fontWeight: 700, color: '#0f172a' }}>
+                                        Thông tin dịch vụ: {svc.serviceName}
+                                      </div>
+                                      {svc.fields.map((field) => {
+                                        const value = getSelectedServiceFieldValue(svc._id, field.fieldCode);
+                                        const outOfRange = isFieldValueOutOfRange(field, value);
+                                        return (
+                                          <div key={field.fieldCode} style={{ marginBottom: 10 }}>
+                                            <label style={{ display: 'block', marginBottom: 4, fontSize: 13, fontWeight: 600 }}>
+                                              {field.label}{field.required ? ' *' : ''}
+                                            </label>
+                                            {field.type === 'IMAGE' ? (
+                                              <>
+                                                <input
+                                                  type="file"
+                                                  accept="image/*"
+                                                  multiple
+                                                  className="hm-form-input"
+                                                  onChange={(e) => {
+                                                    const files = Array.from(e.target.files || []);
+                                                    setSelectedServiceFieldFiles(svc._id, field.fieldCode, files);
+                                                  }}
+                                                />
+                                                {getSelectedServiceFieldFiles(svc._id, field.fieldCode).length > 0 && (
+                                                  <div style={{ marginTop: 8, display: 'grid', gap: 6 }}>
+                                                    {getSelectedServiceFieldFiles(svc._id, field.fieldCode).map((file, idx) => (
+                                                      <div key={idx} style={{ fontSize: 12, color: '#334155' }}>
+                                                        {file.name}
+                                                      </div>
+                                                    ))}
+                                                  </div>
+                                                )}
+                                              </>
+                                            ) : field.type === 'NUMBER' ? (
+                                              <input
+                                                type="number"
+                                                className={`hm-form-input${outOfRange ? ' is-warn' : ''}`}
+                                                placeholder={field.placeholder || 'Nhập giá trị số'}
+                                                value={value}
+                                                step="any"
+                                                onChange={(e) => setSelectedServiceFieldValue(svc._id, field.fieldCode, e.target.value)}
+                                              />
+                                            ) : field.type === 'DROPDOWN' ? (
+                                              <select
+                                                className="hm-form-input"
+                                                value={value}
+                                                onChange={(e) => setSelectedServiceFieldValue(svc._id, field.fieldCode, e.target.value)}
+                                              >
+                                                <option value="">-- Chọn --</option>
+                                                {(Array.isArray(field.options) ? field.options : []).map((opt) => (
+                                                  <option key={opt} value={opt}>{opt}</option>
+                                                ))}
+                                              </select>
+                                            ) : (
+                                              <input
+                                                type="text"
+                                                className={`hm-form-input${outOfRange ? ' is-warn' : ''}`}
+                                                placeholder={field.placeholder || 'Nhập giá trị'}
+                                                value={value}
+                                                onChange={(e) => setSelectedServiceFieldValue(svc._id, field.fieldCode, e.target.value)}
+                                              />
+                                            )}
+                                            {field.type === 'IMAGE' && getSelectedServiceFieldFiles(svc._id, field.fieldCode).length > 0 && (
+                                              <div style={{ marginTop: 6, display: 'grid', gap: 10 }}>
+                                                {getSelectedServiceFieldFiles(svc._id, field.fieldCode).map((file, idx) => (
+                                                  <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: 6, maxWidth: 280 }}>
+                                                    {file.preview ? (
+                                                      <img
+                                                        src={file.preview}
+                                                        alt={file.name || `preview-${idx}`}
+                                                        style={{ width: '100%', maxHeight: 180, objectFit: 'cover', borderRadius: 8, border: '1px solid #e2e8f0' }}
+                                                      />
+                                                    ) : null}
+                                                    <span style={{ fontSize: 12, color: '#334155', wordBreak: 'break-word' }}>{file.name}</span>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            )}
+                                            {field.type === 'NUMBER' && (
+                                              <div style={{ marginTop: 4, fontSize: 12, color: outOfRange ? '#b91c1c' : '#475569' }}>
+                                                {getServiceFieldHint(field, value)}
+                                              </div>
+                                            )}
+                                            {field.type === 'DROPDOWN' && (
+                                              <div style={{ marginTop: 4, fontSize: 12, color: '#475569' }}>
+                                                {getServiceFieldHint(field, value)}
+                                              </div>
+                                            )}
+                                          </div>
+                                        );
+                                      })}
                                     </div>
                                   )}
                                 </div>

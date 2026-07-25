@@ -96,9 +96,20 @@ const daysUntil = (validUntil) => {
 // COMPLETED/CANCELLED still fall back to the plain StatusBadge.
 function RxStatusCell({ prescription }) {
   const { t } = useTranslation();
+  const discontinuedCount = (prescription.items || []).filter((it) => it.isActive === false).length;
+
   if (prescription.status !== 'ACTIVE') {
     return <StatusBadge status={prescription.status} type="rx" />;
   }
+  if (discontinuedCount > 0) {
+    return (
+      <span className="med-badge med-badge--stopped">
+        {t('medication.discontinuedLabel')}
+        {discontinuedCount > 1 ? ` (${discontinuedCount})` : ''}
+      </span>
+    );
+  }
+
   const days = daysUntil(prescription.validUntil);
   if (days === null) return <StatusBadge status="ACTIVE" type="rx" />;
   if (days < 0) return <span className="med-badge med-badge--missed">{t('medication.rxExpired')}</span>;
@@ -176,7 +187,7 @@ function HealthWarningPanel({ residentId }) {
     <div className="med-health-panel">
       <div className="med-health-panel__title">{t('medication.healthProfile')}</div>
 
-      {/* Dị ứng thuốc — đỏ, ưu tiên cao nhất */}
+      {/* Dị ứng — đỏ, ưu tiên cao nhất */}
       {allergies.length > 0 && (
         <div className="med-health-section med-health-section--danger">
           <div className="med-health-section__head">
@@ -441,13 +452,14 @@ function ItemRow({ item, idx, onChange, onRemove, t, canRemove, errors = {}, exc
             <label className="cpf-label">{t('medication.duration')}</label>
             <input
               type="number"
-              className="cpf-input"
+              className={`cpf-input${errors[`item_${idx}_duration`] ? ' cpf-input--err' : ''}`}
               value={item.duration}
               onChange={(e) => onChange(idx, { ...item, duration: e.target.value })}
               min="1"
               placeholder="7"
             />
             <small className="cpf-hint">{t('medication.durationAutoScheduleHint')}</small>
+            {errors[`item_${idx}_duration`] && <span className="cpf-error">{errors[`item_${idx}_duration`]}</span>}
           </div>
         </div>
 
@@ -542,6 +554,24 @@ function CreatePrescriptionModal({ residents, onSave, onClose }) {
       if (!item.startDate) errs[`item_${i}_startDate`] = t('medication.startDateRequired');
       else if (item.startDate < today) errs[`item_${i}_startDate`] = t('medication.startDatePast');
       else if (form.validUntil && item.startDate > form.validUntil) errs[`item_${i}_startDate`] = t('medication.startDateAfterValidUntil');
+
+      if (item.duration === '' || item.duration === null || item.duration === undefined) {
+        errs[`item_${i}_duration`] = t('medication.durationRequired');
+      } else {
+        const durationValue = Number(item.duration);
+        if (Number.isNaN(durationValue)) {
+          errs[`item_${i}_duration`] = t('medication.durationNotNumber');
+        } else if (!Number.isInteger(durationValue) || durationValue < 1) {
+          errs[`item_${i}_duration`] = t('medication.durationPositive');
+        } else if (form.validUntil && item.startDate) {
+          const endDateStr = addDaysStr(item.startDate, durationValue);
+          const effectiveEnd = new Date(`${endDateStr}T00:00:00`);
+          const validUntilDate = new Date(`${form.validUntil}T00:00:00`);
+          if (effectiveEnd > validUntilDate) {
+            errs[`item_${i}_duration`] = t('medication.durationExceedsValidUntil');
+          }
+        }
+      }
     });
     setErrors(errs);
     return Object.keys(errs).length === 0;
@@ -1171,7 +1201,6 @@ function EditPrescriptionModal({ prescription, onSave, onClose }) {
       isActive: it.isActive !== false,
     }))
   );
-  const [status, setStatus] = useState(prescription.status || 'ACTIVE');
   const [saving, setSaving] = useState(false);
 
   const [activeIdx, setActiveIdx] = useState(0);
@@ -1201,22 +1230,17 @@ function EditPrescriptionModal({ prescription, onSave, onClose }) {
   const handleSubmit = async () => {
     setSaving(true);
     try {
-      // This modal only ever touches times/instructions (+ status/discontinue for
-      // doctors) — dosage, frequency, route, and dates aren't editable here, so we
-      // must not echo them back. Re-sending an item's original (often past) startDate
-      // trips the backend's "startDate cannot be in the past" check on every edit.
-      const payload = isDoctor
-        ? {
-          status,
-          items: items.map((it) => (
-            it.isActive === false
-              ? { _id: it._id, isActive: false }
-              : { _id: it._id, times: it.times, instructions: it.instructions }
-          )),
-        }
-        : {
-          items: items.map((it) => ({ _id: it._id, times: it.times, instructions: it.instructions })),
-        };
+      // This modal only ever touches instructions (+ discontinue for doctors).
+      // Dosage, frequency, route, and dates aren't editable here, so we must not
+      // echo them back. Re-sending an item's original (often past) startDate trips
+      // the backend's "startDate cannot be in the past" check on every edit.
+      const payload = {
+        items: items.map((it) => (
+          it.isActive === false
+            ? { _id: it._id, isActive: false }
+            : { _id: it._id, times: it.times, instructions: it.instructions }
+        )),
+      };
       await onSave(prescription._id, payload);
     } finally {
       setSaving(false);
@@ -1346,27 +1370,6 @@ function EditPrescriptionModal({ prescription, onSave, onClose }) {
               </div>
             </div>
           )}
-
-          {/* Status */}
-          <div className="cpf-field">
-            <label className="cpf-label">
-              {t('medication.colStatus')}
-              {isDoctor && items.length > 1 && (
-                <span className="cpf-hint" style={{ marginLeft: 6, fontWeight: 400 }}>
-                  ({t('medication.statusAppliesWholeRx')})
-                </span>
-              )}
-            </label>
-            {isDoctor ? (
-              <select className="cpf-input" value={status} onChange={(e) => setStatus(e.target.value)}>
-                {Object.keys(MANUAL_RX_STATUS_KEYS).map((k) => (
-                  <option key={k} value={k}>{t(`medication.${MANUAL_RX_STATUS_KEYS[k]}`)}</option>
-                ))}
-              </select>
-            ) : (
-              <input className="cpf-input edit-input--readonly" value={t(`medication.${RX_STATUS_KEYS[status]}`)} readOnly />
-            )}
-          </div>
 
           {/* Info notice */}
           <div className="edit-notice">
@@ -1566,9 +1569,6 @@ function PrescriptionsTab({ prescriptions, residents, loading, selectedResidentI
                                         <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                                       </svg>
                                       {t('medication.editPrescription')}
-                                    </button>
-                                    <button className="med-action-btn med-action-btn--schedule" onClick={() => onOpenSchedule(p)}>
-                                      {t('medication.editSchedule')}
                                     </button>
                                     <button className="med-action-btn med-action-btn--history" onClick={() => onOpenHistory(p)}>
                                       {t('medication.viewHistory')}

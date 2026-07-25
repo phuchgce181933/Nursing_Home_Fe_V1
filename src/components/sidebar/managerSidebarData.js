@@ -55,6 +55,11 @@ export const managerSidebarData = [
     ],
   },
   {
+    title: 'sidebar.incidents',
+    icon: FileText,
+    path: '/manager/incidents',
+  },
+  {
     title: 'sidebar.activityManagement',
     icon: Activity,
     path: '/manager/activity-dashboard',

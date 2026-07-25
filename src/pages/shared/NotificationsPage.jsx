@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Settings, Bell, Trash2, CheckCheck, AlertTriangle, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { Settings, Bell, Trash2, CheckCheck, AlertTriangle, ChevronLeft, ChevronRight, X, Search } from 'lucide-react';
 import notificationsService from '../../services/notifications.service';
 
 const CATEGORY_LABELS = {
@@ -36,13 +36,17 @@ function NotificationsPage({ role = 'family' }) {
   const [total, setTotal] = useState(0);
   const [selected, setSelected] = useState(new Set());
   const [search, setSearch] = useState('');
-  const [filterRead, setFilterRead] = useState('all'); // all, unread, read
+  const [searchInput, setSearchInput] = useState('');
+  const [filterRead, setFilterRead] = useState('all');
   const [category, setCategory] = useState('');
   const [categories, setCategories] = useState([]);
   const [showSettingsPanel, setShowSettingsPanel] = useState(false);
   const [settings, setSettings] = useState({ enabledCategories: [], deliveryChannels: [], doNotDisturb: false });
   const [markingAll, setMarkingAll] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(null); // { type: 'one'|'bulk', id? }
+
+  const getNotificationTitle = (item) => item.title || item.subject || item.message || CATEGORY_LABELS[item.category] || 'Thông báo mới';
+  const getNotificationContent = (item) => item.content || item.message || item.body || item.description || item.text || 'Nội dung đang cập nhật...';
 
   const buildQuery = (p = 1) => {
     const q = { page: p, limit };
@@ -51,6 +55,18 @@ function NotificationsPage({ role = 'family' }) {
     if (filterRead === 'read') q.isRead = true;
     if (category) q.category = category;
     return q;
+  };
+
+  const handleApplyFilters = () => {
+    setPage(1);
+    setSearch(searchInput);
+  };
+
+  const handleSearchKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleApplyFilters();
+    }
   };
 
   const fetch = async (p = 1) => {
@@ -72,8 +88,7 @@ function NotificationsPage({ role = 'family' }) {
   useEffect(() => {
     fetch(1);
     notificationsService.getCategories(role).then((cats) => setCategories(cats || [])).catch(() => setCategories([]));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, filterRead, category]);
+  }, [search, filterRead, category, role]);
 
   const loadSettings = async () => {
     try {
@@ -253,6 +268,17 @@ function NotificationsPage({ role = 'family' }) {
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-outline-variant bg-white p-3">
         <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1.5 rounded-lg border border-outline-variant bg-white px-3 py-2 text-sm text-slate-500">
+            <Search size={15} />
+            <input
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyDown={handleSearchKeyDown}
+              onBlur={handleApplyFilters}
+              placeholder="Tìm thông báo"
+              className="w-36 border-none bg-transparent text-sm text-slate-600 outline-none placeholder:text-slate-400"
+            />
+          </div>
           <select value={filterRead} onChange={(e) => setFilterRead(e.target.value)} className={SELECT_CLASS}>
             <option value="all">Tất cả</option>
             <option value="unread">Chưa đọc</option>
@@ -350,7 +376,7 @@ function NotificationsPage({ role = 'family' }) {
                 />
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <strong className="text-sm font-bold text-slate-800">{n.title}</strong>
+                    <strong className="text-sm font-bold text-slate-800">{getNotificationTitle(n)}</strong>
                     {!n.isRead && (
                       <span className="rounded-full bg-status-success px-2 py-0.5 text-[11px] font-semibold text-white">Mới</span>
                     )}
@@ -360,7 +386,7 @@ function NotificationsPage({ role = 'family' }) {
                       </span>
                     )}
                   </div>
-                  <div className="mt-1.5 whitespace-pre-wrap text-sm text-slate-600">{n.content}</div>
+                  <div className="mt-1.5 whitespace-pre-wrap text-sm text-slate-600">{getNotificationContent(n)}</div>
                   <div className="mt-1.5 text-xs text-slate-400">{new Date(n.updatedAt || n.createdAt).toLocaleString('vi-VN')}</div>
                 </div>
               </div>

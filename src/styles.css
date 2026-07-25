@@ -63,6 +63,11 @@ body,
   min-height: 100%;
 }
 
+/* Keep vertical scrollbar stable to avoid layout shift when content changes */
+html {
+  scrollbar-gutter: stable;
+}
+
 body {
   min-height: 100vh;
   font-family: 'Be Vietnam Pro', Inter, 'Segoe UI', Roboto, Arial, sans-serif;

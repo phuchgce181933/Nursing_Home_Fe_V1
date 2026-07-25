@@ -443,6 +443,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
     e.preventDefault();
     if (!formFloorBuildingId) return setFormError('Vui lòng chọn tòa nhà');
     if (!formFloorNumber) return setFormError('Số tầng là bắt buộc');
+    if (Number(formFloorNumber) <= 0) return setFormError('Số tầng phải lớn hơn 0');
 
     try {
       setSubmitting(true);
@@ -467,6 +468,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
     e.preventDefault();
     if (!selectedFloor?._id) return;
     if (!formFloorNumber) return setFormError('Số tầng là bắt buộc');
+    if (Number(formFloorNumber) <= 0) return setFormError('Số tầng phải lớn hơn 0');
 
     try {
       setSubmitting(true);
@@ -523,6 +525,9 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
     if (!formRoomBuildingId) return setFormError('Vui lòng chọn tòa nhà');
     if (!formRoomFloorId) return setFormError('Vui lòng chọn tầng');
     if (!formRoomNumber.trim()) return setFormError('Số phòng là bắt buộc');
+    if (formRoomNumber.trim().startsWith('-') || (!isNaN(formRoomNumber.trim()) && Number(formRoomNumber.trim()) <= 0)) {
+      return setFormError('Số phòng phải lớn hơn 0');
+    }
     if (formRoomCapacity < 1) return setFormError('Sức chứa phải từ 1 trở lên');
 
     try {
@@ -577,6 +582,9 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
     e.preventDefault();
     if (!selectedRoom?._id) return;
     if (!formRoomNumber.trim()) return setFormError('Số phòng là bắt buộc');
+    if (formRoomNumber.trim().startsWith('-') || (!isNaN(formRoomNumber.trim()) && Number(formRoomNumber.trim()) <= 0)) {
+      return setFormError('Số phòng phải lớn hơn 0');
+    }
     if (formRoomCapacity < 1) return setFormError('Sức chứa phải từ 1 trở lên');
 
     try {
@@ -630,7 +638,19 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
   // Bed CRUD Handlers (Branch 3)
   // ----------------------------------------------------
   const handleOpenCreateBed = () => {
-    setFormBedCode('');
+    const currentRoom = rooms.find(r => r._id === selectedRoomId);
+    let autoBedCode = '';
+    if (currentRoom) {
+      const roomPrefix = currentRoom.roomNumber;
+      let nextIndex = 1;
+      autoBedCode = `${roomPrefix}-G${String(nextIndex).padStart(2, '0')}`;
+      const existingCodes = beds.map(b => b.bedCode.toLowerCase().trim());
+      while (existingCodes.includes(autoBedCode.toLowerCase())) {
+        nextIndex++;
+        autoBedCode = `${roomPrefix}-G${String(nextIndex).padStart(2, '0')}`;
+      }
+    }
+    setFormBedCode(autoBedCode);
     setFormBedType('normal');
     setFormBedCondition('good');
     setFormBedStatus('available');
@@ -736,7 +756,8 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
   // Equipment CRUD Handlers (Branch 4)
   // ----------------------------------------------------
   const handleOpenCreateEq = () => {
-    setFormEqCode('');
+    const randNum = Math.floor(100000 + Math.random() * 900000);
+    setFormEqCode(`EQ-${randNum}`);
     setFormEqName('');
     setFormEqCategory('');
     setFormEqStatus('available');
@@ -777,6 +798,17 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
     e.preventDefault();
     if (!formEqCode.trim()) return setFormError('Mã thiết bị là bắt buộc');
     if (!formEqName.trim()) return setFormError('Tên thiết bị là bắt buộc');
+    if (formEqCategory.trim().startsWith('-') || (!isNaN(formEqCategory.trim()) && Number(formEqCategory.trim()) < 0)) {
+      return setFormError('Danh mục không được là số âm');
+    }
+    if (formEqMaintenanceDueAt) {
+      const selectedDate = new Date(formEqMaintenanceDueAt + 'T00:00:00');
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (selectedDate < today) {
+        return setFormError('Hạn bảo trì không được ở trong quá khứ');
+      }
+    }
 
     try {
       setSubmitting(true);
@@ -812,6 +844,17 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
     if (!selectedEq?._id) return;
     if (!formEqCode.trim()) return setFormError('Mã thiết bị là bắt buộc');
     if (!formEqName.trim()) return setFormError('Tên thiết bị là bắt buộc');
+    if (formEqCategory.trim().startsWith('-') || (!isNaN(formEqCategory.trim()) && Number(formEqCategory.trim()) < 0)) {
+      return setFormError('Danh mục không được là số âm');
+    }
+    if (formEqMaintenanceDueAt) {
+      const selectedDate = new Date(formEqMaintenanceDueAt + 'T00:00:00');
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (selectedDate < today) {
+        return setFormError('Hạn bảo trì không được ở trong quá khứ');
+      }
+    }
 
     try {
       setSubmitting(true);
@@ -1236,7 +1279,13 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                   {rooms.map((r) => (
                     <tr key={r._id}>
                       <td style={{ fontWeight: '600' }}>Phòng {r.roomNumber}</td>
-                      <td style={{ textTransform: 'capitalize' }}>{r.roomType}</td>
+                      <td style={{ textTransform: 'capitalize' }}>
+                        {r.roomType === 'standard' ? t('facilities.roomTypeStandard') :
+                         r.roomType === 'premium' ? t('facilities.roomTypePremium') :
+                         r.roomType === 'icu' ? t('facilities.roomTypeIcu') :
+                         r.roomType === 'isolation' ? t('facilities.roomTypeIsolation') :
+                         r.roomType}
+                      </td>
                       <td>{r.capacity} giường</td>
                       <td>{r.occupiedCount || 0}</td>
                       <td>
@@ -1470,19 +1519,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
 
                     {/* Body */}
                     <div style={{ padding: '0 14px 14px' }}>
-                      {/* Bed type tag */}
-                      <div style={{ marginBottom: '10px' }}>
-                        <span style={{
-                          fontSize: '11px', fontWeight: '500', color: '#64748b',
-                          background: '#f1f5f9', borderRadius: '6px',
-                          padding: '3px 10px', display: 'inline-block'
-                        }}>
-                          {bedTypeLabel}
-                        </span>
-                      </div>
 
-                      {/* Divider */}
-                      <div style={{ height: '1px', background: '#f1f5f9', margin: '0 0 10px' }} />
 
                       {/* Info rows */}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
@@ -1517,7 +1554,6 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                 <thead>
                   <tr>
                     <th>{t('facilities.colBedCode')}</th>
-                    <th>{t('facilities.colBedType')}</th>
                     <th>{t('facilities.colStatus')}</th>
                     <th>{t('facilities.colCondition')}</th>
                     <th>{t('facilities.colNotes')}</th>
@@ -1528,7 +1564,6 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                   {beds.map((b) => (
                     <tr key={b._id}>
                       <td style={{ fontWeight: '600' }}>{b.bedCode}</td>
-                      <td style={{ textTransform: 'capitalize' }}>{b.bedType}</td>
                       <td>
                         <span className={`fac-badge ${
                           b.status === 'available' ? 'fac-badge--success' :
@@ -2181,6 +2216,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                     placeholder={t('facilities.placeholderFloorNumber')}
                     value={formFloorNumber}
                     onChange={(e) => setFormFloorNumber(e.target.value)}
+                    min="1"
                     required
                   />
                 </div>
@@ -2242,6 +2278,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                     className="fac-form-control"
                     value={formFloorNumber}
                     onChange={(e) => setFormFloorNumber(e.target.value)}
+                    min="1"
                     required
                   />
                 </div>
@@ -2376,11 +2413,12 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                 <div className="fac-form-group">
                   <label>{t('facilities.fieldRoomNumber')}</label>
                   <input
-                    type="text"
+                    type="number"
                     className="fac-form-control"
                     placeholder={t('facilities.placeholderRoomNumber')}
                     value={formRoomNumber}
                     onChange={(e) => setFormRoomNumber(e.target.value)}
+                    min="1"
                     required
                   />
                 </div>
@@ -2392,10 +2430,10 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                       value={formRoomType}
                       onChange={(e) => setFormRoomType(e.target.value)}
                     >
-                      <option value="standard">Standard</option>
-                      <option value="premium">Premium</option>
-                      <option value="icu">ICU</option>
-                      <option value="isolation">Isolation</option>
+                      <option value="standard">{t('facilities.roomTypeStandard')}</option>
+                      <option value="premium">{t('facilities.roomTypePremium')}</option>
+                      <option value="icu">{t('facilities.roomTypeIcu')}</option>
+                      <option value="isolation">{t('facilities.roomTypeIsolation')}</option>
                     </select>
                   </div>
                   <div className="fac-form-group">
@@ -2454,10 +2492,11 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                 <div className="fac-form-group">
                   <label>{t('facilities.fieldRoomNumber')}</label>
                   <input
-                    type="text"
+                    type="number"
                     className="fac-form-control"
                     value={formRoomNumber}
                     onChange={(e) => setFormRoomNumber(e.target.value)}
+                    min="1"
                     required
                   />
                 </div>
@@ -2469,10 +2508,10 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                       value={formRoomType}
                       onChange={(e) => setFormRoomType(e.target.value)}
                     >
-                      <option value="standard">Standard</option>
-                      <option value="premium">Premium</option>
-                      <option value="icu">ICU</option>
-                      <option value="isolation">Isolation</option>
+                      <option value="standard">{t('facilities.roomTypeStandard')}</option>
+                      <option value="premium">{t('facilities.roomTypePremium')}</option>
+                      <option value="icu">{t('facilities.roomTypeIcu')}</option>
+                      <option value="isolation">{t('facilities.roomTypeIsolation')}</option>
                     </select>
                   </div>
                   <div className="fac-form-group">
@@ -2582,7 +2621,32 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                   </div>
                 )}
                 <div className="fac-form-group">
-                  <label>{t('facilities.fieldBedCode')}</label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                    <label>{t('facilities.fieldBedCode')} *</label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const currentRoom = rooms.find(r => r._id === selectedRoomId);
+                        if (currentRoom) {
+                          const roomPrefix = currentRoom.roomNumber;
+                          let nextIndex = 1;
+                          let code = `${roomPrefix}-G${String(nextIndex).padStart(2, '0')}`;
+                          const existingCodes = beds.map(b => b.bedCode.toLowerCase().trim());
+                          while (existingCodes.includes(code.toLowerCase())) {
+                            nextIndex++;
+                            code = `${roomPrefix}-G${String(nextIndex).padStart(2, '0')}`;
+                          }
+                          setFormBedCode(code);
+                        } else {
+                          alert('Vui lòng chọn phòng trước');
+                        }
+                      }}
+                      className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                      style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 0 }}
+                    >
+                      Tự động tạo mã
+                    </button>
+                  </div>
                   <input
                     type="text"
                     className="fac-form-control"
@@ -2592,31 +2656,17 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                     required
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="fac-form-group">
-                    <label>{t('facilities.fieldBedType')}</label>
-                    <select
-                      className="fac-form-control"
-                      value={formBedType}
-                      onChange={(e) => setFormBedType(e.target.value)}
-                    >
-                      <option value="normal">Normal</option>
-                      <option value="electric">Electric</option>
-                      <option value="icu">ICU</option>
-                    </select>
-                  </div>
-                  <div className="fac-form-group">
-                    <label>Tình Trạng</label>
-                    <select
-                      className="fac-form-control"
-                      value={formBedCondition}
-                      onChange={(e) => setFormBedCondition(e.target.value)}
-                    >
-                      <option value="good">Tốt</option>
-                      <option value="fair">Trung bình</option>
-                      <option value="broken">Hỏng</option>
-                    </select>
-                  </div>
+                <div className="fac-form-group">
+                  <label>Tình Trạng</label>
+                  <select
+                    className="fac-form-control"
+                    value={formBedCondition}
+                    onChange={(e) => setFormBedCondition(e.target.value)}
+                  >
+                    <option value="good">Tốt</option>
+                    <option value="fair">Trung bình</option>
+                    <option value="broken">Hỏng</option>
+                  </select>
                 </div>
                 <div className="fac-form-group">
                   <label>{t('facilities.fieldBedNotes')}</label>
@@ -2669,31 +2719,17 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                     required
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="fac-form-group">
-                    <label>{t('facilities.fieldBedType')}</label>
-                    <select
-                      className="fac-form-control"
-                      value={formBedType}
-                      onChange={(e) => setFormBedType(e.target.value)}
-                    >
-                      <option value="normal">Normal</option>
-                      <option value="electric">Electric</option>
-                      <option value="icu">ICU</option>
-                    </select>
-                  </div>
-                  <div className="fac-form-group">
-                    <label>Tình Trạng</label>
-                    <select
-                      className="fac-form-control"
-                      value={formBedCondition}
-                      onChange={(e) => setFormBedCondition(e.target.value)}
-                    >
-                      <option value="good">Tốt</option>
-                      <option value="fair">Trung bình</option>
-                      <option value="broken">Hỏng</option>
-                    </select>
-                  </div>
+                <div className="fac-form-group">
+                  <label>Tình Trạng</label>
+                  <select
+                    className="fac-form-control"
+                    value={formBedCondition}
+                    onChange={(e) => setFormBedCondition(e.target.value)}
+                  >
+                    <option value="good">Tốt</option>
+                    <option value="fair">Trung bình</option>
+                    <option value="broken">Hỏng</option>
+                  </select>
                 </div>
                 <div className="fac-form-group">
                   <label>{t('facilities.fieldBedStatus')}</label>
@@ -2789,7 +2825,20 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                 )}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="fac-form-group">
-                    <label>{t('facilities.fieldEquipCode')}</label>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                      <label>{t('facilities.fieldEquipCode')} *</label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const randNum = Math.floor(100000 + Math.random() * 900000);
+                          setFormEqCode(`EQ-${randNum}`);
+                        }}
+                        className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                        style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 0 }}
+                      >
+                        Tự động tạo mã
+                      </button>
+                    </div>
                     <input
                       type="text"
                       className="fac-form-control"
@@ -2830,6 +2879,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                       className="fac-form-control"
                       value={formEqMaintenanceDueAt}
                       onChange={(e) => setFormEqMaintenanceDueAt(e.target.value)}
+                      min={new Date().toISOString().split('T')[0]}
                     />
                   </div>
                 </div>
@@ -3022,6 +3072,7 @@ export default function FacilitiesPage({ defaultTab = 'buildings' }) {
                       className="fac-form-control"
                       value={formEqMaintenanceDueAt}
                       onChange={(e) => setFormEqMaintenanceDueAt(e.target.value)}
+                      min={new Date().toISOString().split('T')[0]}
                     />
                   </div>
                 </div>

@@ -1,5 +1,6 @@
 import axiosClient from '../api/axiosClient';
 import facilityService from './facility.service';
+import { getAuthRole } from '../utils/auth';
 
 const createResident = async (body) => {
   const response = await axiosClient.post('/admin/residents', body);
@@ -7,7 +8,7 @@ const createResident = async (body) => {
 };
 
 const getResidentList = async (params = {}) => {
-  const response = await axiosClient.get('/admin/residents', { params });
+  const response = await axiosClient.get('/residents', { params });
   return response.data;
 };
 
@@ -759,8 +760,8 @@ export const RESIDENT_DRUG_ALLERGIES_ROUTE_HINT =
   'Đặt GET /residents/drug-allergies trước /:residentId và mount PUT|POST /:id/drug-allergies.';
 
 export const RESIDENT_TRANSFER_ROUTE_HINT =
-  'Backend chưa có route chuyển phòng cư dân (/transfer-room). ' +
-  'Cập nhật backend và khởi động lại API để dùng tính năng chuyển phòng.';
+  'Route chuyển phòng cư dân đang có vấn đề khi gọi tới API /residents/:id/transfer-room. ' +
+  'Kiểm tra quyền truy cập, dữ liệu đầu vào (targetRoomId/targetBedId), và khởi động lại API nếu server đang chạy phiên bản cũ.';
 
 const getPreExistingConditionsFallback = async (residentId) => {
   const r = await getResidentDetailRaw(residentId);
@@ -913,10 +914,12 @@ const updateDrugAllergiesViaAdmin = async (residentId, payload) => {
   };
 };
 
-/** PUT /api/residents/:id/drug-allergies (fallback: POST, PATCH allergies) */
+/** PUT /api/residents/:id/drug-allergies (fallback: POST, PATCH allergies — doctor only) */
 const updateDrugAllergies = async (residentId, body) => {
   const id = residentPathId(residentId);
   const payload = buildDrugAllergiesPayload(body);
+  const role = getAuthRole();
+  const canUseAdminFallback = role === 'doctor';
 
   const tryPut = () =>
     axiosClient.put(`/residents/${id}/drug-allergies`, payload).then(unwrapResidentApiBody);
@@ -928,7 +931,7 @@ const updateDrugAllergies = async (residentId, body) => {
     return await tryPut();
   } catch (e) {
     const status = e?.response?.status;
-    if (status === 404 || status === 405) {
+    if (canUseAdminFallback && (status === 404 || status === 405)) {
       try {
         return await tryPost();
       } catch (postErr) {
@@ -939,14 +942,16 @@ const updateDrugAllergies = async (residentId, body) => {
         throw postErr;
       }
     }
-    if (status === 403 && shouldUseDrugAllergiesDetailFallback(e)) {
-      return updateDrugAllergiesViaAdmin(residentId, payload);
-    }
     throw e;
   }
 };
 
 /** GET /api/residents/:id/transfer-room/targets?floorId= */
+const adminReleaseResident = async (residentId) => {
+  const response = await axiosClient.patch(`/admin/residents/${residentId}/release`);
+  return response.data;
+};
+
 const getTransferTargets = (residentId, params) =>
   axiosClient.get(`/residents/${residentId}/transfer-room/targets`, { params }).then((r) => r.data);
 
@@ -998,6 +1003,7 @@ const residentService = {
   updatePreExistingConditions,
   getDrugAllergies,
   updateDrugAllergies,
+  adminReleaseResident,
   getTransferTargets,
   transferResidentToRoom,
 };

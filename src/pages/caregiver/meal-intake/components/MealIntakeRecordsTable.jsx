@@ -2,12 +2,43 @@ import { useTranslation } from 'react-i18next';
 import { formatLocaleDateTime, intakeStatusLabel, mealTypeLabel } from '../../../../utils/nutritionLabels';
 import '../../../../styles/caregiver/MealIntakeNotesPage.css';
 
-function MealIntakeRecordsTable({ records, loading, onEdit, onDelete }) {
+function recordedByLabel(row) {
+  return (
+    row.recordedByStaffId?.userId?.fullName ||
+    row.recordedByStaffId?.staffCode ||
+    '—'
+  );
+}
+
+function isOwnRecord(row, currentUserId) {
+  if (!currentUserId) return true;
+  const recorderUserId = row.recordedByStaffId?.userId?._id || row.recordedByStaffId?.userId;
+  return String(recorderUserId || '') === String(currentUserId);
+}
+
+function MealIntakeRecordsTable({
+  records,
+  loading,
+  onEdit,
+  onDelete,
+  readOnly = false,
+  canMutate = true,
+  showRecordedBy = false,
+  currentUserId,
+  recordsListTitle,
+  colRecordedByLabel,
+  emptyMessage,
+}) {
   const { t, i18n } = useTranslation();
+  const showActionsCol = !readOnly && canMutate;
+  const colCount = 6 + (showRecordedBy ? 1 : 0) + (showActionsCol ? 1 : 0);
+  const listTitle = recordsListTitle || t('caregiver.mealIntake.recordsList');
+  const emptyText = emptyMessage || t('caregiver.mealIntake.emptyFiltered');
+  const recordedByHeader = colRecordedByLabel || t('admin.mealIntake.colRecordedBy');
 
   return (
     <>
-      <h3 className="meal-intake-page__section-title">{t('caregiver.mealIntake.recordsList')}</h3>
+      <h3 className="meal-intake-page__section-title">{listTitle}</h3>
       <div className="resident-page__table">
         <table className="resident-page__table-element">
           <thead>
@@ -18,21 +49,22 @@ function MealIntakeRecordsTable({ records, loading, onEdit, onDelete }) {
               <th>{t('caregiver.mealIntake.colStatus')}</th>
               <th>%</th>
               <th>{t('common.colTime')}</th>
-              <th>{t('common.colActions')}</th>
+              {showRecordedBy && <th>{recordedByHeader}</th>}
+              {showActionsCol && <th>{t('common.colActions')}</th>}
             </tr>
           </thead>
           <tbody>
             {loading && (
               <tr>
-                <td colSpan={7} className="empty-state">
+                <td colSpan={colCount} className="empty-state">
                   {t('common.loading')}
                 </td>
               </tr>
             )}
             {!loading && records.length === 0 && (
               <tr>
-                <td colSpan={7} className="empty-state">
-                  {t('caregiver.mealIntake.emptyFiltered')}
+                <td colSpan={colCount} className="empty-state">
+                  {emptyText}
                 </td>
               </tr>
             )}
@@ -45,22 +77,31 @@ function MealIntakeRecordsTable({ records, loading, onEdit, onDelete }) {
                   <td>{intakeStatusLabel(row.intakeStatus, t)}</td>
                   <td>{row.intakeStatus === 'partial' ? `${row.portionPercent ?? '—'}%` : '—'}</td>
                   <td>{formatLocaleDateTime(row.recordedAt, i18n.language)}</td>
-                  <td className="meal-intake-page__row-actions">
-                    <button
-                      type="button"
-                      className="resident-page__button resident-page__button--ghost"
-                      onClick={() => onEdit(row)}
-                    >
-                      {t('common.edit')}
-                    </button>
-                    <button
-                      type="button"
-                      className="resident-page__button resident-page__button--ghost"
-                      onClick={() => onDelete(row)}
-                    >
-                      {t('common.delete')}
-                    </button>
-                  </td>
+                  {showRecordedBy && <td>{recordedByLabel(row)}</td>}
+                  {showActionsCol && (
+                    <td className="meal-intake-page__row-actions">
+                      {isOwnRecord(row, currentUserId) ? (
+                        <>
+                      <button
+                        type="button"
+                        className="resident-page__button resident-page__button--ghost"
+                        onClick={() => onEdit(row)}
+                      >
+                        {t('common.edit')}
+                      </button>
+                      <button
+                        type="button"
+                        className="resident-page__button resident-page__button--ghost"
+                        onClick={() => onDelete(row)}
+                      >
+                        {t('common.delete')}
+                      </button>
+                        </>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
+                  )}
                 </tr>
               ))}
           </tbody>

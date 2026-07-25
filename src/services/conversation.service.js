@@ -1,9 +1,9 @@
 import axiosClient from '../api/axiosClient';
 
 // Canonical mount, works for every authenticated role (see /api/conversations in app.js).
-const base = () => `/conversations`;
+const base = () => '/conversations';
 // public guest endpoints are mounted under /api/family/conversations (no auth needed)
-const publicGuestBase = () => `/family/conversations`;
+const publicGuestBase = () => '/family/conversations';
 
 const createConversation = async (payload) => {
   const response = await axiosClient.post(`${base()}`, payload);

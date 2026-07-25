@@ -20,8 +20,44 @@ const updateIncidentStatus = async (id, payload) => {
   return response.data;
 };
 
+const reopenIncident = async (id, payload = {}) => {
+  const response = await axiosClient.patch(`/incidents/${id}/reopen`, payload);
+  return response.data;
+};
+
 const exportIncidents = async (params = {}) => {
   const response = await axiosClient.get('/incidents/export', { params, responseType: 'text' });
+  return response.data;
+};
+
+const assignHandlers = async (id, payload) => {
+  const response = await axiosClient.patch(`/incidents/${id}/handlers`, payload);
+  return response.data;
+};
+
+const getAssignmentConflicts = async (payload = {}) => {
+  const response = await axiosClient.post('/incidents/assignment-conflicts', payload);
+  return response.data;
+};
+
+const updateIncidentResolution = async (id, payload = {}, files = []) => {
+  const form = new FormData();
+  Object.keys(payload || {}).forEach((key) => {
+    const val = payload[key];
+    if (val === undefined || val === null) return;
+    if (typeof val === 'object' && !(val instanceof File) && !(val instanceof Blob)) {
+      form.append(key, JSON.stringify(val));
+    } else {
+      form.append(key, String(val));
+    }
+  });
+  (files || []).forEach((file) => {
+    form.append('resolutionFiles', file);
+  });
+
+  const response = await axiosClient.patch(`/incidents/${id}/resolution`, form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
   return response.data;
 };
 
@@ -30,5 +66,9 @@ export default {
   getIncident,
   createIncident,
   updateIncidentStatus,
+  reopenIncident,
+  assignHandlers,
+  updateIncidentResolution,
   exportIncidents,
+  getAssignmentConflicts,
 };

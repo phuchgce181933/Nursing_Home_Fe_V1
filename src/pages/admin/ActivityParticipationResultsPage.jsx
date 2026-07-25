@@ -18,6 +18,8 @@ export default function ActivityParticipationResultsPage() {
   const [appliedFilters, setAppliedFilters] = useState({ search: '', status: 'completed' });
 
   const [editingId, setEditingId] = useState(null);
+  const [editingOccurrenceDate, setEditingOccurrenceDate] = useState(null);
+  const [editingOccurrenceOptions, setEditingOccurrenceOptions] = useState([]);
   const [form, setForm] = useState({
     attendanceRecords: [],
     participationRecords: [],
@@ -26,7 +28,29 @@ export default function ActivityParticipationResultsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [residents, setResidents] = useState({});
 
-  const buildAttendanceDraftFromActivity = useCallback((activity) => {
+  const toDateKey = useCallback((value) => {
+    if (!value) return null;
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return null;
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }, []);
+
+  const toDateOnlyISOString = useCallback((value) => {
+    if (!value) return null;
+    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      const [year, month, day] = value.split('-').map(Number);
+      return new Date(Date.UTC(year, month - 1, day)).toISOString();
+    }
+
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return null;
+    return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())).toISOString();
+  }, []);
+
+  const buildAttendanceDraftFromActivity = useCallback((activity, targetOccurrenceDate = null) => {
     if (!activity) {
       return {
         attendanceRecords: [],
@@ -34,28 +58,38 @@ export default function ActivityParticipationResultsPage() {
       };
     }
 
-    const existingAttendance = (activity.attendanceRecords || []).reduce((acc, record) => {
-      acc[record.residentId] = record;
-      return acc;
-    }, {});
-    const existingParticipation = (activity.participationRecords || []).reduce((acc, record) => {
-      acc[record.residentId] = record;
-      return acc;
-    }, {});
+    const targetKey = toDateKey(targetOccurrenceDate);
+
+    const findForResident = (records = [], residentId) => {
+      // prefer record matching target occurrenceDate, then undated
+      const byDate = (records || []).find((r) => r && r.residentId && String(r.residentId) === String(residentId) && r.occurrenceDate && toDateKey(r.occurrenceDate) === targetKey);
+      if (byDate) return byDate;
+      const noDate = (records || []).find((r) => r && r.residentId && String(r.residentId) === String(residentId) && !r.occurrenceDate);
+      return noDate || null;
+    };
+
+    const existingAttendance = activity.attendanceRecords || [];
+    const existingParticipation = activity.participationRecords || [];
 
     const participantIds = activity.participantResidentIds || [];
     return {
-      attendanceRecords: participantIds.map((residentId) => ({
-        residentId,
-        status: existingAttendance[residentId]?.status || 'present',
-        note: existingAttendance[residentId]?.note || '',
-      })),
-      participationRecords: participantIds.map((residentId) => ({
-        residentId,
-        participationLevel: existingParticipation[residentId]?.participationLevel || 'active',
-        comment: existingParticipation[residentId]?.comment || '',
-        incident: existingParticipation[residentId]?.incident || '',
-      })),
+      attendanceRecords: participantIds.map((residentId) => {
+        const rec = findForResident(existingAttendance, residentId);
+        return {
+          residentId,
+          status: rec?.status || 'present',
+          note: rec?.note || '',
+        };
+      }),
+      participationRecords: participantIds.map((residentId) => {
+        const rec = findForResident(existingParticipation, residentId);
+        return {
+          residentId,
+          participationLevel: rec?.participationLevel || 'active',
+          comment: rec?.comment || '',
+          incident: rec?.incident || '',
+        };
+      }),
     };
   }, []);
 
@@ -136,13 +170,29 @@ export default function ActivityParticipationResultsPage() {
   };
 
   const handleEdit = (activity) => {
+    // choose latest occurrenceDate from activity records, fallback to scheduledAt
+    const occDates = [];
+    (activity.attendanceRecords || []).forEach((r) => { if (r?.occurrenceDate) occDates.push(new Date(r.occurrenceDate)); });
+    (activity.participationRecords || []).forEach((r) => { if (r?.occurrenceDate) occDates.push(new Date(r.occurrenceDate)); });
+    let chosen = null;
+    if (occDates.length > 0) {
+      const unique = [...new Set(occDates.map((d) => toDateKey(d)).filter(Boolean))];
+      setEditingOccurrenceOptions(unique);
+      const max = occDates.reduce((a, b) => (a > b ? a : b));
+      chosen = toDateKey(max);
+    } else if (activity.scheduledAt) {
+      chosen = toDateKey(activity.scheduledAt);
+    }
+
     setEditingId(activity._id);
-    setForm(buildAttendanceDraftFromActivity(activity));
+    setEditingOccurrenceDate(chosen);
+    setForm(buildAttendanceDraftFromActivity(activity, chosen));
     setFormError(null);
   };
 
   const handleCancel = () => {
     setEditingId(null);
+    setEditingOccurrenceDate(null);
     setForm({
       attendanceRecords: [],
       participationRecords: [],
@@ -156,10 +206,18 @@ export default function ActivityParticipationResultsPage() {
 
     try {
       setSubmitting(true);
-      await activityService.recordParticipationResult(editingId, {
-        attendanceRecords: form.attendanceRecords,
-        participationRecords: form.participationRecords,
-      });
+      const payload = {
+        attendanceRecords: (form.attendanceRecords || []).map((r) => ({ ...r })),
+        participationRecords: (form.participationRecords || []).map((r) => ({ ...r })),
+      };
+      // attach occurrenceDate if we have one selected
+      if (editingOccurrenceDate) {
+        const occurrenceDateOnly = toDateOnlyISOString(editingOccurrenceDate);
+        payload.attendanceRecords = payload.attendanceRecords.map((r) => ({ ...r, occurrenceDate: occurrenceDateOnly }));
+        payload.participationRecords = payload.participationRecords.map((r) => ({ ...r, occurrenceDate: occurrenceDateOnly }));
+      }
+
+      await activityService.recordParticipationResult(editingId, payload);
 
       handleCancel();
       fetchActivities();
@@ -255,9 +313,19 @@ export default function ActivityParticipationResultsPage() {
                 activities.map((activity) => (
                   <tr key={activity._id} className="adm-table-row">
                     <td style={{ fontWeight: 500 }}>{activity.title}</td>
-                    <td>
-                      {activity.scheduledAt ? new Date(activity.scheduledAt).toLocaleString('vi-VN') : '-'}
-                    </td>
+                      <td>
+                        {(() => {
+                          // show latest occurrenceDate if any, otherwise scheduledAt
+                          const occs = (activity.attendanceRecords || []).map(r => r?.occurrenceDate).filter(Boolean)
+                            .concat((activity.participationRecords || []).map(r => r?.occurrenceDate).filter(Boolean));
+                          if (occs.length > 0) {
+                            const dates = occs.map(d => new Date(d));
+                            const max = dates.reduce((a,b) => (a > b ? a : b));
+                            return max.toLocaleDateString('vi-VN');
+                          }
+                          return activity.scheduledAt ? new Date(activity.scheduledAt).toLocaleDateString('vi-VN') : '-';
+                        })()}
+                      </td>
                     <td style={{ textAlign: 'center' }}>
                       {activity.participantResidentIds?.length || 0}
                     </td>
@@ -314,83 +382,83 @@ export default function ActivityParticipationResultsPage() {
             </div>
 
             <form onSubmit={handleSubmit} className="adm-modal-body">
+                    {editingOccurrenceOptions.length > 0 && (
+                      <div style={{ marginBottom: 12 }}>
+                        <label className="text-sm font-semibold">Chọn ngày</label>
+                        <select className="adm-filter-select" value={editingOccurrenceDate || ''} onChange={(e) => {
+                          const val = e.target.value || null;
+                          setEditingOccurrenceDate(val);
+                          const act = activities.find(a => a._id === editingId);
+                          setForm(buildAttendanceDraftFromActivity(act, val));
+                        }}>
+                          {editingOccurrenceOptions.map((opt) => {
+                            const rawDate = new Date(`${opt}T00:00:00`);
+                            return (
+                              <option key={opt} value={opt}>{rawDate.toLocaleDateString('vi-VN')}</option>
+                            );
+                          })}
+                        </select>
+                      </div>
+                    )}
               {form.attendanceRecords.length > 0 && (
                 <div className="adm-modal-section">
                   <label className="text-sm font-semibold">Ghi nhận từng cư dân</label>
-                  {form.attendanceRecords.map((record) => {
-                    const resident = residents[record.residentId];
-                    const participation = form.participationRecords.find((item) => item.residentId === record.residentId) || { participationLevel: 'active', comment: '', incident: '' };
+                  <div className="adm-table-responsive">
+                    <table className="adm-table adm-participation-table">
+                      <thead>
+                        <tr>
+                          <th>Cư dân</th>
+                          <th>Điểm danh</th>
+                          <th>Mức độ tham gia</th>
+                          <th>Nhận xét</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {form.attendanceRecords.map((record) => {
+                          const resident = residents[record.residentId];
+                          const participation = form.participationRecords.find((item) => item.residentId === record.residentId) || { participationLevel: 'active', comment: '', incident: '' };
 
-                    return (
-                      <div key={record.residentId} className="adm-modal-card">
-                        <div className="adm-modal-card-title">
-                          {resident?.fullName || record.residentId}
-                        </div>
-
-                        <div className="adm-modal-grid">
-                          <div className="adm-modal-field">
-                            <label className="text-sm font-semibold">Điểm danh</label>
-                            <select
-                              className="adm-filter-select"
-                              value={record.status}
-                              onChange={(e) => updateAttendanceRecord(record.residentId, 'status', e.target.value)}
-                            >
-                              <option value="present">Có mặt</option>
-                              <option value="absent">Vắng mặt</option>
-                              <option value="late">Muộn</option>
-                              <option value="left_early">Về sớm</option>
-                            </select>
-                          </div>
-
-                          <div className="adm-modal-field">
-                            <label className="text-sm font-semibold">Mức độ tham gia</label>
-                            <select
-                              className="adm-filter-select"
-                              value={participation.participationLevel}
-                              onChange={(e) => updateParticipationRecord(record.residentId, 'participationLevel', e.target.value)}
-                            >
-                              <option value="active">Tích cực</option>
-                              <option value="partial">Một phần</option>
-                              <option value="passive">Thụ động</option>
-                            </select>
-                          </div>
-                        </div>
-
-                        <div className="adm-modal-field">
-                          <label className="text-sm font-semibold">Nhận xét</label>
-                          <textarea
-                            rows="2"
-                            className="adm-filter-input"
-                            value={participation.comment}
-                            onChange={(e) => updateParticipationRecord(record.residentId, 'comment', e.target.value)}
-                            placeholder="Nhận xét cho cư dân này..."
-                          />
-                        </div>
-
-                        <div className="adm-modal-field">
-                          <label className="text-sm font-semibold">Sự cố</label>
-                          <textarea
-                            rows="2"
-                            className="adm-filter-input"
-                            value={participation.incident}
-                            onChange={(e) => updateParticipationRecord(record.residentId, 'incident', e.target.value)}
-                            placeholder="Nếu có, ghi rõ sự cố..."
-                          />
-                        </div>
-
-                        <div className="adm-modal-field">
-                          <label className="text-sm font-semibold">Ghi chú điểm danh</label>
-                          <textarea
-                            rows="2"
-                            className="adm-filter-input"
-                            value={record.note || ''}
-                            onChange={(e) => updateAttendanceRecord(record.residentId, 'note', e.target.value)}
-                            placeholder="Ghi chú thêm..."
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
+                          return (
+                            <tr key={record.residentId}>
+                              <td>{resident?.fullName || record.residentId}</td>
+                              <td>
+                                <select
+                                  className="adm-filter-select"
+                                  value={record.status}
+                                  onChange={(e) => updateAttendanceRecord(record.residentId, 'status', e.target.value)}
+                                >
+                                  <option value="present">Có mặt</option>
+                                  <option value="absent">Vắng mặt</option>
+                                  <option value="late">Muộn</option>
+                                  <option value="left_early">Về sớm</option>
+                                </select>
+                              </td>
+                              <td>
+                                <select
+                                  className="adm-filter-select"
+                                  value={participation.participationLevel}
+                                  onChange={(e) => updateParticipationRecord(record.residentId, 'participationLevel', e.target.value)}
+                                >
+                                  <option value="passive">Không tham gia</option>
+                                  <option value="partial">Tham gia TB</option>
+                                  <option value="active">Thường xuyên tham gia</option>
+                                </select>
+                              </td>
+                              <td>
+                                <textarea
+                                  rows="2"
+                                  className="adm-filter-input"
+                                  value={participation.comment}
+                                  onChange={(e) => updateParticipationRecord(record.residentId, 'comment', e.target.value)}
+                                  placeholder="Nhận xét..."
+                                />
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
 

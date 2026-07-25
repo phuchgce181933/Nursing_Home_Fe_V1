@@ -3,11 +3,16 @@ import { useTranslation } from 'react-i18next';
 function MealIntakeListFilters({
   workDate,
   residentId,
+  mealType,
+  mealTypeOptions,
   residents,
   loading,
   maxDate,
+  readOnly = false,
+  canCreate = true,
   onWorkDateChange,
   onResidentIdChange,
+  onMealTypeChange,
   onOpenCreate,
   onReload,
 }) {
@@ -19,7 +24,12 @@ function MealIntakeListFilters({
         <div className="resident-page__filter-row">
           <label className="resident-page__filter">
             <span>{t('common.date')}</span>
-            <input type="date" max={maxDate} value={workDate} onChange={(e) => onWorkDateChange(e.target.value)} />
+            <input
+              type="date"
+              max={maxDate}
+              value={workDate}
+              onChange={(e) => onWorkDateChange(e.target.value)}
+            />
           </label>
           <label className="resident-page__filter">
             <span>{t('common.resident')}</span>
@@ -32,14 +42,29 @@ function MealIntakeListFilters({
               ))}
             </select>
           </label>
+          {mealTypeOptions && onMealTypeChange && (
+            <label className="resident-page__filter">
+              <span>{t('caregiver.mealIntake.colMeal')}</span>
+              <select value={mealType || ''} onChange={(e) => onMealTypeChange(e.target.value)}>
+                <option value="">{t('common.all')}</option>
+                {mealTypeOptions.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <div className="resident-page__filter-actions">
-            <button
-              type="button"
-              className="resident-page__button resident-page__button--primary"
-              onClick={onOpenCreate}
-            >
-              {t('caregiver.mealIntake.addRecord')}
-            </button>
+            {!readOnly && canCreate && (
+              <button
+                type="button"
+                className="resident-page__button resident-page__button--primary"
+                onClick={onOpenCreate}
+              >
+                {t('caregiver.mealIntake.addRecord')}
+              </button>
+            )}
             <button
               type="button"
               className="resident-page__button resident-page__button--ghost"

@@ -169,7 +169,7 @@ export default function ServicePackagesPage() {
   const handleCreatePackage = async (e) => {
     if (e) e.preventDefault();
     if (!formName.trim()) {
-      setFormError('Package Name is required');
+      setFormError('Tên gói dịch vụ là bắt buộc');
       return;
     }
 
@@ -195,7 +195,7 @@ export default function ServicePackagesPage() {
       fetchPackages();
     } catch (err) {
       console.error('Failed to create package:', err);
-      setFormError(err.response?.data?.message || 'An error occurred while creating the package.');
+      setFormError(err.response?.data?.message || 'Đã xảy ra lỗi khi tạo gói dịch vụ.');
     } finally {
       setSubmitting(false);
     }
@@ -206,7 +206,7 @@ export default function ServicePackagesPage() {
     if (e) e.preventDefault();
     if (!selectedPackage?._id) return;
     if (!formName.trim()) {
-      setFormError('Package Name is required');
+      setFormError('Tên gói dịch vụ là bắt buộc');
       return;
     }
 
@@ -685,20 +685,20 @@ export default function ServicePackagesPage() {
             <div className="dossier-body">
               {/* Premium Pricing Highlight Panel */}
               <div className="dossier-price-panel">
-                <span className="dossier-price-label">Price per Month</span>
+                <span className="dossier-price-label">Đơn Giá / Tháng</span>
                 <span className="dossier-price-value">
                   {selectedPackage.monthlyPrice?.toLocaleString()} <span>VND</span>
                 </span>
               </div>
 
               {/* Italic plan description dossier block */}
-              <span className="dossier-section-title">Care Description</span>
+              <span className="dossier-section-title">Mô Tả Gói Dịch Vụ</span>
               <div className="dossier-desc">
                 "{selectedPackage.description || 'Standard specialized clinical services, health monitoring, and cognitive assistance designated for elderly care.'}"
               </div>
 
               {/* Included services with checkmark bullets */}
-              <span className="dossier-section-title">Included Medical Services</span>
+              <span className="dossier-section-title">Dịch Vụ Y Tế Đi Kèm</span>
               <div className="dossier-services-box">
                 {selectedPackage.services && selectedPackage.services.length > 0 ? (
                   selectedPackage.services.map((srv, i) => (
@@ -710,7 +710,7 @@ export default function ServicePackagesPage() {
                     </div>
                   ))
                 ) : (
-                  <p className="text-xs text-slate-400 italic py-3 text-center">No services specified for this care tier.</p>
+                  <p className="text-xs text-slate-400 italic py-3 text-center">Chưa có dịch vụ nào được thêm vào gói này.</p>
                 )}
               </div>
 
@@ -721,7 +721,7 @@ export default function ServicePackagesPage() {
                   className="sp-btn-close-dossier"
                   onClick={() => setShowDetailModal(false)}
                 >
-                  Close Dossier
+                  Đóng Chi Tiết
                 </button>
               </div>
             </div>
@@ -733,9 +733,9 @@ export default function ServicePackagesPage() {
       {showCreateModal && (
         <div className="arh-modal-backdrop" onClick={() => setShowCreateModal(false)}>
           <div className="arh-modal" style={{ maxWidth: '600px' }} onClick={(e) => e.stopPropagation()}>
-            <h4 className="arh-modal__title">Create Care Plan Package</h4>
+            <h4 className="arh-modal__title">Tạo Gói Dịch Vụ Chăm Sóc Mới</h4>
             <p className="arh-modal__text">
-              Create a new specialized healthcare service package for active admissions.
+              Lập một gói dịch vụ chăm sóc y tế chuyên biệt mới để áp dụng khi cư dân nhập viện.
             </p>
 
             <form onSubmit={handleCreatePackage}>
@@ -747,13 +747,13 @@ export default function ServicePackagesPage() {
 
               <div className="mb-3">
                 <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
-                  Package Name *
+                  Tên Gói Dịch Vụ *
                 </label>
                 <input
                   type="text"
                   className="adm-filter-input"
                   style={{ paddingLeft: '14px' }}
-                  placeholder="e.g. Standard Clinical Care Plan"
+                  placeholder="Ví dụ: Gói chăm sóc phục hồi chức năng tiêu chuẩn"
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
                   required
@@ -763,22 +763,27 @@ export default function ServicePackagesPage() {
               <div className="grid grid-cols-2 gap-3 mb-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
-                    Tier Level
+                    Cấp Độ Gói
                   </label>
                   <select
                     className="adm-filter-select"
                     value={formTier}
                     onChange={(e) => setFormTier(e.target.value)}
                   >
-                    <option value="basic">Basic Level</option>
-                    <option value="standard">Standard Level</option>
-                    <option value="premium">Premium Level</option>
-                    <option value="vip">VIP Level</option>
+                    <option value="basic">Cơ bản</option>
+                    <option value="standard">Tiêu chuẩn</option>
+                    <option value="premium">Cao cấp</option>
+                    <option value="vip">VIP</option>
                   </select>
+                  <small style={{ color: '#0f766e', fontSize: '11.5px', marginTop: '4px', display: 'block', fontWeight: 500 }}>
+                    {formTier === 'vip' && '🏥 Loại phòng: ICU / Isolation'}
+                    {formTier === 'premium' && '🌟 Loại phòng: Premium'}
+                    {(formTier === 'standard' || formTier === 'basic') && '🏠 Loại phòng: Standard'}
+                  </small>
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
-                    Price / Month (VND)
+                    Đơn Giá / Tháng (VND)
                   </label>
                   <input
                     type="number"
@@ -792,12 +797,12 @@ export default function ServicePackagesPage() {
 
               <div className="mb-3">
                 <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
-                  Description
+                  Mô Tả Chi Tiết
                 </label>
                 <textarea
                   className="arh-modal__textarea"
                   style={{ minHeight: '60px' }}
-                  placeholder="Summarize care features, target health requirements..."
+                  placeholder="Tóm tắt các đặc điểm chăm sóc nổi bật, đối tượng sức khỏe phù hợp..."
                   value={formDescription}
                   onChange={(e) => setFormDescription(e.target.value)}
                 />
@@ -805,12 +810,12 @@ export default function ServicePackagesPage() {
 
               <div className="mb-5">
                 <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
-                  Included Services (One per line)
+                  Dịch Vụ Đi Kèm (Mỗi dòng một dịch vụ)
                 </label>
                 <textarea
                   className="arh-modal__textarea"
                   style={{ minHeight: '120px', fontFamily: 'monospace' }}
-                  placeholder="e.g.&#10;Specialized Geriatric Assessment&#10;Geriatric Nurse Support 24/7&#10;Clinical Medication Administration"
+                  placeholder="Ví dụ:&#10;Đánh giá y tế chuyên sâu định kỳ&#10;Điều dưỡng trực hỗ trợ 24/7&#10;Quản lý cấp phát thuốc lâm sàng"
                   value={formServices}
                   onChange={(e) => setFormServices(e.target.value)}
                 />
@@ -827,7 +832,7 @@ export default function ServicePackagesPage() {
                   }}
                   disabled={submitting}
                 >
-                  Cancel
+                  Hủy bỏ
                 </button>
                 <button
                   type="submit"
@@ -836,7 +841,7 @@ export default function ServicePackagesPage() {
                   disabled={submitting}
                 >
                   {submitting && <Loader2 className="animate-spin mr-1" size={13} />}
-                  Create Plan
+                  Tạo Gói Dịch Vụ
                 </button>
               </div>
             </form>
@@ -848,9 +853,9 @@ export default function ServicePackagesPage() {
       {showEditModal && selectedPackage && (
         <div className="arh-modal-backdrop" onClick={() => setShowEditModal(false)}>
           <div className="arh-modal" style={{ maxWidth: '600px' }} onClick={(e) => e.stopPropagation()}>
-            <h4 className="arh-modal__title">Modify Care Plan Package</h4>
+            <h4 className="arh-modal__title">Chỉnh Sửa Gói Dịch Vụ</h4>
             <p className="arh-modal__text">
-              Edit pricing details and features for <strong className="text-slate-800">{selectedPackage.name}</strong>.
+              Cập nhật thông tin, giá và dịch vụ cho gói <strong className="text-slate-800">{selectedPackage.name}</strong>.
             </p>
 
             <form onSubmit={handleUpdatePackage}>
@@ -862,7 +867,7 @@ export default function ServicePackagesPage() {
 
               <div className="mb-3">
                 <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
-                  Package Name *
+                  Tên Gói Dịch Vụ *
                 </label>
                 <input
                   type="text"
@@ -877,22 +882,22 @@ export default function ServicePackagesPage() {
               <div className="grid grid-cols-2 gap-3 mb-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
-                    Tier Level
+                    Cấp Độ Gói
                   </label>
                   <select
                     className="adm-filter-select"
                     value={formTier}
                     onChange={(e) => setFormTier(e.target.value)}
                   >
-                    <option value="basic">Basic Level</option>
-                    <option value="standard">Standard Level</option>
-                    <option value="premium">Premium Level</option>
-                    <option value="vip">VIP Level</option>
+                     <option value="basic">Cơ bản</option>
+                     <option value="standard">Tiêu chuẩn</option>
+                     <option value="premium">Cao cấp</option>
+                     <option value="vip">VIP</option>
                   </select>
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
-                    Price / Month (VND)
+                    Đơn Giá / Tháng (VND)
                   </label>
                   <input
                     type="number"
@@ -906,7 +911,7 @@ export default function ServicePackagesPage() {
 
               <div className="mb-3">
                 <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
-                  Description
+                  Mô Tả Chi Tiết
                 </label>
                 <textarea
                   className="arh-modal__textarea"
@@ -918,7 +923,7 @@ export default function ServicePackagesPage() {
 
               <div className="mb-5">
                 <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
-                  Included Services (One per line)
+                  Dịch Vụ Đi Kèm (Mỗi dòng một dịch vụ)
                 </label>
                 <textarea
                   className="arh-modal__textarea"
@@ -939,7 +944,7 @@ export default function ServicePackagesPage() {
                   }}
                   disabled={submitting}
                 >
-                  Cancel
+                  Hủy bỏ
                 </button>
                 <button
                   type="submit"
@@ -948,7 +953,7 @@ export default function ServicePackagesPage() {
                   disabled={submitting}
                 >
                   {submitting && <Loader2 className="animate-spin mr-1" size={13} />}
-                  Update Plan
+                  Cập Nhật Gói
                 </button>
               </div>
             </form>
@@ -965,11 +970,11 @@ export default function ServicePackagesPage() {
           }
         }}>
           <div className="arh-modal" style={{ maxWidth: '480px' }} onClick={(e) => e.stopPropagation()}>
-            <h4 className="arh-modal__title" style={{ color: '#ef4444' }}>Deactivate Care Package</h4>
+            <h4 className="arh-modal__title" style={{ color: '#ef4444' }}>Vô Hiệu Hóa Gói Dịch Vụ</h4>
             <p className="arh-modal__text" style={{ marginBottom: '24px', fontSize: '14.5px', color: '#475569' }}>
-              Are you sure you want to deactivate/soft-delete <strong>"{packageToDeactivate.name}"</strong>?
+              Bạn có chắc chắn muốn vô hiệu hóa gói <strong>"{packageToDeactivate.name}"</strong>?
               <span className="block mt-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                Deactivated packages cannot be assigned to new admissions.
+                Gói dịch vụ bị vô hiệu hóa sẽ không thể được gán cho cư dân mới.
               </span>
             </p>
 
@@ -984,7 +989,7 @@ export default function ServicePackagesPage() {
                 }}
                 disabled={loading}
               >
-                Cancel
+                Hủy bỏ
               </button>
               <button
                 type="button"
@@ -1009,7 +1014,7 @@ export default function ServicePackagesPage() {
                 disabled={loading}
               >
                 {loading && <Loader2 className="animate-spin mr-2" size={14} />}
-                Confirm Deactivation
+                Xác Nhận Vô Hiệu Hóa
               </button>
             </div>
           </div>

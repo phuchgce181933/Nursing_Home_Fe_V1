@@ -40,13 +40,14 @@ const TODAY_ISO = () => {
   return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 };
 
-const getDateTimeLocal = (value) => {
-  if (!value) return '';
-  const date = new Date(value);
-  const tzOffset = date.getTimezoneOffset();
-  const localDate = new Date(date.getTime() - tzOffset * 60000);
-  return localDate.toISOString().slice(0, 10);
-};
+const formatCurrency = (value) =>
+  new Intl.NumberFormat('vi-VN', {
+    style: 'currency',
+    currency: 'VND',
+    maximumFractionDigits: 0,
+  }).format(Number(value || 0));
+
+const formatPercent = (value) => `${Math.round(Number(value || 0) * 100)}%`;
 
 const buildSavePayload = (reportType, filters, reportData) => ({
   reportType,
@@ -180,7 +181,8 @@ export default function AdminReportsPage() {
   return (
     <div className="adm-container">
       <div className="adm-header">
-        <div>
+        <div className="adm-header__title-wrap">
+          <div className="adm-header__badge">Admin Analytics</div>
           <h1>
             <FileText size={28} /> Báo cáo & Phân tích
           </h1>
@@ -219,6 +221,15 @@ export default function AdminReportsPage() {
       </div>
 
       <div className="adm-filter-panel">
+        <div className="adm-filter-panel__header">
+          <div>
+            <div className="adm-section-eyebrow">Bộ lọc</div>
+            <h2>Chọn khoảng thời gian và điều kiện để xem dữ liệu</h2>
+          </div>
+          <div className="adm-filter-panel__hint">
+            <CalendarDays size={16} /> Dữ liệu sẽ tự động cập nhật khi thay đổi bộ lọc
+          </div>
+        </div>
         <div className="adm-filter-grid">
           <div className="adm-filter-group">
             <label>Ngày bắt đầu</label>
@@ -244,11 +255,11 @@ export default function AdminReportsPage() {
             <>
               <div className="adm-filter-group">
                 <label>Trạng thái</label>
-                <input value={status} onChange={(e) => setStatus(e.target.value)} placeholder="open, investigating, resolved... (để trống = tất cả)" />
+                <input value={status} onChange={(e) => setStatus(e.target.value)} placeholder="open, investigating, resolved..." />
               </div>
               <div className="adm-filter-group">
                 <label>Độ nghiêm trọng</label>
-                <input value={severity} onChange={(e) => setSeverity(e.target.value)} placeholder="low, medium, high, critical (để trống = tất cả)" />
+                <input value={severity} onChange={(e) => setSeverity(e.target.value)} placeholder="low, medium, high, critical" />
               </div>
             </>
           )}
@@ -313,21 +324,21 @@ export default function AdminReportsPage() {
           <>
             {currentType === 'summary' && (
               <div className="adm-summary-grid">
-                <div className="adm-summary-card">
-                  <strong>Tổng số cư dân</strong>
+                <div className="adm-summary-card adm-summary-card--accent">
+                  <span className="adm-summary-card__label">Tổng số cư dân</span>
                   <div>{reportData.totalResidents ?? '-'}</div>
                 </div>
-                <div className="adm-summary-card">
-                  <strong>Sự cố</strong>
+                <div className="adm-summary-card adm-summary-card--rose">
+                  <span className="adm-summary-card__label">Sự cố</span>
                   <div>{reportData.totalIncidents ?? '-'}</div>
                 </div>
-                <div className="adm-summary-card">
-                  <strong>Hoạt động</strong>
+                <div className="adm-summary-card adm-summary-card--green">
+                  <span className="adm-summary-card__label">Hoạt động</span>
                   <div>{reportData.totalActivities ?? '-'}</div>
                 </div>
-                <div className="adm-summary-card">
-                  <strong>Doanh thu</strong>
-                  <div>{reportData.invoiceSummary?.totalAmount ?? '-'}</div>
+                <div className="adm-summary-card adm-summary-card--violet">
+                  <span className="adm-summary-card__label">Doanh thu</span>
+                  <div>{formatCurrency(reportData.invoiceSummary?.totalAmount)}</div>
                 </div>
               </div>
             )}
@@ -452,24 +463,29 @@ export default function AdminReportsPage() {
 
             {currentType === 'financial' && (
               <div className="adm-table-card">
-                <h2>Báo cáo tài chính</h2>
-                <div className="adm-data-grid">
-                  <div className="adm-data-block">
-                    <strong>Hóa đơn</strong>
-                    <div>{reportData.invoiceSummary?.totalInvoices ?? 0}</div>
-                  </div>
-                  <div className="adm-data-block">
-                    <strong>Tổng tiền hóa đơn</strong>
-                    <div>{reportData.invoiceSummary?.totalAmount ?? 0} VND</div>
-                  </div>
-                  <div className="adm-data-block">
-                    <strong>Thanh toán</strong>
-                    <div>{reportData.paymentSummary?.totalPayments ?? 0}</div>
+                <div className="adm-section-head">
+                  <div>
+                    <div className="adm-section-eyebrow">Tài chính</div>
+                    <h2>Báo cáo tài chính</h2>
                   </div>
                 </div>
-                <div className="adm-data-block">
-                  <strong>Tiền chưa thanh toán</strong>
-                  <div>{reportData.invoiceSummary?.outstandingAmount ?? 0} VND</div>
+                <div className="adm-data-grid">
+                  <div className="adm-data-block">
+                    <div className="adm-data-block__title">Hóa đơn</div>
+                    <div className="adm-data-block__value">{reportData.invoiceSummary?.totalInvoices ?? 0}</div>
+                  </div>
+                  <div className="adm-data-block">
+                    <div className="adm-data-block__title">Tổng tiền hóa đơn</div>
+                    <div className="adm-data-block__value">{formatCurrency(reportData.invoiceSummary?.totalAmount)}</div>
+                  </div>
+                  <div className="adm-data-block">
+                    <div className="adm-data-block__title">Thanh toán</div>
+                    <div className="adm-data-block__value">{reportData.paymentSummary?.totalPayments ?? 0}</div>
+                  </div>
+                </div>
+                <div className="adm-data-block adm-data-block--wide">
+                  <div className="adm-data-block__title">Tiền chưa thanh toán</div>
+                  <div className="adm-data-block__value">{formatCurrency(reportData.invoiceSummary?.outstandingAmount)}</div>
                 </div>
               </div>
             )}
@@ -597,8 +613,13 @@ export default function AdminReportsPage() {
         )}
       </div>
 
-      <div className="adm-table-card">
-        <h2>Lịch sử báo cáo</h2>
+      <div className="adm-table-card adm-table-card--history">
+        <div className="adm-section-head">
+          <div>
+            <div className="adm-section-eyebrow">Lịch sử</div>
+            <h2>Lịch sử báo cáo</h2>
+          </div>
+        </div>
         <div className="adm-table-responsive">
           <table className="adm-table">
             <thead>
@@ -609,13 +630,23 @@ export default function AdminReportsPage() {
               </tr>
             </thead>
             <tbody>
-              {historyData?.items?.map((item) => (
-                <tr key={item._id} className="adm-table-row">
-                  <td>{item.title}</td>
-                  <td>{item.reportType}</td>
-                  <td>{new Date(item.generatedAt).toLocaleString()}</td>
+              {historyData?.items?.length ? (
+                historyData.items.map((item) => (
+                  <tr key={item._id} className="adm-table-row">
+                    <td>{item.title}</td>
+                    <td>
+                      <span className="adm-pill">{item.reportType}</span>
+                    </td>
+                    <td>{new Date(item.generatedAt).toLocaleString()}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={3} className="adm-empty-state">
+                    Chưa có lịch sử báo cáo nào được lưu.
+                  </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>

@@ -34,6 +34,9 @@ import {
   Trophy,
   Stethoscope,
   Receipt,
+  UtensilsCrossed,
+  Droplets,
+  Brain,
 } from 'lucide-react';
 
 export const sidebarData = [
@@ -68,6 +71,7 @@ export const sidebarData = [
     icon: ClipboardList,
     children: [
       { title: 'sidebar.admissionRequests', icon: UserPlus, path: '/admin/admission-requests' },
+      { title: 'sidebar.consultationRequests', icon: MessageSquare, path: '/admin/consultation-requests' },
       { title: 'sidebar.tourRequests', icon: Compass, path: '/admin/tour-requests' },
       { title: 'sidebar.residentVisitRequests', icon: Calendar, path: '/admin/resident-visits' },
       { title: 'sidebar.servicePackages', icon: Package, path: '/admin/service-packages' },
@@ -101,6 +105,22 @@ export const sidebarData = [
       { title: 'sidebar.activityManagement', icon: Activity, path: '/admin/activities' },
       { title: 'sidebar.activityStatistics', icon: BarChart3, path: '/admin/activities/statistics' },
       { title: 'sidebar.participationResults', icon: Trophy, path: '/admin/activities/participation-results' },
+    ],
+  },
+  {
+    title: 'sidebar.dailyCare',
+    icon: ClipboardList,
+    children: [
+      { title: 'sidebar.hygieneActivityList', icon: Droplets, path: '/admin/hygiene-activities' },
+      { title: 'sidebar.dailyBehaviorList', icon: Brain, path: '/admin/daily-behaviors' },
+    ],
+  },
+  {
+    title: 'sidebar.nutrition',
+    icon: UtensilsCrossed,
+    children: [
+      { title: 'sidebar.dishes', icon: UtensilsCrossed, path: '/admin/dishes' },
+      { title: 'sidebar.mealIntakeNoteList', icon: ClipboardList, path: '/admin/meal-intake-notes' },
     ],
   },
   {

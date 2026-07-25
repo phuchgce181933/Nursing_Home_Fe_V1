@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import AdminPageShell from '../../../components/admin/AdminPageShell';
 import ListPagination from '../../../components/ui/ListPagination';
 import useClientPagination from '../../../hooks/useClientPagination';
+import useAuth from '../../../hooks/useAuth';
 import mealIntakeNoteService from '../../../services/mealIntakeNote.service';
 import { resolveApiError } from '../../../utils/apiMessage';
 import { getLocalDateString } from '../../../utils/dateUtils';
@@ -17,10 +18,12 @@ const today = () => getLocalDateString();
 
 function MealIntakeNotesPage() {
   const { t, i18n } = useTranslation();
+  const { user } = useAuth();
   const [workDate, setWorkDate] = useState(today());
   const [residentId, setResidentId] = useState('');
   const [residents, setResidents] = useState([]);
   const [records, setRecords] = useState([]);
+  const [canMutate, setCanMutate] = useState(false);
   const [loading, setLoading] = useState(false);
   const [listError, setListError] = useState('');
 
@@ -32,7 +35,7 @@ function MealIntakeNotesPage() {
   const loadResidents = async () => {
     try {
       const res = await mealIntakeNoteService.listResidents();
-      setResidents(Array.isArray(res?.data) ? res.data : []);
+      setResidents(Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : []);
     } catch (e) {
       setListError(resolveApiError(e, t, 'caregiver.mealIntake.loadResidentsFailed'));
     }
@@ -48,13 +51,15 @@ function MealIntakeNotesPage() {
         limit: 100,
       });
       setRecords(Array.isArray(res?.data) ? res.data : []);
+      setCanMutate(Boolean(res?.meta?.canMutate));
     } catch (e) {
       setListError(resolveApiError(e, t, 'caregiver.mealIntake.loadRecordsFailed'));
       setRecords([]);
+      setCanMutate(false);
     } finally {
       setLoading(false);
     }
-  }, [workDate, residentId]);
+  }, [workDate, residentId, t]);
 
   useEffect(() => {
     loadResidents();
@@ -112,12 +117,19 @@ function MealIntakeNotesPage() {
     <AdminPageShell title={t('caregiver.mealIntake.title')} subtitle={t('caregiver.mealIntake.subtitle')}>
       {listError && <div className="resident-page__error">{listError}</div>}
 
+      {!loading && !canMutate && (
+        <p className="meal-intake-page__context meal-intake-page__context--warn">
+          {t('caregiver.mealIntake.shiftWindowClosed')}
+        </p>
+      )}
+
       <MealIntakeListFilters
         workDate={workDate}
         residentId={residentId}
         residents={residents}
         loading={loading}
         maxDate={today()}
+        canCreate={canMutate}
         onWorkDateChange={setWorkDate}
         onResidentIdChange={setResidentId}
         onOpenCreate={handleOpenCreate}
@@ -127,6 +139,9 @@ function MealIntakeNotesPage() {
       <MealIntakeRecordsTable
         records={paginatedRecords}
         loading={loading}
+        canMutate={canMutate}
+        showRecordedBy
+        currentUserId={user?._id}
         onEdit={handleOpenEdit}
         onDelete={handleOpenDelete}
       />
@@ -142,6 +157,7 @@ function MealIntakeNotesPage() {
         residents={residents}
         defaultWorkDate={workDate}
         maxDate={today()}
+        canMutate={canMutate}
         onClose={() => setFormModal(null)}
         onSuccess={handleFormSuccess}
       />

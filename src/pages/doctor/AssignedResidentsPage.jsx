@@ -1,6 +1,5 @@
-import AssignedResidentsPage from '../caregiver/AssignedResidentsPage';
-import staffResidentService from '../../services/staffResident.service';
+import AssignedResidentsListPage from '../shared/assigned-residents/AssignedResidentsListPage';
 
 export default function DoctorAssignedResidentsPage() {
-  return <AssignedResidentsPage service={staffResidentService} i18nNs="doctor" showMealIntakeLink={false} />;
+  return <AssignedResidentsListPage role="doctor" />;
 }

@@ -598,6 +598,29 @@
   box-shadow: 0 0 0 2.5px rgba(220,38,38,0.12);
 }
 
+.hm-service-fields-panel {
+  overflow: visible;
+}
+
+.hm-service-fields-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.hm-service-fields-heading {
+  grid-column: 1 / -1;
+}
+
+.hm-service-fields-panel::-webkit-scrollbar {
+  width: 8px;
+}
+
+.hm-service-fields-panel::-webkit-scrollbar-thumb {
+  background: rgba(75, 85, 99, 0.3);
+  border-radius: 999px;
+}
+
 .hm-form-hint {
   font-size: 10.5px;
   color: #94a3b8;

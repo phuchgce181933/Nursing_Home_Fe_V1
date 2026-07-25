@@ -33,6 +33,7 @@ export default function AdminMedicalChargesPage() {
         billingStatus: statusFilter || undefined,
       });
       setCharges(result.data || []);
+      setSelectedCharges(new Set());
     } catch (err) {
       console.error(err);
       setError(err.response?.data?.message || 'Không thể tải danh sách khoản phí.');
@@ -59,22 +60,38 @@ export default function AdminMedicalChargesPage() {
     loadResidents();
   }, [loadCharges, loadResidents]);
 
+  const filteredCharges = charges.filter((c) => {
+    const resident = residents[c.residentId];
+    const residentName = resident?.fullName || '';
+    const matchSearch =
+      c.serviceName?.toLowerCase().includes(search.toLowerCase()) ||
+      residentName.toLowerCase().includes(search.toLowerCase());
+    return matchSearch;
+  });
+
+  const normalizeChargeId = (id) => String(id);
+
   const toggleChargeSelection = (chargeId) => {
-    const newSelected = new Set(selectedCharges);
-    if (newSelected.has(chargeId)) {
-      newSelected.delete(chargeId);
-    } else {
-      newSelected.add(chargeId);
-    }
-    setSelectedCharges(newSelected);
+    const normalizedId = normalizeChargeId(chargeId);
+    setSelectedCharges((prev) => {
+      const nextSelection = new Set(prev);
+      if (nextSelection.has(normalizedId)) {
+        nextSelection.delete(normalizedId);
+      } else {
+        nextSelection.add(normalizedId);
+      }
+      return nextSelection;
+    });
   };
 
   const toggleAllSelection = () => {
-    if (selectedCharges.size === charges.length) {
-      setSelectedCharges(new Set());
-    } else {
-      setSelectedCharges(new Set(charges.map((c) => c._id)));
-    }
+    setSelectedCharges((prev) => {
+      const visiblePendingChargeIds = filteredCharges
+        .filter((c) => c.billingStatus === 'PENDING')
+        .map((c) => normalizeChargeId(c._id));
+      const allVisibleSelected = visiblePendingChargeIds.every((id) => prev.has(id));
+      return allVisibleSelected ? new Set() : new Set(visiblePendingChargeIds);
+    });
   };
 
   const getStatusBadge = (status) => {
@@ -167,17 +184,8 @@ export default function AdminMedicalChargesPage() {
     }
   };
 
-  const filteredCharges = charges.filter((c) => {
-    const resident = residents[c.residentId];
-    const residentName = resident?.fullName || '';
-    const matchSearch =
-      c.serviceName?.toLowerCase().includes(search.toLowerCase()) ||
-      residentName.toLowerCase().includes(search.toLowerCase());
-    return matchSearch;
-  });
-
   const totalSelected = Array.from(selectedCharges).reduce((sum, chargeId) => {
-    const charge = charges.find((c) => c._id === chargeId);
+    const charge = charges.find((c) => normalizeChargeId(c._id) === chargeId);
     return sum + (charge?.totalPrice || 0);
   }, 0);
 
@@ -271,7 +279,11 @@ export default function AdminMedicalChargesPage() {
               <th style={{ width: '40px' }}>
                 <input
                   type="checkbox"
-                  checked={selectedCharges.size === charges.length && charges.length > 0}
+                  checked={
+                    selectedCharges.size > 0 &&
+                    selectedCharges.size ===
+                      filteredCharges.filter((c) => c.billingStatus === 'PENDING').length
+                  }
                   onChange={toggleAllSelection}
                 />
               </th>
@@ -306,7 +318,7 @@ export default function AdminMedicalChargesPage() {
                     <td style={{ width: '40px' }}>
                       <input
                         type="checkbox"
-                        checked={selectedCharges.has(charge._id)}
+                        checked={selectedCharges.has(normalizeChargeId(charge._id))}
                         onChange={() => toggleChargeSelection(charge._id)}
                         disabled={charge.billingStatus !== 'PENDING'}
                       />

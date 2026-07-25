@@ -125,6 +125,17 @@
   color: #64748b;
 }
 
+.daily-care-page__update-context {
+  margin: 0 0 12px;
+  font-size: 0.875rem;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.daily-care-page__modal--edit .daily-care-page__notes-field textarea {
+  min-height: 88px;
+}
+
 @media (max-width: 768px) {
   .daily-care-page__modal-overlay {
     padding: 12px;

@@ -21,12 +21,43 @@ function detailText(row, t) {
   return '—';
 }
 
-function BehaviorRecordsTable({ records, loading, onEdit, onDelete }) {
+function recordedByLabel(row) {
+  return (
+    row.recordedByStaffId?.userId?.fullName ||
+    row.recordedByStaffId?.staffCode ||
+    '—'
+  );
+}
+
+function isOwnRecord(row, currentUserId) {
+  if (!currentUserId) return true;
+  const recorderUserId = row.recordedByStaffId?.userId?._id || row.recordedByStaffId?.userId;
+  return String(recorderUserId || '') === String(currentUserId);
+}
+
+function BehaviorRecordsTable({
+  records,
+  loading,
+  onEdit,
+  onDelete,
+  readOnly = false,
+  canMutate = true,
+  showRecordedBy = false,
+  currentUserId,
+  recordsListTitle,
+  colRecordedByLabel,
+  emptyMessage,
+}) {
   const { t, i18n } = useTranslation();
+  const showActionsCol = !readOnly && canMutate;
+  const colCount = 5 + (showRecordedBy ? 1 : 0) + (showActionsCol ? 1 : 0);
+  const listTitle = recordsListTitle || t('caregiver.dailyBehaviors.recordsList');
+  const emptyText = emptyMessage || t('caregiver.dailyBehaviors.emptyFiltered');
+  const recordedByHeader = colRecordedByLabel || t('admin.dailyBehaviors.colRecordedBy');
 
   return (
     <>
-      <h3 className="behavior-page__section-title">{t('caregiver.dailyBehaviors.recordsList')}</h3>
+      <h3 className="behavior-page__section-title">{listTitle}</h3>
       <div className="resident-page__table">
         <table className="resident-page__table-element">
           <thead>
@@ -36,21 +67,22 @@ function BehaviorRecordsTable({ records, loading, onEdit, onDelete }) {
               <th>{t('caregiver.dailyBehaviors.colDetail')}</th>
               <th>{t('caregiver.dailyBehaviors.colSeverity')}</th>
               <th>{t('caregiver.dailyBehaviors.colObservedAt')}</th>
-              <th>{t('common.colActions')}</th>
+              {showRecordedBy && <th>{recordedByHeader}</th>}
+              {showActionsCol && <th>{t('common.colActions')}</th>}
             </tr>
           </thead>
           <tbody>
             {loading && (
               <tr>
-                <td colSpan={6} className="empty-state">
+                <td colSpan={colCount} className="empty-state">
                   {t('common.loading')}
                 </td>
               </tr>
             )}
             {!loading && records.length === 0 && (
               <tr>
-                <td colSpan={6} className="empty-state">
-                  {t('caregiver.dailyBehaviors.emptyFiltered')}
+                <td colSpan={colCount} className="empty-state">
+                  {emptyText}
                 </td>
               </tr>
             )}
@@ -72,22 +104,31 @@ function BehaviorRecordsTable({ records, loading, onEdit, onDelete }) {
                     </span>
                   </td>
                   <td>{formatLocaleDateTime(row.observedAt, i18n.language)}</td>
-                  <td className="behavior-page__row-actions">
-                    <button
-                      type="button"
-                      className="resident-page__button resident-page__button--ghost"
-                      onClick={() => onEdit(row)}
-                    >
-                      {t('common.edit')}
-                    </button>
-                    <button
-                      type="button"
-                      className="resident-page__button resident-page__button--ghost"
-                      onClick={() => onDelete(row)}
-                    >
-                      {t('common.delete')}
-                    </button>
-                  </td>
+                  {showRecordedBy && <td>{recordedByLabel(row)}</td>}
+                  {showActionsCol && (
+                    <td className="behavior-page__row-actions">
+                      {isOwnRecord(row, currentUserId) ? (
+                        <>
+                          <button
+                            type="button"
+                            className="resident-page__button resident-page__button--ghost"
+                            onClick={() => onEdit(row)}
+                          >
+                            {t('common.edit')}
+                          </button>
+                          <button
+                            type="button"
+                            className="resident-page__button resident-page__button--ghost"
+                            onClick={() => onDelete(row)}
+                          >
+                            {t('common.delete')}
+                          </button>
+                        </>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
+                  )}
                 </tr>
               ))}
           </tbody>

@@ -16,13 +16,13 @@ import {
   Truck,
   ShieldCheck,
   Soup,
-  BarChart3,
   Droplets,
   Brain,
   Apple,
   Dumbbell,
   Image,
   LifeBuoy,
+  CalendarDays,
 } from 'lucide-react';
 
 export const roleSidebarData = {
@@ -33,6 +33,8 @@ export const roleSidebarData = {
     { title: 'sidebar.assignedResidents', icon: Users, path: '/doctor/assigned-residents' },
     { title: 'sidebar.careTasks', icon: ClipboardList, path: '/doctor/care-tasks' },
     { title: 'sidebar.appointments', icon: Calendar, path: '/doctor/appointments' },
+    { title: 'sidebar.mySchedule', icon: CalendarDays, path: '/doctor/schedule' },
+    { title: 'sidebar.activitySchedule', icon: Calendar, path: '/doctor/activity-schedule' },
     { title: 'sidebar.healthMonitoring', icon: HeartPulse, path: '/doctor/health-monitoring' },
     { title: 'sidebar.initialHealthRecord', icon: FileText, path: '/doctor/residents/initial-health' },
     { title: 'sidebar.drugAllergies', icon: ShieldCheck, path: '/doctor/residents/drug-allergies' },
@@ -41,8 +43,8 @@ export const roleSidebarData = {
     { title: 'sidebar.servicePackages', icon: HeartPulse, path: '/doctor/service-packages' },
     { title: 'sidebar.incidents', icon: FileText, path: '/doctor/incidents' },
     { title: 'sidebar.staffLeave', icon: CalendarOff, path: '/doctor/leave' },
-    { title: 'sidebar.messages', icon: MessageSquare, path: '/doctor/messages' },
     { title: 'sidebar.notifications', icon: Bell, path: '/doctor/notifications' },
+    { title: 'sidebar.messages', icon: MessageSquare, path: '/doctor/messages' },
   ],
   caregiver: [
 
@@ -52,7 +54,7 @@ export const roleSidebarData = {
       path: '/caregiver/dashboard',
     },
     {
-      title: 'Hồ sơ cá nhân',
+      title: 'sidebar.myProfile',
       icon: UserCircle,
       path: '/caregiver/profile',
     },
@@ -77,6 +79,11 @@ export const roleSidebarData = {
       path: '/caregiver/daily-care-schedule',
     },
     {
+      title: 'sidebar.activitySchedule',
+      icon: Calendar,
+      path: '/caregiver/activity-schedule',
+    },
+    {
       title: 'sidebar.mealIntakeNotes',
       icon: Soup,
       path: '/caregiver/meal-intake-notes',
@@ -86,11 +93,7 @@ export const roleSidebarData = {
       icon: Apple,
       path: '/caregiver/diet-plans',
     },
-    {
-      title: 'sidebar.rehabSchedule',
-      icon: Dumbbell,
-      path: '/caregiver/rehabilitation-schedule',
-    },
+
     {
       title: 'sidebar.residentPhotos',
       icon: Image,
@@ -98,7 +101,6 @@ export const roleSidebarData = {
     },
     {
       title: 'sidebar.hygieneActivities',
-
       icon: Droplets,
       path: '/caregiver/hygiene-activities',
     },
@@ -117,7 +119,13 @@ export const roleSidebarData = {
       icon: Bell,
       path: '/caregiver/notifications',
     },
+    {
+      title: 'sidebar.incidents',
+      icon: FileText,
+      path: '/caregiver/incidents',
+    },
   ],
+
   nurse: [
     { title: 'sidebar.nurseDashboard', icon: LayoutDashboard, path: '/nurse/dashboard' },
     { title: 'sidebar.myProfile', icon: UserCircle, path: '/nurse/profile' },
@@ -130,34 +138,40 @@ export const roleSidebarData = {
     { title: 'sidebar.healthMonitoring', icon: HeartPulse, path: '/nurse/health-monitoring' },
     { title: 'sidebar.initialHealthRecord', icon: FileText, path: '/nurse/residents/initial-health' },
     { title: 'sidebar.mealPlans', icon: Soup, path: '/nurse/meal-plans' },
-    { title: 'sidebar.nutritionReports', icon: BarChart3, path: '/nurse/nutrition-reports' },
     { title: 'sidebar.medication', icon: Pill, path: '/nurse/medications' },
     { title: 'sidebar.admissionRequests', icon: ClipboardList, path: '/nurse/admission-requests' },
     { title: 'sidebar.residentVisitRequests', icon: Calendar, path: '/nurse/resident-visits' },
     { title: 'sidebar.servicePackages', icon: HeartPulse, path: '/nurse/service-packages' },
     { title: 'sidebar.incidents', icon: FileText, path: '/nurse/incidents' },
     { title: 'sidebar.staffLeave', icon: CalendarOff, path: '/nurse/leave' },
-    { title: 'sidebar.messages', icon: MessageSquare, path: '/nurse/messages' },
     { title: 'sidebar.notifications', icon: Bell, path: '/nurse/notifications' },
+    { title: 'sidebar.messages', icon: MessageSquare, path: '/nurse/messages' },
   ],
+
   family: [
+    { title: 'sidebar.myProfile', icon: UserCircle, path: '/family/profile' },
     { title: 'sidebar.familyDashboard', icon: LayoutDashboard, path: '/family/dashboard' },
     { title: 'sidebar.admissionHistory', icon: History, path: '/family/admission-requests' },
     { title: 'sidebar.facilityTourHistory', icon: Calendar, path: '/family/facility-tours' },
     { title: 'sidebar.residentVisits', icon: Calendar, path: '/family/resident-visits' },
     { title: 'sidebar.residentPhotos', icon: Image, path: '/family/resident-photos' },
+    { title: 'sidebar.residentAppointments', icon: CalendarDays, path: '/family/appointments' },
     { title: 'sidebar.activities', icon: Activity, path: '/family/activities' },
     { title: 'sidebar.residentInfo', icon: Users, path: '/family/resident' },
     { title: 'sidebar.notifications', icon: Bell, path: '/family/notifications' },
     { title: 'sidebar.messages', icon: MessageSquare, path: '/family/messages' },
     { title: 'sidebar.supportRequests', icon: LifeBuoy, path: '/family/support-requests' },
   ],
+
   pharmacist: [
     { title: 'sidebar.pharmacyOverview', icon: LayoutDashboard, path: '/pharmacist/overview' },
+    { title: 'sidebar.myShifts', icon: Calendar, path: '/pharmacist/my-shifts' },
+    { title: 'sidebar.staffLeave', icon: CalendarOff, path: '/pharmacist/leave' },
     { title: 'sidebar.myProfile', icon: UserCircle, path: '/pharmacist/profile' },
     { title: 'sidebar.medication', icon: Pill, path: '/pharmacist/medications' },
     { title: 'sidebar.pharmacySuppliers', icon: Truck, path: '/pharmacist/suppliers' },
     { title: 'sidebar.pharmacyStocks', icon: PackageOpen, path: '/pharmacist/stocks' },
+    { title: 'sidebar.incidents', icon: FileText, path: '/pharmacist/incidents' },
     { title: 'sidebar.pharmacyReports', icon: FileText, path: '/pharmacist/reports' },
   ],
 };

@@ -64,6 +64,12 @@ const confirmShift = (id) =>
   axiosClient.put(`/shifts/${id}/confirm`).then((r) => r.data);
 
 /**
+ * Mark a confirmed shift as completed (within 15 min after shift end).
+ */
+const completeShift = (id) =>
+  axiosClient.put(`/shifts/${id}/complete`).then((r) => r.data);
+
+/**
  * Update a shift. changeReason is optional.
  * Allowed fields: workDate, assignedStaffId, shiftTemplateId, taskDescription, notes.
  * Blocked on ERROR-level conflicts (400).
@@ -94,6 +100,7 @@ const shiftService = {
   createShift,
   publishShift,
   confirmShift,
+  completeShift,
   updateShift,
   cancelShift,
   deleteShift,

@@ -1,1 +1,5 @@
-export { default } from '../../../admin/residents/drug-allergies';
+import DrugAllergiesPageContent from '../../../../components/resident/DrugAllergiesPageContent';
+
+export default function DoctorDrugAllergiesPage() {
+  return <DrugAllergiesPageContent i18nNs="doctor.residents" canEdit />;
+}

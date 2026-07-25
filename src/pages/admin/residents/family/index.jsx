@@ -3,12 +3,15 @@ import { useTranslation } from 'react-i18next';
 import { Search, RefreshCw, Users, Phone } from 'lucide-react';
 import residentService from '../../../../services/resident.service';
 import { formatLeaveDate } from '../../../../utils/leaveUtils';
+import { resolveApiError } from '../../../../utils/apiMessage';
+import { isValidStaffPhone } from '../../../../utils/staffPhoneValidation';
 import { FaEye } from 'react-icons/fa';
 import AdminPageShell from '../../../../components/admin/AdminPageShell';
 import ListPagination from '../../../../components/ui/ListPagination';
 import { ADMIN_LIST_PAGE_SIZE } from '../../../../constants/adminListPage';
 import useDebouncedSearch from '../../../../hooks/useDebouncedSearch';
 import '../../../../styles/admin/residentActionIcons.css';
+import '../../../../styles/admin/FamilyManagementPage.css';
 import { getGenderLabel, getResidencyLabel } from '../_shared/residentLabels';
 
 const emptyContact = () => ({
@@ -20,6 +23,30 @@ const emptyContact = () => ({
   isPrimary: false,
 });
 
+const contactPhoneKey = (contact) => String(contact?.phone || '').replace(/\D/g, '');
+
+const contactEmailKey = (contact) => {
+  const email = String(contact?.email || '').trim().toLowerCase();
+  return email || null;
+};
+
+const findDuplicateContact = (payload, existingContacts, excludeContactId) => {
+  const key = contactPhoneKey(payload);
+  return (existingContacts || []).find((c) => {
+    if (excludeContactId && c._id === excludeContactId) return false;
+    return contactPhoneKey(c) === key;
+  });
+};
+
+const findDuplicateContactByEmail = (payload, existingContacts, excludeContactId) => {
+  const key = contactEmailKey(payload);
+  if (!key) return null;
+  return (existingContacts || []).find((c) => {
+    if (excludeContactId && c._id === excludeContactId) return false;
+    return contactEmailKey(c) === key;
+  });
+};
+
 function formatRoom(room, t) {
   if (!room) return '—';
   const floor = room.floorId;
@@ -28,12 +55,8 @@ function formatRoom(room, t) {
 }
 
 function ContactFormModal({ mode, initial, saving, error, onSave, onClose, relationshipSuggestions, t }) {
-  const [form, setForm] = useState(initial || emptyContact());
+  const [form, setForm] = useState(() => initial || emptyContact());
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
-
-  useEffect(() => {
-    setForm(initial || emptyContact());
-  }, [initial, mode]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -207,6 +230,35 @@ export default function FamilyManagementPage() {
   const handleSaveContact = async (payload) => {
     setContactSaving(true);
     setContactError('');
+    if (!isValidStaffPhone(payload.phone)) {
+      setContactError(t('admin.residents.family.validation.phoneInvalid'));
+      setContactSaving(false);
+      return;
+    }
+    const excludeId =
+      contactModal?.mode === 'edit' && contactModal.contact?._id ? contactModal.contact._id : null;
+    const duplicate = findDuplicateContact(payload, contacts, excludeId);
+    if (duplicate) {
+      setContactError(
+        t('apiErrors.RESIDENT_EMERGENCY_CONTACT_DUPLICATE', {
+          fullName: duplicate.fullName,
+          phone: payload.phone,
+        })
+      );
+      setContactSaving(false);
+      return;
+    }
+    const duplicateEmail = findDuplicateContactByEmail(payload, contacts, excludeId);
+    if (duplicateEmail) {
+      setContactError(
+        t('apiErrors.RESIDENT_EMERGENCY_CONTACT_EMAIL_DUPLICATE', {
+          fullName: duplicateEmail.fullName,
+          email: payload.email,
+        })
+      );
+      setContactSaving(false);
+      return;
+    }
     try {
       if (contactModal?.mode === 'edit' && contactModal.contact?._id) {
         await residentService.updateEmergencyContact(
@@ -222,7 +274,7 @@ export default function FamilyManagementPage() {
       setContactModal(null);
       await refreshAfterContactChange();
     } catch (e) {
-      setContactError(e.response?.data?.message || t('admin.residents.common.saveFailed'));
+      setContactError(resolveApiError(e, t, 'admin.residents.common.saveFailed'));
     } finally {
       setContactSaving(false);
     }
@@ -351,7 +403,7 @@ export default function FamilyManagementPage() {
 
       {listError && <div className="resident-page__error">{listError}</div>}
 
-      <div className="resident-page__split">
+      <div className="resident-page__split family-layout">
         <div>
           <div className="resident-page__table">
           <table className="resident-page__table-element">
@@ -436,8 +488,8 @@ export default function FamilyManagementPage() {
 
               {panelMsg && <p className="form-success">{panelMsg}</p>}
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569' }}>
+              <div className="family-contact-toolbar">
+                <span className="family-contact-toolbar__label">
                   {t('admin.residents.family.emergencyContactList')}
                 </span>
                 <button
@@ -517,6 +569,7 @@ export default function FamilyManagementPage() {
 
       {contactModal && (
         <ContactFormModal
+          key={contactModal.mode === 'edit' ? contactModal.contact?._id : 'add'}
           mode={contactModal.mode}
           initial={
             contactModal.mode === 'edit' && contactModal.contact

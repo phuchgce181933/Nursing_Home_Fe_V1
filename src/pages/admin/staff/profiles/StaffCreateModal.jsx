@@ -1,24 +1,19 @@
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Eye, EyeOff } from 'lucide-react';
 import { ALL_STAFF_ROLE_OPTIONS } from '../../../../constants/rolePolicy';
+import { staffDateOfBirthValidationKey, validateStaffDateOfBirth } from '../../../../utils/staffAgeValidation';
+import { isValidStaffPhone } from '../../../../utils/staffPhoneValidation';
+import {
+  staffCertificationValidationKey,
+  validateStaffCertifications,
+} from '../../../../utils/staffCertificateValidation';
 
 // Mirror backend validators
-const PHONE_REGEX = /^(\+84|0)[0-9]{8,10}$/;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,30}$/;
 
-const validateDateOfBirth = (dob, t) => {
-  if (!dob) return null;
-  const d = new Date(dob);
-  if (Number.isNaN(d.getTime())) return t('admin.staff.profiles.validation.dateOfBirthInvalid');
-  if (d > new Date()) return t('admin.staff.profiles.validation.dateOfBirthInvalid');
-  const minAge = new Date();
-  minAge.setFullYear(minAge.getFullYear() - 18);
-  if (d > minAge) return t('admin.staff.profiles.validation.dateOfBirthMinAge');
-  return null;
-};
-
-const validate = (form, t) => {
+const validate = (form, certificationEntries, t) => {
   const errs = {};
   const v = (key) => t(`admin.staff.profiles.validation.${key}`);
 
@@ -36,7 +31,7 @@ const validate = (form, t) => {
 
   if (!form.role) errs.role = v('roleRequired');
 
-  if (form.phone && !PHONE_REGEX.test(form.phone.trim())) {
+  if (form.phone && !isValidStaffPhone(form.phone)) {
     errs.phone = v('phoneInvalid');
   }
 
@@ -44,8 +39,14 @@ const validate = (form, t) => {
     errs.username = v('usernameInvalid');
   }
 
-  const dobError = validateDateOfBirth(form.dateOfBirth, t);
-  if (dobError) errs.dateOfBirth = dobError;
+  const dobErrorKey = validateStaffDateOfBirth(form.dateOfBirth, { role: form.role, gender: form.gender });
+  if (dobErrorKey) errs.dateOfBirth = staffDateOfBirthValidationKey(dobErrorKey, t);
+
+  const certErrorKey = validateStaffCertifications(
+    form.role,
+    certificationEntries.map((entry) => ({ issueDate: entry.issueDate }))
+  );
+  if (certErrorKey) errs.certifications = staffCertificationValidationKey(certErrorKey, t);
 
   return errs;
 };
@@ -53,7 +54,7 @@ const validate = (form, t) => {
 const emptyForm = {
   fullName: '', email: '', password: '', role: 'nurse',
   phone: '', username: '', gender: '', dateOfBirth: '',
-  address: '', specialty: '', certificationFiles: [],
+  address: '', specialty: '',
 };
 
 export default function StaffCreateModal({
@@ -67,7 +68,8 @@ export default function StaffCreateModal({
   const [errors, setErrors] = useState({});
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState(null);
-  const [certificationFiles, setCertificationFiles] = useState([]);
+  const [certificationEntries, setCertificationEntries] = useState([]);
+  const [showPassword, setShowPassword] = useState(false);
   const fileRef = useRef();
   const certFileRef = useRef();
 
@@ -86,23 +88,39 @@ export default function StaffCreateModal({
   const handleCertificationChange = (e) => {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
-    setCertificationFiles((prev) => [...prev, ...files]);
+    setCertificationEntries((prev) => [
+      ...prev,
+      ...files.map((file) => ({ file, issueDate: '' })),
+    ]);
+    if (errors.certifications) {
+      setErrors((prev) => { const next = { ...prev }; delete next.certifications; return next; });
+    }
     if (certFileRef.current) certFileRef.current.value = '';
   };
 
-  const handleRemoveNewCert = (index) => {
-    setCertificationFiles((prev) => prev.filter((_, i) => i !== index));
+  const handleCertIssueDateChange = (index, issueDate) => {
+    setCertificationEntries((prev) => prev.map((entry, i) => (
+      i === index ? { ...entry, issueDate } : entry
+    )));
+    if (errors.certifications) {
+      setErrors((prev) => { const next = { ...prev }; delete next.certifications; return next; });
+    }
   };
 
-  const certFileKey = (file) => `${file.name}-${file.size}-${file.lastModified}`;
+  const handleRemoveNewCert = (index) => {
+    setCertificationEntries((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const certFileKey = (entry) => `${entry.file.name}-${entry.file.size}-${entry.file.lastModified}`;
 
   const handleSubmit = () => {
-    const errs = validate(form, t);
+    const errs = validate(form, certificationEntries, t);
     if (Object.keys(errs).length) { setErrors(errs); return; }
 
     onSave({
       ...form,
-      certificationFiles,
+      certificationFiles: certificationEntries.map((entry) => entry.file),
+      certificationIssueDates: certificationEntries.map((entry) => entry.issueDate),
       avatarFile: avatarFile || undefined,
     });
   };
@@ -150,7 +168,27 @@ export default function StaffCreateModal({
         <div className="form-section-title">{t('admin.staff.profiles.sectionLogin')}</div>
         <div className="form-grid">
           {field(t('admin.staff.profiles.labelEmailRequired'), 'email', { placeholder: t('admin.staff.profiles.placeholderEmail'), type: 'email' })}
-          {field(t('admin.staff.profiles.labelPasswordRequired'), 'password', { placeholder: t('admin.staff.profiles.placeholderPassword'), type: 'password' })}
+          <div className="form-group">
+            <label>{t('admin.staff.profiles.labelPasswordRequired')}</label>
+            <div className="form-group__password-wrap">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                className="form-group__password-input"
+                value={form.password}
+                onChange={(e) => set('password', e.target.value)}
+                placeholder={t('admin.staff.profiles.placeholderPassword')}
+              />
+              <button
+                type="button"
+                className="form-group__password-toggle"
+                onClick={() => setShowPassword((prev) => !prev)}
+                aria-label={showPassword ? t('admin.staff.profiles.hidePassword') : t('admin.staff.profiles.showPassword')}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+            {errors.password && <span className="field-error">{errors.password}</span>}
+          </div>
           {field(t('admin.staff.profiles.labelUsername'), 'username', { placeholder: t('admin.staff.profiles.placeholderUsername') })}
         </div>
 
@@ -168,7 +206,7 @@ export default function StaffCreateModal({
             </select>
           </div>
           <div className="form-group">
-            <label>{t('admin.staff.profiles.labelDateOfBirth')}</label>
+            <label>{t('admin.staff.profiles.labelDateOfBirthRequired')}</label>
             <input
               type="date"
               value={form.dateOfBirth || ''}
@@ -193,13 +231,16 @@ export default function StaffCreateModal({
           {field(t('admin.staff.profiles.labelSpecialty'), 'specialty', { placeholder: t('admin.staff.profiles.placeholderSpecialty') })}
           <div className="form-group form-grid--full">
             <label>{t('admin.staff.profiles.labelCertificationsUpload')}</label>
+            <p style={{ fontSize: '0.75rem', color: '#94a3b8', margin: '0 0 8px' }}>
+              {t('admin.staff.profiles.certIssueDateHint')}
+            </p>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
               <button type="button" className="btn-outline-sm" onClick={() => certFileRef.current?.click()}>
                 {t('admin.staff.profiles.chooseCertFiles')}
               </button>
               <span style={{ color: '#64748b', fontSize: '0.9rem' }}>
-                {certificationFiles.length
-                  ? t('admin.staff.profiles.certFilesSelected', { count: certificationFiles.length })
+                {certificationEntries.length
+                  ? t('admin.staff.profiles.certFilesSelected', { count: certificationEntries.length })
                   : t('admin.staff.profiles.certFilesHint')}
               </span>
             </div>
@@ -211,26 +252,36 @@ export default function StaffCreateModal({
               style={{ display: 'none' }}
               onChange={handleCertificationChange}
             />
-            {certificationFiles.length > 0 && (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '0.5rem' }}>
-                {certificationFiles.map((file, index) => (
-                  <span
-                    key={certFileKey(file)}
+            {errors.certifications && <span className="field-error">{errors.certifications}</span>}
+            {certificationEntries.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '0.5rem' }}>
+                {certificationEntries.map((entry, index) => (
+                  <div
+                    key={certFileKey(entry)}
                     style={{
-                      display: 'inline-flex',
+                      display: 'flex',
                       alignItems: 'center',
-                      gap: '6px',
-                      padding: '6px 10px',
-                      borderRadius: '999px',
-                      backgroundColor: '#e2e8f0',
-                      fontSize: '13px',
+                      gap: '10px',
+                      flexWrap: 'wrap',
+                      padding: '8px 10px',
+                      borderRadius: '8px',
+                      backgroundColor: '#f1f5f9',
                     }}
                   >
-                    {file.name}
+                    <span style={{ fontSize: '13px', flex: '1 1 120px' }}>{entry.file.name}</span>
+                    <label style={{ fontSize: '12px', color: '#64748b' }}>
+                      {t('admin.staff.profiles.labelCertIssueDate')}
+                      <input
+                        type="date"
+                        value={entry.issueDate}
+                        onChange={(e) => handleCertIssueDateChange(index, e.target.value)}
+                        style={{ marginLeft: '6px' }}
+                      />
+                    </label>
                     <button
                       type="button"
                       onClick={() => handleRemoveNewCert(index)}
-                      aria-label={t('admin.staff.profiles.removeCertFileAria', { name: file.name })}
+                      aria-label={t('admin.staff.profiles.removeCertFileAria', { name: entry.file.name })}
                       title={t('admin.staff.profiles.removeCertFile')}
                       style={{
                         display: 'inline-flex',
@@ -247,7 +298,7 @@ export default function StaffCreateModal({
                     >
                       ×
                     </button>
-                  </span>
+                  </div>
                 ))}
               </div>
             )}

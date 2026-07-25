@@ -2,15 +2,16 @@ import React, { useState } from 'react';
 import { MapPin, Phone, Mail, Clock } from 'lucide-react';
 import PublicHeader from '../components/homepage/PublicHeader';
 import PublicFooter from '../components/homepage/PublicFooter';
+import consultationRequestService from '../services/consultationRequest.service';
 import '../styles/shared/ZenPages.css';
 
-const MAP_IMG = 'https://lh3.googleusercontent.com/aida-public/AB6AXuAjd2FKCnuwxptJVMb8j0qNrWXbo-Y0xP-0UibhDcRdw4ZY4X9w7VfE9ncb99YUAZjXLWyek1FOgAYkHgeX3KUep_xtahcaSpeMWDelXwUoPfGk5WxMXm84lq3KB_OYNkllRQuIdyk9Qo76YykSy2rTRF0kIv4uq-EBJwLw1YrILn4XJPx_pZblcyOQPFUzXKZwxPOkNg_l6dm96SXpwmEnuB8TrsBwsNEcgUo4ef9MytWOIag0e1PhjK7YJF62-joJgyuJr1bpaQKc';
+const MAP_IMG = 'https://i0.wp.com/imageearthtravel.com/wp-content/uploads/2015/09/cantho.png?ssl=1';
 
 const INFO = [
   {
     icon: <MapPin size={18} />,
     title: 'Địa Chỉ',
-    content: '123 Đường Nguyễn Văn Linh, Phường Tân Phong, Quận 7, TP. Hồ Chí Minh',
+    content: '68 Đường Nguyễn Văn Cừ, Phường An Khánh, Quận Ninh Kiều, TP. Cần Thơ',
     isHotline: false,
   },
   {
@@ -22,33 +23,115 @@ const INFO = [
   {
     icon: <Mail size={18} />,
     title: 'Email',
-    content: 'info@annhiencarehome.vn',
+    content: 'annhiencarehome@gmail.com',
     isHotline: false,
   },
   {
     icon: <Clock size={18} />,
     title: 'Giờ Hoạt Động',
-    content: 'Thứ Hai – Chủ Nhật: 7:00 – 20:00 (kể cả lễ, Tết)',
+    content: '8h00 - 20h00 ( bao gồm ngày Lễ, Tết )',
     isHotline: false,
   },
 ];
 
 const SERVICES = [
+  'Tư vấn dịch vụ',
+  'Tư vấn chi phí',
   'Chăm sóc ngắn hạn',
   'Chăm sóc dài hạn',
   'Phục hồi chức năng',
   'Tham quan cơ sở',
+  'Đăng ký nhập viện',
+  'Khác',
 ];
 
 export default function ContactPage() {
-  const [form, setForm] = useState({ name: '', phone: '', service: '', message: '' });
+  const [form, setForm] = useState({ name: '', email: '', phone: '', service: '', otherService: '', message: '' });
+  const [errors, setErrors] = useState({});
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleChange = (e) => setForm((p) => ({ ...p, [e.target.name]: e.target.value }));
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setForm((p) => ({ ...p, [name]: value }));
+    setErrors((prev) => ({ ...prev, [name]: '' }));
+  };
 
-  const handleSubmit = (e) => {
+  const validateForm = () => {
+    const nextErrors = {};
+    const trimmedName = form.name.trim();
+    const trimmedEmail = form.email.trim();
+    const trimmedPhone = form.phone.trim();
+    const trimmedService = form.service.trim();
+
+    const nameRegex = /^[\p{L}\s]+$/u;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+    const phoneRegex = /^0\d{9}$/;
+
+    if (!trimmedName) {
+      nextErrors.name = 'Vui lòng nhập họ và tên.';
+    } else if (!nameRegex.test(trimmedName)) {
+      nextErrors.name = 'Họ và tên không được chứa số hoặc ký tự đặc biệt.';
+    }
+
+    if (!trimmedEmail) {
+      nextErrors.email = 'Vui lòng nhập địa chỉ email.';
+    } else if (!emailRegex.test(trimmedEmail)) {
+      nextErrors.email = 'Email không đúng định dạng.';
+    }
+
+    if (!trimmedPhone) {
+      nextErrors.phone = 'Vui lòng nhập số điện thoại.';
+    } else if (!phoneRegex.test(trimmedPhone)) {
+      nextErrors.phone = 'Số điện thoại phải bắt đầu bằng 0 và gồm 10 chữ số.';
+    }
+
+    if (!trimmedService) {
+      nextErrors.service = 'Vui lòng chọn nhu cầu tư vấn mong muốn.';
+    }
+
+    if (trimmedService === 'Khác') {
+      const trimmedOtherService = form.otherService.trim();
+      if (!trimmedOtherService) {
+        nextErrors.otherService = 'Vui lòng mô tả nhu cầu tư vấn khác.';
+      } else if (trimmedOtherService.length > 50) {
+        nextErrors.otherService = 'Vui lòng nhập tối đa 50 ký tự.';
+      }
+    }
+
+    if (form.message && form.message.trim().length > 200) {
+      nextErrors.message = 'Vui lòng nhập tối đa 200 ký tự.';
+    }
+
+    return nextErrors;
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    alert('Cảm ơn bạn đã liên hệ! Chúng tôi sẽ phản hồi trong vòng 24 giờ.');
-    setForm({ name: '', phone: '', service: '', message: '' });
+    const nextErrors = validateForm();
+    if (Object.keys(nextErrors).length > 0) {
+      setErrors(nextErrors);
+      return;
+    }
+
+    setSubmitting(true);
+
+    try {
+      await consultationRequestService.submitConsultationRequest({
+        fullName: form.name.trim(),
+        email: form.email.trim(),
+        phone: form.phone.trim(),
+        serviceInterest: form.service === 'Khác' ? form.otherService.trim() : form.service,
+        message: form.message.trim(),
+      });
+      alert('Chúng tôi đã tiếp nhận yêu cầu tư vấn của bạn. Đội ngũ chuyên viên sẽ nhanh chóng xem xét và liên hệ để hỗ trợ trong thời gian sớm nhất.');
+      setForm({ name: '', email: '', phone: '', service: '', otherService: '', message: '' });
+      setErrors({});
+    } catch (error) {
+      console.error(error);
+      alert('Không thể gửi yêu cầu. Vui lòng thử lại sau.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -59,10 +142,11 @@ export default function ContactPage() {
 
         {/* ── HERO ── */}
         <div className="cp2-hero">
-          <h1>Liên Hệ Với Chúng Tôi</h1>
+          <h1>
+            <span>Liên Hệ Với Chúng Tôi</span>
+          </h1>
           <p>
-            Dù bạn đang tìm kiếm thông tin, cần tư vấn hay muốn đặt lịch tham quan —
-            đội ngũ của chúng tôi luôn sẵn sàng hỗ trợ bạn tìm giải pháp tốt nhất.
+            Chúng tôi luôn sẵn sàng lắng nghe, tư vấn và đồng hành cùng bạn, mang đến giải pháp chăm sóc phù hợp nhất cho người thân yêu.
           </p>
         </div>
 
@@ -72,7 +156,7 @@ export default function ContactPage() {
           {/* Left: info + map */}
           <div className="cp2-left">
             <div className="cp2-info-card">
-              <h2>Thông Tin Liên Hệ</h2>
+              <h2>An Nhiên Care Home</h2>
               <div className="cp2-info-rows">
                 {INFO.map((item, i) => (
                   <div key={i} className="cp2-info-row">
@@ -99,56 +183,92 @@ export default function ContactPage() {
 
           {/* Right: form */}
           <div className="cp2-form-card">
-            <h2>Gửi Tin Nhắn Cho Chúng Tôi</h2>
+            <h2>
+              <bold>
+                Đăng Ký Tư Vấn Dịch Vụ
+              </bold>
+            </h2>
             <form className="cp2-form" onSubmit={handleSubmit}>
               <div className="cp2-form__row">
                 <div className="cp2-form__field">
-                  <label>Họ và tên *</label>
+                  <strong>Họ và tên *</strong>
                   <input
                     name="name"
                     type="text"
                     placeholder="Nguyễn Văn A"
                     value={form.name}
                     onChange={handleChange}
-                    required
                   />
+                  {errors.name && <p className="cp2-form__error">{errors.name}</p>}
                 </div>
                 <div className="cp2-form__field">
-                  <label>Số điện thoại *</label>
+                  <strong>Địa chỉ email *</strong>
+                  <input
+                    name="email"
+                    type="email"
+                    placeholder="nguyenvana@email.com"
+                    value={form.email}
+                    onChange={handleChange}
+                  />
+                  {errors.email && <p className="cp2-form__error">{errors.email}</p>}
+                </div>
+              </div>
+              <div className="cp2-form__row">
+                <div className="cp2-form__field">
+                  <strong>Số điện thoại *</strong>
                   <input
                     name="phone"
                     type="tel"
-                    placeholder="0901 234 567"
+                    placeholder="0901234567"
                     value={form.phone}
                     onChange={handleChange}
-                    required
                   />
+                  {errors.phone && <p className="cp2-form__error">{errors.phone}</p>}
                 </div>
               </div>
 
               <div className="cp2-form__field">
-                <label>Dịch vụ quan tâm *</label>
-                <select name="service" value={form.service} onChange={handleChange} required>
-                  <option value="">-- Chọn dịch vụ --</option>
+                <strong>Nhu cầu tư vấn *</strong>
+                <select name="service" value={form.service} onChange={handleChange}>
+                  <option value="">-- Chọn nhu cầu --</option>
                   {SERVICES.map((s) => (
                     <option key={s} value={s}>{s}</option>
                   ))}
                 </select>
+                {errors.service && <p className="cp2-form__error">{errors.service}</p>}
               </div>
 
+              {form.service === 'Khác' && (
+                <div className="cp2-form__field">
+                  <strong>Nhu cầu tư vấn khác *</strong>
+                  <input
+                    name="otherService"
+                    type="text"
+                    placeholder="Mô tả nhu cầu tư vấn khác"
+                    value={form.otherService}
+                    maxLength={51}
+                    onChange={handleChange}
+                  />
+                  {errors.otherService && <p className="cp2-form__error">{errors.otherService}</p>}
+                </div>
+              )}
+
               <div className="cp2-form__field">
-                <label>Lời nhắn</label>
+                <strong>Lời nhắn</strong>
                 <textarea
                   name="message"
                   rows={6}
                   placeholder="Tôi muốn tìm hiểu thêm về..."
                   value={form.message}
+                  maxLength={200}
                   onChange={handleChange}
                 />
+                <p className="cp2-form__hint">Tối đa 200 ký tự. ({form.message.length}/200)</p>
+                {errors.message && <p className="cp2-form__error">{errors.message}</p>}
               </div>
 
-              <button type="submit" className="cp2-form__submit">
-                Gửi Tin Nhắn
+              <button type="submit" className="cp2-form__submit" disabled={submitting}>
+                {submitting ? 'Đang gửi...' : 'Gửi Thông Tin'}
               </button>
             </form>
           </div>

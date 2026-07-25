@@ -149,6 +149,36 @@ const formatDateTime = (value) => {
   });
 };
 
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+const getDaysToExpiry = (expiryDate) => {
+  if (!expiryDate) return null;
+  const target = new Date(expiryDate);
+  if (Number.isNaN(target.getTime())) return null;
+  const now = new Date();
+  return Math.ceil((target.getTime() - now.getTime()) / MS_PER_DAY);
+};
+
+const getExpiryTag = (expiryDate) => {
+  const days = getDaysToExpiry(expiryDate);
+  if (days === null) {
+    return { label: 'Thuốc không tồn tại', badgeClass: 'expiry-badge--black', itemClass: 'expiry-item--black' };
+  }
+  if (days < 0) {
+    return { label: 'Đã hết hạn', badgeClass: 'expiry-badge--gray', itemClass: 'expiry-item--gray' };
+  }
+  if (days < 90) {
+    return { label: '< 3 tháng', badgeClass: 'expiry-badge--red', itemClass: 'expiry-item--red' };
+  }
+  if (days < 180) {
+    return { label: '3 - 6 tháng', badgeClass: 'expiry-badge--purple', itemClass: 'expiry-item--purple' };
+  }
+  if (days < 365) {
+    return { label: '6 - 12 tháng', badgeClass: 'expiry-badge--blue', itemClass: 'expiry-item--blue' };
+  }
+  return { label: '> 12 tháng', badgeClass: 'expiry-badge--green', itemClass: 'expiry-item--green' };
+};
+
 const formatCurrency = (value) => {
   if (value == null || value === '') return 'N/A';
   const num = Number(value);
@@ -173,7 +203,6 @@ const findOptionMatch = (items, value, key) => {
   if (!normalized) return null;
   return items.find((item) => String(item?.[key] || '').trim().toLowerCase() === normalized) || null;
 };
-
 
 const emptyMedicationForm = {
   medicationCode: '',
@@ -218,7 +247,8 @@ function PharmacyPage({ defaultTab = 'overview' }) {
 
   const [lowStock, setLowStock] = useState([]);
   const [expiryList, setExpiryList] = useState([]);
-  const [expiryDays, setExpiryDays] = useState(30);
+  const [overviewLowStockPage, setOverviewLowStockPage] = useState(1);
+  const [overviewExpiryPage, setOverviewExpiryPage] = useState(1);
 
   const [medications, setMedications] = useState([]);
   const [medLoading, setMedLoading] = useState(false);
@@ -245,6 +275,20 @@ function PharmacyPage({ defaultTab = 'overview' }) {
   });
   const [stockPage, setStockPage] = useState(1);
   const [stockTotalPages, setStockTotalPages] = useState(1);
+
+  const PAGE_SIZE = 9;
+  const OVERVIEW_PAGE_SIZE = 4;
+  const normalizePage = (value) => {
+    const page = Number(value);
+    return Number.isInteger(page) && page > 0 ? page : 1;
+  };
+
+  const calculateTotalPages = (total, reportedTotalPages) => {
+    if (reportedTotalPages != null) {
+      return Math.max(1, Number(reportedTotalPages) || 1);
+    }
+    return Math.max(1, Math.ceil((Number(total) || 0) / PAGE_SIZE));
+  };
 
   const [usageStats, setUsageStats] = useState([]);
   const [dispensingDetails, setDispensingDetails] = useState([]);
@@ -348,24 +392,26 @@ function PharmacyPage({ defaultTab = 'overview' }) {
 
   const loadExpiry = useCallback(async () => {
     try {
-      const res = await pharmacyService.trackExpiry({ withinDays: expiryDays });
+      const res = await pharmacyService.trackExpiry();
       setExpiryList(res?.data || []);
+      setOverviewExpiryPage(1);
     } catch (err) {
     }
-  }, [expiryDays]);
+  }, []);
 
   const loadMedications = useCallback(async () => {
+    const page = normalizePage(medPage);
     try {
       setMedLoading(true);
       const res = await pharmacyService.listMedications({
         search: medSearch.trim() || undefined,
         isActive: medActive === '' ? undefined : medActive,
-        page: medPage,
-        limit: 10,
+        page,
+        limit: PAGE_SIZE,
       });
       setMedications(res?.data || []);
-      setMedTotal(res?.total || 0);
-      setMedTotalPages(res?.totalPages || 1);
+      setMedPage(res?.page ? normalizePage(res.page) : page);
+      setMedTotalPages(calculateTotalPages(res?.total, res?.totalPages));
     } catch (err) {
     } finally {
       setMedLoading(false);
@@ -375,14 +421,16 @@ function PharmacyPage({ defaultTab = 'overview' }) {
   const loadSuppliers = useCallback(async () => {
     try {
       setSupLoading(true);
+      const page = normalizePage(supPage);
       const res = await pharmacyService.listSuppliers({
         search: supSearch.trim() || undefined,
         isActive: supActive === '' ? undefined : supActive,
-        page: supPage,
-        limit: 10,
+        page,
+        limit: PAGE_SIZE,
       });
       setSuppliers(res?.data || []);
-      setSupTotalPages(res?.totalPages || 1);
+      setSupPage(res?.page ? normalizePage(res.page) : page);
+      setSupTotalPages(calculateTotalPages(res?.total, res?.totalPages));
     } catch (err) {
     } finally {
       setSupLoading(false);
@@ -392,8 +440,8 @@ function PharmacyPage({ defaultTab = 'overview' }) {
   const loadStocks = useCallback(async () => {
     try {
       setStockLoading(true);
-      const medicationId = stockFilters.medicationId.trim();
-      const supplierId = stockFilters.supplierId.trim();
+      const medicationId = (stockFilters.medicationId || '').trim();
+      const supplierId = (stockFilters.supplierId || '').trim();
       const resolvedMedicationId = medicationId
         ? medicationOptions.find((med) => String(med._id) === medicationId)?._id ||
           findOptionMatch(medicationOptions, medicationId, 'name')?._id ||
@@ -404,14 +452,15 @@ function PharmacyPage({ defaultTab = 'overview' }) {
           findOptionMatch(supplierOptions, supplierId, 'name')?._id ||
           supplierId
         : undefined;
+      const page = normalizePage(stockPage);
       const params = {
         medicationId: resolvedMedicationId,
         supplierId: resolvedSupplierId,
         lotNumber: stockFilters.lotNumber.trim() || undefined,
         expiryFrom: stockFilters.expiryFrom ? toIsoDate(stockFilters.expiryFrom) : undefined,
         expiryTo: stockFilters.expiryTo ? toIsoDate(stockFilters.expiryTo) : undefined,
-        page: stockPage,
-        limit: 10,
+        page,
+        limit: PAGE_SIZE,
       };
       const res = await pharmacyService.listStocks(params);
       const sortedStocks = (res?.data || []).slice().sort((a, b) => {
@@ -420,7 +469,8 @@ function PharmacyPage({ defaultTab = 'overview' }) {
         return bDate - aDate;
       });
       setStocks(sortedStocks);
-      setStockTotalPages(res?.totalPages || 1);
+      setStockPage(res?.page ? normalizePage(res.page) : page);
+      setStockTotalPages(calculateTotalPages(res?.total, res?.totalPages));
     } catch (err) {
     } finally {
       setStockLoading(false);
@@ -559,19 +609,31 @@ function PharmacyPage({ defaultTab = 'overview' }) {
     if (activeTab === 'medications') {
       loadMedications();
     }
-  }, [activeTab, loadMedications]);
+  }, [activeTab, medPage, medSearch, medActive]);
 
   useEffect(() => {
     if (activeTab === 'suppliers') {
       loadSuppliers();
     }
-  }, [activeTab, loadSuppliers]);
+  }, [activeTab, supPage, supSearch, supActive]);
 
   useEffect(() => {
     if (activeTab === 'stocks') {
       loadStocks();
     }
-  }, [activeTab, loadStocks]);
+  }, [activeTab, stockPage, stockFilters, medicationOptions, supplierOptions]);
+
+  useEffect(() => {
+    setMedPage(1);
+  }, [medSearch, medActive]);
+
+  useEffect(() => {
+    setSupPage(1);
+  }, [supSearch, supActive]);
+
+  useEffect(() => {
+    setStockPage(1);
+  }, [stockFilters.medicationId, stockFilters.supplierId, stockFilters.lotNumber, stockFilters.expiryFrom, stockFilters.expiryTo]);
 
   useEffect(() => {
     if (activeTab === 'reports') {
@@ -929,6 +991,7 @@ function PharmacyPage({ defaultTab = 'overview' }) {
                 <strong>{summary?.activeMedications ?? '--'}</strong>
               </div>
             </div>
+
             <div className="summary-card summary-card--active">
               <div className="summary-card__icon">
                 <CheckCircle2 size={24} />
@@ -938,6 +1001,7 @@ function PharmacyPage({ defaultTab = 'overview' }) {
                 <strong>{summary?.activeSuppliers ?? '--'}</strong>
               </div>
             </div>
+
             <div className="summary-card summary-card--warning">
               <div className="summary-card__icon">
                 <AlertCircle size={24} />
@@ -947,6 +1011,7 @@ function PharmacyPage({ defaultTab = 'overview' }) {
                 <strong>{summary?.lowStockCount ?? '--'}</strong>
               </div>
             </div>
+
             <div className="summary-card summary-card--expiring">
               <div className="summary-card__icon">
                 <Clock size={24} />
@@ -962,29 +1027,56 @@ function PharmacyPage({ defaultTab = 'overview' }) {
             <div className="pharmacy-card">
               <div className="pharmacy-card__header">
                 <div>
-                  <h2>Cảnh báo tồn kho thấp</h2>
+                  <strong>Cảnh báo tồn kho thấp</strong>
+                  <strong className="pharmacy-card__meta">Số thuốc tồn kho thấp: {lowStock.length}</strong>
                 </div>
                 <AlertTriangle size={18} />
               </div>
+
               <div className="pharmacy-card__body">
                 {lowStock.length === 0 ? (
                   <p className="pharmacy-empty">Không có cảnh báo tồn kho thấp.</p>
                 ) : (
-                  <ul className="pharmacy-list pharmacy-list--compact">
-                    {lowStock.slice(0, 6).map((item) => (
-                      <li key={item.medication._id}>
-                        <div className="pharmacy-alert-item">
-                          <span className="pharmacy-alert-item__name">{item.medication.name}</span>
-                          <span className="pharmacy-alert-item__meta">
-                            {item.medication.manufacturer
-                              ? `Nhà cung cấp: ${item.medication.manufacturer}`
-                              : 'Chưa có nhà cung cấp'}
-                          </span>
-                        </div>
-                        <strong>{item.medication.availableQuantity}</strong>
-                      </li>
-                    ))}
-                  </ul>
+                  <>
+                    <ul className="pharmacy-list pharmacy-list--compact">
+                      {lowStock
+                        .slice((overviewLowStockPage - 1) * OVERVIEW_PAGE_SIZE, overviewLowStockPage * OVERVIEW_PAGE_SIZE)
+                        .map((item) => (
+                          <li key={item.medication._id}>
+                            <div className="pharmacy-alert-item">
+                              <span className="pharmacy-alert-item__name">{item.medication.name}</span>
+                              <span className="pharmacy-alert-item__meta">
+                                {item.medication.manufacturer
+                                  ? `Nhà cung cấp: ${item.medication.manufacturer}`
+                                  : 'Chưa có nhà cung cấp'}
+                              </span>
+                            </div>
+                            <strong>{item.medication.availableQuantity}</strong>
+                          </li>
+                        ))}
+                    </ul>
+                    {Math.ceil(lowStock.length / OVERVIEW_PAGE_SIZE) > 1 && (
+                      <div className="pharmacy-pagination">
+                        <button
+                          type="button"
+                          onClick={() => setOverviewLowStockPage((prev) => Math.max(1, prev - 1))}
+                          disabled={overviewLowStockPage <= 1}
+                        >
+                          <ChevronLeft size={14} />
+                          Trước
+                        </button>
+                        <span>Trang {overviewLowStockPage} / {Math.max(1, Math.ceil(lowStock.length / OVERVIEW_PAGE_SIZE))}</span>
+                        <button
+                          type="button"
+                          onClick={() => setOverviewLowStockPage((prev) => Math.min(Math.max(1, Math.ceil(lowStock.length / OVERVIEW_PAGE_SIZE)), prev + 1))}
+                          disabled={overviewLowStockPage >= Math.max(1, Math.ceil(lowStock.length / OVERVIEW_PAGE_SIZE))}
+                        >
+                          Tiếp
+                          <ChevronRight size={14} />
+                        </button>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </div>
@@ -992,36 +1084,68 @@ function PharmacyPage({ defaultTab = 'overview' }) {
             <div className="pharmacy-card">
               <div className="pharmacy-card__header">
                 <div>
-                  <h2>Hàng tồn sắp hết hạn</h2>
+                  <strong>Tình trạng thuốc trong 12 tháng</strong>
+                  <strong className="pharmacy-card__meta">Số thuốc đã nhập: {expiryList.length} lần</strong>
                 </div>
                 <PackageOpen size={18} />
               </div>
               <div className="pharmacy-card__body">
-                <label className="pharmacy-inline">
-                  Hết hạn trong vòng
-                  <input
-                    type="number"
-                    min="1"
-                    value={expiryDays}
-                    onChange={(event) => setExpiryDays(Number(event.target.value) || 30)}
-                  />
-                  ngày
-                </label>
+                <div className="expiry-legend">
+                  <span className="expiry-badge expiry-badge--green">Bình thường</span>
+                  <span className="expiry-badge expiry-badge--blue">Theo dõi</span>
+                  <span className="expiry-badge expiry-badge--purple">Ưu tiên xuất</span>
+                  <span className="expiry-badge expiry-badge--red">Cảnh báo khẩn</span>
+                  <span className="expiry-badge expiry-badge--gray">Đã hết hạn</span>
+                </div>
+
                 {expiryList.length === 0 ? (
                   <p className="pharmacy-empty">Không có hàng tồn sắp hết hạn.</p>
                 ) : (
-                  <ul className="pharmacy-list">
-                    {expiryList.slice(0, 6).map((item) => (
-                      <li key={item._id}>
-                        <span>
-                          {item.medicationId?.name
-                            ? `${item.medicationId.name}${item.medicationId.medicationCode ? ' (' + item.medicationId.medicationCode + ')' : ''}`
-                            : item.medicationId?.medicationCode || item.medicationId || 'Unknown medication'}
-                        </span>
-                        <strong>{formatDate(item.expiryDate)}</strong>
-                      </li>
-                    ))}
-                  </ul>
+                  <>
+                    <ul className="pharmacy-list pharmacy-list--expiry">
+                      {expiryList
+                        .slice((overviewExpiryPage - 1) * OVERVIEW_PAGE_SIZE, overviewExpiryPage * OVERVIEW_PAGE_SIZE)
+                        .map((item) => {
+                          const expiryTag = getExpiryTag(item.expiryDate);
+                          const supplierName = item.supplierId?.name || 'Chưa có nhà cung cấp';
+                          const medicationLabel = item.medicationId?.name || item.medicationId?.medicationCode || item.medicationId || 'Thuốc không xác định';
+
+                          return (
+                            <li key={item._id} className={`pharmacy-list-item--expiry ${expiryTag.itemClass}`}>
+                              <div>
+                                <span className="pharmacy-list__title">{medicationLabel}</span>
+                                <span className="pharmacy-list__meta">Nhà cung cấp: {supplierName}</span>
+                              </div>
+                              <div className="pharmacy-list__details">
+                                <span className={`expiry-badge ${expiryTag.badgeClass}`}>{expiryTag.label}</span>
+                                <strong>{formatDate(item.expiryDate)}</strong>
+                              </div>
+                            </li>
+                          );
+                        })}
+                    </ul>
+                    {Math.ceil(expiryList.length / OVERVIEW_PAGE_SIZE) > 1 && (
+                      <div className="pharmacy-pagination">
+                        <button
+                          type="button"
+                          onClick={() => setOverviewExpiryPage((prev) => Math.max(1, prev - 1))}
+                          disabled={overviewExpiryPage <= 1}
+                        >
+                          <ChevronLeft size={14} />
+                          Trước
+                        </button>
+                        <span>Trang {overviewExpiryPage} / {Math.max(1, Math.ceil(expiryList.length / OVERVIEW_PAGE_SIZE))}</span>
+                        <button
+                          type="button"
+                          onClick={() => setOverviewExpiryPage((prev) => Math.min(Math.max(1, Math.ceil(expiryList.length / OVERVIEW_PAGE_SIZE)), prev + 1))}
+                          disabled={overviewExpiryPage >= Math.max(1, Math.ceil(expiryList.length / OVERVIEW_PAGE_SIZE))}
+                        >
+                          Tiếp
+                          <ChevronRight size={14} />
+                        </button>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </div>
@@ -1042,6 +1166,7 @@ function PharmacyPage({ defaultTab = 'overview' }) {
                 placeholder="Tìm theo mã, tên thuốc, nhà cung cấp"
               />
             </div>
+
             <select value={medActive} onChange={(event) => setMedActive(event.target.value)}>
               <option value="">Tất cả</option>
               <option value="true">Đang hoạt động</option>
@@ -1080,6 +1205,7 @@ function PharmacyPage({ defaultTab = 'overview' }) {
                     <td colSpan="10" className="pharmacy-empty">Không tìm thấy thuốc.</td>
                   </tr>
                 )}
+
                 {!medLoading &&
                   medications.map((med) => (
                     <tr key={med._id}>
@@ -1195,6 +1321,7 @@ function PharmacyPage({ defaultTab = 'overview' }) {
                       <MapPin size={16} />
                       <span>{supplier.address || 'N/A'}</span>
                     </div>
+
                     {supplier.contactName && (
                       <div className="supplier-contact-name">
                         <strong>Người liên hệ:</strong> {supplier.contactName}
@@ -1207,6 +1334,7 @@ function PharmacyPage({ defaultTab = 'overview' }) {
                       <Edit3 size={14} />
                       Sửa
                     </button>
+
                     {supplier.isActive && (
                       <button
                         type="button"
@@ -1354,7 +1482,7 @@ function PharmacyPage({ defaultTab = 'overview' }) {
               <BarChart3 size={20} />
               <div>
                 <h2>Báo cáo cấp phát thuốc</h2>
-                <p>Chi tiết từng lần cấp phát thuốc cho bệnh nhân</p>
+                <p>Chi tiết số lần cấp phát thuốc cho bệnh nhân</p>
               </div>
             </div>
             
@@ -1367,6 +1495,7 @@ function PharmacyPage({ defaultTab = 'overview' }) {
                   onChange={(event) => setUsageRange((prev) => ({ ...prev, from: event.target.value }))}
                 />
               </label>
+
               <label>
                 <span>Đến ngày</span>
                 <input
@@ -1375,6 +1504,7 @@ function PharmacyPage({ defaultTab = 'overview' }) {
                   onChange={(event) => setUsageRange((prev) => ({ ...prev, to: event.target.value }))}
                 />
               </label>
+
               <button type="button" className="pharmacy-primary" onClick={loadUsageStats}>
                 <RefreshCw size={16} />
                 Làm mới
@@ -1555,13 +1685,11 @@ function PharmacyPage({ defaultTab = 'overview' }) {
                   Mức tối thiểu
                   <input
                     type="number"
-                    min="0"
                     value={medicationForm.minStockLevel}
                     onChange={(event) =>
                       setMedicationForm((prev) => ({ ...prev, minStockLevel: event.target.value }))
                     }
                   />
-                  
                 </label>
                 
                 <label>
@@ -1712,6 +1840,7 @@ function PharmacyPage({ defaultTab = 'overview' }) {
                 <X size={18} />
               </button>
             </div>
+
             <form className="pharmacy-modal__body" onSubmit={saveStock}>
               <div className="pharmacy-form-grid">
                 <label>
@@ -1728,6 +1857,7 @@ function PharmacyPage({ defaultTab = 'overview' }) {
                         ))}
                       </select>
                 </label>
+
                 <label>
                   Nhà cung cấp
                       <select
@@ -1829,6 +1959,7 @@ function PharmacyPage({ defaultTab = 'overview' }) {
               </button>
             </div>
             <div className="pharmacy-modal__body">
+              
               <form className="pharmacy-form" onSubmit={addNote}>
                 <textarea
                   rows="3"
@@ -1839,6 +1970,7 @@ function PharmacyPage({ defaultTab = 'overview' }) {
                 <button type="submit" className="pharmacy-primary">Thêm ghi chú</button>
                 {noteError && <p className="pharmacy-error">{noteError}</p>}
               </form>
+
               {noteLoading ? (
                 <p className="pharmacy-empty">Đang tải ghi chú...</p>
               ) : (

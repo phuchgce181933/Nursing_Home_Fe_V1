@@ -24,6 +24,66 @@ import paymentService from '../../../services/payment.service';
 import servicePackageService from '../../../services/servicePackage.service';
 import facilityService from '../../../services/facility.service';
 
+// ─── Helper: Avatar với initials fallback ─────────────────────────────────────
+function PersonAvatar({ name, avatarUrl, size = 52, className = '' }) {
+  const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    setHasError(false);
+  }, [avatarUrl]);
+
+  const initials = (name || '?')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0].toUpperCase())
+    .join('');
+
+  const baseStyle = {
+    width: size,
+    height: size,
+    borderRadius: '50%',
+    flexShrink: 0,
+    border: '2px solid #fff',
+    boxShadow: '0 4px 10px rgba(26,54,93,0.08)',
+    overflow: 'hidden',
+  };
+
+  if (avatarUrl && !hasError) {
+    return (
+      <img
+        src={avatarUrl}
+        alt={name || 'Avatar'}
+        className={className}
+        style={{ ...baseStyle, objectFit: 'cover', display: 'block' }}
+        onError={() => setHasError(true)}
+      />
+    );
+  }
+
+  return (
+    <div
+      className={className}
+      style={{
+        ...baseStyle,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'linear-gradient(135deg, #1b365d 0%, #2d5a9e 100%)',
+        color: '#fff',
+        fontSize: size * 0.34,
+        fontWeight: 700,
+        letterSpacing: '0.02em',
+        userSelect: 'none',
+      }}
+      title={name || ''}
+    >
+      {initials}
+    </div>
+  );
+}
+
 const formatViDate = (dateStr) => {
   if (!dateStr) return 'N/A';
   try {
@@ -110,20 +170,46 @@ const formatAdmissionReason = (reason) => {
   if (!reason) return 'Chưa ghi nhận';
   const mapping = {
     long_term_care: 'Chăm sóc dài hạn',
+    rehabilitation: 'Phục hồi chức năng & Trị liệu',
+    post_surgery: 'Phục hồi sau phẫu thuật',
+    hospice: 'Chăm sóc giảm nhẹ cuối đời',
     short_term_rehab: 'Phục hồi chức năng ngắn hạn',
     daycare: 'Bán trú',
     palliative_care: 'Chăm sóc giảm nhẹ',
     assisted_living: 'Hỗ trợ sinh hoạt',
     memory_care: 'Chăm sóc đặc biệt trí tuệ',
+    other: 'Lý do khác',
     'chăm sóc dài hạn': 'Chăm sóc dài hạn',
-    'điều trị phục hồi chức năng': 'Phục hồi chức năng',
+    'phục hồi chức năng & trị liệu': 'Phục hồi chức năng & Trị liệu',
+    'phục hồi sau phẫu thuật': 'Phục hồi sau phẫu thuật',
+    'chăm sóc giảm nhẹ cuối đời': 'Chăm sóc giảm nhẹ cuối đời',
+    'điều trị phục hồi chức năng': 'Phục hồi chức năng & Trị liệu',
     'nghỉ dưỡng ngắn hạn': 'Phục hồi chức năng ngắn hạn',
-    'khác': 'Khác'
+    'khác': 'Lý do khác'
   };
-  const normalized = reason.toLowerCase().replace(/_/g, ' ').trim();
-  if (mapping[reason]) return mapping[reason];
+  const key = String(reason).trim();
+  if (mapping[key]) return mapping[key];
+  if (mapping[key.toLowerCase()]) return mapping[key.toLowerCase()];
+  const normalized = key.toLowerCase().replace(/_/g, ' ').trim();
   if (mapping[normalized]) return mapping[normalized];
-  return reason;
+  return key.replace(/_/g, ' ');
+};
+
+const cleanCancellationReason = (reason) => {
+  if (!reason) return '';
+  return reason
+    .replace(/^\[Admin reject(?:ed)?\]\s*/i, '')
+    .replace(/^\[Doctor evaluation\]\s*/i, '')
+    .replace(/^\[Cancelled by admin\]\s*/i, '')
+    .trim();
+};
+
+const getFamilyInvoiceStatusLabel = (status) => {
+  const normalized = String(status || '').toUpperCase();
+  if (normalized === 'PAID') return 'Đã thanh toán';
+  if (normalized === 'PARTIALLY_PAID') return 'Đã thanh toán một phần';
+  if (normalized === 'CANCELLED') return 'Đã hủy';
+  return 'Chưa thanh toán';
 };
 
 const getCalendarDay = (dateStr) => {
@@ -303,17 +389,27 @@ export default function AdmissionDetailDrawer({
   // Helper: add months to a date string (YYYY-MM-DD) and return YYYY-MM-DD
   const addMonthsToDateStr = (dateStr, months) => {
     try {
-      const d = new Date(dateStr);
+      const d = new Date(`${dateStr}T00:00:00`);
+      if (Number.isNaN(d.getTime())) return dateStr;
       const day = d.getDate();
       d.setMonth(d.getMonth() + months);
       // handle month overflow (e.g., Jan 31 + 1 month -> Feb 28/29)
       if (d.getDate() < day) {
         d.setDate(0); // last day of previous month
       }
-      return d.toISOString().split('T')[0];
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const resultDay = String(d.getDate()).padStart(2, '0');
+      return `${d.getFullYear()}-${month}-${resultDay}`;
     } catch (e) {
       return dateStr;
     }
+  };
+
+  const getTodayInputDate = () => {
+    const today = new Date();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${today.getFullYear()}-${month}-${day}`;
   };
 
   // Helper: calculate full months difference between two date-strings (YYYY-MM-DD)
@@ -329,6 +425,16 @@ export default function AdmissionDetailDrawer({
     } catch (err) {
       return null;
     }
+  };
+
+  const minimumContractEndDate = (startStr) => {
+    if (!startStr) return '';
+    const date = new Date(`${startStr}T00:00:00`);
+    if (Number.isNaN(date.getTime())) return '';
+    date.setDate(date.getDate() + 30);
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${date.getFullYear()}-${month}-${day}`;
   };
 
   // Sync handlers for contract date/duration fields
@@ -366,6 +472,16 @@ export default function AdmissionDetailDrawer({
       const end = addMonthsToDateStr(start, months);
       setContractEnd(end);
     }
+  };
+
+  const handleQuickContractPeriod = (months) => {
+    const start = getTodayInputDate();
+    const calculatedEnd = addMonthsToDateStr(start, months);
+    const minimumEnd = minimumContractEndDate(start);
+    setContractStart(start);
+    setContractDurationMonths(String(months));
+    setContractEnd(calculatedEnd < minimumEnd ? minimumEnd : calculatedEnd);
+    setModalError(null);
   };
 
   useEffect(() => {
@@ -489,7 +605,16 @@ export default function AdmissionDetailDrawer({
         try {
           setLoadingRooms(true);
           const res = await facilityService.listRoomsByFloor(selectedFloorId);
-          setRooms(res || []);
+          const pkgTier = admission?.servicePackageId?.tier || 'standard';
+          const allowedTypes = admission?.servicePackageId?.allowedRoomTypes?.length
+            ? admission.servicePackageId.allowedRoomTypes
+            : (pkgTier === 'vip' ? ['icu', 'isolation'] : pkgTier === 'premium' ? ['premium'] : ['standard']);
+
+          const filtered = (res || []).filter((r) => {
+            if (!allowedTypes || allowedTypes.length === 0) return true;
+            return allowedTypes.includes(r.roomType);
+          });
+          setRooms(filtered);
           setSelectedRoomId('');
           setSelectedBedId('');
           setBeds([]);
@@ -506,7 +631,7 @@ export default function AdmissionDetailDrawer({
       setSelectedBedId('');
       setBeds([]);
     }
-  }, [selectedFloorId]);
+  }, [selectedFloorId, admission?.servicePackageId]);
 
   // Load beds when selectedRoomId changes
   useEffect(() => {
@@ -731,6 +856,14 @@ export default function AdmissionDetailDrawer({
     if (e) e.preventDefault();
     if (!admissionId) return;
 
+    if (contractStart && contractEnd) {
+      const minimumEnd = minimumContractEndDate(contractStart);
+      if (minimumEnd && contractEnd < minimumEnd) {
+        setModalError('Ngày kết thúc hợp đồng phải cách ngày bắt đầu ít nhất 30 ngày.');
+        return;
+      }
+    }
+
     try {
       setCreatingContract(true);
       await admissionService.adminCreateContract(admissionId, {
@@ -764,6 +897,10 @@ export default function AdmissionDetailDrawer({
   const handleCreateInvoice = async (e) => {
     if (e) e.preventDefault();
     if (!admissionId) return;
+    if (!admission?.contractNumber) {
+      setModalError('Vui lòng tạo hợp đồng trước khi tạo hóa đơn.');
+      return;
+    }
     const residentId = admission?.residentId || admission?.resident?._id;
     if (!residentId) return;
 
@@ -771,6 +908,7 @@ export default function AdmissionDetailDrawer({
       setCreatingInvoice(true);
       // careServiceCost is already computed with discount applied; roomCost is always 0
       await paymentService.createInvoice(residentId, {
+        admissionId,
         roomCost: 0,
         medicationCost: medicationCost || 0,
         careServiceCost: careServiceCost ? parseInt(careServiceCost, 10) : 0,
@@ -1171,7 +1309,7 @@ const getStepIcon = (key) => {
                         Ngày hủy: {formatEnglishDate(admission.cancelledAt || admission.updatedAt)}
                       </p>
                       <p className="arh-timeline__desc">
-                        "Lý do: {admission.cancellationReason || admission.rejectionReason || 'Hủy theo yêu cầu'}"
+                        "Lý do: {cleanCancellationReason(admission.cancellationReason || admission.rejectionReason || 'Hủy theo yêu cầu')}"
                       </p>
                     </div>
                   )}
@@ -1217,18 +1355,20 @@ const getStepIcon = (key) => {
                   <User size={16} /> NGƯỜI LIÊN HỆ CHÍNH
                 </h5>
                 <div className="arh-detail-card__profile" style={{ background: 'rgba(239, 244, 255, 0.4)', border: '1px solid rgba(27, 54, 93, 0.05)', padding: '14px', borderRadius: '12px' }}>
-                  <img
-                    alt="Ảnh người yêu cầu"
-                    className="arh-detail-card__avatar"
-                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuCJXACrUfkBY9FzZgqaYWlbX2_62AvB8l3uq1FtPvHQLPXjrGi_pCx100ZMjqgFsjpLnyALy7cQ5HakNfzB6W_5g45qDwYQEw1vHmVH5smWEcdKtoEiRARx_wst369IQZWNEsbxfaQiR7N8bZ8CdZpY4zVsLhpqnZGHYN0qm0QbBarwa-WWJ7keBArDnMmO3hrwY_wqVVkmiqKVtfEhifVie9Jn2HWA4tbPhuGX_x4lUz6m_HgraTM9IbraKGLNxKx4xcqhALN9SqZE"
+                  <PersonAvatar
+                    name={admission.familyAccount?.fullName || admission.requestedByName || 'Người thân'}
+                    avatarUrl={admission.familyAccount?.avatarUrl}
+                    size={52}
                   />
                   <div className="arh-detail-card__info">
                     <h4 className="arh-detail-card__name">
                       {admission.familyAccount?.fullName || admission.requestedByName || 'Người thân'}
                     </h4>
-                    <p className="arh-detail-item__value" style={{ marginTop: '4px', fontSize: '12.5px', color: '#475569', fontWeight: '500' }}>
-                      {formatRelationship(admission.applicant?.relationshipToRequester)} • {admission.requestedByPhone || admission.familyAccount?.phone || 'N/A'}
-                    </p>
+                    <div style={{ marginTop: '6px', fontSize: '12.5px', color: '#475569', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                      <div><strong>Quan hệ:</strong> {formatRelationship(admission.applicant?.relationshipToRequester)}</div>
+                      <div><strong>SĐT liên hệ (trong đơn):</strong> {admission.requestedByPhone || 'N/A'}</div>
+                      <div><strong>SĐT tài khoản gia đình:</strong> {admission.familyAccount?.phone || 'N/A'}</div>
+                    </div>
                     {isAdmin && admission.familyAccount && (
                       <div className="text-[11.5px] text-slate-500 mt-2 font-medium bg-white/70 p-2 rounded border border-slate-100 flex flex-col gap-0.5">
                         <div><strong>Tên đăng nhập:</strong> {admission.familyAccount.username || 'N/A'}</div>
@@ -1244,11 +1384,24 @@ const getStepIcon = (key) => {
                 <h5 className="arh-drawer__section-title">
                   <Heart size={16} /> THÔNG TIN NGƯỜI CAO TUỔI
                 </h5>
-                <div className="arh-detail-grid">
-                  <div className="arh-detail-item">
-                    <p className="arh-detail-item__label">Họ và tên</p>
-                    <p className="arh-detail-item__value" style={{ fontWeight: 'bold' }}>{admission.applicant?.fullName || 'N/A'}</p>
+                
+                <div className="arh-detail-card__profile" style={{ background: 'rgba(239, 244, 255, 0.4)', border: '1px solid rgba(27, 54, 93, 0.05)', padding: '14px', borderRadius: '12px', display: 'flex', gap: '16px', alignItems: 'center', marginBottom: '16px' }}>
+                  <PersonAvatar
+                    name={admission.applicant?.fullName}
+                    avatarUrl={admission.applicant?.avatarUrl}
+                    size={64}
+                  />
+                  <div>
+                    <h4 className="arh-detail-card__name" style={{ fontWeight: 'bold', fontSize: '15px', color: '#1e293b' }}>
+                      {admission.applicant?.fullName || 'N/A'}
+                    </h4>
+                    <p style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
+                      Người cao tuổi cần nhập viện
+                    </p>
                   </div>
+                </div>
+
+                <div className="arh-detail-grid">
                   <div className="arh-detail-item">
                     <p className="arh-detail-item__label">Ngày sinh</p>
                     <p className="arh-detail-item__value">{formatEnglishDate(admission.applicant?.dateOfBirth)}</p>
@@ -1262,6 +1415,10 @@ const getStepIcon = (key) => {
                     <p className="arh-detail-item__value">
                       {formatGender(admission.applicant?.gender)}
                     </p>
+                  </div>
+                  <div className="arh-detail-item">
+                    <p className="arh-detail-item__label">Số điện thoại</p>
+                    <p className="arh-detail-item__value" style={{ fontWeight: '500' }}>{admission.applicant?.phone || 'N/A'}</p>
                   </div>
                   <div className="arh-detail-item" style={{ gridColumn: 'span 2' }}>
                     <p className="arh-detail-item__label">Địa chỉ hiện tại</p>
@@ -1383,11 +1540,14 @@ const getStepIcon = (key) => {
                   {admission.latestInvoice ? (
                     <div className="mt-3 rounded-lg bg-white/80 border border-slate-200 p-3 text-sm">
                       <p className="text-slate-500">Trạng thái hóa đơn gần nhất</p>
-                      <p className="font-semibold text-slate-800">{admission.latestInvoice.status === 'paid' ? 'Đã thanh toán' : admission.latestInvoice.status === 'partially_paid' ? 'Đã thanh toán một phần' : 'Chưa thanh toán'}</p>
+                      <p className="font-semibold text-slate-800">{getFamilyInvoiceStatusLabel(admission.latestInvoice.status)}</p>
+                      {String(admission.latestInvoice.status || '').toUpperCase() === 'CANCELLED' && (
+                        <p className="text-xs text-slate-500 mt-1">Lý do hủy: {admission.latestInvoice.cancellationReason || 'Đã hủy do thay đổi gói dịch vụ.'}</p>
+                      )}
                       {admission.latestInvoice.dueDate && (
                         <p className="text-xs text-slate-500 mt-1">Hạn thanh toán: {new Date(admission.latestInvoice.dueDate).toLocaleDateString('vi-VN')}</p>
                       )}
-                      {admission.latestInvoice.status !== 'paid' && (
+                      {!['PAID', 'CANCELLED'].includes(String(admission.latestInvoice.status || '').toUpperCase()) && (
                         <button
                           type="button"
                           className="button button-primary mt-3"
@@ -1563,6 +1723,17 @@ const getStepIcon = (key) => {
                       </button>
                     )}
 
+                    {isDoctorOrNurseRole && ['new_request', 'consulting'].includes(admission.status) && !scheduledDate && (
+                      <button
+                        type="button"
+                        onClick={() => setShowScheduleModal(true)}
+                        className="adm-btn-apply"
+                        style={{ padding: '8px 16px', fontSize: '12px', borderRadius: '10px', boxShadow: 'none', background: '#2563eb' }}
+                      >
+                        Lên lịch khám
+                      </button>
+                    )}
+
                     {isDoctorRole && ['new_request', 'consulting', 'assessing', 'contracting'].includes(admission.status) && (
                       <button
                         type="button"
@@ -1617,17 +1788,6 @@ const getStepIcon = (key) => {
                         style={{ padding: '8px 16px', fontSize: '12px', borderRadius: '10px', boxShadow: 'none', background: '#1B365D' }}
                       >
                         {admission.contractNumber ? 'Sửa hợp đồng' : 'Tạo hợp đồng'}
-                      </button>
-                    )}
-
-                    {isAdminRole && (admission.status === 'contracting' || admission.status === 'checked_in') && (admission.servicePackageId || admission.assignedServicePackage) && !admission.latestInvoice && (
-                      <button
-                        type="button"
-                        onClick={() => setShowInvoiceModal(true)}
-                        className="adm-btn-apply"
-                        style={{ padding: '8px 16px', fontSize: '12px', borderRadius: '10px', boxShadow: 'none', background: '#1B365D' }}
-                      >
-                        Tạo hóa đơn
                       </button>
                     )}
 
@@ -2355,6 +2515,7 @@ const getStepIcon = (key) => {
                     className="adm-filter-input"
                     style={{ paddingLeft: '14px' }}
                     value={contractEnd}
+                    min={minimumContractEndDate(contractStart)}
                     onChange={(e) => handleContractEndChange(e.target.value)}
                   />
                 </div>
@@ -2374,6 +2535,19 @@ const getStepIcon = (key) => {
                     value={contractDurationMonths}
                     onChange={(e) => handleContractDurationChange(e.target.value)}
                   />
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {[{ label: '1 tháng', months: 1 }, { label: '3 tháng', months: 3 }, { label: '6 tháng', months: 6 }, { label: '1 năm', months: 12 }].map((period) => (
+                      <button
+                        key={period.months}
+                        type="button"
+                        className="adm-btn-apply"
+                        style={{ padding: '5px 9px', fontSize: '11px', borderRadius: '7px', boxShadow: 'none', background: '#1B365D' }}
+                        onClick={() => handleQuickContractPeriod(period.months)}
+                      >
+                        {period.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
@@ -2603,6 +2777,24 @@ const getStepIcon = (key) => {
               </div>
             )}
 
+            {(() => {
+              const pkgTier = admission?.servicePackageId?.tier || 'standard';
+              const pkgName = admission?.servicePackageId?.name || admission?.assignedServicePackage || 'Gói chăm sóc';
+              const allowedTypes = admission?.servicePackageId?.allowedRoomTypes?.length
+                ? admission.servicePackageId.allowedRoomTypes
+                : (pkgTier === 'vip' ? ['icu', 'isolation'] : pkgTier === 'premium' ? ['premium'] : ['standard']);
+              const typeNames = { standard: 'Standard', premium: 'Premium', icu: 'ICU', isolation: 'Isolation' };
+              const allowedStr = allowedTypes.map((t) => typeNames[t] || t).join(' / ');
+
+              return (
+                <div className="bg-amber-50 border border-amber-200 p-2.5 rounded-xl mb-4 text-xs text-amber-900 leading-relaxed font-sans">
+                  <strong>📌 Gói dịch vụ đăng ký:</strong> {pkgName} ({pkgTier.toUpperCase()})
+                  <br />
+                  <strong>🔒 Giới hạn loại phòng nhận:</strong> <span className="font-bold text-amber-950 underline">{allowedStr}</span>
+                </div>
+              );
+            })()}
+
             <form onSubmit={handleCheckInResident}>
               <div className="grid grid-cols-2 gap-3 mb-4">
                 <div>
@@ -2697,7 +2889,7 @@ const getStepIcon = (key) => {
                       <option value="">-- Chọn giường --</option>
                       {beds.map((b) => (
                         <option key={b._id} value={b._id}>
-                          Giường {b.bedCode} ({b.bedType})
+                          Giường {b.bedCode}
                         </option>
                       ))}
                     </select>
@@ -2842,7 +3034,8 @@ const getStepIcon = (key) => {
                     <span className="block text-white/45 text-[9px] uppercase tracking-wider font-bold mb-1">Trạng thái hóa đơn</span>
                     {admission.latestInvoice ? (
                       <span className="font-semibold text-[12.5px] text-white/90">
-                        {admission.latestInvoice.status === 'paid' ? 'Đã thanh toán' : admission.latestInvoice.status === 'partially_paid' ? 'Thanh toán một phần' : admission.latestInvoice.status}
+                        {getFamilyInvoiceStatusLabel(admission.latestInvoice.status)}
+                        {String(admission.latestInvoice.status || '').toUpperCase() === 'CANCELLED' ? ` - ${admission.latestInvoice.cancellationReason || 'Đã hủy do thay đổi gói dịch vụ.'}` : ''}
                       </span>
                     ) : (
                       <div className="flex items-center gap-2">

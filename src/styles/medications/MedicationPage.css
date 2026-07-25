@@ -666,6 +666,7 @@
 .med-badge--overdue    { background: #fecdd3; color: #881337; }
 .med-badge--skipped    { background: #f1f5f9; color: #475569; }
 .med-badge--active     { background: #dbeafe; color: #1e40af; }
+.med-badge--stopped    { background: #e2e8f0; color: #334155; }
 .med-badge--completed  { background: #dcfce7; color: #166534; }
 .med-badge--cancelled  { background: #fee2e2; color: #991b1b; }
 

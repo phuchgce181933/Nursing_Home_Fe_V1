@@ -16,6 +16,7 @@ import residentService from '../../../services/resident.service';
 import { useAuth } from '../../../hooks/useAuth';
 import '../../../styles/admin/ResidentPage.css';
 import { resolveApiError } from '../../../utils/apiMessage';
+import { isValidStaffPhone } from '../../../utils/staffPhoneValidation';
 
 const GENDERS = [
   { value: '', label: 'Tất cả giới tính' },
@@ -82,8 +83,10 @@ const splitList = (value) =>
 
 const parseFamilyIds = (value) => splitList(value).filter(Boolean);
 
-const buildContactsPayload = (contacts) => {
+const buildContactsPayload = (contacts, t) => {
   const payload = [];
+  const seenPhones = new Map();
+  const seenEmails = new Map();
 
   for (const contact of contacts) {
     const fullName = String(contact.fullName || '').trim();
@@ -96,7 +99,25 @@ const buildContactsPayload = (contacts) => {
     if (!hasAny) continue;
 
     if (!fullName || !relationship || !phone) {
-      return { error: 'Mỗi liên hệ khẩn cấp phải có họ tên, quan hệ và số điện thoại.' };
+      return { error: t('admin.residents.family.validation.contactRequiredFields') };
+    }
+
+    if (!isValidStaffPhone(phone)) {
+      return { error: t('admin.residents.family.validation.phoneInvalid') };
+    }
+
+    const phoneKey = phone.replace(/\D/g, '');
+    if (seenPhones.has(phoneKey)) {
+      return { error: t('admin.residents.family.validation.duplicatePhone', { phone }) };
+    }
+    seenPhones.set(phoneKey, fullName);
+
+    const emailKey = email.toLowerCase();
+    if (emailKey) {
+      if (seenEmails.has(emailKey)) {
+        return { error: t('admin.residents.family.validation.duplicateEmail', { email }) };
+      }
+      seenEmails.set(emailKey, fullName);
     }
 
     payload.push({
@@ -384,7 +405,7 @@ function ResidentPage({ defaultMode = '' }) {
       }
     }
 
-    const { contacts, error: contactsError } = buildContactsPayload(createContacts);
+    const { contacts, error: contactsError } = buildContactsPayload(createContacts, t);
     if (contactsError) {
       setCreateError(contactsError);
       return;
@@ -483,7 +504,7 @@ function ResidentPage({ defaultMode = '' }) {
     if (event) event.preventDefault();
     if (!selectedResidentId) return;
 
-    const { contacts, error: contactsError } = buildContactsPayload(familyContacts);
+    const { contacts, error: contactsError } = buildContactsPayload(familyContacts, t);
     if (contactsError) {
       setFamilyError(contactsError);
       return;

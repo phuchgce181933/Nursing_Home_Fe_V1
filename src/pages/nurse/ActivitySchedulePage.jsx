@@ -21,6 +21,7 @@ import {
 import activityService from '../../services/activity.service';
 import residentService from '../../services/resident.service';
 import { resolveApiError } from '../../utils/apiMessage';
+import medicalRecordService from '../../services/medicalRecord.service';
 import '../../styles/nurse/ActivitySchedulePage.css';
 
 const formatDurationLabel = (durationMinutes) => {
@@ -50,8 +51,33 @@ const formatActivityDateRange = (activity) => {
   if (sameDay) {
     return `${startDate.toLocaleString('vi-VN')}`;
   }
+  // If activity has a per-day duration (dailyDurationMinutes), show per-day time range instead of a continuous span
+  const dailyMinutes = Number(activity?.dailyDurationMinutes);
+  if (Number.isFinite(dailyMinutes) && dailyMinutes > 0 && activity?.startAt) {
+    const startTime = new Date(activity.startAt);
+    const perDayStart = startTime.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+    const perDayEndDate = new Date(startTime.getTime() + dailyMinutes * 60000);
+    const perDayEnd = perDayEndDate.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+    return `${startDate.toLocaleDateString('vi-VN')} → ${endDate.toLocaleDateString('vi-VN')} · mỗi ngày ${perDayStart}–${perDayEnd}`;
+  }
 
   return `${startDate.toLocaleString('vi-VN')} → ${endDate.toLocaleString('vi-VN')}`;
+};
+
+const formatTimeShort = (isoString) => {
+  if (!isoString) return '';
+  const d = new Date(isoString);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+};
+
+const getPerDayEndTime = (activity) => {
+  const startIso = activity?.startAt || activity?.scheduledAt;
+  const dailyMinutes = Number(activity?.dailyDurationMinutes);
+  if (!startIso || !Number.isFinite(dailyMinutes)) return null;
+  const start = new Date(startIso);
+  const end = new Date(start.getTime() + dailyMinutes * 60000);
+  return end.toISOString();
 };
 
 const isActivityOnDate = (activity, date) => {
@@ -73,10 +99,64 @@ const isActivityOnDate = (activity, date) => {
 // attendance can still be recorded shortly after the activity ends, even after it auto-flips to 'completed'.
 const RECORD_GRACE_MS = 2 * 60 * 60 * 1000;
 
+const isNowInDailyOccurrence = (activity) => {
+  try {
+    const dailyMinutes = Number(activity?.dailyDurationMinutes);
+    if (!dailyMinutes || dailyMinutes <= 0) return false;
+
+    const startIso = activity?.startAt || activity?.scheduledAt;
+    const endIso = activity?.endAt || activity?.startAt || activity?.scheduledAt;
+    if (!startIso || !endIso) return false;
+
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    const startDate = new Date(startIso);
+    const endDate = new Date(endIso);
+    const startDay = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+    const endDay = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+
+    // If today not within date range, not occurring today
+    if (today < startDay || today > endDay) return false;
+
+    // Build today's occurrence start using time from activity.startAt
+    const occurrenceStart = new Date(today);
+    occurrenceStart.setHours(startDate.getHours(), startDate.getMinutes(), startDate.getSeconds() || 0, 0);
+
+    const occurrenceEnd = new Date(occurrenceStart.getTime() + dailyMinutes * 60000);
+
+    return now >= occurrenceStart && now <= occurrenceEnd;
+  } catch (e) {
+    return false;
+  }
+};
+
+const getEffectiveStatus = (activity) => {
+  if (!activity) return '';
+  // If activity uses dailyDurationMinutes, determine ongoing based on today's time window
+  if (activity.dailyDurationMinutes) {
+    if (isNowInDailyOccurrence(activity)) return 'ongoing';
+    // if today within start-end date range but not in time window, show scheduled
+    const today = new Date();
+    const startDate = new Date(activity.startAt || activity.scheduledAt);
+    const endDate = new Date(activity.endAt || activity.startAt || activity.scheduledAt);
+    const startDay = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+    const endDay = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+    const todayDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    if (todayDay >= startDay && todayDay <= endDay) return 'scheduled';
+  }
+  return activity.status || '';
+};
+
 const canRecordAttendance = (activity) => {
   const status = String(activity?.status || '').trim().toLowerCase();
   if (status === 'draft' || status === 'cancelled') {
     return false;
+  }
+
+  // If activity defines a daily duration, check today's occurrence window
+  if (activity?.dailyDurationMinutes) {
+    return isNowInDailyOccurrence(activity);
   }
 
   const startDate = new Date(activity?.startAt || activity?.scheduledAt);
@@ -125,6 +205,7 @@ export default function ActivitySchedulePage() {
   const [viewMode, setViewMode] = useState('list');
   const [selectedActivity, setSelectedActivity] = useState(null);
   const [residents, setResidents] = useState({});
+  const [residentsAbnormalStatus, setResidentsAbnormalStatus] = useState({});
   const [savingRecord, setSavingRecord] = useState(false);
   const [recordMessage, setRecordMessage] = useState('');
   const [recordMessageType, setRecordMessageType] = useState('success');
@@ -158,6 +239,24 @@ export default function ActivitySchedulePage() {
           const map = {};
           residentList?.data?.forEach((r) => { map[r._id] = r; });
           setResidents(map);
+          // load latest vitals to detect abnormal status
+          try {
+            const results = await Promise.allSettled(
+              Array.from(residentIds).map((id) => medicalRecordService.getLatestVitals(id))
+            );
+            const statusMap = {};
+            results.forEach((r, idx) => {
+              const id = Array.from(residentIds)[idx];
+              if (r.status === 'fulfilled' && r.value) {
+                statusMap[id] = Boolean(r.value.abnormalFlag === true);
+              } else {
+                statusMap[id] = false;
+              }
+            });
+            setResidentsAbnormalStatus(statusMap);
+          } catch (err) {
+            console.error('Failed to load resident vitals for abnormal status', err);
+          }
         }
       }
     } catch (err) {
@@ -179,29 +278,49 @@ export default function ActivitySchedulePage() {
       };
     }
 
-    const existingAttendance = (activity.attendanceRecords || []).reduce((acc, record) => {
-      acc[record.residentId] = record;
-      return acc;
-    }, {});
-    const existingParticipation = (activity.participationRecords || []).reduce((acc, record) => {
-      acc[record.residentId] = record;
-      return acc;
-    }, {});
+    const today = new Date();
+    const todayKey = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).toISOString();
+    const targetDayIso = todayKey(today);
+
+    const pickRecordForResident = (records = [], residentId) => {
+      // Prefer record with occurrenceDate matching today, then fallback to record without occurrenceDate
+      const foundByDate = (records || []).find((r) => {
+        if (!r) return false;
+        if (!r.residentId) return false;
+        if (String(r.residentId) !== String(residentId)) return false;
+        if (!r.occurrenceDate) return false;
+        const occ = new Date(r.occurrenceDate);
+        if (Number.isNaN(occ.getTime())) return false;
+        return todayKey(occ) === targetDayIso;
+      });
+      if (foundByDate) return foundByDate;
+      const foundNoDate = (records || []).find((r) => String(r.residentId) === String(residentId) && !r.occurrenceDate);
+      return foundNoDate || null;
+    };
+
+    const existingAttendance = activity.attendanceRecords || [];
+    const existingParticipation = activity.participationRecords || [];
 
     const participantIds = activity.participantResidentIds || [];
     return {
       participantResultNotes: activity.participantResultNotes || '',
-      attendanceRecords: participantIds.map((residentId) => ({
-        residentId,
-        status: existingAttendance[residentId]?.status || 'present',
-        note: existingAttendance[residentId]?.note || '',
-      })),
-      participationRecords: participantIds.map((residentId) => ({
-        residentId,
-        participationLevel: existingParticipation[residentId]?.participationLevel || 'active',
-        comment: existingParticipation[residentId]?.comment || '',
-        incident: existingParticipation[residentId]?.incident || '',
-      })),
+      attendanceRecords: participantIds.map((residentId) => {
+        const rec = pickRecordForResident(existingAttendance, residentId);
+        return {
+          residentId,
+          status: rec?.status || 'present',
+          note: rec?.note || '',
+        };
+      }),
+      participationRecords: participantIds.map((residentId) => {
+        const rec = pickRecordForResident(existingParticipation, residentId);
+        return {
+          residentId,
+          participationLevel: rec?.participationLevel || 'active',
+          comment: rec?.comment || '',
+          incident: rec?.incident || '',
+        };
+      }),
     };
   };
 
@@ -238,7 +357,7 @@ export default function ActivitySchedulePage() {
           </tr>
         </thead>
         <tbody>
-          {loading ? (
+            {loading ? (
             <tr>
               <td colSpan="6" className="as-table-empty">
                 <div className="as-loading">
@@ -252,26 +371,29 @@ export default function ActivitySchedulePage() {
                 {t('activitySchedule.noActivities')}
               </td>
             </tr>
-          ) : (
-            activities.map((activity) => (
-              <tr
-                key={activity._id}
-                onClick={() => setSelectedActivity(activity)}
-              >
-                <td className="as-table-title">{activity.title}</td>
-                <td>{activity.category || '-'}</td>
-                <td>{formatActivityDateRange(activity)}</td>
-                <td>{activity.location || '-'}</td>
-                <td>
-                  <span className={`as-status-badge as-status-badge--${activity.status || 'draft'}`}>
-                    {statusLabels[activity.status] || activity.status}
-                  </span>
-                </td>
-                <td className="as-participant-count">
-                  {t('activitySchedule.residentCount', { count: activity.participantResidentIds?.length || 0 })}
-                </td>
-              </tr>
-            ))
+            ) : (
+            activities.map((activity) => {
+              const effectiveStatus = getEffectiveStatus(activity);
+              return (
+                <tr
+                  key={activity._id}
+                  onClick={() => setSelectedActivity(activity)}
+                >
+                  <td className="as-table-title">{activity.title}</td>
+                  <td>{activity.category || '-'}</td>
+                  <td>{formatActivityDateRange(activity)}</td>
+                  <td>{activity.location || '-'}</td>
+                  <td>
+                    <span className={`as-status-badge as-status-badge--${effectiveStatus || activity.status || 'draft'}`}>
+                      {statusLabels[effectiveStatus] || statusLabels[activity.status] || activity.status}
+                    </span>
+                  </td>
+                  <td className="as-participant-count">
+                    {t('activitySchedule.residentCount', { count: activity.participantResidentIds?.length || 0 })}
+                  </td>
+                </tr>
+              );
+            })
           )}
         </tbody>
       </table>
@@ -317,16 +439,21 @@ export default function ActivitySchedulePage() {
                 className={`as-calendar-cell ${isToday ? 'as-calendar-cell--today' : ''}`}
               >
                 <div className="as-cell-date">{day.getDate()}</div>
-                {dayActivities.map((a) => (
-                  <div
-                    key={a._id}
-                    className={`as-event-pill as-event-pill--${a.status || 'draft'}`}
-                    onClick={() => setSelectedActivity(a)}
-                    title={a.title}
-                  >
-                    {a.title}
-                  </div>
-                ))}
+                {dayActivities.map((a) => {
+                  const effectiveStatus = getEffectiveStatus(a);
+                  return (
+                    <div
+                      key={a._id}
+                      className={`as-event-pill as-event-pill--${effectiveStatus || a.status || 'draft'}`}
+                      onClick={() => setSelectedActivity(a)}
+                      title={a.title}
+                    >
+                      {/* Show per-day time if available */}
+                      <span className={`as-event-time as-event-time--${effectiveStatus || a.status || 'draft'}`}>{formatTimeShort(a.startAt || a.scheduledAt)}</span>
+                      <span className="as-event-title"> {a.title}</span>
+                    </div>
+                  );
+                })}
               </div>
             );
           })}
@@ -341,8 +468,23 @@ export default function ActivitySchedulePage() {
   const DetailDrawer = () => {
     if (!selectedActivity) return null;
     const a = selectedActivity;
-    const attendanceAllowed = canRecordAttendance(a);
+    const attendanceAllowed = canRecordAttendance(a) || isNowInDailyOccurrence(a);
     const [draft, setDraft] = useState(() => buildAttendanceFormFromActivity(a));
+
+    const getTodayOccurrenceLabel = (activity) => {
+      try {
+        const today = new Date();
+        const key = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).toISOString();
+        // if activity uses dailyDurationMinutes, show today's date
+        if (activity?.dailyDurationMinutes) return key(today);
+        // else check attendanceRecords for today's occurrence
+        const occ = (activity.attendanceRecords || []).find((r) => r?.occurrenceDate && key(new Date(r.occurrenceDate)) === key(today));
+        if (occ) return key(today);
+        return null;
+      } catch (e) {
+        return null;
+      }
+    };
 
     useEffect(() => {
       setDraft(buildAttendanceFormFromActivity(a));
@@ -391,13 +533,29 @@ export default function ActivitySchedulePage() {
       try {
         setSavingRecord(true);
         setRecordMessage('');
-        const result = await activityService.recordParticipationResult(a._id, {
+        const payload = {
           participantResultNotes: draft.participantResultNotes.trim(),
-          status: a.status === 'scheduled' ? 'completed' : a.status,
-          attendanceRecords: draft.attendanceRecords,
-          participationRecords: draft.participationRecords,
-        });
+        };
+
+        // Attach occurrenceDate for per-day recordings (use local date at midnight)
+        const today = new Date();
+        const occurrenceDate = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString();
+
+        payload.attendanceRecords = (draft.attendanceRecords || []).map((r) => ({
+          ...r,
+          occurrenceDate,
+        }));
+        payload.participationRecords = (draft.participationRecords || []).map((r) => ({
+          ...r,
+          occurrenceDate,
+        }));
+        if (a.status === 'scheduled') {
+          payload.status = 'completed';
+        }
+        const result = await activityService.recordParticipationResult(a._id, payload);
         setSelectedActivity((prev) => (prev && prev._id === result?._id ? { ...prev, ...result } : result));
+        // refresh list/calendar so counts and records update immediately
+        fetchActivities();
         setDraft(buildAttendanceFormFromActivity(result || a));
         setRecordMessageType('success');
         setRecordMessage('Đã lưu điểm danh và ghi nhận tham gia cho hoạt động.');
@@ -434,6 +592,21 @@ export default function ActivitySchedulePage() {
             </div>
 
             {/* Detail rows */}
+            {/* Occurrence date (for per-day activities) */}
+            {(() => {
+              const occLabel = getTodayOccurrenceLabel(a);
+              if (occLabel) {
+                const d = new Date(occLabel);
+                return (
+                  <div className="as-detail-row">
+                    <Calendar size={16} />
+                    <span className="as-detail-label">Ngày điểm danh</span>
+                    <span className="as-detail-value">{d.toLocaleDateString('vi-VN')}</span>
+                  </div>
+                );
+              }
+              return null;
+            })()}
             <div className="as-detail-row">
               <Calendar size={16} />
               <span className="as-detail-label">{t('activitySchedule.detail.dateTime')}</span>
@@ -500,7 +673,12 @@ export default function ActivitySchedulePage() {
                   {a.participantResidentIds.map((rid) => (
                     <div key={rid} className="as-participant-item">
                       <User size={14} />
-                      {residents[rid]?.fullName || t('activitySchedule.residentById', { id: rid })}
+                      <span style={{ marginRight: 8 }}>{residents[rid]?.fullName || t('activitySchedule.residentById', { id: rid })}</span>
+                      {residentsAbnormalStatus[rid] && (
+                        <span className="as-abnormal-badge" title="Cảnh báo: chỉ số bất thường" style={{ color: '#b91c1c', fontWeight: 600 }}>
+                          ⚠️
+                        </span>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -540,78 +718,81 @@ export default function ActivitySchedulePage() {
                 maxLength={500}
               />
 
-              {draft.attendanceRecords.map((record) => {
-                const resident = residents[record.residentId];
-                return (
-                  <div key={record.residentId} className="as-resident-record-card">
-                    <div className="as-resident-record-title">
-                      <User size={14} />
-                      <span>{resident?.fullName || record.residentId}</span>
-                    </div>
-
-                    <div className="as-resident-record-grid">
-                      <div>
-                        <label className="as-record-label">Điểm danh</label>
-                        <select
-                          className="as-record-select"
-                          value={record.status}
-                          onChange={(e) => handleAttendanceChange(record.residentId, 'status', e.target.value)}
-                          disabled={!attendanceAllowed}
-                        >
-                          <option value="present">Có mặt</option>
-                          <option value="absent">Vắng mặt</option>
-                          <option value="late">Muộn</option>
-                          <option value="left_early">Về sớm</option>
-                        </select>
+              <div className="as-resident-list">
+                {draft.attendanceRecords.map((record) => {
+                  const resident = residents[record.residentId];
+                  const participation = draft.participationRecords.find((item) => item.residentId === record.residentId) || { participationLevel: 'active', comment: '', incident: '' };
+                  return (
+                    <div key={record.residentId} className="as-resident-record-card">
+                      <div className="as-resident-record-title">
+                        <User size={14} />
+                        <span>{resident?.fullName || record.residentId}</span>
                       </div>
 
-                      <div>
-                        <label className="as-record-label">Mức độ tham gia</label>
-                        <select
-                          className="as-record-select"
-                          value={draft.participationRecords.find((item) => item.residentId === record.residentId)?.participationLevel || 'active'}
-                          onChange={(e) => handleParticipationChange(record.residentId, 'participationLevel', e.target.value)}
-                          disabled={!attendanceAllowed}
-                        >
-                          <option value="active">Tích cực</option>
-                          <option value="partial">Một phần</option>
-                          <option value="passive">Thụ động</option>
-                        </select>
+                      <div className="as-resident-record-grid">
+                        <div>
+                          <label className="as-record-label">Điểm danh</label>
+                          <select
+                            className="as-record-select"
+                            value={record.status}
+                            onChange={(e) => handleAttendanceChange(record.residentId, 'status', e.target.value)}
+                            disabled={!attendanceAllowed}
+                          >
+                            <option value="present">Có mặt</option>
+                            <option value="absent">Vắng mặt</option>
+                            <option value="late">Muộn</option>
+                            <option value="left_early">Về sớm</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="as-record-label">Mức độ tham gia</label>
+                          <select
+                            className="as-record-select"
+                            value={participation.participationLevel || 'active'}
+                            onChange={(e) => handleParticipationChange(record.residentId, 'participationLevel', e.target.value)}
+                            disabled={!attendanceAllowed}
+                          >
+                            <option value="passive">Không tham gia</option>
+                            <option value="partial">Tham gia TB</option>
+                            <option value="active">Thường xuyên tham gia</option>
+                          </select>
+                        </div>
                       </div>
+
+                      <label className="as-record-label">Nhận xét</label>
+                      <textarea
+                        className="as-record-textarea"
+                        value={participation.comment || ''}
+                        onChange={(e) => handleParticipationChange(record.residentId, 'comment', e.target.value)}
+                        placeholder="Nhập nhận xét..."
+                        disabled={!attendanceAllowed}
+                        maxLength={500}
+                      />
+
+                      <label className="as-record-label">Sự cố</label>
+                      <textarea
+                        className="as-record-textarea"
+                        value={participation.incident || ''}
+                        onChange={(e) => handleParticipationChange(record.residentId, 'incident', e.target.value)}
+                        placeholder="Nếu có, ghi rõ sự cố..."
+                        disabled={!attendanceAllowed}
+                        maxLength={500}
+                      />
+
+                      <label className="as-record-label">Ghi chú điểm danh</label>
+                      <textarea
+                        className="as-record-textarea"
+                        value={record.note || ''}
+                        onChange={(e) => handleAttendanceChange(record.residentId, 'note', e.target.value)}
+                        placeholder="Ghi chú thêm về điểm danh..."
+                        disabled={!attendanceAllowed}
+                        maxLength={500}
+                      />
                     </div>
-
-                    <label className="as-record-label">Nhận xét</label>
-                    <textarea
-                      className="as-record-textarea"
-                      value={draft.participationRecords.find((item) => item.residentId === record.residentId)?.comment || ''}
-                      onChange={(e) => handleParticipationChange(record.residentId, 'comment', e.target.value)}
-                      placeholder="Nhập nhận xét..."
-                      disabled={!attendanceAllowed}
-                      maxLength={500}
-                    />
-
-                    <label className="as-record-label">Sự cố</label>
-                    <textarea
-                      className="as-record-textarea"
-                      value={draft.participationRecords.find((item) => item.residentId === record.residentId)?.incident || ''}
-                      onChange={(e) => handleParticipationChange(record.residentId, 'incident', e.target.value)}
-                      placeholder="Nếu có, ghi rõ sự cố..."
-                      disabled={!attendanceAllowed}
-                      maxLength={500}
-                    />
-
-                    <label className="as-record-label">Ghi chú điểm danh</label>
-                    <textarea
-                      className="as-record-textarea"
-                      value={record.note || ''}
-                      onChange={(e) => handleAttendanceChange(record.residentId, 'note', e.target.value)}
-                      placeholder="Ghi chú thêm về điểm danh..."
-                      disabled={!attendanceAllowed}
-                      maxLength={500}
-                    />
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           </div>
 

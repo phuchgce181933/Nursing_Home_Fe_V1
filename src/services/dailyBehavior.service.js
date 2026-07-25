@@ -2,10 +2,13 @@ import axiosClient from '../api/axiosClient';
 
 const unwrap = (r) => r.data?.data ?? r.data;
 const BASE = '/caregiver/daily-behaviors';
+const ADMIN_BASE = '/admin/daily-behaviors';
 
 const listResidents = () => axiosClient.get(`${BASE}/residents`).then(unwrap);
 
 const listRecords = (params = {}) => axiosClient.get(BASE, { params }).then((r) => r.data);
+
+const adminListRecords = (params = {}) => axiosClient.get(ADMIN_BASE, { params }).then((r) => r.data);
 
 const createRecord = (payload) => axiosClient.post(BASE, payload).then(unwrap);
 
@@ -18,6 +21,7 @@ const deleteRecord = (id) => axiosClient.delete(`${BASE}/${id}`).then(unwrap);
 const dailyBehaviorService = {
   listResidents,
   listRecords,
+  adminListRecords,
   createRecord,
   getRecord,
   updateRecord,

@@ -72,6 +72,26 @@
   white-space: nowrap;
 }
 
+.family-invoice-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.family-invoice-filter select {
+  min-height: 38px;
+  padding: 0 32px 0 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #fff;
+  color: #1e293b;
+  font: inherit;
+  cursor: pointer;
+}
+
 /* ── Resident list (accordion rows) ── */
 .family-resident-list {
   display: flex;
@@ -330,6 +350,7 @@
 
 .family-invoice-row__status.is-paid { color: #16a34a; }
 .family-invoice-row__status.is-due { color: #dc2626; }
+.family-invoice-row__status.is-cancelled { color: #64748b; }
 
 .family-invoice-row__total {
   font-size: 14px;
