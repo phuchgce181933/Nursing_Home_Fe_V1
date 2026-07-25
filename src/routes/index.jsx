@@ -92,6 +92,7 @@ import DailyBehaviorsPage from '../pages/caregiver/daily-behaviors/DailyBehavior
 import DietPlansPage from '../pages/caregiver/diet-plans/DietPlansPage';
 import MealIntakeNotesPage from '../pages/caregiver/meal-intake/MealIntakeNotesPage';
 import CaregiverResidentPhotosPage from '../pages/caregiver/ResidentPhotosPage';
+import RehabilitationSchedulePage from '../pages/caregiver/rehabilitation-schedule/RehabilitationSchedulePage';
 
 import ActivitySchedulePage from '../pages/nurse/ActivitySchedulePage';
 
