@@ -86,6 +86,7 @@ export default function AdmissionRequestsHistoryPage() {
   // Filters & Pagination states
   const [admissions, setAdmissions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [limit] = useState(6); // 6 rows is professional and aesthetic
@@ -143,6 +144,7 @@ export default function AdmissionRequestsHistoryPage() {
   const loadData = async () => {
     try {
       setLoading(true);
+      setLoadError(null);
       const params = {
         page,
         limit,
@@ -156,6 +158,7 @@ export default function AdmissionRequestsHistoryPage() {
       setTotalPages(res?.totalPages || 1);
     } catch (err) {
       console.error('Failed to load admission requests history:', err);
+      setLoadError(err?.response?.data?.message || err?.message || 'Không thể tải danh sách yêu cầu. Vui lòng thử lại.');
     } finally {
       setLoading(false);
     }
@@ -291,6 +294,15 @@ export default function AdmissionRequestsHistoryPage() {
             />
           </div>
         </div>
+
+        {loadError && (
+          <div className="arh-error-banner">
+            <span>{loadError}</span>
+            <button type="button" className="arh-error-banner__retry" onClick={loadData}>
+              Thử lại
+            </button>
+          </div>
+        )}
 
         {/* Main Request History Table Card */}
         <div className="arh-card">

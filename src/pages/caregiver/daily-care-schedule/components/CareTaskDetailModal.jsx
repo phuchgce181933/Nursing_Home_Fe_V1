@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import caregiverCareTaskService from '../../../../services/caregiverCareTask.service';
 import { careTaskTypeLabel } from '../../../../utils/blockingCareTasks';
+import { resolveApiError } from '../../../../utils/apiMessage';
 import { TASK_STATUS_NEXT } from '../constants';
 
 function shiftDetail(shift, shiftFallback, t) {
@@ -32,7 +33,7 @@ function CareTaskDetailModal({ taskId, mode = 'view', ns, onClose, onUpdated }) 
       setTask(data);
       setNotes(data.notes || '');
     } catch (e) {
-      setError(e?.response?.data?.message || t(`${ns}.taskDetailLoadFailed`));
+      setError(resolveApiError(e, t, `${ns}.taskDetailLoadFailed`));
     } finally {
       setLoading(false);
     }
@@ -43,6 +44,10 @@ function CareTaskDetailModal({ taskId, mode = 'view', ns, onClose, onUpdated }) 
   }, [loadTask]);
 
   const handleStatus = async (status) => {
+    if (status === 'skipped' && !notes.trim()) {
+      setError(t(`${ns}.skipNotesRequired`, { defaultValue: 'Please enter a reason before marking this task as skipped.' }));
+      return;
+    }
     setSaving(true);
     setError('');
     try {
@@ -50,7 +55,7 @@ function CareTaskDetailModal({ taskId, mode = 'view', ns, onClose, onUpdated }) 
       onUpdated();
       onClose();
     } catch (e) {
-      setError(e?.response?.data?.message || t(`${ns}.updateFailed`));
+      setError(resolveApiError(e, t, `${ns}.updateFailed`));
     } finally {
       setSaving(false);
     }

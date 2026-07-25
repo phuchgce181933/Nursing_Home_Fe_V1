@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion } from 'motion/react';
 import {
   Calendar,
   Clock,
@@ -64,6 +65,10 @@ export default function SubmitFacilityTourPage() {
         if (val && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) return 'Địa chỉ email không hợp lệ';
         return null;
 
+      case 'notes':
+        if (val && val.length > 500) return 'Ghi chú thêm không được vượt quá 500 ký tự';
+        return null;
+
       case 'preferredDate': {
         if (!val) return 'Ngày mong muốn là bắt buộc';
         const dateObj = new Date(val);
@@ -125,7 +130,7 @@ export default function SubmitFacilityTourPage() {
   };
 
   const validateForm = () => {
-    const fields = ['contactName', 'contactPhone', 'contactEmail', 'preferredDate', 'numberOfVisitors'];
+    const fields = ['contactName', 'contactPhone', 'contactEmail', 'preferredDate', 'numberOfVisitors', 'notes'];
     const formErrors = {};
     let isValid = true;
 
@@ -175,11 +180,21 @@ export default function SubmitFacilityTourPage() {
 
   if (submitted) {
     return (
-      <div className="sftp-success">
+      <motion.div
+        className="sftp-success"
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+      >
         <div className="sftp-success__card">
-          <div className="sftp-success__icon-box">
+          <motion.div
+            className="sftp-success__icon-box"
+            initial={{ scale: 0.4, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ delay: 0.15, type: 'spring', stiffness: 260, damping: 18 }}
+          >
             <CheckCircle size={48} className="sftp-success__icon" />
-          </div>
+          </motion.div>
           <h2 className="sftp-success__title">Đăng ký tham quan thành công</h2>
           <p className="sftp-success__desc">
             Yêu cầu tham quan cơ sở của bạn đã được gửi thành công đến ban quản lý.
@@ -230,7 +245,7 @@ export default function SubmitFacilityTourPage() {
             </button>
           </div>
         </div>
-      </div>
+      </motion.div>
     );
   }
 
@@ -375,7 +390,7 @@ export default function SubmitFacilityTourPage() {
         </div>
 
         {/* Additional Notes */}
-        <div className="sftp-group sftp-group--full">
+        <div className={`sftp-group sftp-group--full ${errors.notes && touched.notes ? 'has-error' : ''}`}>
           <label className="sftp-label">Ghi chú thêm</label>
           <div className="sftp-input-wrap sftp-textarea-wrap">
             <MessageSquare size={16} className="sftp-input-icon sftp-textarea-icon" />
@@ -383,11 +398,17 @@ export default function SubmitFacilityTourPage() {
               className="sftp-input sftp-textarea"
               placeholder="Cho chúng tôi biết nếu bạn có bất kỳ yêu cầu đặc biệt nào..."
               rows={4}
+              maxLength={500}
               value={formData.notes}
               onChange={(e) => setField('notes', e.target.value)}
+              onBlur={() => handleBlur('notes')}
               disabled={submitting}
             />
           </div>
+          <div className="sftp-char-count">{(formData.notes || '').length}/500</div>
+          {errors.notes && touched.notes && (
+            <span className="sftp-error-text">{errors.notes}</span>
+          )}
         </div>
 
         {/* Error Banner */}

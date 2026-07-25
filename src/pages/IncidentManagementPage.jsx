@@ -22,6 +22,7 @@ import residentService from '../services/resident.service';
 import facilityService from '../services/facility.service';
 import { useAuth } from '../hooks/useAuth';
 import incidentService from '../services/incident.service';
+import { resolveApiError } from '../utils/apiMessage';
 import clinicalServiceService from '../services/clinicalService.service';
 import staffService from '../services/staff.service';
 import { floorLabel } from '../utils/residentArea';
@@ -77,6 +78,15 @@ function toIsoDatetime(value) {
   return date.toISOString();
 }
 
+function getMaxDatetimeLocal() {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+const MAX_TEXT_LENGTH = 500;
+const MAX_SHORT_TEXT_LENGTH = 200;
+
 function IncidentManagementPage() {
   const { t } = useTranslation();
   const { user } = useAuth();
@@ -93,6 +103,7 @@ function IncidentManagementPage() {
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('success');
   const [form, setForm] = useState(initialForm);
+  const [fieldErrors, setFieldErrors] = useState({});
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [residents, setResidents] = useState([]);
@@ -513,7 +524,7 @@ function IncidentManagementPage() {
       setMessage('');
     } catch (error) {
       setMessageType('error');
-      setMessage(error?.response?.data?.message || t('incidents.error.loadFailed'));
+      setMessage(resolveApiError(error, t, 'incidents.error.loadFailed'));
     } finally {
       setLoading(false);
     }
@@ -668,7 +679,7 @@ function IncidentManagementPage() {
       } catch (error) {
         if (!active) return;
         setMessageType('error');
-        setMessage(error?.response?.data?.message || t('incidents.error.loadOptionsFailed'));
+        setMessage(resolveApiError(error, t, 'incidents.error.loadOptionsFailed'));
       } finally {
         if (active) setOptionsLoading(false);
       }
@@ -678,8 +689,22 @@ function IncidentManagementPage() {
   }, [user, t]);
 
   /* ── Handlers ──────────────────────────────────────────────── */
+  const validateForm = () => {
+    const errors = {};
+    if (!form.incidentType.trim()) errors.incidentType = t('incidents.form.errRequired', 'This field is required');
+    else if (form.incidentType.trim().length > MAX_SHORT_TEXT_LENGTH) errors.incidentType = t('incidents.form.errTooLong', { max: MAX_SHORT_TEXT_LENGTH, defaultValue: `Must not exceed ${MAX_SHORT_TEXT_LENGTH} characters` });
+    if (!form.incidentAt) errors.incidentAt = t('incidents.form.errRequired', 'This field is required');
+    else if (new Date(form.incidentAt).getTime() > Date.now() + 60000) errors.incidentAt = t('incidents.form.errFutureDate', 'Cannot be in the future');
+    if (form.location && form.location.length > MAX_SHORT_TEXT_LENGTH) errors.location = t('incidents.form.errTooLong', { max: MAX_SHORT_TEXT_LENGTH, defaultValue: `Must not exceed ${MAX_SHORT_TEXT_LENGTH} characters` });
+    if (!form.description.trim()) errors.description = t('incidents.form.errRequired', 'This field is required');
+    else if (form.description.trim().length > MAX_TEXT_LENGTH) errors.description = t('incidents.form.errTooLong', { max: MAX_TEXT_LENGTH, defaultValue: `Must not exceed ${MAX_TEXT_LENGTH} characters` });
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleCreate = async (event) => {
     event.preventDefault();
+    if (!validateForm()) return;
     setIsSaving(true);
     setMessage('');
     // Validate that incident date is today (only time may be edited)
@@ -716,11 +741,12 @@ function IncidentManagementPage() {
       setMessageType('success');
       setMessage(t('incidents.success.created'));
       setForm(initialForm);
+      setFieldErrors({});
       setDrawerOpen(false);
       await loadIncidents();
     } catch (error) {
       setMessageType('error');
-      setMessage(error?.response?.data?.message || t('incidents.error.createFailed'));
+      setMessage(resolveApiError(error, t, 'incidents.error.createFailed'));
     } finally {
       setIsSaving(false);
     }
@@ -757,7 +783,7 @@ function IncidentManagementPage() {
       await loadIncidents();
     } catch (error) {
       setMessageType('error');
-      setMessage(error?.response?.data?.message || t('incidents.error.updateStatusFailed'));
+      setMessage(resolveApiError(error, t, 'incidents.error.updateStatusFailed'));
     } finally {
       setIsSaving(false);
     }
@@ -819,7 +845,7 @@ function IncidentManagementPage() {
       setMessage(t('incidents.success.exportStarted'));
     } catch (error) {
       setMessageType('error');
-      setMessage(error?.response?.data?.message || t('incidents.error.exportFailed'));
+      setMessage(resolveApiError(error, t, 'incidents.error.exportFailed'));
     }
   };
 
@@ -1627,9 +1653,11 @@ function IncidentManagementPage() {
                   <input
                     className="ic-field__input"
                     value={form.incidentType}
-                    onChange={(e) => setForm((c) => ({ ...c, incidentType: e.target.value }))}
+                    onChange={(e) => { setForm((c) => ({ ...c, incidentType: e.target.value })); setFieldErrors((p) => ({ ...p, incidentType: undefined })); }}
+                    maxLength={MAX_SHORT_TEXT_LENGTH}
                     required
                   />
+                  {fieldErrors.incidentType && <span className="ic-field__error">{fieldErrors.incidentType}</span>}
                 </div>
 
                 <div className="ic-field">
@@ -1648,23 +1676,15 @@ function IncidentManagementPage() {
 
                 <div className="ic-field ic-field--horizontal">
                   <label className="ic-field__label">{t('incidents.form.incidentAt')} *</label>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <input
-                      className="ic-field__input"
-                      type="date"
-                      value={(form.incidentAt && form.incidentAt.split('T')[0]) || ''}
-                      disabled
-                      aria-disabled
-                    />
-                    <input
-                      className="ic-field__input"
-                      type="time"
-                      value={getIncidentTime()}
-                      onChange={(e) => setIncidentTime(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div style={{ fontSize: 12, color: '#666', marginTop: 6 }}>{t('incidents.form.incidentAtHelp')}</div>
+                  <input
+                    className="ic-field__input"
+                    type="datetime-local"
+                    value={form.incidentAt}
+                    max={getMaxDatetimeLocal()}
+                    onChange={(e) => { setForm((c) => ({ ...c, incidentAt: e.target.value })); setFieldErrors((p) => ({ ...p, incidentAt: undefined })); }}
+                    required
+                  />
+                  {fieldErrors.incidentAt && <span className="ic-field__error">{fieldErrors.incidentAt}</span>}
                 </div>
 
                 <div className="ic-field">
@@ -1672,8 +1692,10 @@ function IncidentManagementPage() {
                   <input
                     className="ic-field__input"
                     value={form.location}
-                    onChange={(e) => setForm((c) => ({ ...c, location: e.target.value }))}
+                    maxLength={MAX_SHORT_TEXT_LENGTH}
+                    onChange={(e) => { setForm((c) => ({ ...c, location: e.target.value })); setFieldErrors((p) => ({ ...p, location: undefined })); }}
                   />
+                  {fieldErrors.location && <span className="ic-field__error">{fieldErrors.location}</span>}
                 </div>
 
                 <div className="ic-field ic-field--multi-select">
@@ -1837,9 +1859,12 @@ function IncidentManagementPage() {
                     className="ic-field__textarea"
                     rows={4}
                     value={form.description}
-                    onChange={(e) => setForm((c) => ({ ...c, description: e.target.value }))}
+                    maxLength={MAX_TEXT_LENGTH}
+                    onChange={(e) => { setForm((c) => ({ ...c, description: e.target.value })); setFieldErrors((p) => ({ ...p, description: undefined })); }}
                     required
                   />
+                  <span className="ic-field__char-count">{form.description.length}/{MAX_TEXT_LENGTH}</span>
+                  {fieldErrors.description && <span className="ic-field__error">{fieldErrors.description}</span>}
                 </div>
               </div>
 

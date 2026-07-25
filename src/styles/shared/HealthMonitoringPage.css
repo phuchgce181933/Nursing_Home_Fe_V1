@@ -592,6 +592,12 @@
   background: #fff7f7;
 }
 
+.hm-form-input.is-error {
+  border-color: #dc2626;
+  background: #fef2f2;
+  box-shadow: 0 0 0 2.5px rgba(220,38,38,0.12);
+}
+
 .hm-service-fields-panel {
   overflow: visible;
 }
@@ -623,6 +629,11 @@
 
 .hm-form-hint.is-warn {
   color: #ef4444;
+}
+
+.hm-form-hint.is-error {
+  color: #dc2626;
+  font-weight: 600;
 }
 
 .hm-form-textarea {

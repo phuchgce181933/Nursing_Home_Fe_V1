@@ -11,6 +11,7 @@ import {
   Pill,
   ClipboardList,
   MessageSquare,
+  LifeBuoy,
   Settings,
   FileCheck,
   DollarSign,
@@ -72,6 +73,7 @@ export const sidebarData = [
       { title: 'sidebar.admissionRequests', icon: UserPlus, path: '/admin/admission-requests' },
       { title: 'sidebar.consultationRequests', icon: MessageSquare, path: '/admin/consultation-requests' },
       { title: 'sidebar.tourRequests', icon: Compass, path: '/admin/tour-requests' },
+      { title: 'sidebar.residentVisitRequests', icon: Calendar, path: '/admin/resident-visits' },
       { title: 'sidebar.servicePackages', icon: Package, path: '/admin/service-packages' },
     ],
   },
@@ -168,6 +170,11 @@ export const sidebarData = [
     title: 'sidebar.communication',
     icon: MessageSquare,
     path: '/admin/messages',
+  },
+  {
+    title: 'sidebar.supportRequests',
+    icon: LifeBuoy,
+    path: '/admin/support-requests',
   },
   {
     title: 'sidebar.settings',

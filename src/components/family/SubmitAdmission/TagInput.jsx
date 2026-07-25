@@ -1,13 +1,14 @@
 import { useState, useRef } from 'react';
 import { X } from 'lucide-react';
 
-export default function TagInput({ tags = [], onRemove, onAdd, placeholder }) {
+export default function TagInput({ tags = [], onRemove, onAdd, placeholder, maxTags = 20, maxTagLength = 50 }) {
   const [val, setVal] = useState('');
   const inputRef = useRef(null);
+  const limitReached = tags.length >= maxTags;
 
   const commit = () => {
-    const trimmed = val.trim();
-    if (trimmed && !tags.includes(trimmed)) {
+    const trimmed = val.trim().slice(0, maxTagLength);
+    if (trimmed && !tags.includes(trimmed) && !limitReached) {
       onAdd(trimmed);
     }
     setVal('');
@@ -36,10 +37,11 @@ export default function TagInput({ tags = [], onRemove, onAdd, placeholder }) {
       <input
         ref={inputRef}
         value={val}
-        onChange={(e) => setVal(e.target.value)}
+        onChange={(e) => setVal(e.target.value.slice(0, maxTagLength))}
         onKeyDown={handleKey}
         onBlur={commit}
-        placeholder={tags.length === 0 ? placeholder : ''}
+        disabled={limitReached}
+        placeholder={limitReached ? `Đã đạt tối đa ${maxTags} mục` : tags.length === 0 ? placeholder : ''}
         className="sap-tag-input__field"
       />
     </div>

@@ -1,5 +1,6 @@
 import axiosClient from '../api/axiosClient';
 
+// Family keeps its own scoped endpoint; every other role uses the generic staff inbox.
 const getBasePath = (role = 'family') => (role === 'family' ? '/family/notifications' : '/notifications');
 
 const listNotifications = (params = {}, role = 'family') =>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Calendar, MapPin, Clock, Users, Search, RefreshCw, UserCheck, Eye, X } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Calendar, MapPin, Clock, Users, Search, RefreshCw, UserCheck, UserX, Eye, X, CheckCircle2, AlertTriangle } from 'lucide-react';
 import activityService from '../../services/activity.service';
 import residentService from '../../services/resident.service';
 import '../../styles/admin/AdminAdmissionRequestsPage.css';
@@ -38,6 +39,8 @@ export default function FamilyActivityPage() {
   const [selectedResident, setSelectedResident] = useState(null);
   const [registering, setRegistering] = useState(false);
   const [selectedActivityId, setSelectedActivityId] = useState(null);
+  const [actionMessage, setActionMessage] = useState('');
+  const [actionMessageType, setActionMessageType] = useState('success');
 
   const fetchActivities = useCallback(async () => {
     try {
@@ -85,25 +88,54 @@ export default function FamilyActivityPage() {
 
   const handleRegisterResident = async (activityId) => {
     if (!selectedResident) {
-      alert('Vui lòng chọn cư dân');
+      setActionMessageType('error');
+      setActionMessage('Vui lòng chọn cư dân');
       return;
     }
 
     try {
       setRegistering(true);
+      setActionMessage('');
       await activityService.registerResident(activityId, selectedResident);
-      
+
       setRegisteredResidents(prev => {
         const newSet = new Set(prev);
         newSet.add(`${activityId}-${selectedResident}`);
         return newSet;
       });
-      
-      alert('Đã đăng ký hoạt động thành công!');
+
+      setActionMessageType('success');
+      setActionMessage('Đã đăng ký hoạt động thành công!');
       fetchActivities();
     } catch (err) {
       console.error('Register failed:', err);
-      alert(err.response?.data?.message || 'Không thể đăng ký hoạt động.');
+      setActionMessageType('error');
+      setActionMessage(err?.response?.data?.message || 'Không thể đăng ký hoạt động.');
+    } finally {
+      setRegistering(false);
+    }
+  };
+
+  const handleUnregisterResident = async (activityId) => {
+    if (!selectedResident) return;
+    try {
+      setRegistering(true);
+      setActionMessage('');
+      await activityService.unregisterResident(activityId, selectedResident);
+
+      setRegisteredResidents(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(`${activityId}-${selectedResident}`);
+        return newSet;
+      });
+
+      setActionMessageType('success');
+      setActionMessage('Đã hủy đăng ký hoạt động.');
+      fetchActivities();
+    } catch (err) {
+      console.error('Unregister failed:', err);
+      setActionMessageType('error');
+      setActionMessage(err?.response?.data?.message || 'Không thể hủy đăng ký hoạt động.');
     } finally {
       setRegistering(false);
     }
@@ -207,6 +239,32 @@ export default function FamilyActivityPage() {
         </form>
       </div>
 
+      <AnimatePresence>
+        {actionMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: -8, height: 0 }}
+            animate={{ opacity: 1, y: 0, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.25 }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '10px 14px',
+              borderRadius: '8px',
+              marginBottom: '16px',
+              fontSize: '13px',
+              fontWeight: 500,
+              backgroundColor: actionMessageType === 'success' ? '#dcfce7' : '#fee2e2',
+              color: actionMessageType === 'success' ? '#166534' : '#b91c1c',
+            }}
+          >
+            {actionMessageType === 'success' ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
+            {actionMessage}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {loading ? (
         <div style={{ textAlign: 'center', padding: '40px' }}>
           Đang tải hoạt động...
@@ -227,11 +285,14 @@ export default function FamilyActivityPage() {
             gap: '16px',
             marginBottom: '24px'
           }}>
-            {activities.map((activity) => {
+            {activities.map((activity, idx) => {
               const isResidentRegistered = selectedResident && isRegistered(activity._id, selectedResident);
               return (
-                <div
+                <motion.div
                   key={activity._id}
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: 0.03 * (idx % 12) }}
                   style={{
                     backgroundColor: 'white',
                     borderRadius: '12px',
@@ -309,22 +370,39 @@ export default function FamilyActivityPage() {
                     >
                       <Eye size={14} /> Xem chi tiết
                     </button>
-                    <button
-                      type="button"
-                      className="adm-btn-refresh"
-                      disabled={!selectedResident || isResidentRegistered || registering || activity.status === 'cancelled' || activity.status === 'completed'}
-                      onClick={() => handleRegisterResident(activity._id)}
-                      style={{
-                        flex: 1,
-                        opacity: !selectedResident || isResidentRegistered || registering || activity.status === 'cancelled' || activity.status === 'completed' ? 0.5 : 1,
-                        cursor: !selectedResident || isResidentRegistered || registering || activity.status === 'cancelled' || activity.status === 'completed' ? 'not-allowed' : 'pointer'
-                      }}
-                    >
-                      <UserCheck size={14} />
-                      {isResidentRegistered ? 'Đã đăng ký' : activity.status === 'completed' ? 'Không thể đăng ký' : 'Đăng ký'}
-                    </button>
+                    {isResidentRegistered ? (
+                      <button
+                        type="button"
+                        className="adm-btn-refresh"
+                        disabled={!selectedResident || registering || activity.status === 'completed'}
+                        onClick={() => handleUnregisterResident(activity._id)}
+                        style={{
+                          flex: 1,
+                          opacity: registering || activity.status === 'completed' ? 0.5 : 1,
+                          cursor: registering || activity.status === 'completed' ? 'not-allowed' : 'pointer',
+                          color: '#b91c1c',
+                        }}
+                      >
+                        <UserX size={14} /> Hủy đăng ký
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="adm-btn-refresh"
+                        disabled={!selectedResident || registering || activity.status === 'cancelled' || activity.status === 'completed'}
+                        onClick={() => handleRegisterResident(activity._id)}
+                        style={{
+                          flex: 1,
+                          opacity: !selectedResident || registering || activity.status === 'cancelled' || activity.status === 'completed' ? 0.5 : 1,
+                          cursor: !selectedResident || registering || activity.status === 'cancelled' || activity.status === 'completed' ? 'not-allowed' : 'pointer'
+                        }}
+                      >
+                        <UserCheck size={14} />
+                        {activity.status === 'completed' ? 'Không thể đăng ký' : 'Đăng ký'}
+                      </button>
+                    )}
                   </div>
-                </div>
+                </motion.div>
               );
             })}
           </div>

@@ -35,6 +35,13 @@ const payInvoice = async (residentId, invoiceId, body) => {
   return response.data.data || response.data;
 };
 
+// Returns a checksum-signed PayOS checkout URL for this invoice — safe to open directly,
+// unlike embedding the auth token itself in a query string.
+const getInvoicePaymentUrl = async (residentId, invoiceId) => {
+  const response = await axiosClient.get(`/family/residents/${residentId}/invoices/${invoiceId}/payment-url`);
+  return response.data.data || response.data;
+};
+
 const initiateWalletPayment = async (payload) => {
   const response = await axiosClient.post('/family/wallet/payments/initiate', payload);
   return response.data.data || response.data;
@@ -100,6 +107,7 @@ export default {
   getResidentInvoices,
   createInvoice,
   payInvoice,
+  getInvoicePaymentUrl,
   initiateWalletPayment,
   verifyWalletPayment,
   batchPayment,

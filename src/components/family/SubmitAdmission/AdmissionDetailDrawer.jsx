@@ -296,6 +296,7 @@ export default function AdmissionDetailDrawer({
   const [initialAssessmentNotes, setInitialAssessmentNotes] = useState('');
   const [scheduleGenNotes, setScheduleGenNotes] = useState('');
   const [scheduling, setScheduling] = useState(false);
+  const [scheduleAdjustedNotice, setScheduleAdjustedNotice] = useState(null);
 
   const [showEligibilityModal, setShowEligibilityModal] = useState(false);
   const [eligibilityStatus, setEligibilityStatus] = useState('eligible');
@@ -371,6 +372,7 @@ export default function AdmissionDetailDrawer({
   // Reset modal error when any modal state changes
   useEffect(() => {
     setModalError(null);
+    setScheduleAdjustedNotice(null);
   }, [
     showCancelModal,
     showApproveModal,
@@ -778,6 +780,9 @@ export default function AdmissionDetailDrawer({
       const now = new Date();
       if (selectedDate.getTime() - now.getTime() < 5 * 60 * 1000) {
         selectedDate = new Date(now.getTime() + 10 * 60 * 1000);
+        setScheduleAdjustedNotice(
+          `Thời điểm bạn chọn quá gần hiện tại nên hệ thống đã tự động dời sang ${selectedDate.toLocaleString('vi-VN')}.`
+        );
       }
 
       await admissionService.medicalScheduleAssessment(admissionId, {
@@ -1217,7 +1222,13 @@ export default function AdmissionDetailDrawer({
   const doctor = appt?.doctor;
   const nurse = appt?.nurse;
 
-  const getStepIcon = (key) => {
+  const getMinDateTimeLocal = (bufferMinutes = 5) => {
+  const d = new Date(Date.now() + bufferMinutes * 60 * 1000);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
+const getStepIcon = (key) => {
     switch (key) {
       case 'new_request':
         return <Clock size={8} />;
@@ -1876,7 +1887,9 @@ export default function AdmissionDetailDrawer({
               placeholder="Vui lòng cho biết lý do hủy (ví dụ: Thay đổi kế hoạch gia đình, đã tìm được giải pháp khác...)"
               value={cancellationReason}
               onChange={(e) => setCancellationReason(e.target.value)}
+              maxLength={500}
             />
+            <div className="text-[10px] text-slate-400 text-right mt-1 mb-2">{cancellationReason.length}/500</div>
             <div className="flex gap-3 pt-2">
               <button
                 className="arh-drawer__btn"
@@ -1939,7 +1952,9 @@ export default function AdmissionDetailDrawer({
                 placeholder="Thêm ghi chú, hướng dẫn đặc biệt hoặc các công việc cần theo dõi..."
                 value={adminNotes}
                 onChange={(e) => setAdminNotes(e.target.value)}
+                maxLength={500}
               />
+              <div className="text-[10px] text-slate-400 text-right mt-1">{adminNotes.length}/500</div>
             </div>
 
             <div className="flex gap-3 pt-2">
@@ -2001,7 +2016,9 @@ export default function AdmissionDetailDrawer({
                 value={rejectionReason}
                 onChange={(e) => setRejectionReason(e.target.value)}
                 required
+                maxLength={500}
               />
+              <div className="text-[10px] text-slate-400 text-right mt-1">{rejectionReason.length}/500</div>
             </div>
 
             <div className="flex gap-3 pt-2">
@@ -2124,7 +2141,9 @@ export default function AdmissionDetailDrawer({
                   value={consultationNotes}
                   onChange={(e) => setConsultationNotes(e.target.value)}
                   required
+                  maxLength={500}
                 />
+                <div className="text-[10px] text-slate-400 text-right mt-1">{consultationNotes.length}/500</div>
               </div>
 
               <div className="mb-4">
@@ -2137,7 +2156,9 @@ export default function AdmissionDetailDrawer({
                   placeholder="Ghi chú thêm (không bắt buộc)..."
                   value={consultationGenNotes}
                   onChange={(e) => setConsultationGenNotes(e.target.value)}
+                  maxLength={500}
                 />
+                <div className="text-[10px] text-slate-400 text-right mt-1">{consultationGenNotes.length}/500</div>
               </div>
 
               <div className="flex gap-3 pt-2">
@@ -2182,6 +2203,11 @@ export default function AdmissionDetailDrawer({
                 {modalError}
               </div>
             )}
+            {scheduleAdjustedNotice && (
+              <div className="bg-amber-50 border border-amber-200 text-amber-700 p-3 rounded-lg text-xs mb-4 font-sans">
+                {scheduleAdjustedNotice}
+              </div>
+            )}
 
             <form onSubmit={handleScheduleAssessment}>
               <div className="mb-3">
@@ -2194,6 +2220,7 @@ export default function AdmissionDetailDrawer({
                   style={{ paddingLeft: '14px' }}
                   value={scheduleDate}
                   onChange={(e) => setScheduleDate(e.target.value)}
+                  min={getMinDateTimeLocal()}
                   required
                 />
               </div>
@@ -2208,7 +2235,9 @@ export default function AdmissionDetailDrawer({
                   placeholder="Hướng dẫn đặc biệt cho bệnh nhân, địa điểm (vd: Phòng B102)..."
                   value={initialAssessmentNotes}
                   onChange={(e) => setInitialAssessmentNotes(e.target.value)}
+                  maxLength={500}
                 />
+                <div className="text-[10px] text-slate-400 text-right mt-1">{initialAssessmentNotes.length}/500</div>
               </div>
 
               <div className="mb-4">
@@ -2221,7 +2250,9 @@ export default function AdmissionDetailDrawer({
                   placeholder="Ghi chú thêm (không bắt buộc)..."
                   value={scheduleGenNotes}
                   onChange={(e) => setScheduleGenNotes(e.target.value)}
+                  maxLength={500}
                 />
+                <div className="text-[10px] text-slate-400 text-right mt-1">{scheduleGenNotes.length}/500</div>
               </div>
 
               <div className="flex gap-3 pt-2">
@@ -2295,7 +2326,9 @@ export default function AdmissionDetailDrawer({
                   value={assessmentResult}
                   onChange={(e) => setAssessmentResult(e.target.value)}
                   required
+                  maxLength={500}
                 />
+                <div className="text-[10px] text-slate-400 text-right mt-1">{assessmentResult.length}/500</div>
               </div>
 
               {eligibilityStatus === 'not_eligible' && (
@@ -2310,7 +2343,9 @@ export default function AdmissionDetailDrawer({
                     value={rejReason}
                     onChange={(e) => setRejReason(e.target.value)}
                     required
+                    maxLength={500}
                   />
+                  <div className="text-[10px] text-slate-400 text-right mt-1">{rejReason.length}/500</div>
                 </div>
               )}
 
@@ -2324,7 +2359,9 @@ export default function AdmissionDetailDrawer({
                   placeholder="Ghi chú thêm (không bắt buộc)..."
                   value={eligibilityGenNotes}
                   onChange={(e) => setEligibilityGenNotes(e.target.value)}
+                  maxLength={500}
                 />
+                <div className="text-[10px] text-slate-400 text-right mt-1">{eligibilityGenNotes.length}/500</div>
               </div>
 
               <div className="flex gap-3 pt-2">
@@ -2540,7 +2577,9 @@ export default function AdmissionDetailDrawer({
                   placeholder="Nhập chi tiết chu kỳ thanh toán, điều khoản trách nhiệm, liên hệ khẩn cấp..."
                   value={contractTerms}
                   onChange={(e) => setContractTerms(e.target.value)}
+                  maxLength={500}
                 />
+                <div className="text-[10px] text-slate-400 text-right mt-1">{contractTerms.length}/500</div>
               </div>
 
               <div className="mb-4">
@@ -2553,7 +2592,9 @@ export default function AdmissionDetailDrawer({
                   placeholder="Ghi chú thêm (không bắt buộc)..."
                   value={contractGenNotes}
                   onChange={(e) => setContractGenNotes(e.target.value)}
+                  maxLength={500}
                 />
+                <div className="text-[10px] text-slate-400 text-right mt-1">{contractGenNotes.length}/500</div>
               </div>
 
               <div className="flex gap-3 pt-2">

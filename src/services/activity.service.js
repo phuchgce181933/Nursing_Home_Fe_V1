@@ -51,6 +51,11 @@ const registerResident = async (activityId, residentId) => {
   return response.data;
 };
 
+const unregisterResident = async (activityId, residentId) => {
+  const response = await axiosClient.post(`/admin/activities/${activityId}/unregister`, { residentId });
+  return response.data;
+};
+
 const recordParticipationResult = async (activityId, body) => {
   const response = await axiosClient.post(`/admin/activities/${activityId}/record-result`, body);
   return response.data;
@@ -77,6 +82,7 @@ export default {
   updateActivityStatus,
   setParticipantList,
   registerResident,
+  unregisterResident,
   recordParticipationResult,
   getActivityStatistics,
   getActivityStatisticsById,

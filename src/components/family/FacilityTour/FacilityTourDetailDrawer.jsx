@@ -351,7 +351,7 @@ export default function FacilityTourDetailDrawer({ isOpen, onClose, tour, onCanc
           {showCancelConfirm ? (
             <form onSubmit={handleCancelSubmit} className="w-full flex flex-col gap-3.5">
               <span className="ftd-cancel-label">
-                Vui lòng nhập lý do hủy yêu cầu:
+                Lý do hủy yêu cầu (không bắt buộc):
               </span>
               <div>
                 <textarea
@@ -359,7 +359,7 @@ export default function FacilityTourDetailDrawer({ isOpen, onClose, tour, onCanc
                   placeholder="Hãy chia sẻ lý do bạn cần hủy lịch..."
                   value={cancelReason}
                   onChange={(e) => setCancelReason(e.target.value)}
-                  required
+                  maxLength={500}
                   disabled={cancelling}
                 />
               </div>

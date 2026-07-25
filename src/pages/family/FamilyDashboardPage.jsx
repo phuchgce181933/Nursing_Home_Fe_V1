@@ -1,15 +1,15 @@
 import { useEffect, useState } from 'react';
-import { AlertTriangle, Users, Wallet, PlusCircle, Bell, Search, ChevronDown } from 'lucide-react';
-import notificationsService from '../../services/notifications.service';
-import '../../styles/family/NotificationPage.css';
+import { AlertTriangle, CheckCircle, CreditCard, Package, Users, Wallet, PlusCircle, Search, ChevronDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { getAuthToken } from '../../utils/auth';
 import residentService from '../../services/resident.service';
 import familyPortalService from '../../services/familyPortal.service';
 import '../../styles/family/FamilyDashboardPage.css';
 
 const formatMoney = (value) =>
   new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value || 0);
+
+const TOPUP_MIN = 10000;
+const TOPUP_MAX = 500000000;
 
 const PACKAGE_PRICES = {
   'Gói Cơ Bản': 8000000,
@@ -79,14 +79,11 @@ function FamilyDashboardPage() {
   const [selectedPackages, setSelectedPackages] = useState({});
   const [currentResidentPayment, setCurrentResidentPayment] = useState(null);
   const [isBatchPaymentProcessing, setIsBatchPaymentProcessing] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [showBellPanel, setShowBellPanel] = useState(false);
-  const [bellItems, setBellItems] = useState([]);
-  const [bellTab, setBellTab] = useState('all');
   const [residentSearch, setResidentSearch] = useState('');
   const [invoiceFilter, setInvoiceFilter] = useState('unpaid');
   const [expandedResidentIds, setExpandedResidentIds] = useState(new Set());
   const [expandedInvoiceIds, setExpandedInvoiceIds] = useState(new Set());
+  const [checkoutLoadingInvoiceId, setCheckoutLoadingInvoiceId] = useState(null);
   const navigate = useNavigate();
 
   const toggleResident = (residentId) => {
@@ -122,16 +119,6 @@ function FamilyDashboardPage() {
     };
 
     loadResidents();
-    // load unread count for notifications
-    const loadUnread = async () => {
-      try {
-        const res = await notificationsService.listNotifications({ isRead: false, limit: 1 });
-        setUnreadCount(res.total || 0);
-      } catch (e) {
-        setUnreadCount(0);
-      }
-    };
-    loadUnread();
   }, []);
 
   useEffect(() => {
@@ -171,16 +158,34 @@ function FamilyDashboardPage() {
     loadWallet();
   }, []);
 
-  const handleOpenCheckout = (residentId, invoiceId) => {
+  const handleOpenCheckout = async (residentId, invoiceId) => {
     if (!invoiceId) return;
-    const token = getAuthToken();
-    const url = `/api/residents/${residentId}/invoices/payos/checkout/${invoiceId}${token ? `?token=${encodeURIComponent(token)}` : ''}`;
-    window.open(url, '_blank');
+    try {
+      setCheckoutLoadingInvoiceId(invoiceId);
+      setError(null);
+      const payload = await familyPortalService.getInvoicePaymentUrl(residentId, invoiceId);
+      if (payload?.paymentUrl) {
+        window.open(payload.paymentUrl, '_blank');
+      }
+    } catch (err) {
+      console.error('Failed to get checkout URL:', err);
+      setError(err?.response?.data?.message || err.message || 'Không thể mở trang thanh toán');
+    } finally {
+      setCheckoutLoadingInvoiceId(null);
+    }
   };
 
   const handleWalletTopup = async () => {
     if (!topupAmount || topupAmount <= 0) {
       setWalletError('Số tiền nạp phải lớn hơn 0');
+      return;
+    }
+    if (topupAmount < TOPUP_MIN) {
+      setWalletError(`Số tiền nạp tối thiểu là ${formatMoney(TOPUP_MIN)}`);
+      return;
+    }
+    if (topupAmount > TOPUP_MAX) {
+      setWalletError(`Số tiền nạp tối đa là ${formatMoney(TOPUP_MAX)}`);
       return;
     }
 
@@ -308,9 +313,10 @@ function FamilyDashboardPage() {
         [resident._id]: Array.isArray(updatedInvoices) ? updatedInvoices : updatedInvoices?.data || [],
       }));
       
-      const token = getAuthToken();
-      const checkoutUrl = `/api/residents/${resident._id}/invoices/payos/checkout/${createdInvoice._id}${token ? `?token=${encodeURIComponent(token)}` : ''}`;
-      window.open(checkoutUrl, '_blank');
+      const paymentPayload = await familyPortalService.getInvoicePaymentUrl(resident._id, createdInvoice._id);
+      if (paymentPayload?.paymentUrl) {
+        window.open(paymentPayload.paymentUrl, '_blank');
+      }
     } catch (err) {
       console.error('Failed to create invoice:', err);
       setError(err?.response?.data?.message || err.message || 'Không thể tạo hóa đơn');
@@ -445,69 +451,6 @@ function FamilyDashboardPage() {
           <h1>Trang Gia đình</h1>
           <p>Xem gói dịch vụ đã đăng ký và các khoản phí cần thanh toán cho cư dân của bạn.</p>
         </div>
-        <div className="header-bell">
-          <button title="Thông báo" className="notification-btn" onClick={async () => { setShowBellPanel(s => !s); if (!showBellPanel) {
-              const res = await notificationsService.listNotifications({ page: 1, limit: 6 });
-              setBellItems(res.items || []);
-            } }}>
-            <Bell size={20} />
-          </button>
-          {unreadCount > 0 && <span className="notification-badge">{unreadCount}</span>}
-        </div>
-        {showBellPanel && (
-          <div style={{ position: 'absolute', right: 24, top: 64, zIndex: 60 }}>
-            <div className="notification-panel bell-notification-panel" style={{ width: 360 }}>
-              <div className="panel-header">
-                <div className="meta" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                  <strong style={{ fontSize: 18 }}>Thông báo</strong>
-                  <div style={{ marginTop: 8 }} className="bell-tabs">
-                    <button className={bellTab === 'all' ? 'tab-btn active' : 'tab-btn'} onClick={() => setBellTab('all')}>Tất cả</button>
-                    <button className={bellTab === 'unread' ? 'tab-btn active' : 'tab-btn'} onClick={() => setBellTab('unread')}>Chưa đọc</button>
-                  </div>
-                </div>
-              </div>
-              {bellTab === 'all' && (
-                <div style={{ padding: '8px 12px 0 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#9aa4af', fontSize: 13 }}>
-                  <div>Trước đó</div>
-                  <div><a href="/family/notifications" style={{ color: '#7dd3fc', textDecoration: 'none' }}>Xem tất cả</a></div>
-                </div>
-              )}
-              <div className="notification-list" style={{ paddingTop: 8 }}>
-                {(() => {
-                  const filtered = bellTab === 'all' ? bellItems : bellItems.filter(i => !i.isRead);
-                  if (!filtered || filtered.length === 0) {
-                    if (bellTab === 'unread') {
-                      return (
-                        <div className="empty-bell" style={{ padding: 28, textAlign: 'center', color: '#94a3b8' }}>
-                          <div style={{ display: 'flex', justifyContent: 'center' }}><Bell size={64} /></div>
-                          <div style={{ marginTop: 14, fontSize: 16, color: '#cbd5e1' }}>Bạn không có thông báo nào</div>
-                        </div>
-                      );
-                    }
-                    return (
-                      <div className="empty-bell" style={{ padding: 32, textAlign: 'center', color: '#94a3b8' }}>
-                        <div style={{ display: 'flex', justifyContent: 'center' }}><Bell size={48} /></div>
-                        <div style={{ marginTop: 12, fontSize: 16, color: '#cbd5e1' }}>Bạn không có thông báo nào</div>
-                      </div>
-                    );
-                  }
-                  return filtered.slice(0, 4).map(n => (
-                    <div key={n._id} className={`notification-item ${n.isRead ? '' : 'unread'}`}>
-                      <div className="left">
-                        <div className={`notification-dot ${n.isRead ? '' : 'unseen'}`} />
-                        <div>
-                          <div className="notification-title">{n.title}</div>
-                          <div className="notification-content">{n.content}</div>
-                          <div className="notification-time">{new Date(n.updatedAt || n.createdAt).toLocaleString()}</div>
-                        </div>
-                      </div>
-                    </div>
-                  ));
-                })()}
-              </div>
-            </div>
-          </div>
-        )}
       </header>
 
       <section className="wallet-summary-card">
@@ -555,7 +498,8 @@ function FamilyDashboardPage() {
               <input
                 id="wallet-topup-amount"
                 type="number"
-                min="1000"
+                min={TOPUP_MIN}
+                max={TOPUP_MAX}
                 step="1000"
                 value={topupAmount}
                 onChange={(event) => setTopupAmount(Number(event.target.value))}
@@ -570,6 +514,9 @@ function FamilyDashboardPage() {
                 <PlusCircle size={16} />
               </button>
             </div>
+            <span className="wallet-topup-hint">
+              Tối thiểu {formatMoney(TOPUP_MIN)} · Tối đa {formatMoney(TOPUP_MAX)}
+            </span>
           </div>
         </div>
       </section>
@@ -647,6 +594,7 @@ function FamilyDashboardPage() {
               creatingInvoiceFor={creatingInvoiceFor}
               isWalletPaymentProcessing={isWalletPaymentProcessing}
               walletLoading={walletLoading}
+              checkoutLoadingInvoiceId={checkoutLoadingInvoiceId}
             />
           );
         })}
@@ -692,7 +640,7 @@ function ResidentListItem({
   resident, invoices, latestInvoice, hasServicePackage,
   isExpanded, onToggle, expandedInvoiceIds, onToggleInvoice,
   onOpenCheckout, onPayWithWallet, onCreateInvoice,
-  hasUnpaidServiceInvoice, creatingInvoiceFor, isWalletPaymentProcessing, walletLoading,
+  hasUnpaidServiceInvoice, creatingInvoiceFor, isWalletPaymentProcessing, walletLoading, checkoutLoadingInvoiceId,
 }) {
   const unpaidCount = invoices.filter((inv) => !['PAID', 'CANCELLED'].includes(String(inv.status || '').toUpperCase())).length;
 
@@ -743,6 +691,7 @@ function ResidentListItem({
                   onPayWithWallet={onPayWithWallet}
                   isWalletPaymentProcessing={isWalletPaymentProcessing}
                   walletLoading={walletLoading}
+                  checkoutLoadingInvoiceId={checkoutLoadingInvoiceId}
                 />
               );
             })
@@ -784,7 +733,7 @@ function ResidentListItem({
 
 /* ══════════════════════ Invoice group + row (nested accordion) ══════════════════════ */
 
-function InvoiceGroup({ group, invoices, resident, expandedInvoiceIds, onToggleInvoice, onOpenCheckout, onPayWithWallet, isWalletPaymentProcessing, walletLoading }) {
+function InvoiceGroup({ group, invoices, resident, expandedInvoiceIds, onToggleInvoice, onOpenCheckout, onPayWithWallet, isWalletPaymentProcessing, walletLoading, checkoutLoadingInvoiceId }) {
   return (
     <div className={`family-invoice-group family-invoice-group--${group.theme}`}>
       <div className="family-invoice-group__title">{group.icon} {group.label}</div>
@@ -800,6 +749,7 @@ function InvoiceGroup({ group, invoices, resident, expandedInvoiceIds, onToggleI
           onPayWithWallet={onPayWithWallet}
           isWalletPaymentProcessing={isWalletPaymentProcessing}
           walletLoading={walletLoading}
+          checkoutLoadingInvoiceId={checkoutLoadingInvoiceId}
         />
       ))}
     </div>
@@ -819,12 +769,13 @@ const INVOICE_COST_FIELDS_BY_THEME = {
   other: [],
 };
 
-function InvoiceRow({ invoice, theme, resident, isExpanded, onToggle, onOpenCheckout, onPayWithWallet, isWalletPaymentProcessing, walletLoading }) {
+function InvoiceRow({ invoice, theme, resident, isExpanded, onToggle, onOpenCheckout, onPayWithWallet, isWalletPaymentProcessing, walletLoading, checkoutLoadingInvoiceId }) {
   const invoiceStatus = invoice?.status?.toString().toUpperCase?.();
   const invoiceTotalAmount = invoice?.totalAmount ?? invoice?.total ?? 0;
   const isPaid = invoiceStatus === 'PAID';
   const isCancelled = invoiceStatus === 'CANCELLED';
   const costFields = INVOICE_COST_FIELDS_BY_THEME[theme] || [];
+  const isCheckoutLoading = checkoutLoadingInvoiceId === invoice._id;
 
   return (
     <div className={`family-invoice-row ${isExpanded ? 'family-invoice-row--open' : ''}`}>
@@ -877,8 +828,9 @@ function InvoiceRow({ invoice, theme, resident, isExpanded, onToggle, onOpenChec
                 type="button"
                 className="button button-primary"
                 onClick={() => onOpenCheckout(resident._id, invoice._id)}
+                disabled={isCheckoutLoading}
               >
-                Thanh toán
+                {isCheckoutLoading ? 'Đang mở...' : 'Thanh toán'}
               </button>
               <button
                 type="button"
