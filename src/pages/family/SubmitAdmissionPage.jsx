@@ -26,7 +26,7 @@ const BACKEND_FIELD_ERROR_MAP = [
   { test: /requestedByPhone/i, field: 'contactPhone', step: 3 },
   { test: /reasonForAdmission/i, field: 'admissionReason', step: 3 },
   { test: /preferredAdmissionDate/i, field: 'preferredDate', step: 3 },
-  { test: /citizenId/i, field: 'idNumber', step: 1 },
+  { test: /citizenId|CCCD|cư dân/i, field: 'idNumber', step: 1 },
   { test: /initialHealthCondition/i, field: 'healthCondition', step: 2 },
   { test: /^notes/i, field: 'additionalNotes', step: 3 },
 ];
