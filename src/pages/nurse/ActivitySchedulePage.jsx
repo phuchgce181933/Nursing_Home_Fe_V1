@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import activityService from '../../services/activity.service';
 import residentService from '../../services/resident.service';
+import { resolveApiError } from '../../utils/apiMessage';
 import '../../styles/nurse/ActivitySchedulePage.css';
 
 const formatDurationLabel = (durationMinutes) => {
@@ -68,9 +69,13 @@ const isActivityOnDate = (activity, date) => {
   return targetDay >= startDay && targetDay <= endDay;
 };
 
+// Kept in sync with the backend's 2-hour grace window (services/activityService.js recordParticipationResult):
+// attendance can still be recorded shortly after the activity ends, even after it auto-flips to 'completed'.
+const RECORD_GRACE_MS = 2 * 60 * 60 * 1000;
+
 const canRecordAttendance = (activity) => {
   const status = String(activity?.status || '').trim().toLowerCase();
-  if (status === 'draft' || status === 'cancelled' || status === 'completed') {
+  if (status === 'draft' || status === 'cancelled') {
     return false;
   }
 
@@ -82,7 +87,7 @@ const canRecordAttendance = (activity) => {
   }
 
   const now = new Date();
-  return now >= startDate && now <= endDate;
+  return now >= startDate && now <= new Date(endDate.getTime() + RECORD_GRACE_MS);
 };
 
 /* ------------------------------------------------------------------ */
@@ -122,6 +127,7 @@ export default function ActivitySchedulePage() {
   const [residents, setResidents] = useState({});
   const [savingRecord, setSavingRecord] = useState(false);
   const [recordMessage, setRecordMessage] = useState('');
+  const [recordMessageType, setRecordMessageType] = useState('success');
 
   /* ---- fetch ---- */
   const fetchActivities = useCallback(async () => {
@@ -367,7 +373,18 @@ export default function ActivitySchedulePage() {
     const handleSaveRecord = async () => {
       if (!a) return;
       if (!canRecordAttendance(a)) {
-        setRecordMessage('Chỉ có thể điểm danh khi hoạt động đã được lên lịch và đang diễn ra.');
+        setRecordMessageType('error');
+        setRecordMessage('Chỉ có thể điểm danh khi hoạt động đã hoặc đang diễn ra (trong vòng 2 giờ sau khi kết thúc).');
+        return;
+      }
+      const MAX_NOTE_LENGTH = 500;
+      const tooLong =
+        draft.participantResultNotes.trim().length > MAX_NOTE_LENGTH ||
+        draft.attendanceRecords.some((r) => (r.note || '').length > MAX_NOTE_LENGTH) ||
+        draft.participationRecords.some((r) => (r.comment || '').length > MAX_NOTE_LENGTH || (r.incident || '').length > MAX_NOTE_LENGTH);
+      if (tooLong) {
+        setRecordMessageType('error');
+        setRecordMessage(`Ghi chú không được vượt quá ${MAX_NOTE_LENGTH} ký tự.`);
         return;
       }
 
@@ -382,10 +399,12 @@ export default function ActivitySchedulePage() {
         });
         setSelectedActivity((prev) => (prev && prev._id === result?._id ? { ...prev, ...result } : result));
         setDraft(buildAttendanceFormFromActivity(result || a));
+        setRecordMessageType('success');
         setRecordMessage('Đã lưu điểm danh và ghi nhận tham gia cho hoạt động.');
       } catch (err) {
         console.error('Save activity attendance failed:', err);
-        setRecordMessage(err.response?.data?.message || 'Không thể lưu dữ liệu.');
+        setRecordMessageType('error');
+        setRecordMessage(resolveApiError(err, t, 'activitySchedule.saveRecordFailed'));
       } finally {
         setSavingRecord(false);
       }
@@ -498,8 +517,8 @@ export default function ActivitySchedulePage() {
               </div>
 
               {recordMessage && (
-                <div className={`as-record-message ${recordMessage.includes('Không thể') ? 'as-record-message--error' : ''}`}>
-                  {recordMessage.includes('Không thể') ? <X size={14} /> : <CheckCircle2 size={14} />}
+                <div className={`as-record-message ${recordMessageType === 'error' ? 'as-record-message--error' : ''}`}>
+                  {recordMessageType === 'error' ? <X size={14} /> : <CheckCircle2 size={14} />}
                   {recordMessage}
                 </div>
               )}
@@ -518,6 +537,7 @@ export default function ActivitySchedulePage() {
                 onChange={(e) => updateDraft((prev) => ({ ...prev, participantResultNotes: e.target.value }))}
                 placeholder="Nhập nhận xét chung về hoạt động..."
                 disabled={!attendanceAllowed}
+                maxLength={500}
               />
 
               {draft.attendanceRecords.map((record) => {
@@ -567,6 +587,7 @@ export default function ActivitySchedulePage() {
                       onChange={(e) => handleParticipationChange(record.residentId, 'comment', e.target.value)}
                       placeholder="Nhập nhận xét..."
                       disabled={!attendanceAllowed}
+                      maxLength={500}
                     />
 
                     <label className="as-record-label">Sự cố</label>
@@ -576,6 +597,7 @@ export default function ActivitySchedulePage() {
                       onChange={(e) => handleParticipationChange(record.residentId, 'incident', e.target.value)}
                       placeholder="Nếu có, ghi rõ sự cố..."
                       disabled={!attendanceAllowed}
+                      maxLength={500}
                     />
 
                     <label className="as-record-label">Ghi chú điểm danh</label>
@@ -585,6 +607,7 @@ export default function ActivitySchedulePage() {
                       onChange={(e) => handleAttendanceChange(record.residentId, 'note', e.target.value)}
                       placeholder="Ghi chú thêm về điểm danh..."
                       disabled={!attendanceAllowed}
+                      maxLength={500}
                     />
                   </div>
                 );

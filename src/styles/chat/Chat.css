@@ -1,0 +1,19 @@
+/* ════════════════════════════════════════
+   Chat — typing indicator (guest widget bot replies)
+   ════════════════════════════════════════ */
+@keyframes chatTypingBounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
+  30% { transform: translateY(-4px); opacity: 1; }
+}
+
+.chat-typing-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #4F7942;
+  display: inline-block;
+  animation: chatTypingBounce 1.1s ease-in-out infinite;
+}
+
+.chat-typing-dot:nth-child(2) { animation-delay: 0.15s; }
+.chat-typing-dot:nth-child(3) { animation-delay: 0.3s; }

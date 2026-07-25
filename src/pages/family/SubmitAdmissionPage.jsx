@@ -20,6 +20,17 @@ import LockoutScreen from '../../components/family/SubmitAdmission/LockoutScreen
 import Stepper, { Step } from '../../components/ui/Stepper/Stepper';
 
 /* ─── constants ─────────────────────────────── */
+// Maps known backend validation error substrings to the form field + step that should show the error,
+// since the API returns plain messages rather than a field-keyed error object.
+const BACKEND_FIELD_ERROR_MAP = [
+  { test: /requestedByPhone/i, field: 'contactPhone', step: 3 },
+  { test: /reasonForAdmission/i, field: 'admissionReason', step: 3 },
+  { test: /preferredAdmissionDate/i, field: 'preferredDate', step: 3 },
+  { test: /citizenId/i, field: 'idNumber', step: 1 },
+  { test: /initialHealthCondition/i, field: 'healthCondition', step: 2 },
+  { test: /^notes/i, field: 'additionalNotes', step: 3 },
+];
+
 const STEP_LABELS = [
   { label: 'Thông tin cá nhân', Icon: User },
   { label: 'Hồ sơ sức khỏe',   Icon: Stethoscope },
@@ -331,6 +342,12 @@ export default function SubmitAdmissionPage() {
         }
         setDuplicateDetected(true);
       } else {
+        const matched = BACKEND_FIELD_ERROR_MAP.find(({ test }) => test.test(msg));
+        if (matched) {
+          setErrors((prev) => ({ ...prev, [matched.field]: msg }));
+          setTouched((prev) => ({ ...prev, [matched.field]: true }));
+          setStep(matched.step);
+        }
         setSubmitError(msg);
       }
     } finally {

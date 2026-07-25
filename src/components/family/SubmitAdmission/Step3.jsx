@@ -82,9 +82,11 @@ export default function Step3({ data = {}, onChange, errors = {}, touched = {}, 
           <label className="sap-label">Ghi chú thêm</label>
           <textarea
             rows={4}
+            maxLength={500}
             placeholder="Yêu cầu đặc biệt về phòng, chế độ ăn uống, hỗ trợ sinh hoạt, v.v..."
             {...textareaField('additionalNotes')}
           />
+          <div className="sap-field__char-count">{(data.additionalNotes ?? '').length}/500</div>
           {touched.additionalNotes && errors.additionalNotes && (
             <div className="sap-field__error-message">
               <AlertCircle size={12} />

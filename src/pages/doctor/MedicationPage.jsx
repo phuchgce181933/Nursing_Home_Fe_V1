@@ -1114,7 +1114,16 @@ function HistoryModal({ prescription, onClose }) {
                           <td><span className="med-time-badge">{fmtTime(r.scheduledTime)}</span></td>
                           <td>
                             {r.actualTimeTaken
-                              ? <span className="med-actual-time">{fmtTime(r.actualTimeTaken)}</span>
+                              ? (
+                                <>
+                                  <span className="med-actual-time">{fmtTime(r.actualTimeTaken)}</span>
+                                  {r.administrationTiming && (
+                                    <div className="med-reason-note">
+                                      ({t(`medication.timing${r.administrationTiming === 'early' ? 'Early' : r.administrationTiming === 'late' ? 'Late' : 'OnTime'}`)})
+                                    </div>
+                                  )}
+                                </>
+                              )
                               : <span className="med-no-data">—</span>}
                           </td>
                           <td>
@@ -1786,6 +1795,7 @@ function DailyTab() {
                       <th>{t('medication.colDosage')}</th>
                       <th>{t('medication.colStatus')}</th>
                       <th>{t('medication.colActualTime')}</th>
+                      <th>{t('medication.colNotes')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1794,12 +1804,27 @@ function DailyTab() {
                         <td><span className="med-time-badge">{fmtTime(s.scheduledTime)}</span></td>
                         <td className="med-drug__name">{s.medicationName}</td>
                         <td>{s.dosage}</td>
-                        <td><StatusBadge status={s.status} type="sched" /></td>
                         <td>
-                          {s.actualTimeTaken
-                            ? `${t('medication.atTime')} ${fmtTime(s.actualTimeTaken)}`
-                            : '—'}
+                          <StatusBadge status={s.status} type="sched" />
+                          {s.status === 'MISSED' && s.missedReason && (
+                            <div className="med-reason-note">
+                              ({t(`medication.reason${s.missedReason.charAt(0).toUpperCase() + s.missedReason.slice(1)}`)})
+                            </div>
+                          )}
                         </td>
+                        <td>
+                          {s.actualTimeTaken ? (
+                            <>
+                              {`${t('medication.atTime')} ${fmtTime(s.actualTimeTaken)}`}
+                              {s.administrationTiming && (
+                                <div className="med-reason-note">
+                                  ({t(`medication.timing${s.administrationTiming === 'early' ? 'Early' : s.administrationTiming === 'late' ? 'Late' : 'OnTime'}`)})
+                                </div>
+                              )}
+                            </>
+                          ) : '—'}
+                        </td>
+                        <td>{s.notes || '—'}</td>
                       </tr>
                     ))}
                   </tbody>

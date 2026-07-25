@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   HeartPulse,
   Search,
@@ -45,6 +46,18 @@ const CHART_METRICS = [
   { key: 'bloodSugar',             label: 'Đường huyết',          color: '#10b981', unit: 'mmol/L' },
   { key: 'weightKg',               label: 'Cân nặng',             color: '#3b82f6', unit: 'kg' },
 ];
+
+// ─── Giới hạn hợp lệ (chặn submit, khớp backend VITAL_RANGES) — khác với THRESHOLDS chỉ để cảnh báo ───
+const VALID_RANGES = {
+  bloodPressureSystolic:  { min: 60,  max: 260 },
+  bloodPressureDiastolic: { min: 30,  max: 160 },
+  pulse:                  { min: 30,  max: 220 },
+  temperatureCelsius:     { min: 30,  max: 45 },
+  oxygenSaturation:       { min: 0,   max: 100 },
+  bloodSugar:             { min: 20,  max: 800 },
+  weightKg:               { min: 1,   max: 300 },
+  heightCm:               { min: 30,  max: 250 },
+};
 
 // ─── Helpers ───
 const isAbnormal = (key, value) => {
@@ -755,6 +768,7 @@ export default function HealthMonitoringPage() {
   const [form, setForm] = useState(emptyForm);
   const [formSaving, setFormSaving] = useState(false);
   const [formError, setFormError] = useState(null);
+  const [fieldErrors, setFieldErrors] = useState({});
   const [formSuccess, setFormSuccess] = useState(false);
   const [expandedSections, setExpandedSections] = useState({});
 
@@ -882,9 +896,42 @@ export default function HealthMonitoringPage() {
   };
 
   // ─── Submit form nhập chỉ số ───
+  const VITAL_FIELD_KEYS = ['bloodPressureSystolic', 'bloodPressureDiastolic', 'pulse', 'temperatureCelsius', 'oxygenSaturation', 'bloodSugar', 'weightKg', 'heightCm'];
+
+  const validateVitalsForm = () => {
+    const errors = {};
+    const hasAnyVital = VITAL_FIELD_KEYS.some((key) => form[key] !== '' && form[key] !== undefined && form[key] !== null);
+    if (!hasAnyVital) {
+      return { errors, general: 'Vui lòng nhập ít nhất một chỉ số sinh tồn trước khi lưu.' };
+    }
+    VITAL_FIELD_KEYS.forEach((key) => {
+      const val = form[key];
+      if (val === '' || val === undefined || val === null) return;
+      const num = Number(val);
+      const range = VALID_RANGES[key];
+      if (Number.isNaN(num)) {
+        errors[key] = 'Giá trị không hợp lệ';
+      } else if (range && (num < range.min || num > range.max)) {
+        errors[key] = `Phải từ ${range.min} đến ${range.max}`;
+      }
+    });
+    if (form.bloodPressureSystolic !== '' && form.bloodPressureDiastolic !== '' && !errors.bloodPressureSystolic && !errors.bloodPressureDiastolic) {
+      if (Number(form.bloodPressureDiastolic) >= Number(form.bloodPressureSystolic)) {
+        errors.bloodPressureDiastolic = 'Phải nhỏ hơn HA tâm thu';
+      }
+    }
+    return { errors, general: Object.keys(errors).length ? 'Vui lòng kiểm tra lại các chỉ số được đánh dấu.' : null };
+  };
+
   const handleSubmitVitals = async (e) => {
     e.preventDefault();
     if (!selectedResident) return;
+    const { errors, general } = validateVitalsForm();
+    setFieldErrors(errors);
+    if (general) {
+      setFormError(general);
+      return;
+    }
     setFormSaving(true);
     setFormError(null);
     setFormSuccess(false);
@@ -945,24 +992,24 @@ export default function HealthMonitoringPage() {
         unitPrice: Number(s.unitPrice) || 0,
       }));
       if (services.length) {
-        console.log('[HealthMonitoring] Selected services to save:', services);
         body.selectedServices = services;
         body.consentToPayment = true;
-      } else {
-        console.log('[HealthMonitoring] No services selected');
       }
 
-      console.log('[HealthMonitoring] Saving vital signs with body:', body);
       await medicalRecordService.recordVitals(selectedResident._id, body);
       setFormSuccess(true);
       setForm(emptyForm);
+      setFieldErrors({});
       // Reload history and resident list to update abnormal badge
       await loadHistory(selectedResident._id, 1, appliedFrom, appliedTo);
       setRecPage(1);
       loadResidents();
       setTimeout(() => setFormSuccess(false), 4000);
     } catch (err) {
-      setFormError(err?.response?.data?.message || 'Không thể lưu chỉ số. Vui lòng thử lại.');
+      const msg = err?.response?.data?.message || 'Không thể lưu chỉ số. Vui lòng thử lại.';
+      const matchedField = VITAL_FIELD_KEYS.find((key) => msg.includes(key));
+      if (matchedField) setFieldErrors((prev) => ({ ...prev, [matchedField]: msg }));
+      setFormError(msg);
     } finally {
       setFormSaving(false);
     }
@@ -1286,16 +1333,30 @@ export default function HealthMonitoringPage() {
               {activeTab === 'update' && (
                 <div className="hm-tab-content">
                   <form onSubmit={handleSubmitVitals}>
-                    {formSuccess && (
-                      <div className="hm-success-banner">
-                        <CheckCircle size={16} /> Đã lưu chỉ số sức khỏe thành công!
-                      </div>
-                    )}
-                    {formError && (
-                      <div className="hm-error-banner">
-                        <AlertTriangle size={16} /> {formError}
-                      </div>
-                    )}
+                    <AnimatePresence>
+                      {formSuccess && (
+                        <motion.div
+                          className="hm-success-banner"
+                          initial={{ opacity: 0, y: -8, height: 0 }}
+                          animate={{ opacity: 1, y: 0, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ duration: 0.25 }}
+                        >
+                          <CheckCircle size={16} /> Đã lưu chỉ số sức khỏe thành công!
+                        </motion.div>
+                      )}
+                      {formError && (
+                        <motion.div
+                          className="hm-error-banner"
+                          initial={{ opacity: 0, y: -8, height: 0 }}
+                          animate={{ opacity: 1, y: 0, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ duration: 0.25 }}
+                        >
+                          <AlertTriangle size={16} /> {formError}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
 
                     {/* Vital Signs */}
                     <div className="hm-form-section">
@@ -1313,6 +1374,7 @@ export default function HealthMonitoringPage() {
                         ].map(({ key, label, placeholder }) => {
                           const val = form[key];
                           const warn = val !== '' && isAbnormal(key, val);
+                          const fieldErr = fieldErrors[key];
                           return (
                             <div key={key} className="hm-form-group">
                               <label className="hm-form-label" htmlFor={`hm-input-${key}`}>
@@ -1322,12 +1384,21 @@ export default function HealthMonitoringPage() {
                                 id={`hm-input-${key}`}
                                 type="number"
                                 step="any"
-                                className={`hm-form-input${warn ? ' is-warn' : ''}`}
+                                min={VALID_RANGES[key]?.min}
+                                max={VALID_RANGES[key]?.max}
+                                className={`hm-form-input${fieldErr ? ' is-error' : warn ? ' is-warn' : ''}`}
                                 placeholder={placeholder}
                                 value={val}
-                                onChange={(e) => setForm(prev => ({ ...prev, [key]: e.target.value }))}
+                                onChange={(e) => {
+                                  setForm(prev => ({ ...prev, [key]: e.target.value }));
+                                  if (fieldErrors[key]) setFieldErrors((prev) => ({ ...prev, [key]: undefined }));
+                                }}
                               />
-                              <span className={`hm-form-hint${warn ? ' is-warn' : ''}`}>{getHint(key, val)}</span>
+                              {fieldErr ? (
+                                <span className="hm-form-hint is-error">{fieldErr}</span>
+                              ) : (
+                                <span className={`hm-form-hint${warn ? ' is-warn' : ''}`}>{getHint(key, val)}</span>
+                              )}
                             </div>
                           );
                         })}
@@ -1342,11 +1413,13 @@ export default function HealthMonitoringPage() {
                       <div className="hm-form-grid">
                         <div className="hm-form-group">
                           <label className="hm-form-label" htmlFor="hm-input-weightKg">Cân nặng <span>(kg)</span></label>
-                          <input id="hm-input-weightKg" type="number" step="0.1" className="hm-form-input" placeholder="VD: 65" value={form.weightKg} onChange={(e) => setForm(prev => ({ ...prev, weightKg: e.target.value }))} />
+                          <input id="hm-input-weightKg" type="number" step="0.1" min={VALID_RANGES.weightKg.min} max={VALID_RANGES.weightKg.max} className={`hm-form-input${fieldErrors.weightKg ? ' is-error' : ''}`} placeholder="VD: 65" value={form.weightKg} onChange={(e) => { setForm(prev => ({ ...prev, weightKg: e.target.value })); if (fieldErrors.weightKg) setFieldErrors((prev) => ({ ...prev, weightKg: undefined })); }} />
+                          {fieldErrors.weightKg && <span className="hm-form-hint is-error">{fieldErrors.weightKg}</span>}
                         </div>
                         <div className="hm-form-group">
                           <label className="hm-form-label" htmlFor="hm-input-heightCm">Chiều cao <span>(cm)</span></label>
-                          <input id="hm-input-heightCm" type="number" step="0.1" className="hm-form-input" placeholder="VD: 160" value={form.heightCm} onChange={(e) => setForm(prev => ({ ...prev, heightCm: e.target.value }))} />
+                          <input id="hm-input-heightCm" type="number" step="0.1" min={VALID_RANGES.heightCm.min} max={VALID_RANGES.heightCm.max} className={`hm-form-input${fieldErrors.heightCm ? ' is-error' : ''}`} placeholder="VD: 160" value={form.heightCm} onChange={(e) => { setForm(prev => ({ ...prev, heightCm: e.target.value })); if (fieldErrors.heightCm) setFieldErrors((prev) => ({ ...prev, heightCm: undefined })); }} />
+                          {fieldErrors.heightCm && <span className="hm-form-hint is-error">{fieldErrors.heightCm}</span>}
                         </div>
                         <div className="hm-form-group">
                           <label className="hm-form-label" htmlFor="hm-input-bloodType">Nhóm máu</label>
@@ -1357,7 +1430,8 @@ export default function HealthMonitoringPage() {
                         </div>
                         <div className="hm-form-group full">
                           <label className="hm-form-label" htmlFor="hm-input-summary">Ghi chú / Tóm tắt tình trạng</label>
-                          <textarea id="hm-input-summary" className="hm-form-textarea" placeholder="Nhập ghi chú về tình trạng sức khỏe..." value={form.summary} onChange={(e) => setForm(prev => ({ ...prev, summary: e.target.value }))} />
+                          <textarea id="hm-input-summary" className="hm-form-textarea" maxLength={500} placeholder="Nhập ghi chú về tình trạng sức khỏe..." value={form.summary} onChange={(e) => setForm(prev => ({ ...prev, summary: e.target.value }))} />
+                          <span className="hm-form-hint">{form.summary.length}/500</span>
                         </div>
                       </div>
                     </div>

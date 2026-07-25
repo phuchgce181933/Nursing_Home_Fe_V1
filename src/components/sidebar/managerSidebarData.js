@@ -15,6 +15,8 @@ import {
   AlertTriangle,
   CalendarClock,
   Briefcase,
+  Calendar,
+  LifeBuoy,
 } from 'lucide-react';
 
 export const managerSidebarData = [
@@ -56,5 +58,15 @@ export const managerSidebarData = [
     title: 'sidebar.activityManagement',
     icon: Activity,
     path: '/manager/activity-dashboard',
+  },
+  {
+    title: 'sidebar.residentVisitRequests',
+    icon: Calendar,
+    path: '/manager/resident-visits',
+  },
+  {
+    title: 'sidebar.supportRequests',
+    icon: LifeBuoy,
+    path: '/manager/support-requests',
   },
 ];

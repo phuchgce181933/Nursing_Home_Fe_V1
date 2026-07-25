@@ -1,21 +1,31 @@
 import axiosClient from '../api/axiosClient';
 
-const listNotifications = (params = {}) =>
-  axiosClient.get('/family/notifications', { params }).then((r) => r.data);
+// Family keeps its own scoped endpoint; every other role uses the generic staff inbox.
+const buildBase = (role) => (role === 'family' ? '/family/notifications' : '/notifications');
 
-const markAsRead = (id) => axiosClient.patch(`/family/notifications/${id}/read`).then((r) => r.data);
+const listNotifications = (params = {}, role = 'family') =>
+  axiosClient.get(buildBase(role), { params }).then((r) => r.data);
 
-const markManyAsRead = (ids) => axiosClient.post('/family/notifications/mark-read', { ids }).then((r) => r.data);
+const markAsRead = (id, role = 'family') =>
+  axiosClient.patch(`${buildBase(role)}/${id}/read`).then((r) => r.data);
 
-const deleteNotification = (id) => axiosClient.delete(`/family/notifications/${id}`).then((r) => r.data);
+const markManyAsRead = (ids, role = 'family') =>
+  axiosClient.post(`${buildBase(role)}/mark-read`, { ids }).then((r) => r.data);
 
-const deleteMany = (ids) => axiosClient.post('/family/notifications/delete', { ids }).then((r) => r.data);
+const deleteNotification = (id, role = 'family') =>
+  axiosClient.delete(`${buildBase(role)}/${id}`).then((r) => r.data);
 
-const getSettings = () => axiosClient.get('/family/notifications/settings').then((r) => r.data);
+const deleteMany = (ids, role = 'family') =>
+  axiosClient.post(`${buildBase(role)}/delete`, { ids }).then((r) => r.data);
 
-const updateSettings = (payload) => axiosClient.post('/family/notifications/settings', payload).then((r) => r.data);
+const getSettings = (role = 'family') =>
+  axiosClient.get(`${buildBase(role)}/settings`).then((r) => r.data);
 
-const getCategories = () => axiosClient.get('/family/notifications/categories').then((r) => r.data.categories || []);
+const updateSettings = (payload, role = 'family') =>
+  axiosClient.post(`${buildBase(role)}/settings`, payload).then((r) => r.data);
+
+const getCategories = (role = 'family') =>
+  axiosClient.get(`${buildBase(role)}/categories`).then((r) => r.data.categories || []);
 
 export default {
   listNotifications,

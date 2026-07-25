@@ -1,16 +1,34 @@
 import axiosClient from '../api/axiosClient';
 
-const resolvePrefix = () => {
-  const seg = (window.location.pathname || '').split('/').filter(Boolean)[0] || '';
-  return seg ? `/${seg}` : '';
-};
-
-const base = () => `${resolvePrefix()}/conversations`;
+// Canonical mount, works for every authenticated role (see /api/conversations in app.js).
+const base = () => `/conversations`;
 // public guest endpoints are mounted under /api/family/conversations (no auth needed)
 const publicGuestBase = () => `/family/conversations`;
 
 const createConversation = async (payload) => {
   const response = await axiosClient.post(`${base()}`, payload);
+  return response.data;
+};
+
+/**
+ * Start (or reuse) a direct conversation with a colleague — no family involved.
+ * @param {string} targetUserId - the other staff user's id
+ * @param {string} [subject]
+ */
+const createStaffConversation = async (targetUserId, subject) => {
+  const response = await axiosClient.post(`${base()}`, { targetUserId, subject });
+  return response.data;
+};
+
+/** Directory of staff users (non-family) available to start a chat with. */
+const getStaffDirectory = async () => {
+  const response = await axiosClient.get(`${base()}/staff-directory`);
+  return response.data;
+};
+
+/** Family-only: assigned nurse/doctor for their resident(s), to start a direct chat with. */
+const getCareTeam = async () => {
+  const response = await axiosClient.get(`${base()}/care-team`);
   return response.data;
 };
 
@@ -102,6 +120,9 @@ const deleteConversation = async (conversationId) => {
 
 export default {
   createConversation,
+  createStaffConversation,
+  getStaffDirectory,
+  getCareTeam,
   createGuestConversation,
   listConversations,
   getConversation,

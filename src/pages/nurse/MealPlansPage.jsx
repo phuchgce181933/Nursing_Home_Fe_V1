@@ -222,6 +222,12 @@ function MealPlanTab() {
     }
     const hasInvalid = entries.some((e) => !e.residentId || !e.mealType || !e.mealName?.trim() || !e.mealTime);
     if (hasInvalid) return t(`${MP}.invalidMealRow`);
+    const hasInvalidCalories = entries.some((e) => {
+      if (e.calories === '' || e.calories === undefined || e.calories === null) return false;
+      const num = Number(e.calories);
+      return Number.isNaN(num) || num < 0 || num > 5000;
+    });
+    if (hasInvalidCalories) return t(`${MP}.invalidCalories`, { defaultValue: 'Calories must be between 0 and 5000.' });
     return '';
   };
 
@@ -438,7 +444,7 @@ function MealPlanTab() {
                     </select>
                   </td>
                   <td><input value={row.mealName} onChange={(e) => patchEntry(idx, { mealName: e.target.value })} /></td>
-                  <td><input type="number" min="0" value={row.calories} onChange={(e) => patchEntry(idx, { calories: e.target.value })} /></td>
+                  <td><input type="number" min="0" max="5000" value={row.calories} onChange={(e) => patchEntry(idx, { calories: e.target.value })} /></td>
                   <td><input type="time" value={row.mealTime || defaultMealTimeByType(row.mealType)} onChange={(e) => patchEntry(idx, { mealTime: e.target.value })} /></td>
                   <td><input value={Array.isArray(row.ingredients) ? row.ingredients.join(', ') : row.ingredients || ''} onChange={(e) => patchEntry(idx, { ingredients: e.target.value })} /></td>
                   <td>{sourceLabel(row.source, t)}</td>
@@ -675,6 +681,14 @@ function SpecialDietTab() {
     if (!entries.length) return t(`${MP}.addAtLeastOneSpecialEntry`);
     const hasInvalid = entries.some((e) => !e.residentId || !e.dietType || !e.effectiveTime);
     if (hasInvalid) return t(`${MP}.invalidSpecialRow`);
+    const seenResidents = new Set();
+    for (const e of entries) {
+      const rid = String(e.residentId || '');
+      if (rid && seenResidents.has(rid)) {
+        return t(`${MP}.duplicateResidentEntry`, { defaultValue: 'Each resident can only have one special diet entry.' });
+      }
+      seenResidents.add(rid);
+    }
     return '';
   };
 
@@ -1115,6 +1129,18 @@ function MealTimeScheduleTab() {
     if (hasInvalid) return t(`${MP}.invalidTimeRow`);
     const uniqueResidents = new Set(entries.map((e) => String(e.residentId)));
     if (uniqueResidents.size !== entries.length) return t(`${MP}.oneRowPerResident`);
+    const toMinutes = (hhmm) => {
+      const [h, m] = String(hhmm || '').split(':').map(Number);
+      return Number.isNaN(h) || Number.isNaN(m) ? null : h * 60 + m;
+    };
+    const hasOutOfOrder = entries.some((e) => {
+      const b = toMinutes(e.breakfastTime);
+      const l = toMinutes(e.lunchTime);
+      const d = toMinutes(e.dinnerTime);
+      if (b === null || l === null || d === null) return false;
+      return !(b < l && l < d);
+    });
+    if (hasOutOfOrder) return t(`${MP}.mealTimeOrderInvalid`, { defaultValue: 'Breakfast time must be before lunch, which must be before dinner.' });
     return '';
   };
 

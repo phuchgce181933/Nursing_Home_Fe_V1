@@ -408,13 +408,14 @@ function ScheduleTab() {
                 <th>{t('medication.colDosage')}</th>
                 <th>{t('medication.colStatus')}</th>
                 <th>{t('medication.colActualTime')}</th>
+                <th>{t('medication.colNotes')}</th>
                 <th>{t('medication.colActions')}</th>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={7}>
+                  <td colSpan={8}>
                     <div className="med-empty-state">
                       <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                         <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
@@ -452,8 +453,20 @@ function ScheduleTab() {
                     </td>
                     <td>
                       {s.actualTimeTaken
-                        ? <span className="med-actual-time">{t('medication.atTime')} {fmtTime(s.actualTimeTaken)}</span>
+                        ? (
+                          <>
+                            <span className="med-actual-time">{t('medication.atTime')} {fmtTime(s.actualTimeTaken)}</span>
+                            {s.administrationTiming && (
+                              <div className="med-reason-note">
+                                ({t(`medication.timing${s.administrationTiming === 'early' ? 'Early' : s.administrationTiming === 'late' ? 'Late' : 'OnTime'}`)})
+                              </div>
+                            )}
+                          </>
+                        )
                         : <span className="med-no-data">—</span>}
+                    </td>
+                    <td>
+                      {s.notes ? <span className="med-dosage">{s.notes}</span> : <span className="med-no-data">—</span>}
                     </td>
                     <td>
                       {(s.status === 'PENDING' || s.status === 'OVERDUE') && (

@@ -190,6 +190,13 @@
   margin-top: 2px;
 }
 
+.sftp-char-count {
+  font-size: 11px;
+  color: #94a3b8;
+  text-align: right;
+  margin-top: 2px;
+}
+
 /* ─── error banner ────────────────────────────────── */
 .sftp-error-banner {
   display: flex;

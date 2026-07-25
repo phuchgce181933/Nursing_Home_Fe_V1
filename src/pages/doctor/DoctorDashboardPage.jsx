@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Users, Pill, CalendarCheck, FileText,
+  Users, Pill, CalendarCheck,
   Clock, RefreshCw, Loader2,
-  ChevronRight, Stethoscope, Activity,
+  ChevronRight, Stethoscope,
   CheckCircle2,
 } from 'lucide-react';
 import {
@@ -12,7 +12,6 @@ import {
 } from 'recharts';
 import careAppointmentService from '../../services/careAppointment.service';
 import medicationService from '../../services/medication.service';
-import careNoteService from '../../services/careNote.service';
 import useAuth from '../../hooks/useAuth';
 import '../../styles/doctor/DoctorDashboardPage.css';
 
@@ -51,11 +50,6 @@ function formatTime(str) {
   return new Date(str).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
 }
 
-function formatDate(str) {
-  if (!str) return '—';
-  return new Date(str).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
-}
-
 const ChartTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
   return (
@@ -79,8 +73,6 @@ export default function DoctorDashboardPage() {
 
   const [appointments, setAppointments] = useState([]);
   const [medStats, setMedStats] = useState(null);
-  const [recentNotes, setRecentNotes] = useState([]);
-  const [notesTotal, setNotesTotal] = useState(0);
 
   const assignedResidentCount = user?.staffProfile?.assignedResidentIds?.length ?? 0;
 
@@ -93,9 +85,6 @@ export default function DoctorDashboardPage() {
     const to = new Date();
     to.setDate(to.getDate() + 7);
 
-    const weekAgo = new Date();
-    weekAgo.setDate(weekAgo.getDate() - 7);
-
     // 1 API lỗi (VD chưa có staffProfile) không được làm trắng cả trang
     const results = await Promise.allSettled([
       careAppointmentService.getMyAppointments({
@@ -104,14 +93,9 @@ export default function DoctorDashboardPage() {
         limit: 100,
       }),
       medicationService.getDailySchedule({ date: todayISO }),
-      careNoteService.getMyNotes({
-        from: weekAgo.toISOString(),
-        to: new Date().toISOString(),
-        limit: 5,
-      }),
     ]);
 
-    const [apptR, medR, notesR] = results;
+    const [apptR, medR] = results;
 
     if (apptR.status === 'fulfilled') {
       const d = apptR.value;
@@ -136,13 +120,6 @@ export default function DoctorDashboardPage() {
         else if (st === 'MISSED') counts.missed++;
       });
       setMedStats(counts);
-    }
-
-    if (notesR.status === 'fulfilled') {
-      const d = notesR.value;
-      const arr = Array.isArray(d) ? d : (Array.isArray(d?.data) ? d.data : []);
-      setRecentNotes(arr.slice(0, 5));
-      setNotesTotal(d?.total ?? arr.length);
     }
 
     setLoading(false);
@@ -225,7 +202,7 @@ export default function DoctorDashboardPage() {
           label="Bệnh nhân phụ trách"
           value={assignedResidentCount}
           sub="Cư dân được phân công"
-          onClick={() => navigate('/doctor/care-notes')}
+          onClick={() => navigate('/doctor/health-monitoring')}
         />
         <KpiCard
           icon={CalendarCheck} color="#0891b2" bg="#e0f2fe"
@@ -240,13 +217,6 @@ export default function DoctorDashboardPage() {
           value={medStats?.pending ?? 0}
           sub={`Tổng hôm nay: ${totalDoses} liều`}
           onClick={() => navigate('/doctor/medications')}
-        />
-        <KpiCard
-          icon={FileText} color="#f59e0b" bg="#fef3c7"
-          label="Ghi chú chăm sóc tuần này"
-          value={notesTotal}
-          sub="Do bạn ghi nhận, 7 ngày qua"
-          onClick={() => navigate('/doctor/care-notes')}
         />
       </div>
 
@@ -365,36 +335,6 @@ export default function DoctorDashboardPage() {
           </div>
         </div>
 
-        {/* Recent care notes */}
-        <div className="dd-list-card">
-          <div className="dd-list-card__head">
-            <div className="dd-chart-icon" style={{ background: '#fef3c7', color: '#f59e0b' }}>
-              <Activity size={17} />
-            </div>
-            <h3 className="dd-list-card__title">Ghi chú chăm sóc gần đây</h3>
-            <button className="dd-see-all" onClick={() => navigate('/doctor/care-notes')}>
-              Xem tất cả <ChevronRight size={14} />
-            </button>
-          </div>
-          <div className="dd-list-body">
-            {recentNotes.length === 0 ? (
-              <div className="dd-empty-list">
-                <FileText size={32} color="#94a3b8" />
-                <span>Bạn chưa ghi chú nào trong 7 ngày qua</span>
-              </div>
-            ) : (
-              recentNotes.map((n, i) => (
-                <div key={n._id || i} className="dd-note-item" onClick={() => navigate('/doctor/care-notes')}>
-                  <div className="dd-note-item__body">
-                    <span className="dd-note-item__resident">{n.residentId?.fullName || 'Cư dân'}</span>
-                    <span className="dd-note-item__content">{n.content}</span>
-                  </div>
-                  <span className="dd-note-item__date">{formatDate(n.noteAt || n.createdAt)}</span>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
       </div>
 
     </div>

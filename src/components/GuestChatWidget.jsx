@@ -1,11 +1,77 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { useLocation } from 'react-router-dom';
-import { MessageCircle, X, User, Mail, Phone, MessageSquare, Send, AlertCircle } from 'lucide-react';
+import { useLocation, Link } from 'react-router-dom';
+import { MessageCircle, X, User, Mail, Phone, Send, AlertCircle, Bot, ChevronRight, Paperclip } from 'lucide-react';
 import conversationService from '../services/conversation.service';
 import { useToast } from '../hooks/useToast';
+import AttachmentList from './chat/AttachmentList';
 
 const AUTHENTICATED_PREFIXES = ['/admin', '/manager', '/doctor', '/nurse', '/caregiver', '/pharmacist', '/family'];
 const STORAGE_KEY = 'guest_chat_conversation';
+
+// Gợi ý dựa trên các mục chính đang có sẵn trên website (Dịch vụ, Bảng giá, Đặt lịch
+// tham quan, Không gian sống...) — trả lời tự động phía client, tin nhắn thật vẫn được
+// gửi cho admin như bình thường để nhân viên có thể rep trực tiếp ngay sau đó.
+// `reply` là mảng các đoạn: chuỗi thường, hoặc { text, to } để render thành link điều
+// hướng thẳng tới trang tương ứng trên web.
+const QUICK_SUGGESTIONS = [
+  {
+    id: 'services',
+    label: 'Dịch vụ chăm sóc',
+    reply: [
+      'An Nhiên cung cấp dịch vụ chăm sóc người cao tuổi toàn diện: theo dõi sức khỏe 24/7, phục hồi chức năng, dinh dưỡng cá nhân hóa và các hoạt động cộng đồng. Bạn có thể xem chi tiết tại mục "',
+      { text: 'Dịch vụ', to: '/services' },
+      '" trên trang chủ nhé!',
+    ],
+  },
+  {
+    id: 'pricing',
+    label: 'Bảng giá dịch vụ',
+    reply: [
+      'An Nhiên có nhiều gói dịch vụ từ Cơ bản đến VIP, phù hợp với từng nhu cầu chăm sóc. Bạn xem chi tiết tại mục "',
+      { text: 'Bảng giá', to: '/pricing' },
+      '", hoặc đội tư vấn sẽ gửi báo giá cụ thể cho bạn ngay sau đây.',
+    ],
+  },
+  {
+    id: 'tour',
+    label: 'Đặt lịch tham quan cơ sở',
+    reply: [
+      'Bạn có thể ',
+      { text: 'đặt lịch tham quan', to: '/login' },
+      ' trực tiếp để trải nghiệm không gian sống tại An Nhiên. Đội ngũ tư vấn sẽ liên hệ xác nhận thời gian phù hợp với bạn trong thời gian sớm nhất.',
+    ],
+  },
+  {
+    id: 'admission',
+    label: 'Thủ tục nhập viện',
+    reply: [
+      'Thủ tục ',
+      { text: 'đăng ký nhập viện', to: '/login' },
+      ' khá đơn giản: đăng ký thông tin → tư vấn & đánh giá sức khỏe ban đầu → ký hợp đồng → nhận phòng. Đội ngũ An Nhiên sẽ đồng hành cùng gia đình trong từng bước.',
+    ],
+  },
+  {
+    id: 'living',
+    label: 'Không gian sống & cơ sở vật chất',
+    reply: [
+      'An Nhiên được thiết kế theo tiêu chuẩn Nhật Bản với không gian xanh, phòng ở tiện nghi và khu sinh hoạt cộng đồng. Xem thêm hình ảnh thực tế tại mục "',
+      { text: 'Không gian sống', to: '/living' },
+      '".',
+    ],
+  },
+];
+
+function ReplyParts({ parts }) {
+  return (parts || []).map((part, i) =>
+    typeof part === 'string' ? (
+      <React.Fragment key={i}>{part}</React.Fragment>
+    ) : (
+      <Link key={i} to={part.to} className="font-semibold text-navy-deep underline underline-offset-2 hover:opacity-80">
+        {part.text}
+      </Link>
+    )
+  );
+}
 
 function readSavedConversation() {
   try {
@@ -23,12 +89,17 @@ function writeSavedConversation(data) {
   }
 }
 
+// Khớp với utils/validators.js phía backend (EMAIL_REGEX / PHONE_REGEX) để tránh lệch
+// giữa validate client và server — số Việt Nam: 0xxxxxxxxx hoặc +84xxxxxxxxx.
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const PHONE_REGEX = /^(\+84|0)[0-9]{8,10}$/;
+
 const FIELD_BASE_CLASS =
-  'w-full rounded-lg border bg-white py-2.5 pl-9 pr-3 text-sm text-slate-700 placeholder:text-slate-400 transition-colors focus:outline-none focus:ring-2';
-const FIELD_NORMAL_CLASS = `${FIELD_BASE_CLASS} border-slate-200 focus:border-violet-500 focus:ring-violet-100`;
-const FIELD_ERROR_CLASS = `${FIELD_BASE_CLASS} border-red-300 focus:border-red-500 focus:ring-red-100`;
+  'w-full rounded-lg border bg-white py-1.5 pl-9 pr-3 text-sm text-slate-700 placeholder:text-slate-400 transition-colors focus:outline-none focus:ring-2';
+const FIELD_NORMAL_CLASS = `${FIELD_BASE_CLASS} border-outline-variant focus:border-navy-deep focus:ring-navy-deep/10`;
+const FIELD_ERROR_CLASS = `${FIELD_BASE_CLASS} border-status-error/50 focus:border-status-error focus:ring-status-error/10`;
 const PLAIN_INPUT_CLASS =
-  'rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-700 placeholder:text-slate-400 transition-colors focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-100';
+  'rounded-lg border border-outline-variant bg-white px-3.5 py-2.5 text-sm text-slate-700 placeholder:text-slate-400 transition-colors focus:border-navy-deep focus:outline-none focus:ring-2 focus:ring-navy-deep/10';
 
 export default function GuestChatWidget() {
   const location = useLocation();
@@ -43,7 +114,12 @@ export default function GuestChatWidget() {
   const [messages, setMessages] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [botTyping, setBotTyping] = useState(false);
+  const [files, setFiles] = useState([]);
   const pollRef = useRef(null);
+  const bodyRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     if (isAuthenticatedArea) return undefined;
@@ -65,12 +141,24 @@ export default function GuestChatWidget() {
     if (isAuthenticatedArea) stopPolling();
   }, [isAuthenticatedArea]);
 
+  useEffect(() => {
+    const el = bodyRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages, showSuggestions, botTyping, conversation]);
+
   const fetchMessages = async (convId) => {
     try {
       const res = await conversationService.getGuestMessages(convId, { page: 1, limit: 20 });
       const d = res.data || res;
       // backend already returns oldest-first, ready for top-to-bottom chat display
-      setMessages(Array.isArray(d.items) ? d.items : []);
+      const serverItems = Array.isArray(d.items) ? d.items : [];
+      setMessages((prev) => {
+        // Bot canned replies only exist client-side (never persisted) — carry them
+        // over and re-sort by actual timestamp so a real reply that arrives later
+        // (e.g. admin's) doesn't get displayed before a bot reply that fired earlier.
+        const localBots = prev.filter((m) => m.isBot);
+        return [...serverItems, ...localBots].sort((a, b) => new Date(a.sentAt) - new Date(b.sentAt));
+      });
     } catch (e) {
       // ignore
     }
@@ -91,7 +179,20 @@ export default function GuestChatWidget() {
   const validate = () => {
     const nextErrors = {};
     if (!name.trim()) nextErrors.name = 'Vui lòng nhập họ tên';
-    if (!email.trim() && !phone.trim()) nextErrors.contact = 'Vui lòng nhập email hoặc số điện thoại';
+
+    const trimmedEmail = email.trim();
+    const trimmedPhone = phone.trim();
+
+    if (!trimmedEmail && !trimmedPhone) {
+      nextErrors.contact = 'Vui lòng nhập email hoặc số điện thoại';
+    } else {
+      if (trimmedEmail && !EMAIL_REGEX.test(trimmedEmail)) {
+        nextErrors.email = 'Địa chỉ email không hợp lệ';
+      }
+      if (trimmedPhone && !PHONE_REGEX.test(trimmedPhone)) {
+        nextErrors.phone = 'Số điện thoại không hợp lệ (VD: 0912345678)';
+      }
+    }
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   };
@@ -100,7 +201,7 @@ export default function GuestChatWidget() {
     if (!validate()) return;
     setSubmitting(true);
     try {
-      const payload = { guestName: name, guestEmail: email, guestPhone: phone, content: message };
+      const payload = { guestName: name, guestEmail: email, guestPhone: phone };
       const res = await conversationService.createGuestConversation(payload);
       const data = res.data || res;
       const conv = data.conversation || data;
@@ -108,7 +209,7 @@ export default function GuestChatWidget() {
       if (data.message) setMessages([data.message]);
       writeSavedConversation({ conversationId: conv._id || conv.id, name, email, phone });
       startPolling(conv._id || conv.id);
-      setMessage('');
+      setShowSuggestions(true);
     } catch (err) {
       console.error(err);
       showToast(err.response?.data?.message || err.message || 'Không thể tạo liên hệ', 'error');
@@ -118,19 +219,55 @@ export default function GuestChatWidget() {
   };
 
   const sendMessage = async () => {
-    if (!conversation || !message) return;
+    if (!conversation || (!message.trim() && files.length === 0)) return;
+    // Guest chose to type their own message instead of picking a suggestion — the
+    // canned prompt is no longer relevant, so dismiss it instead of leaving it
+    // stuck on screen underneath whatever they just sent.
+    setShowSuggestions(false);
     try {
-      const res = await conversationService.sendGuestMessage(conversation._id || conversation.id, { content: message, guestName: name, guestEmail: email, guestPhone: phone });
+      const hasFiles = files.length > 0;
+      const payload = { content: message, guestName: name, guestEmail: email, guestPhone: phone };
+      if (hasFiles) payload.attachments = files;
+      const res = await conversationService.sendGuestMessage(conversation._id || conversation.id, payload, hasFiles);
       const d = res.data || res;
       setMessages((m) => [...m, d]);
       setMessage('');
+      setFiles([]);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (err) {
       console.error(err);
       showToast(err.response?.data?.message || err.message || 'Không gửi được', 'error');
     }
   };
 
-  const isGuestMessage = (m) => !m.senderUserId;
+  const removeFile = (index) => {
+    setFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  // Clicking a suggestion sends it as a real guest message (so admin still receives it
+  // and can reply live), then shows a canned automatic reply after a short "typing" beat.
+  const handleQuickReply = async (item) => {
+    setShowSuggestions(false);
+    try {
+      const res = await conversationService.sendGuestMessage(conversation._id || conversation.id, {
+        content: item.label,
+        guestName: name,
+        guestEmail: email,
+        guestPhone: phone,
+      });
+      const d = res.data || res;
+      setMessages((m) => [...m, d]);
+    } catch (err) {
+      console.error(err);
+    }
+    setBotTyping(true);
+    setTimeout(() => {
+      setBotTyping(false);
+      setMessages((m) => [...m, { _id: `bot-${item.id}-${Date.now()}`, isBot: true, replyParts: item.reply, sentAt: new Date().toISOString() }]);
+    }, 900);
+  };
+
+  const isGuestMessage = (m) => !m.senderUserId && !m.isBot;
 
   if (isAuthenticatedArea) return null;
 
@@ -142,18 +279,22 @@ export default function GuestChatWidget() {
             type="button"
             onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen(true); }}
             aria-label="Mở khung liên hệ tư vấn"
-            className="group relative flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-violet-600 to-purple-500 text-white shadow-lg shadow-purple-500/30 transition-transform duration-200 hover:scale-105 active:scale-95"
+            className="press-effect group relative flex h-14 w-14 items-center justify-center rounded-full bg-navy-deep text-white shadow-lg shadow-navy-deep/30 transition-transform duration-200 hover:scale-105"
           >
-            <span className="absolute inset-0 rounded-full bg-purple-400 opacity-40 animate-ping" />
-            <MessageCircle size={26} className="relative" />
+            <span className="absolute inset-0 rounded-full bg-navy-deep opacity-40 animate-ping" />
+            <MessageCircle size={23} className="relative" />
           </button>
         ) : (
-          <div className="flex h-[560px] max-h-[80vh] w-[380px] max-w-[90vw] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-black/5">
+          <div
+            className={`animate-scale-in flex w-[320px] max-w-[85vw] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 ${
+              conversation ? 'h-[480px] max-h-[70vh]' : 'max-h-[85vh]'
+            }`}
+          >
             {/* Header */}
-            <div className="flex items-center justify-between gap-2 bg-gradient-to-r from-violet-600 to-purple-500 px-4 py-3.5 text-white">
+            <div className="flex items-center justify-between gap-2 bg-navy-deep px-4 py-3 text-white">
               <div className="flex items-center gap-2">
-                <MessageCircle size={19} />
-                <span className="font-semibold">Liên hệ tư vấn</span>
+                <MessageCircle size={18} />
+                <span className="text-sm font-semibold">Liên hệ tư vấn</span>
               </div>
               <button
                 type="button"
@@ -161,15 +302,15 @@ export default function GuestChatWidget() {
                 aria-label="Đóng"
                 className="rounded-full p-1.5 text-white/90 transition-colors hover:bg-white/15 hover:text-white"
               >
-                <X size={18} />
+                <X size={17} />
               </button>
             </div>
 
             {/* Body */}
-            <div className="flex-1 overflow-y-auto px-5 py-4">
+            <div ref={bodyRef} className="flex-1 overflow-y-auto px-4 py-3.5">
               {!conversation ? (
-                <div className="flex flex-col gap-3.5">
-                  <p className="text-sm text-slate-500">
+                <div className="flex flex-col gap-2.5">
+                  <p className="text-xs text-slate-500">
                     Để lại thông tin, đội ngũ An Nhiên sẽ liên hệ tư vấn cho bạn sớm nhất.
                   </p>
 
@@ -182,56 +323,118 @@ export default function GuestChatWidget() {
                     />
                   </Field>
 
-                  <Field icon={<Mail size={16} />}>
+                  <Field icon={<Mail size={16} />} error={errors.email}>
                     <input
-                      className={errors.contact ? FIELD_ERROR_CLASS : FIELD_NORMAL_CLASS}
+                      className={errors.email ? FIELD_ERROR_CLASS : FIELD_NORMAL_CLASS}
                       placeholder="Email"
                       type="email"
                       value={email}
-                      onChange={(e) => { setEmail(e.target.value); if (errors.contact) setErrors((prev) => ({ ...prev, contact: undefined })); }}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setEmail(v);
+                        setErrors((prev) => {
+                          if (!prev.email && !(prev.contact && (v.trim() || phone.trim()))) return prev;
+                          const next = { ...prev };
+                          delete next.email;
+                          if (v.trim() || phone.trim()) delete next.contact;
+                          return next;
+                        });
+                      }}
                     />
                   </Field>
 
-                  <Field icon={<Phone size={16} />} error={errors.contact}>
+                  <Field icon={<Phone size={16} />} error={errors.phone || errors.contact}>
                     <input
-                      className={errors.contact ? FIELD_ERROR_CLASS : FIELD_NORMAL_CLASS}
+                      className={errors.phone || errors.contact ? FIELD_ERROR_CLASS : FIELD_NORMAL_CLASS}
                       placeholder="Số điện thoại"
                       value={phone}
-                      onChange={(e) => { setPhone(e.target.value); if (errors.contact) setErrors((prev) => ({ ...prev, contact: undefined })); }}
-                    />
-                  </Field>
-
-                  <Field icon={<MessageSquare size={16} />} align="top">
-                    <textarea
-                      className={`${FIELD_NORMAL_CLASS} resize-none`}
-                      placeholder="Nội dung cần tư vấn..."
-                      value={message}
-                      onChange={(e) => setMessage(e.target.value)}
-                      rows={3}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setPhone(v);
+                        setErrors((prev) => {
+                          if (!prev.phone && !(prev.contact && (v.trim() || email.trim()))) return prev;
+                          const next = { ...prev };
+                          delete next.phone;
+                          if (v.trim() || email.trim()) delete next.contact;
+                          return next;
+                        });
+                      }}
                     />
                   </Field>
                 </div>
               ) : (
                 <div className="flex flex-col gap-2.5">
                   {messages.map((m) => {
+                    if (m.isBot) {
+                      return (
+                        <div key={m._id} className="animate-fade-in-up flex items-start gap-2">
+                          <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-sage-healing/15 text-sage-healing">
+                            <Bot size={15} />
+                          </div>
+                          <div className="max-w-[80%] rounded-2xl rounded-tl-sm bg-surface-container-low px-3.5 py-2 text-sm leading-snug text-slate-700 shadow-sm">
+                            <ReplyParts parts={m.replyParts} />
+                          </div>
+                        </div>
+                      );
+                    }
                     const guest = isGuestMessage(m);
                     return (
-                      <div key={m._id || m.id} className={`flex flex-col ${guest ? 'items-end' : 'items-start'}`}>
+                      <div key={m._id || m.id} className={`animate-fade-in-up flex flex-col ${guest ? 'items-end' : 'items-start'}`}>
                         <span className="mb-1 px-1 text-[11px] font-medium text-slate-400">
                           {m.guestName || m.senderUserId?.fullName || (guest ? 'Bạn' : 'Tư vấn viên')}
                         </span>
                         <div
                           className={`max-w-[85%] rounded-2xl px-3.5 py-2 text-sm leading-snug shadow-sm ${
                             guest
-                              ? 'rounded-tr-sm bg-violet-600 text-white'
-                              : 'rounded-tl-sm bg-slate-100 text-slate-700'
+                              ? 'rounded-tr-sm bg-navy-deep text-white'
+                              : 'rounded-tl-sm bg-surface-container-low text-slate-700'
                           }`}
                         >
                           {m.content}
+                          <AttachmentList attachments={m.attachments} hasText={!!m.content} isMine={guest} />
                         </div>
                       </div>
                     );
                   })}
+
+                  {botTyping && (
+                    <div className="animate-fade-in flex items-center gap-2">
+                      <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-sage-healing/15 text-sage-healing">
+                        <Bot size={15} />
+                      </div>
+                      <div className="flex items-center gap-1 rounded-2xl rounded-tl-sm bg-surface-container-low px-3.5 py-2.5">
+                        <span className="chat-typing-dot" />
+                        <span className="chat-typing-dot" />
+                        <span className="chat-typing-dot" />
+                      </div>
+                    </div>
+                  )}
+
+                  {showSuggestions && (
+                    <div className="animate-fade-in-up flex flex-col gap-2 pt-1">
+                      <div className="flex items-start gap-2">
+                        <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-sage-healing/15 text-sage-healing">
+                          <Bot size={15} />
+                        </div>
+                        <div className="rounded-2xl rounded-tl-sm bg-surface-container-low px-3.5 py-2 text-sm text-slate-700 shadow-sm">
+                          Bạn muốn tìm hiểu về nội dung nào dưới đây?
+                        </div>
+                      </div>
+                      <div className="ml-9 flex flex-col gap-1.5">
+                        {QUICK_SUGGESTIONS.map((item, i) => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => handleQuickReply(item)}
+                            className={`animate-fade-in-up delay-${Math.min(i + 1, 6)} press-effect flex items-center justify-between gap-2 rounded-xl border border-outline-variant bg-white px-3 py-2 text-left text-[12.5px] font-medium text-navy-deep transition-colors hover:bg-navy-deep/5`}
+                          >
+                            {item.label}
+                            <ChevronRight size={14} className="flex-shrink-0 text-slate-400" />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -243,28 +446,59 @@ export default function GuestChatWidget() {
                   type="button"
                   disabled={submitting}
                   onClick={(e) => { e.preventDefault(); e.stopPropagation(); createConversation(); }}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 py-3 font-semibold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="press-effect flex w-full items-center justify-center gap-2 rounded-xl bg-sage-healing py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <Send size={16} />
                   {submitting ? 'Đang gửi...' : 'Bắt đầu chat'}
                 </button>
               ) : (
-                <div className="flex items-center gap-2">
-                  <input
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); sendMessage(); } }}
-                    placeholder="Nhập tin nhắn..."
-                    className={`${PLAIN_INPUT_CLASS} flex-1`}
-                  />
-                  <button
-                    type="button"
-                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); sendMessage(); }}
-                    aria-label="Gửi"
-                    className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-violet-600 text-white transition-colors hover:bg-violet-700"
-                  >
-                    <Send size={16} />
-                  </button>
+                <div>
+                  {files.length > 0 && (
+                    <div className="mb-2 flex flex-wrap gap-1.5">
+                      {files.map((f, i) => (
+                        <span key={i} className="animate-scale-in flex items-center gap-1 rounded-full bg-navy-deep/10 py-1 pl-2.5 pr-1.5 text-xs text-navy-deep">
+                          {f.name}
+                          <button type="button" onClick={() => removeFile(i)} className="rounded-full p-0.5 hover:bg-navy-deep/15">
+                            <X size={11} />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      title="Đính kèm tệp"
+                      data-tooltip="Đính kèm tệp"
+                      className="press-effect flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-navy-deep"
+                    >
+                      <Paperclip size={17} />
+                    </button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      multiple
+                      className="hidden"
+                      onChange={(e) => setFiles(Array.from(e.target.files))}
+                    />
+                    <input
+                      value={message}
+                      onChange={(e) => setMessage(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); sendMessage(); } }}
+                      placeholder="Nhập tin nhắn..."
+                      className={`${PLAIN_INPUT_CLASS} flex-1`}
+                    />
+                    <button
+                      type="button"
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); sendMessage(); }}
+                      aria-label="Gửi"
+                      disabled={!message.trim() && files.length === 0}
+                      className="press-effect flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-navy-deep text-white transition-colors hover:bg-[#132745] disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <Send size={16} />
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

@@ -11,14 +11,14 @@ import { resolveApiError } from '../../utils/apiMessage';
 import { formatResidentAreaLine, pickDrugAllergiesList } from '../../utils/residentArea';
 import '../../styles/caregiver/AssignedResidentsPage.css';
 
-function formatAllergies(row, t) {
+function formatAllergies(row, t, i18nNs) {
   const drug = pickDrugAllergiesList(row);
   const food = (row.allergies || []).filter(
     (a) => !drug.some((d) => d.toLowerCase() === String(a).toLowerCase())
   );
   const parts = [];
-  if (drug.length) parts.push(`${t('caregiver.assignedResidents.allergiesDrug')}: ${drug.join(', ')}`);
-  if (food.length) parts.push(`${t('caregiver.assignedResidents.allergiesOther')}: ${food.join(', ')}`);
+  if (drug.length) parts.push(`${t(`${i18nNs}.assignedResidents.allergiesDrug`)}: ${drug.join(', ')}`);
+  if (food.length) parts.push(`${t(`${i18nNs}.assignedResidents.allergiesOther`)}: ${food.join(', ')}`);
   return parts.length ? parts.join(' · ') : '—';
 }
 
@@ -27,7 +27,7 @@ function formatConditions(row) {
   return list.length ? list.join(', ') : '—';
 }
 
-function ResidentWarning({ resident, t }) {
+function ResidentWarning({ resident, t, i18nNs }) {
   if (!resident) return null;
   const drug = pickDrugAllergiesList(resident);
   const food = (resident.allergies || []).filter(Boolean);
@@ -38,24 +38,24 @@ function ResidentWarning({ resident, t }) {
     <div className="assigned-residents-page__warning">
       {drug.length > 0 && (
         <p>
-          <strong>{t('caregiver.assignedResidents.drugAllergies')}:</strong> {drug.join(', ')}
+          <strong>{t(`${i18nNs}.assignedResidents.drugAllergies`)}:</strong> {drug.join(', ')}
         </p>
       )}
       {food.length > 0 && (
         <p>
-          <strong>{t('caregiver.assignedResidents.otherAllergies')}:</strong> {food.join(', ')}
+          <strong>{t(`${i18nNs}.assignedResidents.otherAllergies`)}:</strong> {food.join(', ')}
         </p>
       )}
       {conditions.length > 0 && (
         <p>
-          <strong>{t('caregiver.assignedResidents.chronicConditions')}:</strong> {conditions.join(', ')}
+          <strong>{t(`${i18nNs}.assignedResidents.chronicConditions`)}:</strong> {conditions.join(', ')}
         </p>
       )}
     </div>
   );
 }
 
-function ResidentDetailModal({ residentId, onClose, t, locale }) {
+function ResidentDetailModal({ residentId, onClose, t, locale, service, i18nNs }) {
   const [loading, setLoading] = useState(true);
   const [resident, setResident] = useState(null);
   const [error, setError] = useState('');
@@ -64,12 +64,12 @@ function ResidentDetailModal({ residentId, onClose, t, locale }) {
     if (!residentId) return;
     setLoading(true);
     setError('');
-    caregiverResidentService
+    service
       .getResident(residentId)
       .then(setResident)
-      .catch((e) => setError(resolveApiError(e, t, 'caregiver.assignedResidents.detailLoadFailed')))
+      .catch((e) => setError(resolveApiError(e, t, `${i18nNs}.assignedResidents.detailLoadFailed`)))
       .finally(() => setLoading(false));
-  }, [residentId, t]);
+  }, [residentId, t, service, i18nNs]);
 
   const formatAdmittedAt = (d) => {
     if (!d) return '—';
@@ -85,7 +85,7 @@ function ResidentDetailModal({ residentId, onClose, t, locale }) {
         aria-modal="true"
       >
         <div className="assigned-residents-page__modal-header">
-          <h3 className="assigned-residents-page__modal-title">{t('caregiver.assignedResidents.detailTitle')}</h3>
+          <h3 className="assigned-residents-page__modal-title">{t(`${i18nNs}.assignedResidents.detailTitle`)}</h3>
           <button type="button" className="assigned-residents-page__modal-close" onClick={onClose}>
             ×
           </button>
@@ -95,22 +95,22 @@ function ResidentDetailModal({ residentId, onClose, t, locale }) {
           {error && <div className="resident-page__error">{error}</div>}
           {!loading && !error && resident && (
             <>
-              <ResidentWarning resident={resident} t={t} />
+              <ResidentWarning resident={resident} t={t} i18nNs={i18nNs} />
               <ResidentContextBlock resident={resident} showGender showStatus />
               <div className="assigned-residents-page__meta-block">
                 {resident.bloodType && resident.bloodType !== 'unknown' && (
                   <p>
-                    <strong>{t('caregiver.assignedResidents.bloodType')}:</strong> {resident.bloodType}
+                    <strong>{t(`${i18nNs}.assignedResidents.bloodType`)}:</strong> {resident.bloodType}
                   </p>
                 )}
                 {resident.initialHealthCondition && (
                   <p>
-                    <strong>{t('caregiver.assignedResidents.initialHealth')}:</strong>{' '}
+                    <strong>{t(`${i18nNs}.assignedResidents.initialHealth`)}:</strong>{' '}
                     {resident.initialHealthCondition}
                   </p>
                 )}
                 <p>
-                  <strong>{t('caregiver.assignedResidents.admittedAt')}:</strong>{' '}
+                  <strong>{t(`${i18nNs}.assignedResidents.admittedAt`)}:</strong>{' '}
                   {formatAdmittedAt(resident.admittedAt)}
                 </p>
               </div>
@@ -122,7 +122,12 @@ function ResidentDetailModal({ residentId, onClose, t, locale }) {
   );
 }
 
-function AssignedResidentsPage() {
+function AssignedResidentsPage({
+  service = caregiverResidentService,
+  i18nNs = 'caregiver',
+  mealIntakeLinkPath = '/caregiver/meal-intake-notes',
+  showMealIntakeLink = true,
+} = {}) {
   const { t, i18n } = useTranslation();
   const locale = i18n.language === 'vi' ? 'vi-VN' : 'en-US';
   const { search, setSearch, debouncedSearch, resetSearch } = useDebouncedSearch();
@@ -144,18 +149,18 @@ function AssignedResidentsPage() {
     setLoading(true);
     setError('');
     try {
-      const res = await caregiverResidentService.listResidents({
+      const res = await service.listResidents({
         search: debouncedSearch || undefined,
       });
       setResidents(Array.isArray(res.data) ? res.data : []);
       setEmptyMessage(res.message || '');
     } catch (e) {
-      setError(resolveApiError(e, t, 'caregiver.assignedResidents.loadFailed'));
+      setError(resolveApiError(e, t, `${i18nNs}.assignedResidents.loadFailed`));
       setResidents([]);
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, t]);
+  }, [debouncedSearch, t, service, i18nNs]);
 
   useEffect(() => {
     loadResidents();
@@ -168,16 +173,16 @@ function AssignedResidentsPage() {
 
   return (
     <AdminPageShell
-      title={t('caregiver.assignedResidents.title')}
-      subtitle={t('caregiver.assignedResidents.subtitle')}
+      title={t(`${i18nNs}.assignedResidents.title`)}
+      subtitle={t(`${i18nNs}.assignedResidents.subtitle`)}
     >
       <div className="resident-page__filters">
         <div className="resident-page__filter-row">
           <label className="resident-page__filter">
-            <span>{t('caregiver.assignedResidents.searchLabel')}</span>
+            <span>{t(`${i18nNs}.assignedResidents.searchLabel`)}</span>
             <input
               type="search"
-              placeholder={t('caregiver.assignedResidents.searchPlaceholder')}
+              placeholder={t(`${i18nNs}.assignedResidents.searchPlaceholder`)}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -229,14 +234,14 @@ function AssignedResidentsPage() {
               <tr>
                 <td colSpan={8} className="empty-state">
                   {debouncedSearch
-                    ? t('caregiver.assignedResidents.emptyFiltered')
-                    : t('caregiver.assignedResidents.emptyList')}
+                    ? t(`${i18nNs}.assignedResidents.emptyFiltered`)
+                    : t(`${i18nNs}.assignedResidents.emptyList`)}
                 </td>
               </tr>
             )}
             {!loading &&
               paginatedResidents.map((row) => {
-                const allergies = formatAllergies(row, t);
+                const allergies = formatAllergies(row, t, i18nNs);
                 const hasAllergy = allergies !== '—';
                 return (
                   <tr key={row._id}>
@@ -274,10 +279,12 @@ function AssignedResidentsPage() {
         />
       )}
 
-      <p className="assigned-residents-page__footer-link">
-        <Link to="/caregiver/meal-intake-notes">{t('caregiver.assignedResidents.mealIntakeLink')}</Link>{' '}
-        {t('caregiver.assignedResidents.footerLink')}
-      </p>
+      {showMealIntakeLink && (
+        <p className="assigned-residents-page__footer-link">
+          <Link to={mealIntakeLinkPath}>{t(`${i18nNs}.assignedResidents.mealIntakeLink`)}</Link>{' '}
+          {t(`${i18nNs}.assignedResidents.footerLink`)}
+        </p>
+      )}
 
       {detailId && (
         <ResidentDetailModal
@@ -285,6 +292,8 @@ function AssignedResidentsPage() {
           onClose={() => setDetailId(null)}
           t={t}
           locale={locale}
+          service={service}
+          i18nNs={i18nNs}
         />
       )}
     </AdminPageShell>

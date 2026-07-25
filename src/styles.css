@@ -24,6 +24,9 @@
 @import './styles/family/SubmitFacilityTourPage.css';
 @import './styles/family/FacilityTourHistoryPage.css';
 
+/* Chat Styles */
+@import './styles/chat/Chat.css';
+
 /* Medication Styles (Doctor + Nurse) */
 @import './styles/medications/MedicationPage.css';
 

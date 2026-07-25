@@ -22,7 +22,11 @@ const emptyForm = () => ({
 export default function InitialHealthPage() {
   const { t } = useTranslation();
   const location = useLocation();
-  const residentBase = location.pathname.startsWith('/manager') ? '/manager' : '/admin';
+  const currentRoleBase = ['/manager', '/doctor', '/nurse'].find((base) => location.pathname.startsWith(base)) || '/admin';
+  const residentBase = currentRoleBase;
+  // Pre-existing conditions stays admin/manager-only; drug allergies is admin/manager/doctor (not nurse).
+  const canViewPreExisting = currentRoleBase === '/admin' || currentRoleBase === '/manager';
+  const canViewDrugAllergies = canViewPreExisting || currentRoleBase === '/doctor';
   const [residents, setResidents] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -488,17 +492,27 @@ export default function InitialHealthPage() {
                         })}
                       </span>
                     </div>
-                    <p className="initial-health-related-tabs">
-                      {t('admin.residents.initialHealth.linkPreExisting')}{' '}
-                      <Link to={`${residentBase}/residents/pre-existing-conditions`}>
-                        {t('admin.residents.initialHealth.linkPreExistingTab')}
-                      </Link>
-                      {' · '}
-                      {t('admin.residents.initialHealth.linkDrugAllergies')}{' '}
-                      <Link to={`${residentBase}/residents/drug-allergies`}>
-                        {t('admin.residents.initialHealth.linkDrugAllergiesTab')}
-                      </Link>
-                    </p>
+                    {(canViewPreExisting || canViewDrugAllergies) && (
+                      <p className="initial-health-related-tabs">
+                        {canViewPreExisting && (
+                          <>
+                            {t('admin.residents.initialHealth.linkPreExisting')}{' '}
+                            <Link to={`${residentBase}/residents/pre-existing-conditions`}>
+                              {t('admin.residents.initialHealth.linkPreExistingTab')}
+                            </Link>
+                          </>
+                        )}
+                        {canViewPreExisting && canViewDrugAllergies && ' · '}
+                        {canViewDrugAllergies && (
+                          <>
+                            {t('admin.residents.initialHealth.linkDrugAllergies')}{' '}
+                            <Link to={`${residentBase}/residents/drug-allergies`}>
+                              {t('admin.residents.initialHealth.linkDrugAllergiesTab')}
+                            </Link>
+                          </>
+                        )}
+                      </p>
+                    )}
                   </div>
                   <div className="modal__actions">
                     <button type="button" className="btn-cancel" onClick={() => setEditPopup(false)}>
