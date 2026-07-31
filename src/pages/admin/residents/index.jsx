@@ -713,6 +713,7 @@ function ResidentPage({ defaultMode = '' }) {
               <th>Mã</th>
               <th>Ảnh</th>
               <th>Họ tên</th>
+              <th>CCCD</th>
               <th>Trạng thái</th>
               <th>Phòng</th>
               <th>Giường</th>
@@ -724,7 +725,7 @@ function ResidentPage({ defaultMode = '' }) {
 
             {loading && (
               <tr>
-                <td colSpan="8" className="resident-page__empty">
+                <td colSpan="9" className="resident-page__empty">
                   Đang tải danh sách cư dân...
                 </td>
               </tr>
@@ -732,7 +733,7 @@ function ResidentPage({ defaultMode = '' }) {
 
             {!loading && residents.length === 0 && (
               <tr>
-                <td colSpan="8" className="resident-page__empty">
+                <td colSpan="9" className="resident-page__empty">
                   Không tìm thấy cư dân nào.
                 </td>
               </tr>
@@ -750,11 +751,9 @@ function ResidentPage({ defaultMode = '' }) {
                     />
                   </td>
                   <td>
-                    <div className="resident-page__name">
-                      <strong>{resident.fullName}</strong>
-                      <span>{resident.citizenId || 'Chưa có CCCD'}</span>
-                    </div>
+                    <strong>{resident.fullName}</strong>
                   </td>
+                  <td>{resident.citizenId || '—'}</td>
                   <td>
                     <span
                       className={`resident-page__status resident-page__status--${
@@ -764,7 +763,7 @@ function ResidentPage({ defaultMode = '' }) {
                       {resident.residencyStatus || 'pending'}
                     </span>
                   </td>
-                  <td>{resident.room?.roomCode || 'Chưa phân công'}</td>
+                  <td>{resident.room?.roomNumber || 'Chưa phân công'}</td>
                   <td>{resident.bed?.bedCode || 'Chưa phân công'}</td>
                   <td>{formatDateTime(resident.admittedAt)}</td>
                   <td>
@@ -1141,7 +1140,7 @@ function ResidentPage({ defaultMode = '' }) {
                   <div>
                     <span>Phòng / Giường</span>
                     <strong>
-                      {selectedResident.room?.roomCode || 'Chưa phân công'} /{' '}
+                      {selectedResident.room?.roomNumber || 'Chưa phân công'} /{' '}
                       {selectedResident.bed?.bedCode || 'Chưa phân công'}
                     </strong>
                   </div>
