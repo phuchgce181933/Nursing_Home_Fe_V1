@@ -39,12 +39,12 @@ export const roleSidebarData = {
     { title: 'sidebar.initialHealthRecord', icon: FileText, path: '/doctor/residents/initial-health' },
     { title: 'sidebar.drugAllergies', icon: ShieldCheck, path: '/doctor/residents/drug-allergies' },
     { title: 'sidebar.medication', icon: Pill, path: '/doctor/medications' },
+    { title: 'sidebar.careNotes', icon: Activity, path: '/doctor/care-notes' },
     { title: 'sidebar.admissionRequests', icon: ClipboardList, path: '/doctor/admission-requests' },
     { title: 'sidebar.servicePackages', icon: HeartPulse, path: '/doctor/service-packages' },
     { title: 'sidebar.incidents', icon: FileText, path: '/doctor/incidents' },
     { title: 'sidebar.staffLeave', icon: CalendarOff, path: '/doctor/leave' },
     { title: 'sidebar.notifications', icon: Bell, path: '/doctor/notifications' },
-    { title: 'sidebar.messages', icon: MessageSquare, path: '/doctor/messages' },
   ],
   caregiver: [
 
@@ -110,6 +110,11 @@ export const roleSidebarData = {
       path: '/caregiver/daily-behaviors',
     },
     {
+      title: 'sidebar.careNotes',
+      icon: Activity,
+      path: '/caregiver/care-notes',
+    },
+    {
       title: 'sidebar.messages',
       icon: MessageSquare,
       path: '/caregiver/messages',
@@ -145,7 +150,6 @@ export const roleSidebarData = {
     { title: 'sidebar.incidents', icon: FileText, path: '/nurse/incidents' },
     { title: 'sidebar.staffLeave', icon: CalendarOff, path: '/nurse/leave' },
     { title: 'sidebar.notifications', icon: Bell, path: '/nurse/notifications' },
-    { title: 'sidebar.messages', icon: MessageSquare, path: '/nurse/messages' },
   ],
 
   family: [
@@ -171,6 +175,7 @@ export const roleSidebarData = {
     { title: 'sidebar.medication', icon: Pill, path: '/pharmacist/medications' },
     { title: 'sidebar.pharmacySuppliers', icon: Truck, path: '/pharmacist/suppliers' },
     { title: 'sidebar.pharmacyStocks', icon: PackageOpen, path: '/pharmacist/stocks' },
+    { title: 'sidebar.notifications', icon: Bell, path: '/pharmacist/notifications' },
     { title: 'sidebar.incidents', icon: FileText, path: '/pharmacist/incidents' },
     { title: 'sidebar.pharmacyReports', icon: FileText, path: '/pharmacist/reports' },
   ],

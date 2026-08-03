@@ -103,7 +103,7 @@ export default function ServicePackagesPage() {
       }
     } catch (err) {
       console.error('Failed to fetch service packages:', err);
-      setError('Could not retrieve service packages. Please check your privileges or network connection.');
+      setError('Không thể tải danh sách gói dịch vụ. Vui lòng kiểm tra quyền truy cập hoặc kết nối mạng.');
     } finally {
       setLoading(false);
     }
@@ -138,7 +138,7 @@ export default function ServicePackagesPage() {
       setShowDetailModal(true);
     } catch (err) {
       console.error('Failed to load details:', err);
-      alert('Could not retrieve package details. Please try again.');
+      alert('Không thể tải chi tiết gói dịch vụ. Vui lòng thử lại.');
     }
   };
 
@@ -232,7 +232,7 @@ export default function ServicePackagesPage() {
       fetchPackages();
     } catch (err) {
       console.error('Failed to update package:', err);
-      setFormError(err.response?.data?.message || 'An error occurred while updating the package.');
+      setFormError(err.response?.data?.message || 'Đã xảy ra lỗi khi cập nhật gói dịch vụ.');
     } finally {
       setSubmitting(false);
     }
@@ -254,7 +254,7 @@ export default function ServicePackagesPage() {
       fetchPackages();
     } catch (err) {
       console.error('Failed to delete package:', err);
-      alert(err.response?.data?.message || 'Could not deactivate package. Please try again.');
+      alert(err.response?.data?.message || 'Không thể ngừng hoạt động gói dịch vụ. Vui lòng thử lại.');
     } finally {
       setLoading(false);
     }

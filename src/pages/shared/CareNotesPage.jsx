@@ -1013,7 +1013,10 @@ function CareNotesPage() {
 
   const canModify = useCallback((note) => {
     if (!user) return false;
-    if (user.role === 'doctor' || user.role === 'admin') return true;
+    // Backend only ever authorizes the `nurse` role to write (create/edit/delete) care
+    // notes — doctor/caregiver get read-only access, so this must match exactly or the
+    // Edit/Delete buttons would show for roles that always get a 403 from the API.
+    if (user.role !== 'nurse') return false;
     const noteUserId = note.authorStaffId?.userId?._id ?? note.authorStaffId?.userId;
     return String(noteUserId) === String(user._id);
   }, [user]);
@@ -1091,9 +1094,11 @@ function CareNotesPage() {
           <h1 className="cn-header__title">{t('careNotes.pageTitle')}</h1>
           <p className="cn-header__subtitle">{t('careNotes.pageSubtitle')}</p>
         </div>
-        <button className="cn-btn cn-btn--primary" onClick={() => setModal({ type: 'create', data: null })}>
-          <PlusCircle size={16} /> {t('careNotes.createNote')}
-        </button>
+        {user.role === 'nurse' && (
+          <button className="cn-btn cn-btn--primary" onClick={() => setModal({ type: 'create', data: null })}>
+            <PlusCircle size={16} /> {t('careNotes.createNote')}
+          </button>
+        )}
       </div>
 
       {/* Stats */}
@@ -1216,9 +1221,11 @@ function CareNotesPage() {
         <button className={`cn-tab${tab === 'all' ? ' cn-tab--active' : ''}`} onClick={() => handleTabChange('all')}>
           {t('careNotes.tabAll')} {tab === 'all' && total > 0 ? `(${total})` : ''}
         </button>
-        <button className={`cn-tab${tab === 'mine' ? ' cn-tab--active' : ''}`} onClick={() => handleTabChange('mine')}>
-          {t('careNotes.tabMine')} {tab === 'mine' && total > 0 ? `(${total})` : ''}
-        </button>
+        {user.role === 'nurse' && (
+          <button className={`cn-tab${tab === 'mine' ? ' cn-tab--active' : ''}`} onClick={() => handleTabChange('mine')}>
+            {t('careNotes.tabMine')} {tab === 'mine' && total > 0 ? `(${total})` : ''}
+          </button>
+        )}
       </div>
 
       {/* Note Cards */}

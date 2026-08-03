@@ -128,7 +128,7 @@ export default function ActivityParticipationResultsPage() {
       }
     } catch (err) {
       console.error('Fetch activities failed:', err);
-      setError(err.response?.data?.message || 'Could not load activities.');
+      setError(err.response?.data?.message || 'Không thể tải danh sách hoạt động.');
     } finally {
       setLoading(false);
     }

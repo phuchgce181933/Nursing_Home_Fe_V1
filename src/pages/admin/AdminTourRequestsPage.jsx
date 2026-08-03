@@ -147,7 +147,7 @@ export default function AdminTourRequestsPage() {
       }
     } catch (err) {
       console.error('Failed to load facility tour requests:', err);
-      setError('Could not retrieve facility tour requests. Please check your credentials or network connection.');
+      setError('Không thể tải danh sách yêu cầu tham quan cơ sở. Vui lòng kiểm tra thông tin đăng nhập hoặc kết nối mạng.');
     } finally {
       setLoading(false);
     }

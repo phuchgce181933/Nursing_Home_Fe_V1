@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import residentService from '../../../services/resident.service';
 import { useAuth } from '../../../hooks/useAuth';
+import FamilyAccountPicker from '../../../components/ui/FamilyAccountPicker';
 import '../../../styles/admin/ResidentPage.css';
 import { resolveApiError } from '../../../utils/apiMessage';
 import { isValidStaffPhone } from '../../../utils/staffPhoneValidation';
@@ -80,8 +81,6 @@ const splitList = (value) =>
     .split(/[\n,]/)
     .map((item) => item.trim())
     .filter(Boolean);
-
-const parseFamilyIds = (value) => splitList(value).filter(Boolean);
 
 const buildContactsPayload = (contacts, t) => {
   const payload = [];
@@ -189,7 +188,7 @@ function ResidentPage({ defaultMode = '' }) {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createForm, setCreateForm] = useState({ ...emptyPersonalForm });
   const [createContacts, setCreateContacts] = useState([]);
-  const [createFamilyIds, setCreateFamilyIds] = useState('');
+  const [createFamilyAccounts, setCreateFamilyAccounts] = useState([]);
   const [createError, setCreateError] = useState(null);
   const [creating, setCreating] = useState(false);
 
@@ -205,7 +204,7 @@ function ResidentPage({ defaultMode = '' }) {
   const [personalSaving, setPersonalSaving] = useState(false);
 
   const [familyContacts, setFamilyContacts] = useState([]);
-  const [familyIds, setFamilyIds] = useState('');
+  const [familyAccounts, setFamilyAccounts] = useState([]);
   const [familyError, setFamilyError] = useState(null);
   const [familySaving, setFamilySaving] = useState(false);
 
@@ -288,10 +287,8 @@ function ResidentPage({ defaultMode = '' }) {
         setFamilyContacts(
           Array.isArray(resident?.emergencyContacts) ? resident.emergencyContacts : []
         );
-        setFamilyIds(
-          Array.isArray(resident?.familyPortalAccounts)
-            ? resident.familyPortalAccounts.map((user) => user._id).join('\n')
-            : ''
+        setFamilyAccounts(
+          Array.isArray(resident?.familyPortalAccounts) ? resident.familyPortalAccounts : []
         );
       } catch (err) {
         console.error('Failed to load resident details:', err);
@@ -354,7 +351,7 @@ function ResidentPage({ defaultMode = '' }) {
   const resetCreateForm = () => {
     setCreateForm({ ...emptyPersonalForm });
     setCreateContacts([]);
-    setCreateFamilyIds('');
+    setCreateFamilyAccounts([]);
     setCreateError(null);
   };
 
@@ -428,7 +425,7 @@ function ResidentPage({ defaultMode = '' }) {
       dischargedAt: createForm.dischargedAt || undefined,
       servicePackage: createForm.servicePackage.trim() || undefined,
       emergencyContacts: contacts || [],
-      familyPortalAccountIds: parseFamilyIds(createFamilyIds),
+      familyPortalAccountIds: createFamilyAccounts.map((a) => a._id),
     };
 
     try {
@@ -515,7 +512,7 @@ function ResidentPage({ defaultMode = '' }) {
       setFamilyError(null);
       const payload = {
         emergencyContacts: contacts || [],
-        familyPortalAccountIds: parseFamilyIds(familyIds),
+        familyPortalAccountIds: familyAccounts.map((a) => a._id),
       };
       const res = await residentService.updateResidentFamilyInfo(selectedResidentId, payload);
       setSelectedResident(res?.resident || selectedResident);
@@ -1056,13 +1053,8 @@ function ResidentPage({ defaultMode = '' }) {
               </div>
 
               <div className="resident-form-section">
-                <h3>ID tài khoản gia đình (mỗi dòng một ID)</h3>
-                <textarea
-                  rows="3"
-                  value={createFamilyIds}
-                  onChange={(e) => setCreateFamilyIds(e.target.value)}
-                  placeholder="Dán ID tài khoản thành viên gia đình vào đây"
-                />
+                <h3>{t('admin.residents.common.familyAccountsLabel')}</h3>
+                <FamilyAccountPicker value={createFamilyAccounts} onChange={setCreateFamilyAccounts} />
               </div>
 
               {createError && <p className="resident-form-error">{createError}</p>}
@@ -1376,13 +1368,8 @@ function ResidentPage({ defaultMode = '' }) {
                   ))}
 
                   <div className="resident-form-section">
-                    <h4>ID tài khoản gia đình (mỗi dòng một ID)</h4>
-                    <textarea
-                      rows="3"
-                      value={familyIds}
-                      onChange={(e) => setFamilyIds(e.target.value)}
-                      placeholder="Dán ID tài khoản thành viên gia đình vào đây"
-                    />
+                    <h4>{t('admin.residents.common.familyAccountsLabel')}</h4>
+                    <FamilyAccountPicker value={familyAccounts} onChange={setFamilyAccounts} />
                   </div>
                   </fieldset>
 

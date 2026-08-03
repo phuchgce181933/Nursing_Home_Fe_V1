@@ -6,6 +6,10 @@ import { useToast } from '../hooks/useToast';
 import AttachmentList from './chat/AttachmentList';
 
 const AUTHENTICATED_PREFIXES = ['/admin', '/manager', '/doctor', '/nurse', '/caregiver', '/pharmacist', '/family'];
+// Auth pages aren't "browsing" pages either — a visitor here is either about to log in
+// (and gets real messaging once authenticated) or resetting credentials, so the guest
+// contact widget doesn't belong here any more than it does inside the dashboards.
+const AUTH_ROUTES = ['/login', '/forgot-password', '/reset-password'];
 const STORAGE_KEY = 'guest_chat_conversation';
 
 // Gợi ý dựa trên các mục chính đang có sẵn trên website (Dịch vụ, Bảng giá, Đặt lịch
@@ -103,7 +107,9 @@ const PLAIN_INPUT_CLASS =
 
 export default function GuestChatWidget() {
   const location = useLocation();
-  const isAuthenticatedArea = AUTHENTICATED_PREFIXES.some((prefix) => location.pathname.startsWith(prefix));
+  const isAuthenticatedArea =
+    AUTHENTICATED_PREFIXES.some((prefix) => location.pathname.startsWith(prefix)) ||
+    AUTH_ROUTES.includes(location.pathname);
   const { showToast } = useToast();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');

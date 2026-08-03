@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
 
 function LoginForm({ onLogin }) {
   const { t } = useTranslation();
@@ -30,21 +30,25 @@ function LoginForm({ onLogin }) {
     <form className="login-form" onSubmit={handleSubmit}>
       <div className="login-form__group">
         <label className="login-form__label">{t('login.email')}</label>
-        <input
-          type="email"
-          className="login-form__input"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-          placeholder={t('login.placeholderEmail')}
-        />
+        <div className="login-form__field">
+          <Mail size={18} className="login-form__field-icon" />
+          <input
+            type="email"
+            className="login-form__input"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            placeholder={t('login.placeholderEmail')}
+          />
+        </div>
       </div>
-      <div className="login-form__group login-form__group--password">
+      <div className="login-form__group">
         <label className="login-form__label">{t('login.password')}</label>
-        <div className="login-form__password-wrapper">
+        <div className="login-form__field">
+          <Lock size={18} className="login-form__field-icon" />
           <input
             type={showPassword ? 'text' : 'password'}
-            className="login-form__input login-form__input--password"
+            className="login-form__input"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required

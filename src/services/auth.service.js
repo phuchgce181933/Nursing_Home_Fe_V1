@@ -56,6 +56,11 @@ const getStaffAccounts = async (params = {}) => {
   return response.data;
 };
 
+const searchFamilyAccounts = async (params = {}) => {
+  const response = await axiosClient.get('/auth/family-accounts', { params });
+  return response.data;
+};
+
 const createStaffAccount = async (payload) => {
   let data = payload;
   const config = {};
@@ -120,6 +125,7 @@ export default {
   forgotPassword,
   resetPassword,
   getStaffAccounts,
+  searchFamilyAccounts,
   createStaffAccount,
   toggleStaffActive,
   updateUserByAdmin,

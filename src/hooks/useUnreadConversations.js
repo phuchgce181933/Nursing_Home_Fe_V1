@@ -2,43 +2,28 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import conversationService from '../services/conversation.service';
 import socketService from '../services/socket.service';
 
-const STORAGE_KEY = 'chat_last_viewed_conversations';
 const VIEWED_EVENT = 'chat:conversationViewed';
 const POLL_INTERVAL_MS = 20000;
 
-function readLastViewedMap() {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
-  } catch {
-    return {};
-  }
-}
-
-function writeLastViewedMap(map) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
-  } catch {
-    // ignore storage failures (e.g. private mode quota)
-  }
-}
-
 // Call when a conversation is opened/actively viewed so it stops counting as unread.
-export function markConversationViewed(conversationId, when = new Date().toISOString()) {
+// Marks all messages in it read on the server, then triggers a badge refresh.
+export async function markConversationViewed(conversationId) {
   if (!conversationId) return;
-  const map = readLastViewedMap();
-  map[conversationId] = when;
-  writeLastViewedMap(map);
+  try {
+    await conversationService.markMessagesRead(conversationId);
+  } catch {
+    // ignore — badge will just stay stale until the next poll/refresh
+  }
   window.dispatchEvent(new Event(VIEWED_EVENT));
 }
 
 // Pure check for a single conversation — used to render a per-row unread dot.
+// `unreadCount` is computed server-side (unread message count for the current user).
 export function isConversationUnread(conversation) {
-  if (!conversation?.lastMessageAt || !conversation?._id) return false;
-  const viewedAt = readLastViewedMap()[conversation._id];
-  return !viewedAt || new Date(conversation.lastMessageAt) > new Date(viewedAt);
+  return (conversation?.unreadCount || 0) > 0;
 }
 
-// Counts conversations (people), not messages, with activity since they were last viewed.
+// Counts conversations (people), not messages, with unread activity.
 export default function useUnreadConversations(enabled) {
   const [unreadCount, setUnreadCount] = useState(0);
   const pollRef = useRef(null);
@@ -48,12 +33,7 @@ export default function useUnreadConversations(enabled) {
     try {
       const res = await conversationService.listConversations();
       const items = res.data || res || [];
-      const lastViewed = readLastViewedMap();
-      const count = items.filter((c) => {
-        if (!c.lastMessageAt) return false;
-        const viewedAt = lastViewed[c._id];
-        return !viewedAt || new Date(c.lastMessageAt) > new Date(viewedAt);
-      }).length;
+      const count = items.filter((c) => (c.unreadCount || 0) > 0).length;
       setUnreadCount(count);
     } catch {
       // ignore — badge just stays at its last known value

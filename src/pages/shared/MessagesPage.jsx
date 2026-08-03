@@ -40,8 +40,6 @@ export default function MessagesPage() {
   const [staffDirectory, setStaffDirectory] = useState([]);
   const [staffQuery, setStaffQuery] = useState('');
   const [selectedTargetUserId, setSelectedTargetUserId] = useState('');
-  const [careTeam, setCareTeam] = useState([]);
-  const [careTeamLoaded, setCareTeamLoaded] = useState(false);
   const [convQuery, setConvQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [msgQuery, setMsgQuery] = useState('');
@@ -234,13 +232,6 @@ export default function MessagesPage() {
         .then((res) => setStaffDirectory(res.data || []))
         .catch((err) => console.error('Không tải được danh bạ nhân viên', err));
     }
-    if (next && isFamily && !careTeamLoaded) {
-      conversationService
-        .getCareTeam()
-        .then((res) => setCareTeam(res.data || []))
-        .catch((err) => console.error('Không tải được đội ngũ chăm sóc', err))
-        .finally(() => setCareTeamLoaded(true));
-    }
   };
 
   const handleCreateConversation = async () => {
@@ -248,10 +239,8 @@ export default function MessagesPage() {
     try {
       let res;
       if (isFamily) {
-        res = await conversationService.createConversation({
-          subject: newChatSubject,
-          targetUserId: selectedTargetUserId || undefined,
-        });
+        // Family always messages admin — no target picker (nurse/doctor direct chat removed).
+        res = await conversationService.createConversation({ subject: newChatSubject });
       } else {
         if (!selectedTargetUserId) return;
         res = await conversationService.createStaffConversation(selectedTargetUserId, newChatSubject);
@@ -357,43 +346,7 @@ export default function MessagesPage() {
                   placeholder="Tiêu đề (tuỳ chọn)"
                   className={`${INPUT_CLASS} mb-2 bg-white`}
                 />
-                <div className="mb-2">
-                  <div className="mb-1.5 text-xs font-medium text-slate-500">
-                    Gửi cho quản trị viên, hoặc chọn nhân viên chăm sóc phụ trách:
-                  </div>
-                  {careTeam.length > 0 ? (
-                    <div className="max-h-32 overflow-y-auto rounded-lg border border-outline-variant bg-white">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedTargetUserId('')}
-                        className={`flex w-full items-center justify-between gap-2 border-b border-slate-100 px-3 py-2 text-left text-sm transition-colors ${
-                          !selectedTargetUserId ? 'bg-navy-deep/10 text-navy-deep' : 'text-slate-700 hover:bg-slate-50'
-                        }`}
-                      >
-                        <span className="truncate font-medium">Quản trị viên (mặc định)</span>
-                      </button>
-                      {careTeam.map((u) => (
-                        <button
-                          key={u._id}
-                          type="button"
-                          onClick={() => setSelectedTargetUserId(u._id)}
-                          className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm transition-colors ${
-                            selectedTargetUserId === u._id ? 'bg-navy-deep/10 text-navy-deep' : 'text-slate-700 hover:bg-slate-50'
-                          }`}
-                        >
-                          <span className="truncate font-medium">{u.fullName || u.email}</span>
-                          <span className="flex-shrink-0 text-[11px] uppercase text-slate-400">
-                            {u.role === 'nurse' ? 'Điều dưỡng' : 'Bác sĩ'}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  ) : careTeamLoaded ? (
-                    <div className="rounded-lg border border-outline-variant bg-white px-3 py-2.5 text-xs text-slate-400">
-                      Chưa có nhân viên chăm sóc được phân công cho người thân của bạn.
-                    </div>
-                  ) : null}
-                </div>
+                <div className="mb-2 text-xs font-medium text-slate-500">Gửi cho quản trị viên</div>
                 <div className="flex gap-2">
                   <button
                     onClick={handleCreateConversation}
@@ -402,7 +355,7 @@ export default function MessagesPage() {
                     Tạo
                   </button>
                   <button
-                    onClick={() => { setNewChatOpen(false); setSelectedTargetUserId(''); }}
+                    onClick={() => setNewChatOpen(false)}
                     className="rounded-lg border border-outline-variant px-3 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100"
                   >
                     Hủy

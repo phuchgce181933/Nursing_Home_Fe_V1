@@ -90,7 +90,7 @@ export default function AdminConsultationRequestsPage() {
       setTotalPages(res?.totalPages || 1);
     } catch (err) {
       console.error(err);
-      setError(err.response?.data?.message || err.message || t('admin.consultationRequests.loadError', 'Failed to load consultation requests.'));
+      setError(err.response?.data?.message || err.message || t('admin.consultationRequests.loadError', 'Không thể tải danh sách yêu cầu tư vấn.'));
     } finally {
       setLoading(false);
     }
@@ -151,10 +151,10 @@ export default function AdminConsultationRequestsPage() {
       setEditStatus('');
       setEditNotes('');
       fetchRequests();
-      alert(t('admin.consultationRequests.saveSuccess', 'Consultation request updated successfully.'));
+      alert(t('admin.consultationRequests.saveSuccess', 'Đã cập nhật yêu cầu tư vấn thành công.'));
     } catch (err) {
       console.error(err);
-      alert(err.response?.data?.message || err.message || t('admin.consultationRequests.saveError', 'Unable to update consultation request.'));
+      alert(err.response?.data?.message || err.message || t('admin.consultationRequests.saveError', 'Không thể cập nhật yêu cầu tư vấn.'));
     } finally {
       setSaving(false);
     }

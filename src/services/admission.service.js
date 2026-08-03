@@ -126,6 +126,28 @@ const adminGetAdmissionList = async (params = {}) => {
 };
 
 /**
+ * Admin | Create Walk-in Admission Request
+ * Tạo hồ sơ nhập viện cho người nhà đến trực tiếp tại quầy, chưa có tài khoản
+ * trên hệ thống. Khi hoàn tất check-in, hệ thống tự tạo tài khoản Family và
+ * gửi mật khẩu tạm qua email (nếu có requestedByEmail) hoặc SMS (nếu chỉ có
+ * requestedByPhone).
+ *
+ * @param {object} body
+ * @param {object} body.applicant - Thông tin người cao tuổi (giống submitAdmissionRequest)
+ * @param {string} body.requestedByName - Tên người nhà (BẮT BUỘC)
+ * @param {string} [body.requestedByEmail] - Email người nhà (ưu tiên gửi qua mail nếu có)
+ * @param {string} [body.requestedByPhone] - SĐT người nhà (dùng gửi SMS nếu không có email)
+ * @param {string} [body.preferredAdmissionDate]
+ * @param {string} [body.reasonForAdmission]
+ * @param {string} [body.notes]
+ * @returns {object} { message, admission }
+ */
+const adminCreateWalkInAdmission = async (body) => {
+  const response = await axiosClient.post('/admin/admission-requests/walk-in', body);
+  return response.data;
+};
+
+/**
  * Admin | See Requirements Details
  * Xem chi tiết một yêu cầu nhập viện (Admin/Manager, bao gồm thông tin tài khoản Family).
  *
@@ -364,6 +386,7 @@ export default {
   getAdmissionDetail,
   cancelAdmissionRequest,
   // Admin / Manager
+  adminCreateWalkInAdmission,
   adminGetAdmissionList,
   adminGetAdmissionDetail,
   adminApproveAdmission,

@@ -14,10 +14,12 @@ import {
   Clock,
   Activity,
   UserCheck,
+  UserPlus,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import admissionService from '../../services/admission.service';
 import AdmissionDetailDrawer from '../../components/family/SubmitAdmission/AdmissionDetailDrawer';
+import CreateWalkInAdmissionModal from '../../components/admin/CreateWalkInAdmissionModal';
 
 const getStatusBadgeClass = (status) => {
   switch (status) {
@@ -152,6 +154,9 @@ export default function AdminAdmissionRequestsPage() {
   const [selectedAdmissionId, setSelectedAdmissionId] = useState(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
+  // Create walk-in admission modal state
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+
   // Fetch admission requests
   const fetchRequests = useCallback(async () => {
     try {
@@ -186,7 +191,7 @@ export default function AdminAdmissionRequestsPage() {
       }
     } catch (err) {
       console.error('Failed to load admission requests:', err);
-      setError('Could not retrieve admission requests. Please check your credentials or network connection.');
+      setError('Không thể tải danh sách yêu cầu nhập viện. Vui lòng kiểm tra thông tin đăng nhập hoặc kết nối mạng.');
     } finally {
       setLoading(false);
     }
@@ -244,14 +249,24 @@ export default function AdminAdmissionRequestsPage() {
             {t('admin.admissionRequests.subtitle', 'Review, evaluate, approve, and track family admission requests for elderly residents.')}
           </p>
         </div>
-        <button
-          onClick={fetchRequests}
-          disabled={loading}
-          className="adm-btn-refresh"
-        >
-          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          {t('admin.admissionRequests.reloadData', 'Reload Data')}
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            onClick={() => setIsCreateModalOpen(true)}
+            className="adm-btn-refresh"
+            style={{ backgroundColor: '#0f766e' }}
+          >
+            <UserPlus className="h-4 w-4" />
+            {t('admin.admissionRequests.createWalkIn', 'Tạo hồ sơ nhập viện (khách vãng lai)')}
+          </button>
+          <button
+            onClick={fetchRequests}
+            disabled={loading}
+            className="adm-btn-refresh"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            {t('admin.admissionRequests.reloadData', 'Reload Data')}
+          </button>
+        </div>
       </div>
 
       {/* Metrics Counters Section */}
@@ -546,6 +561,13 @@ export default function AdminAdmissionRequestsPage() {
         admissionId={selectedAdmissionId}
         onCancelSuccess={handleActionSuccess}
         isAdmin={true}
+      />
+
+      {/* Create Walk-in Admission Modal */}
+      <CreateWalkInAdmissionModal
+        open={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onCreated={fetchRequests}
       />
     </div>
   );
