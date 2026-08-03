@@ -8,6 +8,7 @@ import { isValidStaffPhone } from '../../../../utils/staffPhoneValidation';
 import { FaEye } from 'react-icons/fa';
 import AdminPageShell from '../../../../components/admin/AdminPageShell';
 import ListPagination from '../../../../components/ui/ListPagination';
+import ConfirmDialog from '../../../../components/ui/ConfirmDialog';
 import { ADMIN_LIST_PAGE_SIZE } from '../../../../constants/adminListPage';
 import useDebouncedSearch from '../../../../hooks/useDebouncedSearch';
 import '../../../../styles/admin/residentActionIcons.css';
@@ -169,6 +170,8 @@ export default function FamilyManagementPage() {
   const [contactError, setContactError] = useState('');
   const [detailContact, setDetailContact] = useState(null);
   const [residentDetailPopup, setResidentDetailPopup] = useState(null);
+  const [pendingDeleteContact, setPendingDeleteContact] = useState(null);
+  const [deleteContactSaving, setDeleteContactSaving] = useState(false);
 
   const loadList = useCallback(async ({ silent = false } = {}) => {
     if (!silent) setListLoading(true);
@@ -280,18 +283,26 @@ export default function FamilyManagementPage() {
     }
   };
 
-  const handleDeleteContact = async (contact) => {
+  const handleDeleteContact = (contact) => {
     if (contact.isPrimary) {
       alert(t('admin.residents.family.cannotDeletePrimary'));
       return;
     }
-    if (!window.confirm(t('admin.residents.common.confirmDelete', { name: contact.fullName }))) return;
+    setPendingDeleteContact(contact);
+  };
+
+  const confirmDeleteContact = async () => {
+    if (!pendingDeleteContact) return;
+    setDeleteContactSaving(true);
     try {
-      await residentService.removeEmergencyContact(selectedId, contact._id);
+      await residentService.removeEmergencyContact(selectedId, pendingDeleteContact._id);
       setPanelMsg(t('admin.residents.family.contactDeleted'));
+      setPendingDeleteContact(null);
       await refreshAfterContactChange();
     } catch (e) {
       alert(e.response?.data?.message || t('admin.residents.common.deleteFailed'));
+    } finally {
+      setDeleteContactSaving(false);
     }
   };
 
@@ -591,6 +602,15 @@ export default function FamilyManagementPage() {
           t={t}
         />
       )}
+
+      <ConfirmDialog
+        open={!!pendingDeleteContact}
+        title={t('admin.residents.common.confirmDeleteTitle', { defaultValue: t('common.confirmDeleteTitle') })}
+        message={pendingDeleteContact ? t('admin.residents.common.confirmDelete', { name: pendingDeleteContact.fullName }) : ''}
+        loading={deleteContactSaving}
+        onConfirm={confirmDeleteContact}
+        onCancel={() => setPendingDeleteContact(null)}
+      />
 
       {detailContact && (
         <div className="modal-overlay" onClick={() => setDetailContact(null)}>

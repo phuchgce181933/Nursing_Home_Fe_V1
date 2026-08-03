@@ -11,6 +11,7 @@ export default function ActivityStatisticsPage() {
     categoryCounts: {},
     participationRate: 0,
   });
+  const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [timeRange, setTimeRange] = useState('month');
@@ -45,11 +46,15 @@ export default function ActivityStatisticsPage() {
         status: statusFilter || undefined,
       };
 
-      const res = await activityService.getActivityStatistics(params);
-      setStats(res);
+      const [statsRes, listRes] = await Promise.all([
+        activityService.getActivityStatistics(params),
+        activityService.getActivityList({ ...dateRange, limit: 10, status: 'scheduled,ongoing,completed' }),
+      ]);
+      setStats(statsRes);
+      setActivities(listRes?.data || []);
     } catch (err) {
       console.error('Fetch statistics failed:', err);
-      setError(err.response?.data?.message || 'Could not load statistics.');
+      setError(err.response?.data?.message || 'Không thể tải số liệu thống kê.');
     } finally {
       setLoading(false);
     }
@@ -284,6 +289,47 @@ export default function ActivityStatisticsPage() {
               </div>
             </div>
           )}
+
+          <div className="adm-filter-panel">
+            <h3 style={{ marginTop: 0 }}>Hoạt động gần đây</h3>
+            {activities.length === 0 ? (
+              <p style={{ color: '#94a3b8', marginBottom: 0 }}>Không có hoạt động nào.</p>
+            ) : (
+              <div style={{ overflow: 'auto', maxHeight: '400px' }}>
+                {activities.map((activity) => (
+                  <div key={activity._id} style={{
+                    padding: '12px',
+                    backgroundColor: '#f8fafc',
+                    borderRadius: '8px',
+                    marginBottom: '8px',
+                    borderLeft: '4px solid #3b82f6'
+                  }}>
+                    <div style={{ fontWeight: 600, marginBottom: '4px' }}>
+                      {activity.title}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>
+                      {new Date(activity.scheduledAt).toLocaleString('vi-VN')}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#64748b' }}>
+                      {activity.participantResidentIds?.length || 0} cư dân tham gia
+                    </div>
+                    <div style={{
+                      marginTop: '4px',
+                      display: 'inline-block',
+                      padding: '2px 8px',
+                      backgroundColor: '#e0f2fe',
+                      borderRadius: '12px',
+                      fontSize: '11px',
+                      color: '#0369a1',
+                      fontWeight: 500
+                    }}>
+                      {activity.status}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </>
       )}
     </div>

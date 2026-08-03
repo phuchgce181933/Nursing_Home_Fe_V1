@@ -1,4 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import LoginPage from '../pages/LoginPage';
 import HomePage from '../pages/HomePage';
 import ServicesPage from '../pages/ServicesPage';
@@ -27,7 +28,11 @@ import ManagerLeaveRequestAdminPage from '../pages/manager/staff/leave-requests'
 import RoleLayout from '../layouts/RoleLayout';
 import DashboardPage from '../pages/admin/DashboardPage';
 import ResidentPage from '../pages/admin/residents';
-import FacilitiesPage from '../pages/admin/facilities/FacilitiesPage';
+import BuildingsPage from '../pages/admin/facilities/BuildingsPage';
+import FloorsPage from '../pages/admin/facilities/FloorsPage';
+import RoomsPage from '../pages/admin/facilities/RoomsPage';
+import BedsPage from '../pages/admin/facilities/BedsPage';
+import EquipmentPage from '../pages/admin/facilities/EquipmentPage';
 import FamilyManagementPage from '../pages/admin/residents/family';
 import ResidentsByAreaPage from '../pages/admin/residents/by-area';
 import InitialHealthPage from '../pages/admin/residents/initial-health';
@@ -122,6 +127,7 @@ import NewsPage from '../pages/NewsPage';
 import ContactPage from '../pages/ContactPage';
 
 function AppRoutes() {
+  const { t } = useTranslation();
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
@@ -154,11 +160,11 @@ function AppRoutes() {
         <Route path="residents/pre-existing-conditions" element={<PreExistingConditionsPage />} />
         <Route path="residents/drug-allergies" element={<DrugAllergiesPage />} />
         <Route path="residents/transfer-room" element={<TransferResidentPage />} />
-        <Route path="buildings" element={<FacilitiesPage defaultTab="buildings" />} />
-        <Route path="floors" element={<FacilitiesPage defaultTab="floors" />} />
-        <Route path="rooms" element={<FacilitiesPage defaultTab="rooms" />} />
-        <Route path="beds" element={<FacilitiesPage defaultTab="beds" />} />
-        <Route path="equipment" element={<FacilitiesPage defaultTab="equipment" />} />
+        <Route path="buildings" element={<BuildingsPage />} />
+        <Route path="floors" element={<FloorsPage />} />
+        <Route path="rooms" element={<RoomsPage />} />
+        <Route path="beds" element={<BedsPage />} />
+        <Route path="equipment" element={<EquipmentPage />} />
         <Route path="staff/profiles" element={<StaffProfilesPage />} />
         <Route path="staff/shifts" element={<ShiftManagementPage />} />
         <Route path="staff/assignments" element={<StaffAssignmentPage />} />
@@ -194,7 +200,7 @@ function AppRoutes() {
         <Route path="daily-behaviors" element={<AdminDailyBehaviorsPage />} />
         <Route path="medical-charges" element={<AdminMedicalChargesPage />} />
         <Route path="incidents" element={<IncidentManagementPage />} />
-        <Route path="*" element={<PlaceholderPage title="Trang quản trị" />} />
+        <Route path="*" element={<PlaceholderPage title={t('common.placeholderAdminTitle')} />} />
       </Route>
       <Route
         path="/manager/*"
@@ -226,7 +232,7 @@ function AppRoutes() {
         <Route path="activity-dashboard" element={<ManagerActivityDashboard />} />
         <Route path="resident-visits" element={<ResidentVisitRequestsPage />} />
         <Route path="support-requests" element={<SupportRequestsPage />} />
-        <Route path="*" element={<PlaceholderPage title="Trang quản lý vận hành" />} />
+        <Route path="*" element={<PlaceholderPage title={t('common.placeholderManagerOpsTitle')} />} />
       </Route>
 
       <Route
@@ -244,19 +250,19 @@ function AppRoutes() {
         <Route path="service-packages" element={<ServicePackagesPage />} />
         <Route path="appointments" element={<CareAppointmentsPage />} />
         <Route path="schedule" element={<DoctorSchedulePage />} />
-        <Route path="patients" element={<PlaceholderPage title="Danh sách bệnh nhân" />} />
+        <Route path="patients" element={<PlaceholderPage title={t('common.placeholderPatientsListTitle')} />} />
         <Route path="assigned-residents" element={<DoctorAssignedResidentsPage />} />
         <Route path="health-monitoring" element={<HealthMonitoringPage />} />
         <Route path="residents/initial-health" element={<DoctorInitialHealthPage />} />
         <Route path="assigned-residents/:id" element={<DoctorAssignedResidentDetailPage />} />
         <Route path="residents/drug-allergies" element={<DoctorDrugAllergiesPage />} />
         <Route path="medications" element={<DoctorMedicationPage />} />
+        <Route path="care-notes" element={<CareNotesPage />} />
         <Route path="my-shifts" element={<MyShiftsPage />} />
         <Route path="care-tasks" element={<DailyCareSchedulePage />} />
         <Route path="activity-schedule" element={<ActivitySchedulePage />} />
         <Route path="leave" element={<LeaveRequestPage />} />
         <Route path="notifications" element={<NotificationsPage role="doctor" />} />
-        <Route path="messages" element={<MessagesPage />} />
         <Route path="incidents" element={<IncidentManagementPage />} />
       </Route>
 
@@ -289,7 +295,6 @@ function AppRoutes() {
         <Route path="activity-schedule" element={<ActivitySchedulePage />} />
         <Route path="leave" element={<LeaveRequestPage />} />
         <Route path="notifications" element={<NotificationsPage role="nurse" />} />
-        <Route path="messages" element={<MessagesPage />} />
         <Route path="incidents" element={<IncidentManagementPage />} />
         <Route path="resident-visits" element={<ResidentVisitRequestsPage />} />
       </Route>
@@ -307,6 +312,7 @@ function AppRoutes() {
         <Route path="profile" element={<CaregiverProfile />} />
         <Route path="assigned-residents" element={<AssignedResidentsPage />} />
         <Route path="assigned-residents/:id" element={<CaregiverAssignedResidentDetailPage />} />
+        <Route path="care-notes" element={<CareNotesPage />} />
         <Route path="my-shifts" element={<MyShiftsPage />} />
         <Route path="leave" element={<LeaveRequestPage />} />
         <Route path="daily-care-schedule" element={<DailyCareSchedulePage />} />
@@ -338,10 +344,11 @@ function AppRoutes() {
         <Route path="medications" element={<PharmacyPage defaultTab="medications" />} />
         <Route path="suppliers" element={<PharmacyPage defaultTab="suppliers" />} />
         <Route path="stocks" element={<PharmacyPage defaultTab="stocks" />} />
+        <Route path="notifications" element={<NotificationsPage role="pharmacist" />} />
         <Route path="incidents" element={<IncidentManagementPage />} />
         <Route path="dispense" element={<PharmacyPage defaultTab="dispense" />} />
         <Route path="reports" element={<PharmacyPage defaultTab="reports" />} />
-        <Route path="*" element={<PlaceholderPage title="Trang dược sĩ" />} />
+        <Route path="*" element={<PlaceholderPage title={t('common.placeholderPharmacistTitle')} />} />
       </Route>
 
       <Route

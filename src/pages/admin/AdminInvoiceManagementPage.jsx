@@ -1,9 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Search, RefreshCw, Eye, ChevronLeft, ChevronRight, DollarSign } from 'lucide-react';
 import adminInvoiceService from '../../services/adminInvoice.service';
 import residentService from '../../services/resident.service';
+import { resolveApiError } from '../../utils/apiMessage';
 
 export default function AdminInvoiceManagementPage() {
+  const { t } = useTranslation();
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -57,7 +60,7 @@ export default function AdminInvoiceManagementPage() {
       setTotalPages(result.totalPages || 1);
     } catch (err) {
       console.error(err);
-      setError(err.response?.data?.message || 'Không thể tải danh sách hóa đơn.');
+      setError(resolveApiError(err, t, 'admin.dashboard.loadError'));
     } finally {
       setLoading(false);
     }
@@ -98,11 +101,11 @@ export default function AdminInvoiceManagementPage() {
   const translateStatus = (status) => {
     const normalized = String(status || '').toLowerCase();
     const map = {
-      issued: 'Đã phát hành',
-      partially_paid: 'Đã thanh toán một phần',
-      paid: 'Đã thanh toán',
-      overdue: 'Quá hạn',
-      cancelled: 'Đã hủy',
+      issued: t('adminInvoices.statusIssued'),
+      partially_paid: t('adminInvoices.statusPartiallyPaid'),
+      paid: t('adminInvoices.statusPaid'),
+      overdue: t('adminInvoices.statusOverdue'),
+      cancelled: t('adminInvoices.statusCancelled'),
     };
     return normalized ? map[normalized] || status : '-';
   };
@@ -144,16 +147,16 @@ export default function AdminInvoiceManagementPage() {
       <div className="adm-header">
         <div>
           <h1>
-            <DollarSign size={28} /> Quản lý hóa đơn
+            <DollarSign size={28} /> {t('adminInvoices.title')}
           </h1>
-          <p>Danh sách hóa đơn cho admin, lọc theo trạng thái và tìm kiếm theo mã hóa đơn.</p>
+          <p>{t('adminInvoices.subtitle')}</p>
         </div>
         <div className="adm-header__buttons">
           <button type="button" className="adm-btn-secondary" onClick={handleResetFilters}>
-            Reset bộ lọc
+            {t('adminInvoices.resetFilters')}
           </button>
           <button type="button" className="adm-btn-refresh" onClick={loadInvoices}>
-            <RefreshCw size={18} /> Làm mới
+            <RefreshCw size={18} /> {t('common.refresh')}
           </button>
         </div>
       </div>
@@ -161,35 +164,35 @@ export default function AdminInvoiceManagementPage() {
       <div className="adm-filter-panel">
         <div className="adm-filter-grid">
           <div className="adm-filter-group">
-            <label>Mã hóa đơn</label>
+            <label>{t('adminInvoices.invoiceNumberLabel')}</label>
             <div className="adm-filter-input-wrapper">
               <Search size={16} className="adm-filter-input-icon" />
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Tìm theo mã hóa đơn"
+                placeholder={t('adminInvoices.searchPlaceholder')}
               />
             </div>
           </div>
 
           <div className="adm-filter-group">
-            <label>Cư dân</label>
+            <label>{t('common.resident')}</label>
             <select
               value={residentId}
               onChange={(e) => setResidentId(e.target.value)}
             >
-              <option value="">Tất cả cư dân</option>
+              <option value="">{t('adminInvoices.allResidents')}</option>
               {residents.map((resident) => (
                 <option key={resident._id} value={resident._id}>
                   {resident.fullName || resident.name || resident._id}
                 </option>
               ))}
             </select>
-            {residentsLoading && <div className="adm-filter-loading">Đang tải danh sách cư dân...</div>}
+            {residentsLoading && <div className="adm-filter-loading">{t('adminInvoices.loadingResidents')}</div>}
           </div>
 
           <div className="adm-filter-group">
-            <label>Ngày phát hành từ</label>
+            <label>{t('adminInvoices.issueDateFromLabel')}</label>
             <input
               type="date"
               value={issueFrom}
@@ -198,7 +201,7 @@ export default function AdminInvoiceManagementPage() {
           </div>
 
           <div className="adm-filter-group">
-            <label>Ngày phát hành đến</label>
+            <label>{t('adminInvoices.issueDateToLabel')}</label>
             <input
               type="date"
               value={issueTo}
@@ -207,7 +210,7 @@ export default function AdminInvoiceManagementPage() {
           </div>
 
           <div className="adm-filter-group">
-            <label>Ngày đến hạn từ</label>
+            <label>{t('adminInvoices.dueDateFromLabel')}</label>
             <input
               type="date"
               value={dueFrom}
@@ -216,7 +219,7 @@ export default function AdminInvoiceManagementPage() {
           </div>
 
           <div className="adm-filter-group">
-            <label>Ngày đến hạn đến</label>
+            <label>{t('adminInvoices.dueDateToLabel')}</label>
             <input
               type="date"
               value={dueTo}
@@ -225,7 +228,7 @@ export default function AdminInvoiceManagementPage() {
           </div>
 
           <div className="adm-filter-group">
-            <label>Số tiền min</label>
+            <label>{t('adminInvoices.minAmountLabel')}</label>
             <input
               type="number"
               min="0"
@@ -236,7 +239,7 @@ export default function AdminInvoiceManagementPage() {
           </div>
 
           <div className="adm-filter-group">
-            <label>Số tiền max</label>
+            <label>{t('adminInvoices.maxAmountLabel')}</label>
             <input
               type="number"
               min="0"
@@ -253,37 +256,37 @@ export default function AdminInvoiceManagementPage() {
                 checked={isOverdue}
                 onChange={(e) => setIsOverdue(e.target.checked)}
               />
-              Chỉ hóa đơn quá hạn
+              {t('adminInvoices.overdueOnlyLabel')}
             </label>
           </div>
 
           <div className="adm-filter-group">
-            <label>Sắp xếp</label>
+            <label>{t('adminInvoices.sortByLabel')}</label>
             <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
-              <option value="issuedAt">Ngày phát hành</option>
-              <option value="dueDate">Ngày đến hạn</option>
-              <option value="totalAmount">Tổng tiền</option>
-              <option value="invoiceNumber">Mã hóa đơn</option>
+              <option value="issuedAt">{t('adminInvoices.issuedAtLabel')}</option>
+              <option value="dueDate">{t('adminInvoices.dueDateLabel')}</option>
+              <option value="totalAmount">{t('adminInvoices.totalAmountLabel')}</option>
+              <option value="invoiceNumber">{t('adminInvoices.invoiceNumberLabel')}</option>
             </select>
           </div>
 
           <div className="adm-filter-group">
-            <label>Thứ tự</label>
+            <label>{t('adminInvoices.sortOrderLabel')}</label>
             <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)}>
-              <option value="desc">Giảm dần</option>
-              <option value="asc">Tăng dần</option>
+              <option value="desc">{t('adminInvoices.sortDesc')}</option>
+              <option value="asc">{t('adminInvoices.sortAsc')}</option>
             </select>
           </div>
 
           <div className="adm-filter-group">
-            <label>Trạng thái</label>
+            <label>{t('common.status')}</label>
             <select value={status} onChange={(e) => setStatus(e.target.value)}>
-              <option value="">Tất cả</option>
-              <option value="issued">Đã phát hành</option>
-              <option value="partially_paid">Đã thanh toán một phần</option>
-              <option value="paid">Đã thanh toán</option>
-              <option value="overdue">Quá hạn</option>
-              <option value="cancelled">Đã hủy</option>
+              <option value="">{t('common.all')}</option>
+              <option value="issued">{t('adminInvoices.statusIssued')}</option>
+              <option value="partially_paid">{t('adminInvoices.statusPartiallyPaid')}</option>
+              <option value="paid">{t('adminInvoices.statusPaid')}</option>
+              <option value="overdue">{t('adminInvoices.statusOverdue')}</option>
+              <option value="cancelled">{t('adminInvoices.statusCancelled')}</option>
             </select>
           </div>
         </div>
@@ -295,26 +298,26 @@ export default function AdminInvoiceManagementPage() {
         <table className="adm-table">
           <thead>
             <tr>
-              <th>Mã hóa đơn</th>
-              <th>Cư dân</th>
-              <th>Tổng</th>
-              <th>Trạng thái</th>
-              <th>Ngày phát hành</th>
-              <th>Hạn thanh toán</th>
-              <th>Hành động</th>
+              <th>{t('adminInvoices.invoiceNumberLabel')}</th>
+              <th>{t('common.resident')}</th>
+              <th>{t('adminInvoices.tableHeaderTotal')}</th>
+              <th>{t('common.status')}</th>
+              <th>{t('adminInvoices.issuedAtLabel')}</th>
+              <th>{t('adminInvoices.dueDateLabel')}</th>
+              <th>{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
                 <td colSpan="7" className="adm-table-loading">
-                  Đang tải...
+                  {t('common.loading')}
                 </td>
               </tr>
             ) : invoices.length === 0 ? (
               <tr>
                 <td colSpan="7" className="adm-table-empty">
-                  Không có hóa đơn.
+                  {t('adminInvoices.emptyRow')}
                 </td>
               </tr>
             ) : (
@@ -330,7 +333,7 @@ export default function AdminInvoiceManagementPage() {
                   <td>{formattedDate(invoice.dueDate)}</td>
                   <td>
                     <button type="button" className="adm-btn-secondary" onClick={() => openDetail(invoice)}>
-                      <Eye size={16} /> Chi tiết
+                      <Eye size={16} /> {t('adminInvoices.detailsButton')}
                     </button>
                   </td>
                 </tr>
@@ -344,7 +347,7 @@ export default function AdminInvoiceManagementPage() {
         <button type="button" className="adm-btn-pagination" onClick={() => handlePageChange(page - 1)} disabled={page <= 1}>
           <ChevronLeft size={16} />
         </button>
-        <span>{`Trang ${page} / ${totalPages}`}</span>
+        <span>{t('common.pageOf', { page, totalPages })}</span>
         <button type="button" className="adm-btn-pagination" onClick={() => handlePageChange(page + 1)} disabled={page >= totalPages}>
           <ChevronRight size={16} />
         </button>
@@ -354,52 +357,57 @@ export default function AdminInvoiceManagementPage() {
         <div className="adm-detail-overlay" onClick={closeDetail}>
           <div className="adm-detail-modal" onClick={(e) => e.stopPropagation()}>
             <div className="adm-detail-header">
-              <h2>Chi tiết hóa đơn</h2>
+              <h2>{t('adminInvoices.detailTitle')}</h2>
               <button type="button" className="adm-btn-secondary" onClick={closeDetail}>
-                Đóng
+                {t('common.close')}
               </button>
             </div>
             <div className="adm-detail-grid">
               <div className="adm-detail-item">
-                <span className="adm-detail-label">Mã hóa đơn</span>
+                <span className="adm-detail-label">{t('adminInvoices.invoiceNumberLabel')}</span>
                 <span className="adm-detail-value">{selectedInvoice.invoiceNumber || '-'}</span>
               </div>
               <div className="adm-detail-item">
-                <span className="adm-detail-label">Cư dân</span>
+                <span className="adm-detail-label">{t('common.resident')}</span>
                 <span className="adm-detail-value">{selectedInvoice.residentId?.fullName || selectedInvoice.residentId || '-'}</span>
               </div>
               <div className="adm-detail-item">
-                <span className="adm-detail-label">Trạng thái</span>
+                <span className="adm-detail-label">{t('common.status')}</span>
                 <span className="adm-detail-value">
                   <span className={getStatusBadgeClass(selectedInvoice.status)}>{translateStatus(selectedInvoice.status)}</span>
                 </span>
               </div>
               <div className="adm-detail-item">
-                <span className="adm-detail-label">Tổng tiền</span>
+                <span className="adm-detail-label">{t('adminInvoices.totalAmountLabel')}</span>
                 <span className="adm-detail-value">{selectedInvoice.totalAmount?.toLocaleString('vi-VN')}₫</span>
               </div>
               <div className="adm-detail-item">
-                <span className="adm-detail-label">Phương án thanh toán</span>
-                <span className="adm-detail-value">{selectedInvoice.paymentPlan === 'HALF_NOW' ? '50% trước, còn lại theo tháng' : 'Thanh toán 1 lần'}</span>
+                <span className="adm-detail-label">{t('adminInvoices.paymentPlanLabel')}</span>
+                <span className="adm-detail-value">{selectedInvoice.paymentPlan === 'HALF_NOW' ? t('adminInvoices.paymentPlanHalfNow') : t('adminInvoices.paymentPlanFull')}</span>
               </div>
               {selectedInvoice.remainingAmount > 0 && (
                 <div className="adm-detail-item">
-                  <span className="adm-detail-label">Số tiền còn lại</span>
+                  <span className="adm-detail-label">{t('adminInvoices.remainingAmountLabel')}</span>
                   <span className="adm-detail-value">{selectedInvoice.remainingAmount?.toLocaleString('vi-VN')}₫</span>
                 </div>
               )}
               <div className="adm-detail-item adm-detail-item--full">
-                <span className="adm-detail-label">Chi phí chi tiết</span>
+                <span className="adm-detail-label">{t('adminInvoices.costBreakdownLabel')}</span>
                 <span className="adm-detail-value">
-                  Phòng: {selectedInvoice.roomCost?.toLocaleString('vi-VN')}₫ · Dịch vụ: {selectedInvoice.careServiceCost?.toLocaleString('vi-VN')}₫ · Thuốc: {selectedInvoice.medicationCost?.toLocaleString('vi-VN')}₫ · Khác: {selectedInvoice.otherCost?.toLocaleString('vi-VN')}₫
+                  {t('adminInvoices.costBreakdownValue', {
+                    room: selectedInvoice.roomCost?.toLocaleString('vi-VN'),
+                    service: selectedInvoice.careServiceCost?.toLocaleString('vi-VN'),
+                    medication: selectedInvoice.medicationCost?.toLocaleString('vi-VN'),
+                    other: selectedInvoice.otherCost?.toLocaleString('vi-VN'),
+                  })}
                 </span>
               </div>
               <div className="adm-detail-item">
-                <span className="adm-detail-label">Ngày phát hành</span>
+                <span className="adm-detail-label">{t('adminInvoices.issuedAtLabel')}</span>
                 <span className="adm-detail-value">{formattedDate(selectedInvoice.issuedAt)}</span>
               </div>
               <div className="adm-detail-item">
-                <span className="adm-detail-label">Hạn thanh toán</span>
+                <span className="adm-detail-label">{t('adminInvoices.dueDateLabel')}</span>
                 <span className="adm-detail-value">{formattedDate(selectedInvoice.dueDate)}</span>
               </div>
             </div>

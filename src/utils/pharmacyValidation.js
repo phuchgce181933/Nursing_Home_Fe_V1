@@ -209,23 +209,23 @@ export const getApiErrorMessage = (err, fallbackMessage) => {
     fallbackMessage;
 
   const lowerMessage = String(message).toLowerCase();
-  if (lowerMessage.includes('supplier name already exists')) {
+  if (lowerMessage.includes('tên nhà cung cấp đã tồn tại') || lowerMessage.includes('supplier name already exists')) {
     return 'Tên nhà cung cấp đã tồn tại.';
   }
 
-  if (lowerMessage.includes('email already exists') || lowerMessage.includes('email is already in use')) {
+  if (lowerMessage.includes('email đã tồn tại') || lowerMessage.includes('email already exists') || lowerMessage.includes('email is already in use')) {
     return 'Email đã tồn tại.';
   }
 
-  if (lowerMessage.includes('minstocklevel') && (lowerMessage.includes('less than minimum') || lowerMessage.includes('greater than 1000'))) {
+  if (lowerMessage.includes('minstocklevel') && (lowerMessage.includes('phải lớn hơn 1000') || lowerMessage.includes('less than minimum') || lowerMessage.includes('greater than 1000'))) {
     return 'Mức tối thiểu phải lớn hơn 1000.';
   }
 
-  if (lowerMessage.includes('same name and supplier')) {
+  if (lowerMessage.includes('cùng tên và nhà cung cấp') || lowerMessage.includes('same name and supplier')) {
     return 'Thuốc đã được tạo.';
   }
 
-  if (lowerMessage.includes('already exists')) {
+  if (lowerMessage.includes('đã tồn tại') || lowerMessage.includes('already exists')) {
     return 'Dữ liệu đã tồn tại.';
   }
 

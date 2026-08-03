@@ -1302,11 +1302,11 @@ function EditPrescriptionModal({ prescription, onSave, onClose }) {
           {/* Read-only fields */}
           <div className="cpf-row-2">
             <div className="cpf-field">
-              <label className="cpf-label">{t('medication.medicationName')} <span className="edit-readonly">READ ONLY</span></label>
+              <label className="cpf-label">{t('medication.medicationName')} <span className="edit-readonly">{t('medication.readOnly')}</span></label>
               <input className="cpf-input edit-input--readonly" value={current.medicationName} readOnly />
             </div>
             <div className="cpf-field">
-              <label className="cpf-label">{t('medication.dosage')} <span className="edit-readonly">READ ONLY</span></label>
+              <label className="cpf-label">{t('medication.dosage')} <span className="edit-readonly">{t('medication.readOnly')}</span></label>
               <input className="cpf-input edit-input--readonly" value={`${current.dosage} ${current.unit}`} readOnly />
             </div>
           </div>
@@ -1903,13 +1903,27 @@ function DoctorMedicationPage() {
 
   const closeModal = () => setModal({ type: null, prescription: null });
 
+  // Informational-only stock warnings never block save — just let the doctor know so
+  // they can flag it to the pharmacist (who also gets a system notification).
+  const showStockWarnings = (warnings) => {
+    const stockWarnings = (warnings || []).filter((w) => w.type === 'INSUFFICIENT_STOCK');
+    if (!stockWarnings.length) return;
+    const names = stockWarnings.map((w) => w.medicationName).join(', ');
+    showToast(
+      t('medication.insufficientStockWarning', 'Kho có thể không đủ thuốc cho: {{names}}. Đã báo cho dược sĩ.', { names }),
+      'info',
+      8000
+    );
+  };
+
   const handleCreate = async (payload) => {
     try {
-      await medicationService.createPrescription(payload);
+      const result = await medicationService.createPrescription(payload);
       closeModal();
       loadPrescriptions(payload.residentId);
       if (!selectedResidentId) setSelectedResidentId(payload.residentId);
       showToast(t('medication.createSuccess', 'Đã tạo đơn thuốc thành công'), 'success');
+      showStockWarnings(result?.warnings);
     } catch (err) {
       showToast(err.response?.data?.message || t('medication.createError'), 'error');
       throw err;
@@ -1918,10 +1932,11 @@ function DoctorMedicationPage() {
 
   const handleEditPrescription = async (id, payload) => {
     try {
-      await medicationService.updatePrescription(id, payload);
+      const result = await medicationService.updatePrescription(id, payload);
       closeModal();
       loadPrescriptions(selectedResidentId);
       showToast(t('medication.updateSuccess', 'Đã cập nhật đơn thuốc thành công'), 'success');
+      showStockWarnings(result?.warnings);
     } catch (err) {
       showToast(err.response?.data?.message || t('medication.updateError'), 'error');
       throw err;

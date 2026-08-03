@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { Eye, EyeOff } from 'lucide-react';
 import authService from '../services/auth.service';
 
 function ResetPasswordPage() {
@@ -7,6 +8,8 @@ function ResetPasswordPage() {
   const token = searchParams.get('token') || '';
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [message, setMessage] = useState('');
   const [isSuccess, setIsSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -63,28 +66,48 @@ function ResetPasswordPage() {
         )}
 
         <form className="login-form" onSubmit={handleSubmit}>
-          <div className="login-form__group">
+          <div className="login-form__group login-form__group--password">
             <label className="login-form__label">Mật khẩu mới</label>
-            <input
-              type="password"
-              className="login-form__input"
-              value={newPassword}
-              onChange={(event) => setNewPassword(event.target.value)}
-              placeholder="Nhập mật khẩu mới"
-              required
-            />
+            <div className="login-form__password-wrapper">
+              <input
+                type={showNewPassword ? 'text' : 'password'}
+                className="login-form__input login-form__input--password"
+                value={newPassword}
+                onChange={(event) => setNewPassword(event.target.value)}
+                placeholder="Nhập mật khẩu mới"
+                required
+              />
+              <button
+                type="button"
+                className="login-form__password-toggle"
+                onClick={() => setShowNewPassword((prev) => !prev)}
+                aria-label={showNewPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+              >
+                {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
           </div>
 
-          <div className="login-form__group">
+          <div className="login-form__group login-form__group--password">
             <label className="login-form__label">Xác nhận mật khẩu</label>
-            <input
-              type="password"
-              className="login-form__input"
-              value={confirmPassword}
-              onChange={(event) => setConfirmPassword(event.target.value)}
-              placeholder="Nhập lại mật khẩu mới"
-              required
-            />
+            <div className="login-form__password-wrapper">
+              <input
+                type={showConfirmPassword ? 'text' : 'password'}
+                className="login-form__input login-form__input--password"
+                value={confirmPassword}
+                onChange={(event) => setConfirmPassword(event.target.value)}
+                placeholder="Nhập lại mật khẩu mới"
+                required
+              />
+              <button
+                type="button"
+                className="login-form__password-toggle"
+                onClick={() => setShowConfirmPassword((prev) => !prev)}
+                aria-label={showConfirmPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+              >
+                {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
           </div>
 
           <button type="submit" className="login-form__button" disabled={loading || !canSubmit}>

@@ -118,6 +118,12 @@ const deleteConversation = async (conversationId) => {
   return response.data;
 };
 
+/** Marks every message in the conversation as read by the current user. */
+const markMessagesRead = async (conversationId) => {
+  const response = await axiosClient.patch(`${base()}/${conversationId}/messages/read`);
+  return response.data;
+};
+
 export default {
   createConversation,
   createStaffConversation,
@@ -131,6 +137,7 @@ export default {
   sendMessage,
   sendGuestMessage,
   deleteConversation,
+  markMessagesRead,
   searchConversations,
   searchMessages,
 };

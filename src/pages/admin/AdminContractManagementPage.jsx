@@ -23,6 +23,7 @@ import residentService from '../../services/resident.service';
 import servicePackageService from '../../services/servicePackage.service';
 import facilityService from '../../services/facility.service';
 import { resolveApiError } from '../../utils/apiMessage';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import '../../styles/admin/AdminContractManagementPage.css';
 
 const getContractStatusClass = (startDate, endDate, contractStatus) => {
@@ -159,6 +160,7 @@ export default function AdminContractManagementPage() {
   const [isChangingPackage, setIsChangingPackage] = useState(false);
   const [packageError, setPackageError] = useState('');
   const [isReleasingResident, setIsReleasingResident] = useState(false);
+  const [pendingReleaseContract, setPendingReleaseContract] = useState(null);
 
   const formatDate = (dateStr) => {
     if (!dateStr) return 'N/A';
@@ -256,15 +258,19 @@ export default function AdminContractManagementPage() {
     return overdueDays > 7;
   };
 
-  const handleReleaseResident = async (contract) => {
+  const handleReleaseResident = (contract) => {
     if (!contract || !contract.residentId) return;
-    const confirmMessage = `Bạn có muốn giải phóng phòng/giường cho cư dân ${contract.residentName || ''}?`;
-    if (!window.confirm(confirmMessage)) return;
+    setPendingReleaseContract(contract);
+  };
 
+  const confirmReleaseResident = async () => {
+    const contract = pendingReleaseContract;
+    if (!contract) return;
     setIsReleasingResident(true);
     setError('');
     try {
       await residentService.adminReleaseResident(contract.residentId);
+      setPendingReleaseContract(null);
       await fetchContracts();
     } catch (err) {
       setError(resolveApiError(err) || 'Không thể giải phóng phòng/giường cư dân.');
@@ -349,7 +355,7 @@ export default function AdminContractManagementPage() {
       console.log('Contract data fetched:', contractData[0]); // Debug log to check latestInvoice field
       setContracts(contractData);
     } catch (err) {
-      setError(err.message || 'Failed to fetch contracts');
+      setError(err.message || 'Không thể tải danh sách hợp đồng');
       console.error('Error fetching contracts:', err);
     } finally {
       setIsLoading(false);
@@ -2241,6 +2247,14 @@ export default function AdminContractManagementPage() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!pendingReleaseContract}
+        message={`Bạn có muốn giải phóng phòng/giường cho cư dân ${pendingReleaseContract?.residentName || ''}?`}
+        loading={isReleasingResident}
+        onConfirm={confirmReleaseResident}
+        onCancel={() => setPendingReleaseContract(null)}
+      />
     </div>
   );
 }

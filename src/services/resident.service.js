@@ -434,7 +434,7 @@ const enrichResidentDetail = async (residentIdOrCode, resident) => {
 /** GET /api/residents/:id — full profile; enriches drugAllergies / pre-existing / initial health if missing */
 const getResidentDetail = async (residentIdOrCode) => {
   const base = await getResidentDetailRaw(residentIdOrCode);
-  if (!base) throw new Error('Resident not found');
+  if (!base) throw new Error('Không tìm thấy cư dân');
   const resident = await enrichResidentDetail(residentIdOrCode, base);
   return { resident };
 };
@@ -650,7 +650,7 @@ const listDrugAllergies = async (params = {}) => {
 };
 
 const getInitialHealthFallback = async (residentId) => {
-  if (!r) throw new Error('Resident not found');
+  if (!r) throw new Error('Không tìm thấy cư dân');
 
   const initialHealthCondition = r.initialHealthCondition || '';
   return {
@@ -765,7 +765,7 @@ export const RESIDENT_TRANSFER_ROUTE_HINT =
 
 const getPreExistingConditionsFallback = async (residentId) => {
   const r = await getResidentDetailRaw(residentId);
-  if (!r) throw new Error('Resident not found');
+  if (!r) throw new Error('Không tìm thấy cư dân');
   const chronic = r.chronicConditions || [];
   const history = r.medicalHistory || [];
   return {
@@ -869,7 +869,7 @@ const updatePreExistingConditions = async (residentId, body) => {
 
 const getDrugAllergiesFallback = async (residentId) => {
   const r = await getResidentDetailRaw(residentId);
-  if (!r) throw new Error('Resident not found');
+  if (!r) throw new Error('Không tìm thấy cư dân');
   return {
     resident: r,
     drugAllergies: mapDrugAllergiesFromResident(r),
