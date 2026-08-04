@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import residentService from '../../../services/resident.service';
 import { useAuth } from '../../../hooks/useAuth';
+import { useToast } from '../../../hooks/useToast';
 import FamilyAccountPicker from '../../../components/ui/FamilyAccountPicker';
 import '../../../styles/admin/ResidentPage.css';
 import { resolveApiError } from '../../../utils/apiMessage';
@@ -156,6 +157,7 @@ const emptyPersonalForm = {
 
 function ResidentPage({ defaultMode = '' }) {
   const { t } = useTranslation();
+  const { showToast } = useToast();
   const { user } = useAuth();
   const isManager = user?.role === 'manager';
   const canManageResidents = !isManager;
@@ -306,7 +308,7 @@ function ResidentPage({ defaultMode = '' }) {
     if (!file || !selectedResidentId) return;
     // basic validations
     if (file.size > 5 * 1024 * 1024) {
-      alert('Ảnh quá lớn. Kích thước tối đa 5MB.');
+      showToast('Ảnh quá lớn. Kích thước tối đa 5MB.', 'error');
       return;
     }
 
@@ -317,7 +319,7 @@ function ResidentPage({ defaultMode = '' }) {
       setSelectedResident(resident);
     } catch (err) {
       console.error('Upload avatar failed', err);
-      alert(resolveApiError(err, t, 'admin.residents.common.updateFailed'));
+      showToast(resolveApiError(err, t, 'admin.residents.common.updateFailed'), 'error');
     } finally {
       setAvatarUploading(false);
       event.target.value = '';
@@ -541,7 +543,7 @@ function ResidentPage({ defaultMode = '' }) {
   const removeContact = (index, setter, current) => {
     const contact = current[index];
     if (contact?.isPrimary && contact?._id) {
-      alert(t('admin.residents.family.cannotDeletePrimary'));
+      showToast(t('admin.residents.family.cannotDeletePrimary'), 'error');
       return;
     }
     const next = [...current];

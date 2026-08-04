@@ -14,6 +14,7 @@ import useDebouncedSearch from '../../../../hooks/useDebouncedSearch';
 import '../../../../styles/admin/residentActionIcons.css';
 import '../../../../styles/admin/FamilyManagementPage.css';
 import { getGenderLabel, getResidencyLabel } from '../_shared/residentLabels';
+import { useToast } from '../../../../hooks/useToast';
 
 const emptyContact = () => ({
   fullName: '',
@@ -135,6 +136,7 @@ function ContactFormModal({ mode, initial, saving, error, onSave, onClose, relat
 
 export default function FamilyManagementPage() {
   const { t } = useTranslation();
+  const { showToast } = useToast();
   const relationshipSuggestions = useMemo(
     () => [
       t('admin.residents.family.relationships.son'),
@@ -285,7 +287,7 @@ export default function FamilyManagementPage() {
 
   const handleDeleteContact = (contact) => {
     if (contact.isPrimary) {
-      alert(t('admin.residents.family.cannotDeletePrimary'));
+      showToast(t('admin.residents.family.cannotDeletePrimary'), 'error');
       return;
     }
     setPendingDeleteContact(contact);
@@ -300,7 +302,7 @@ export default function FamilyManagementPage() {
       setPendingDeleteContact(null);
       await refreshAfterContactChange();
     } catch (e) {
-      alert(e.response?.data?.message || t('admin.residents.common.deleteFailed'));
+      showToast(e.response?.data?.message || t('admin.residents.common.deleteFailed'), 'error');
     } finally {
       setDeleteContactSaving(false);
     }
@@ -313,7 +315,7 @@ export default function FamilyManagementPage() {
       setPanelMsg(t('admin.residents.common.setPrimarySuccess', { name: contact.fullName }));
       await refreshAfterContactChange();
     } catch (e) {
-      alert(e.response?.data?.message || t('admin.residents.common.updateFailed'));
+      showToast(e.response?.data?.message || t('admin.residents.common.updateFailed'), 'error');
     }
   };
 

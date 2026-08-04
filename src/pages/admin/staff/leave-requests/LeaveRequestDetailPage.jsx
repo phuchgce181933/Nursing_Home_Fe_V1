@@ -7,6 +7,7 @@ import AdminPageShell from '../../../../components/admin/AdminPageShell';
 import { resolveApiError } from '../../../../utils/apiMessage';
 import { formatLeaveDate } from '../../../../utils/leaveUtils';
 import { useAuth } from '../../../../hooks/useAuth';
+import { useToast } from '../../../../hooks/useToast';
 import ApproveLeaveModal from './ApproveLeaveModal';
 import {
   STATUS_LABELS,
@@ -20,6 +21,7 @@ import '../../../../styles/admin/LeaveRequestAdminPage.css';
 
 export default function LeaveRequestDetailPage() {
   const { t } = useTranslation();
+  const { showToast } = useToast();
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -69,7 +71,7 @@ export default function LeaveRequestDetailPage() {
   const handleReject = async () => {
     const note = rejectNote.trim();
     if (!note) {
-      alert(t('admin.staff.leaveRequests.rejectReasonRequired'));
+      showToast(t('admin.staff.leaveRequests.rejectReasonRequired'), 'error');
       return;
     }
     setActionLoading(true);
@@ -78,7 +80,7 @@ export default function LeaveRequestDetailPage() {
       setRejectNote('');
       await loadRequest();
     } catch (e) {
-      alert(resolveApiError(e, t, 'admin.staff.leaveRequests.actionFailed'));
+      showToast(resolveApiError(e, t, 'admin.staff.leaveRequests.actionFailed'), 'error');
     } finally {
       setActionLoading(false);
     }

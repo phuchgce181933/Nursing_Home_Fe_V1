@@ -13,10 +13,12 @@ import {
 import facilityService from '../../../services/facility.service';
 import useFacilitiesData from './useFacilitiesData';
 import FacilitiesSubNav from './FacilitiesSubNav';
+import { useToast } from '../../../hooks/useToast';
 import '../../../styles/admin/FacilitiesPage.css';
 
 export default function BuildingsPage() {
   const { t } = useTranslation();
+  const { showToast } = useToast();
 
   // Buildings tab doesn't use the floors list, so skip fetching it.
   const { loading, stats, buildings, refetch } = useFacilitiesData({ withFloors: false });
@@ -148,7 +150,7 @@ export default function BuildingsPage() {
       refetch();
     } catch (err) {
       console.error(err);
-      alert(err.response?.data?.message || 'Vô hiệu hóa tòa nhà thất bại.');
+      showToast(err.response?.data?.message || 'Vô hiệu hóa tòa nhà thất bại.', 'error');
     } finally {
       setSubmitting(false);
     }

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Settings, Bell, Trash2, CheckCheck, AlertTriangle, ChevronLeft, ChevronRight, X, Search } from 'lucide-react';
 import notificationsService from '../../services/notifications.service';
 
@@ -28,6 +29,7 @@ function NotificationSkeletonRow({ delay }) {
 }
 
 function NotificationsPage({ role = 'family' }) {
+  const navigate = useNavigate();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -111,6 +113,22 @@ function NotificationsPage({ role = 'family' }) {
     } catch (err) {
       console.error(err);
     }
+  };
+
+  // Deep-link to the underlying record for notification types we have a detail view
+  // for, instead of leaving every notification as a dead click.
+  const getDetailLink = (n) => {
+    if (role === 'admin' && n.targetEntityType === 'ConsultationRequest' && n.targetEntityId) {
+      return `/admin/consultation-requests?requestId=${n.targetEntityId}`;
+    }
+    return null;
+  };
+
+  const handleOpenDetail = async (n) => {
+    const link = getDetailLink(n);
+    if (!link) return;
+    if (!n.isRead) await handleMarkRead(n._id);
+    navigate(link);
   };
 
   const handleDelete = async (id) => {
@@ -374,7 +392,12 @@ function NotificationsPage({ role = 'family' }) {
                   onChange={() => toggleSelect(n._id)}
                   className="mt-1 h-4 w-4 flex-shrink-0 rounded border-outline-variant"
                 />
-                <div className="min-w-0 flex-1">
+                <div
+                  className={`min-w-0 flex-1 ${getDetailLink(n) ? 'cursor-pointer' : ''}`}
+                  onClick={() => handleOpenDetail(n)}
+                  role={getDetailLink(n) ? 'button' : undefined}
+                  tabIndex={getDetailLink(n) ? 0 : undefined}
+                >
                   <div className="flex flex-wrap items-center gap-2">
                     <strong className="text-sm font-bold text-slate-800">{getNotificationTitle(n)}</strong>
                     {!n.isRead && (
@@ -388,6 +411,9 @@ function NotificationsPage({ role = 'family' }) {
                   </div>
                   <div className="mt-1.5 whitespace-pre-wrap text-sm text-slate-600">{getNotificationContent(n)}</div>
                   <div className="mt-1.5 text-xs text-slate-400">{new Date(n.updatedAt || n.createdAt).toLocaleString('vi-VN')}</div>
+                  {getDetailLink(n) && (
+                    <div className="mt-1 text-xs font-semibold text-navy-deep">Xem chi tiết yêu cầu →</div>
+                  )}
                 </div>
               </div>
 

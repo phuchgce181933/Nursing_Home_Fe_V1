@@ -29,6 +29,7 @@ import {
   Download,
 } from 'lucide-react';
 import pharmacyService from '../../services/pharmacy.service';
+import { useToast } from '../../hooks/useToast';
 import {
   validateMedicationForm,
   buildMedicationPayload,
@@ -238,6 +239,7 @@ const emptyStockForm = {
 };
 
 function PharmacyPage({ defaultTab = 'overview' }) {
+  const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState(defaultTab);
   const location = useLocation();
   const navigate = useNavigate();
@@ -523,7 +525,7 @@ function PharmacyPage({ defaultTab = 'overview' }) {
 
   const exportToExcel = useCallback(() => {
     if (aggregatedReportData.length === 0) {
-      alert('Không có dữ liệu để xuất. Vui lòng tải dữ liệu trước.');
+      showToast('Không có dữ liệu để xuất. Vui lòng tải dữ liệu trước.', 'error');
       return;
     }
 

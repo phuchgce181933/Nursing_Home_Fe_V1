@@ -26,6 +26,7 @@ import medicalRecordService from '../../services/medicalRecord.service';
 import clinicalServiceService from '../../services/clinicalService.service';
 import residentService from '../../services/resident.service';
 import { useAuth } from '../../hooks/useAuth';
+import { useToast } from '../../hooks/useToast';
 import '../../styles/shared/HealthMonitoringPage.css';
 
 // ─── Ngưỡng bất thường (sync với backend checkAbnormalVitals) ───
@@ -184,12 +185,14 @@ const exportToCSV = (records, resident) => {
 };
 
 // ── Xuất PDF (client-side) ──
-const exportToPDF = (records, resident) => {
+// onBlocked lets the calling component show its own in-app toast instead of a native
+// alert; falls back to alert() for any caller that doesn't pass one.
+const exportToPDF = (records, resident, onBlocked = (msg) => alert(msg)) => {
   if (!records.length) return;
-  
+
   const printWindow = window.open('', '_blank', 'width=1000,height=900');
   if (!printWindow) {
-    alert('Vui lòng cho phép trình duyệt mở cửa sổ bật lên (pop-up) để xuất báo cáo PDF.');
+    onBlocked('Vui lòng cho phép trình duyệt mở cửa sổ bật lên (pop-up) để xuất báo cáo PDF.');
     return;
   }
   
@@ -647,6 +650,7 @@ function VitalChart({ records, metricKey }) {
 // ─── Main Component ─────────────────────────────────────────────────────────────
 export default function HealthMonitoringPage() {
   const { user } = useAuth();
+  const { showToast } = useToast();
 
   // ── Danh sách cư dân ──
   const [residents, setResidents] = useState([]);
@@ -1509,7 +1513,7 @@ export default function HealthMonitoringPage() {
                   <button
                     className="hm-btn hm-btn-export"
                     style={{ fontSize: '12px', padding: '6px 12px', backgroundColor: '#fee2e2', color: '#dc2626', borderColor: '#fecaca' }}
-                    onClick={() => exportToPDF(records, selectedResident)}
+                    onClick={() => exportToPDF(records, selectedResident, (msg) => showToast(msg, 'error'))}
                     disabled={records.length === 0}
                     title="Xuất báo cáo PDF"
                   >

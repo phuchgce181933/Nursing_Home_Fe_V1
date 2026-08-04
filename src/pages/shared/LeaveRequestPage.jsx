@@ -16,6 +16,7 @@ import { calcInclusiveLeaveDays, formatLeaveDate } from '../../utils/leaveUtils'
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import '../../styles/shared/LeaveRequestPage.css';
 import { resolveApiError } from '../../utils/apiMessage';
+import { useToast } from '../../hooks/useToast';
 
 const minStartDate = (type) => {
   if (type === 'emergency') return new Date().toISOString().slice(0, 10);
@@ -28,6 +29,7 @@ const emptyForm = { type: 'annual', startDate: '', endDate: '', reason: '' };
 
 export default function LeaveRequestPage() {
   const { t } = useTranslation();
+  const { showToast } = useToast();
 
   const STATUS_DISPLAY = {
     draft: t('leaveRequest.statusDraft'),
@@ -121,7 +123,7 @@ export default function LeaveRequestPage() {
       await leaveRequestService.cancel(id);
       setMyRequests((prev) => prev.map((r) => (r._id === id ? { ...r, status: 'cancelled' } : r)));
     } catch (err) {
-      alert(resolveApiError(err, t, 'leaveRequest.cancelFailed'));
+      showToast(resolveApiError(err, t, 'leaveRequest.cancelFailed'), 'error');
     } finally {
       setCancelId(null);
       setCancelModal(null);

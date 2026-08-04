@@ -15,6 +15,7 @@ import {
   ShieldAlert,
 } from 'lucide-react';
 import facilityTourService from '../../../services/facilityTour.service';
+import { useToast } from '../../../hooks/useToast';
 
 const formatViDate = (dateStr) => {
   if (!dateStr) return 'N/A';
@@ -88,6 +89,7 @@ const TIME_SLOTS_OPTIONS = [
 ];
 
 export default function AdminTourDetailDrawer({ isOpen, onClose, tourId, onActionSuccess }) {
+  const { showToast } = useToast();
   const [tour, setTour] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -161,7 +163,7 @@ export default function AdminTourDetailDrawer({ isOpen, onClose, tourId, onActio
       setTour(res?.tour || null);
     } catch (err) {
       console.error('Failed to approve tour request:', err);
-      alert(err.response?.data?.message || 'Đã xảy ra lỗi khi duyệt yêu cầu tham quan. Vui lòng thử lại.');
+      showToast(err.response?.data?.message || 'Đã xảy ra lỗi khi duyệt yêu cầu tham quan. Vui lòng thử lại.', 'error');
     } finally {
       setApproving(false);
     }
@@ -187,7 +189,7 @@ export default function AdminTourDetailDrawer({ isOpen, onClose, tourId, onActio
       setTour(res?.tour || null);
     } catch (err) {
       console.error('Failed to reject tour request:', err);
-      alert(err.response?.data?.message || 'Đã xảy ra lỗi khi từ chối yêu cầu tham quan.');
+      showToast(err.response?.data?.message || 'Đã xảy ra lỗi khi từ chối yêu cầu tham quan.', 'error');
     } finally {
       setRejecting(false);
     }
@@ -203,7 +205,7 @@ export default function AdminTourDetailDrawer({ isOpen, onClose, tourId, onActio
       setTour(res?.tour || null);
     } catch (err) {
       console.error('Failed to complete tour:', err);
-      alert(err.response?.data?.message || 'Đã xảy ra lỗi khi xác nhận hoàn tất tham quan.');
+      showToast(err.response?.data?.message || 'Đã xảy ra lỗi khi xác nhận hoàn tất tham quan.', 'error');
     } finally {
       setCompleting(false);
     }

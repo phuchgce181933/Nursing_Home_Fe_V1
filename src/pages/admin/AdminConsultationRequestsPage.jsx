@@ -1,11 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Search, Filter, Calendar, RefreshCw, AlertCircle, Eye, CheckCircle, MessageCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import consultationRequestService from '../../services/consultationRequest.service';
+import { useToast } from '../../hooks/useToast';
 import '../../styles/admin/AdminConsultationRequestsPage.css';
 
 export default function AdminConsultationRequestsPage() {
   const { t } = useTranslation();
+  const { showToast } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -135,6 +139,37 @@ export default function AdminConsultationRequestsPage() {
     setEditNotes(request.adminNotes || '');
   };
 
+  // Deep-link support: opening this page with ?requestId=... (e.g. from a "Yêu cầu tư
+  // vấn mới" notification) fetches that request directly and opens its detail overlay,
+  // regardless of the current page/filters, then clears the param so it isn't re-triggered.
+  useEffect(() => {
+    const requestId = searchParams.get('requestId');
+    if (!requestId) return;
+    let cancelled = false;
+    consultationRequestService
+      .adminGetConsultationRequestDetail(requestId)
+      .then((request) => {
+        if (!cancelled && request) handleEdit(request);
+      })
+      .catch((err) => {
+        console.error(err);
+        if (!cancelled) {
+          showToast(err.response?.data?.message || err.message || t('admin.consultationRequests.loadError', 'Không thể tải danh sách yêu cầu tư vấn.'), 'error');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setSearchParams((prev) => {
+            const next = new URLSearchParams(prev);
+            next.delete('requestId');
+            return next;
+          }, { replace: true });
+        }
+      });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
   const handleSave = async () => {
     if (!editingRequest) return;
     const notesChanged = editNotes.trim() !== (editingRequest.adminNotes || '').trim();
@@ -151,10 +186,10 @@ export default function AdminConsultationRequestsPage() {
       setEditStatus('');
       setEditNotes('');
       fetchRequests();
-      alert(t('admin.consultationRequests.saveSuccess', 'Đã cập nhật yêu cầu tư vấn thành công.'));
+      showToast(t('admin.consultationRequests.saveSuccess', 'Đã cập nhật yêu cầu tư vấn thành công.'), 'success');
     } catch (err) {
       console.error(err);
-      alert(err.response?.data?.message || err.message || t('admin.consultationRequests.saveError', 'Không thể cập nhật yêu cầu tư vấn.'));
+      showToast(err.response?.data?.message || err.message || t('admin.consultationRequests.saveError', 'Không thể cập nhật yêu cầu tư vấn.'), 'error');
     } finally {
       setSaving(false);
     }

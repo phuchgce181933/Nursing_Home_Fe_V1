@@ -4,10 +4,12 @@ import { Plus, Edit, Trash2, Loader2, X, AlertTriangle, Activity } from 'lucide-
 import facilityService from '../../../services/facility.service';
 import useFacilitiesData from './useFacilitiesData';
 import FacilitiesSubNav from './FacilitiesSubNav';
+import { useToast } from '../../../hooks/useToast';
 import '../../../styles/admin/FacilitiesPage.css';
 
 export default function RoomsPage() {
   const { t } = useTranslation();
+  const { showToast } = useToast();
 
   const { loading, setLoading, stats, buildings, floors, refetch } = useFacilitiesData({ withFloors: true });
 
@@ -183,7 +185,7 @@ export default function RoomsPage() {
       refetch();
     } catch (err) {
       console.error(err);
-      alert(err.response?.data?.message || 'Đóng phòng thất bại.');
+      showToast(err.response?.data?.message || 'Đóng phòng thất bại.', 'error');
     } finally {
       setSubmitting(false);
     }

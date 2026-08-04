@@ -8,6 +8,7 @@ import useDebouncedSearch from '../../../../hooks/useDebouncedSearch';
 import useClientPagination from '../../../../hooks/useClientPagination';
 import staffService from '../../../../services/staff.service';
 import useAuth from '../../../../hooks/useAuth';
+import { useToast } from '../../../../hooks/useToast';
 import {
   canActorManageStaffMember,
   getCreatableRoleOptions,
@@ -35,6 +36,7 @@ const emptyEditForm = {
 
 export default function StaffManagementPage() {
   const { t } = useTranslation();
+  const { showToast } = useToast();
   const { user } = useAuth();
   const actorRole = user?.role;
   const roleOptions = useMemo(() => getCreatableRoleOptions(actorRole), [actorRole]);
@@ -227,7 +229,7 @@ export default function StaffManagementPage() {
       );
       setBanStaff(null);
     } catch (e) {
-      alert(resolveApiError(e, t, 'admin.staff.profiles.banFailed'));
+      showToast(resolveApiError(e, t, 'admin.staff.profiles.banFailed'), 'error');
     } finally {
       setBanLoading(false);
     }
@@ -242,7 +244,7 @@ export default function StaffManagementPage() {
       );
       setBanStaff(null);
     } catch (e) {
-      alert(resolveApiError(e, t, 'admin.staff.profiles.unbanFailed'));
+      showToast(resolveApiError(e, t, 'admin.staff.profiles.unbanFailed'), 'error');
     } finally {
       setBanLoading(false);
     }

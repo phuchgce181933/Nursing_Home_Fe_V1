@@ -85,7 +85,7 @@ export const exportResidentListToCSV = (residents, meta = {}) => {
   downloadCsv(filename, getCsvHeaders(), rows, preambleRows);
 };
 
-export const exportResidentListToPDF = (residents, meta = {}) => {
+export const exportResidentListToPDF = (residents, meta = {}, onBlocked) => {
   if (!residents?.length) return;
 
   const exportedAt = new Date().toLocaleString(getLocale());
@@ -165,5 +165,6 @@ export const exportResidentListToPDF = (residents, meta = {}) => {
       styles: buildReportStyles({ accent: '#0f766e', accentDark: '#0f172a' }),
       content,
     },
+    ...(onBlocked ? { onBlocked } : {}),
   });
 };

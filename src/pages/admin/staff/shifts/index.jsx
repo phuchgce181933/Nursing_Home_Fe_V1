@@ -23,6 +23,7 @@ import {
 import { canAssignShift } from '../../../../utils/staffAssignable';
 import { isStaffOnLeaveForAssignment } from '../../../../utils/leaveUtils';
 import { getApiErrorPayload, blockingCareTasksMessage } from '../../../../utils/blockingCareTasks';
+import { useToast } from '../../../../hooks/useToast';
 import BlockingCareTasksAlert from '../../../../components/staff/BlockingCareTasksAlert';
 import { useTranslation } from 'react-i18next';
 import { resolveApiError } from '../../../../utils/apiMessage';
@@ -827,6 +828,7 @@ function UpdateShiftModal({ shift, templates, onSave, onClose }) {
 
 function AssignTab() {
   const { t, i18n } = useTranslation();
+  const { showToast } = useToast();
   const shiftStatusLabels = useMemo(() => getShiftStatusLabels(t), [t]);
   const [shifts, setShifts]               = useState([]);
   const [listTotalHours, setListTotalHours] = useState(null);
@@ -911,12 +913,12 @@ function AssignTab() {
       setActConflicts(c);
       const msg = resolveApiError(e, t, `${NS}.assignTab.publishFailed`);
       if (hasBlockingConflicts(c)) {
-        alert(t(`${NS}.assignTab.publishBlockedAlert`, {
+        showToast(t(`${NS}.assignTab.publishBlockedAlert`, {
           message: msg,
           count: c.filter((x) => x.severity === 'ERROR').length,
-        }));
+        }), 'error');
       } else {
-        alert(msg);
+        showToast(msg, 'error');
       }
     }
   };
@@ -934,7 +936,7 @@ function AssignTab() {
         setBlockingTasks(blocked);
         setError(blockingCareTasksMessage(message));
       } else {
-        alert(message);
+        showToast(message, 'error');
       }
     }
   };
@@ -951,7 +953,7 @@ function AssignTab() {
         setBlockingTasks(blocked);
         setError(blockingCareTasksMessage(message));
       } else {
-        alert(message);
+        showToast(message, 'error');
       }
     }
   };

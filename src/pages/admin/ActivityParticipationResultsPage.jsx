@@ -2,9 +2,11 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { CheckCircle, Filter, RefreshCw, BarChart3, Search } from 'lucide-react';
 import activityService from '../../services/activity.service';
 import residentService from '../../services/resident.service';
+import { useToast } from '../../hooks/useToast';
 import '../../styles/admin/AdminAdmissionRequestsPage.css';
 
 export default function ActivityParticipationResultsPage() {
+  const { showToast } = useToast();
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -221,7 +223,7 @@ export default function ActivityParticipationResultsPage() {
 
       handleCancel();
       fetchActivities();
-      alert('Đã lưu kết quả tham gia thành công!');
+      showToast('Đã lưu kết quả tham gia thành công!', 'success');
     } catch (err) {
       console.error('Submit failed:', err);
       setFormError(err.response?.data?.message || 'Có lỗi khi lưu kết quả.');

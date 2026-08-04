@@ -19,6 +19,7 @@ import {
   FileText,
 } from 'lucide-react';
 import { useAuth } from '../../../hooks/useAuth';
+import { useToast } from '../../../hooks/useToast';
 import admissionService from '../../../services/admission.service';
 import paymentService from '../../../services/payment.service';
 import servicePackageService from '../../../services/servicePackage.service';
@@ -253,6 +254,7 @@ export default function AdmissionDetailDrawer({
   isAdmin = false,
 }) {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const userRole = user?.role || '';
   const isDoctorRole = userRole === 'doctor';
   const isNurseRole = userRole === 'nurse';
@@ -961,7 +963,7 @@ export default function AdmissionDetailDrawer({
     if (!admission) return;
     const printWindow = window.open('', '_blank', 'width=800,height=600');
     if (!printWindow) {
-      alert('Vui lòng cho phép trình duyệt mở popup để xuất PDF/In hợp đồng.');
+      showToast('Vui lòng cho phép trình duyệt mở popup để xuất PDF/In hợp đồng.', 'error');
       return;
     }
     

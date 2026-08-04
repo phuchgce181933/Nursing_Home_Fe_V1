@@ -17,6 +17,7 @@ import {
   exportResidentListToPDF,
 } from '../../../../utils/residentListExport';
 import { useAuth } from '../../../../hooks/useAuth';
+import { useToast } from '../../../../hooks/useToast';
 
 function ResidentDetailModal({ loading, error, resident, onClose, t }) {
   if (!loading && !error && !resident) return null;
@@ -146,6 +147,7 @@ function ResidentDetailModal({ loading, error, resident, onClose, t }) {
 
 export default function ResidentsByAreaPage() {
   const { t } = useTranslation();
+  const { showToast } = useToast();
   const { user } = useAuth();
   const [buildings, setBuildings] = useState([]);
   const [buildingId, setBuildingId] = useState('');
@@ -300,7 +302,7 @@ export default function ResidentsByAreaPage() {
 
   const handleExport = async (format) => {
     if (!buildingId) {
-      alert(t('admin.residents.common.exportSelectBuilding'));
+      showToast(t('admin.residents.common.exportSelectBuilding'), 'error');
       return;
     }
     try {
@@ -314,7 +316,7 @@ export default function ResidentsByAreaPage() {
         status: statusFilter || undefined,
       });
       if (!rows.length) {
-        alert(t('admin.residents.common.exportNoData'));
+        showToast(t('admin.residents.common.exportNoData'), 'error');
         return;
       }
       const meta = {
@@ -332,7 +334,7 @@ export default function ResidentsByAreaPage() {
       if (format === 'csv') {
         exportResidentListToCSV(rows, meta);
       } else {
-        exportResidentListToPDF(rows, meta);
+        exportResidentListToPDF(rows, meta, (msg) => showToast(msg, 'error'));
       }
     } catch (e) {
       console.error('Failed to export residents by area:', e);

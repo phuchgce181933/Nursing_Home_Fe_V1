@@ -4,6 +4,7 @@ import activityService from '../../services/activity.service';
 import authService from '../../services/auth.service';
 import residentService from '../../services/resident.service';
 import medicalRecordService from '../../services/medicalRecord.service';
+import { useToast } from '../../hooks/useToast';
 import '../../styles/admin/AdminAdmissionRequestsPage.css';
 
 const STATUS_OPTIONS = [
@@ -116,6 +117,7 @@ const isActivityStaff = (staff) => {
 };
 
 export default function AdminActivitiesPage() {
+  const { showToast } = useToast();
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -411,7 +413,7 @@ export default function AdminActivitiesPage() {
       fetchActivities();
     } catch (err) {
       console.error('Delete failed:', err);
-      alert(err.response?.data?.message || 'Không thể xóa hoạt động.');
+      showToast(err.response?.data?.message || 'Không thể xóa hoạt động.', 'error');
     } finally {
       setLoading(false);
     }
@@ -438,7 +440,7 @@ export default function AdminActivitiesPage() {
       fetchActivities();
     } catch (err) {
       console.error('Status update failed:', err);
-      alert(err.response?.data?.message || 'Không thể cập nhật trạng thái.');
+      showToast(err.response?.data?.message || 'Không thể cập nhật trạng thái.', 'error');
     } finally {
       setLoading(false);
     }
@@ -455,10 +457,10 @@ export default function AdminActivitiesPage() {
       setLoading(true);
       await activityService.bulkDeleteActivities(appliedFilters);
       await fetchActivities();
-      alert('Đã xóa các hoạt động phù hợp.');
+      showToast('Đã xóa các hoạt động phù hợp.', 'success');
     } catch (err) {
       console.error('Bulk delete failed:', err);
-      alert(err.response?.data?.message || 'Không thể xóa các hoạt động này.');
+      showToast(err.response?.data?.message || 'Không thể xóa các hoạt động này.', 'error');
     } finally {
       setLoading(false);
     }
@@ -481,10 +483,10 @@ export default function AdminActivitiesPage() {
       }
       await activityService.bulkUpdateActivityStatus({ ...filters, status: bulkStatus });
       await fetchActivities();
-      alert('Đã cập nhật trạng thái cho các hoạt động phù hợp.');
+      showToast('Đã cập nhật trạng thái cho các hoạt động phù hợp.', 'success');
     } catch (err) {
       console.error('Bulk status update failed:', err);
-      alert(err.response?.data?.message || 'Không thể cập nhật trạng thái cho các hoạt động này.');
+      showToast(err.response?.data?.message || 'Không thể cập nhật trạng thái cho các hoạt động này.', 'error');
     } finally {
       setLoading(false);
     }
