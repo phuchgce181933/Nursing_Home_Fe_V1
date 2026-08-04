@@ -11,6 +11,7 @@ import { canReceiveCareTask } from '../../../../utils/staffAssignable';
 import { isStaffOnLeaveForAssignment } from '../../../../utils/leaveUtils';
 import AdminPageShell from '../../../../components/admin/AdminPageShell';
 import { useAuth } from '../../../../hooks/useAuth';
+import { useToast } from '../../../../hooks/useToast';
 import { todayVN } from '../../../../utils/dateUtils';
 import { findStaffDutyGapConflict } from '../../../../utils/careTaskValidation';
 import {
@@ -99,6 +100,7 @@ function careResidentOptionLabel(r, t) {
 
 function CareTaskTab({ staff }) {
   const { t } = useTranslation();
+  const { showToast } = useToast();
   const [tasks, setTasks]               = useState([]);
   const [loading, setLoading]           = useState(false);
   const [error, setError]               = useState('');
@@ -357,7 +359,7 @@ function CareTaskTab({ staff }) {
       await careTaskService.updateCareTaskStatus(id, status);
       loadTasks();
     } catch (e) {
-      alert(e.response?.data?.message || t('admin.staff.assignments.tasks.actionFailed'));
+      showToast(e.response?.data?.message || t('admin.staff.assignments.tasks.actionFailed'), 'error');
     }
   };
 
@@ -367,7 +369,7 @@ function CareTaskTab({ staff }) {
       await careTaskService.deleteCareTask(id);
       loadTasks();
     } catch (e) {
-      alert(e.response?.data?.message || t('admin.staff.assignments.tasks.actionFailed'));
+      showToast(e.response?.data?.message || t('admin.staff.assignments.tasks.actionFailed'), 'error');
     }
   };
 

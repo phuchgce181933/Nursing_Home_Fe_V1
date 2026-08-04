@@ -2,11 +2,13 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Search, Loader2, Grid, List, Activity, Check, CheckCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../hooks/useAuth';
+import { useToast } from '../../hooks/useToast';
 import servicePackageService from '../../services/servicePackage.service';
 import '../../styles/admin/ServicePackagesPage.css'; // Premium care plans styling sheet
 
 export default function ServicePackagesPage() {
   const { t } = useTranslation();
+  const { showToast } = useToast();
   const { user } = useAuth();
   const isAdmin = ['admin', 'manager'].includes(user?.role);
   const rolePrefix = isAdmin ? 'admin' : 'medical';
@@ -138,7 +140,7 @@ export default function ServicePackagesPage() {
       setShowDetailModal(true);
     } catch (err) {
       console.error('Failed to load details:', err);
-      alert('Không thể tải chi tiết gói dịch vụ. Vui lòng thử lại.');
+      showToast('Không thể tải chi tiết gói dịch vụ. Vui lòng thử lại.', 'error');
     }
   };
 
@@ -254,7 +256,7 @@ export default function ServicePackagesPage() {
       fetchPackages();
     } catch (err) {
       console.error('Failed to delete package:', err);
-      alert(err.response?.data?.message || 'Không thể ngừng hoạt động gói dịch vụ. Vui lòng thử lại.');
+      showToast(err.response?.data?.message || 'Không thể ngừng hoạt động gói dịch vụ. Vui lòng thử lại.', 'error');
     } finally {
       setLoading(false);
     }

@@ -24,6 +24,7 @@ import servicePackageService from '../../services/servicePackage.service';
 import facilityService from '../../services/facility.service';
 import { resolveApiError } from '../../utils/apiMessage';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
+import { useToast } from '../../hooks/useToast';
 import '../../styles/admin/AdminContractManagementPage.css';
 
 const getContractStatusClass = (startDate, endDate, contractStatus) => {
@@ -92,6 +93,7 @@ const getContractStatusIcon = (startDate, endDate, contractStatus) => {
 
 export default function AdminContractManagementPage() {
   const { t, i18n } = useTranslation();
+  const { showToast } = useToast();
   const [contracts, setContracts] = useState([]);
   const [filteredContracts, setFilteredContracts] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -573,7 +575,7 @@ export default function AdminContractManagementPage() {
   };
 
   const handleCreateMedicationInvoice = async () => {
-    if (!selectedContract || !medSelectedId) return alert('Vui lòng chọn đơn thuốc.');
+    if (!selectedContract || !medSelectedId) { showToast('Vui lòng chọn đơn thuốc.', 'error'); return; }
     try {
       setMedCreatingInvoice(true);
       setMedConflictMessage('');
@@ -590,7 +592,7 @@ export default function AdminContractManagementPage() {
           const invNum = existingMed.invoiceNumber || existingMed._id || '';
           const message = `Đã có hóa đơn thuốc cho đơn này (${invNum}). Không thể tạo thêm.`;
           setMedConflictMessage(message);
-          alert(message);
+          showToast(message, 'error');
           return;
         }
       } catch (checkErr) {
@@ -598,19 +600,19 @@ export default function AdminContractManagementPage() {
       }
       const selectedPrescription = getSelectedPrescriptionDetails();
       if (!isPrescriptionInvoiceable(selectedPrescription)) {
-        alert('Đơn thuốc này không hợp lệ để tạo hóa đơn thuốc. Vui lòng chọn đơn còn hiệu lực và có thuốc đang được dùng.');
+        showToast('Đơn thuốc này không hợp lệ để tạo hóa đơn thuốc. Vui lòng chọn đơn còn hiệu lực và có thuốc đang được dùng.', 'error');
         return;
       }
       const body = { prescriptionId: medSelectedId };
       if (medEstimatedCost != null) body.medicationCost = medEstimatedCost;
       await paymentService.createInvoice(selectedContract.residentId, body);
-      alert(t('admin.contractManagement.invoiceCreatedSuccess'));
+      showToast(t('admin.contractManagement.invoiceCreatedSuccess'), 'success');
       setShowMedicationModal(false);
       setSelectedContract(null);
       await fetchContracts();
     } catch (err) {
       console.error('Error creating medication invoice:', err);
-      alert(resolveApiError(err, t, 'admin.contractManagement.invoiceCreatedError'));
+      showToast(resolveApiError(err, t, 'admin.contractManagement.invoiceCreatedError'), 'error');
     } finally {
       setMedCreatingInvoice(false);
     }
@@ -787,10 +789,12 @@ export default function AdminContractManagementPage() {
 
   const handleExtendContract = async () => {
     if (!selectedContract || !extensionData.newEndDate || !extensionData.contractStartDate) {
-      return alert('Vui lòng nhập đầy đủ thông tin ngày bắt đầu và ngày hết hạn.');
+      showToast('Vui lòng nhập đầy đủ thông tin ngày bắt đầu và ngày hết hạn.', 'error');
+      return;
     }
     if (!extensionData.selectedNewPackageId) {
-      return alert('Vui lòng chọn gói dịch vụ mới.');
+      showToast('Vui lòng chọn gói dịch vụ mới.', 'error');
+      return;
     }
 
     const startDate = new Date(extensionData.contractStartDate);
@@ -800,18 +804,21 @@ export default function AdminContractManagementPage() {
 
     // Validate start date is not in the past
     if (startDate < today) {
-      return alert('Ngày bắt đầu hợp đồng mới không thể là quá khứ.');
+      showToast('Ngày bắt đầu hợp đồng mới không thể là quá khứ.', 'error');
+      return;
     }
 
     if (endDate <= startDate) {
-      return alert('Ngày hết hạn phải sau ngày bắt đầu.');
+      showToast('Ngày hết hạn phải sau ngày bắt đầu.', 'error');
+      return;
     }
 
     // Calculate contract length
     let monthsDiff = (endDate.getFullYear() - startDate.getFullYear()) * 12;
     monthsDiff += endDate.getMonth() - startDate.getMonth();
     if (monthsDiff <= 0) {
-      return alert('Khoảng thời gian gia hạn phải tối thiểu 1 tháng.');
+      showToast('Khoảng thời gian gia hạn phải tối thiểu 1 tháng.', 'error');
+      return;
     }
 
     const selectedPackage = extensionAvailablePackages.find((pkg) => String(pkg._id) === String(extensionData.selectedNewPackageId));
@@ -847,14 +854,14 @@ export default function AdminContractManagementPage() {
       await paymentService.createInvoice(selectedContract.residentId, invoiceBody);
 
       const discountText = discountPercent > 0 ? ` (giảm ${discountPercent}%)` : '';
-      alert(`Gia hạn hợp đồng và tạo hóa đơn thành công!\nChi phí gia hạn: ${finalServiceCost.toLocaleString('vi-VN')} VND${discountText}`);
+      showToast(`Gia hạn hợp đồng và tạo hóa đơn thành công! Chi phí gia hạn: ${finalServiceCost.toLocaleString('vi-VN')} VND${discountText}`, 'success');
 
       setShowExtensionModal(false);
       setSelectedContract(null);
       await fetchContracts();
     } catch (err) {
       console.error('Error extending contract:', err);
-      alert(resolveApiError(err, t, 'admin.contractManagement.extendFailed') || ('Lỗi khi gia hạn hợp đồng: ' + (err.message || 'Unknown error')));
+      showToast(resolveApiError(err, t, 'admin.contractManagement.extendFailed') || ('Lỗi khi gia hạn hợp đồng: ' + (err.message || 'Unknown error')), 'error');
     } finally {
       setIsExtendingContract(false);
     }
@@ -987,7 +994,7 @@ export default function AdminContractManagementPage() {
         selectedContract?.outstandingAmount > 0 &&
         renewalData.paymentPlan === 'FULL'
       ) {
-        alert('Cư dân hiện có hóa đơn chưa thanh toán. Vui lòng xử lý phần nợ còn lại trước khi tạo hóa đơn đầy đủ mới.');
+        showToast('Cư dân hiện có hóa đơn chưa thanh toán. Vui lòng xử lý phần nợ còn lại trước khi tạo hóa đơn đầy đủ mới.', 'error');
         return;
       }
 
@@ -1007,7 +1014,7 @@ export default function AdminContractManagementPage() {
 
       await paymentService.createInvoice(selectedContract.residentId, invoiceBody);
 
-      alert(t('admin.contractManagement.invoiceCreatedSuccess'));
+      showToast(t('admin.contractManagement.invoiceCreatedSuccess'), 'success');
       setShowRenewalModal(false);
       setSelectedContract(null);
       setRenewalData({
@@ -1024,7 +1031,7 @@ export default function AdminContractManagementPage() {
       await fetchContracts();
     } catch (err) {
       console.error('Error creating invoice:', err);
-      alert(resolveApiError(err, t, 'admin.contractManagement.invoiceCreatedError'));
+      showToast(resolveApiError(err, t, 'admin.contractManagement.invoiceCreatedError'), 'error');
     } finally {
       setIsCreatingInvoice(false);
     }

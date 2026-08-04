@@ -13,10 +13,12 @@ export const downloadCsv = (filename, headers, rows, preambleRows = []) => {
   URL.revokeObjectURL(url);
 };
 
-export const openPrintReport = ({ title, htmlBody, width = 1100, height = 900 }) => {
+// onBlocked lets the caller show its own in-app toast instead of a native alert;
+// falls back to alert() for any caller that doesn't pass one.
+export const openPrintReport = ({ title, htmlBody, width = 1100, height = 900, onBlocked = (msg) => alert(msg) }) => {
   const printWindow = window.open('', '_blank', `width=${width},height=${height}`);
   if (!printWindow) {
-    alert('Vui lòng cho phép trình duyệt mở cửa sổ bật lên (pop-up) để xuất báo cáo PDF.');
+    onBlocked('Vui lòng cho phép trình duyệt mở cửa sổ bật lên (pop-up) để xuất báo cáo PDF.');
     return false;
   }
 

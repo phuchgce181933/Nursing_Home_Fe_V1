@@ -14,10 +14,12 @@ import {
 import facilityService from '../../../services/facility.service';
 import useFacilitiesData from './useFacilitiesData';
 import FacilitiesSubNav from './FacilitiesSubNav';
+import { useToast } from '../../../hooks/useToast';
 import '../../../styles/admin/FacilitiesPage.css';
 
 export default function BedsPage() {
   const { t } = useTranslation();
+  const { showToast } = useToast();
 
   const { loading, setLoading, stats, buildings, floors, refetch } = useFacilitiesData({ withFloors: true });
 
@@ -200,7 +202,7 @@ export default function BedsPage() {
       refetch();
     } catch (err) {
       console.error(err);
-      alert(err.response?.data?.message || 'Xóa giường thất bại.');
+      showToast(err.response?.data?.message || 'Xóa giường thất bại.', 'error');
     } finally {
       setSubmitting(false);
     }
@@ -530,7 +532,7 @@ export default function BedsPage() {
                           }
                           setFormBedCode(code);
                         } else {
-                          alert('Vui lòng chọn phòng trước');
+                          showToast('Vui lòng chọn phòng trước', 'error');
                         }
                       }}
                       className="text-xs text-blue-600 hover:text-blue-800 font-medium"

@@ -3,6 +3,7 @@ import { MapPin, Phone, Mail, Clock } from 'lucide-react';
 import PublicHeader from '../components/homepage/PublicHeader';
 import PublicFooter from '../components/homepage/PublicFooter';
 import consultationRequestService from '../services/consultationRequest.service';
+import { useToast } from '../hooks/useToast';
 import '../styles/shared/ZenPages.css';
 
 const MAP_IMG = 'https://i0.wp.com/imageearthtravel.com/wp-content/uploads/2015/09/cantho.png?ssl=1';
@@ -46,6 +47,7 @@ const SERVICES = [
 ];
 
 export default function ContactPage() {
+  const { showToast } = useToast();
   const [form, setForm] = useState({ name: '', email: '', phone: '', service: '', otherService: '', message: '' });
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
@@ -123,12 +125,12 @@ export default function ContactPage() {
         serviceInterest: form.service === 'Khác' ? form.otherService.trim() : form.service,
         message: form.message.trim(),
       });
-      alert('Chúng tôi đã tiếp nhận yêu cầu tư vấn của bạn. Đội ngũ chuyên viên sẽ nhanh chóng xem xét và liên hệ để hỗ trợ trong thời gian sớm nhất.');
+      showToast('Chúng tôi đã tiếp nhận yêu cầu tư vấn của bạn. Đội ngũ chuyên viên sẽ nhanh chóng xem xét và liên hệ để hỗ trợ trong thời gian sớm nhất.', 'success');
       setForm({ name: '', email: '', phone: '', service: '', otherService: '', message: '' });
       setErrors({});
     } catch (error) {
       console.error(error);
-      alert('Không thể gửi yêu cầu. Vui lòng thử lại sau.');
+      showToast('Không thể gửi yêu cầu. Vui lòng thử lại sau.', 'error');
     } finally {
       setSubmitting(false);
     }

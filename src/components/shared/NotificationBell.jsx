@@ -87,6 +87,12 @@ export default function NotificationBell() {
       }
     }
     setOpen(false);
+    // Deep-link to the underlying record when the notification targets one we have
+    // a detail view for, instead of always dropping the user on the generic inbox.
+    if (role === 'admin' && n.targetEntityType === 'ConsultationRequest' && n.targetEntityId) {
+      navigate(`/admin/consultation-requests?requestId=${n.targetEntityId}`);
+      return;
+    }
     navigate(`/${role}/notifications`);
   };
 
