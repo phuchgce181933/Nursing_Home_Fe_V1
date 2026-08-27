@@ -25,6 +25,7 @@ import {
 import medicalRecordService from '../../services/medicalRecord.service';
 import clinicalServiceService from '../../services/clinicalService.service';
 import residentService from '../../services/resident.service';
+import staffService from '../../services/staff.service';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
 import '../../styles/shared/HealthMonitoringPage.css';
@@ -957,7 +958,18 @@ export default function HealthMonitoringPage() {
   const loadResidents = useCallback(async () => {
     try {
       setResLoading(true);
-      const res = await residentService.listForAssignment({ status: 'admitted,pending', limit: 200 });
+      const isDoctorOrNurse = user?.role === 'doctor' || user?.role === 'nurse';
+      
+      let res;
+      if (isDoctorOrNurse) {
+        // Doctor/Nurse: chỉ xem cư dân được phân công phụ trách
+        const assignedRes = await staffService.listAssignedResidents(user._id);
+        res = { data: assignedRes.data || [] };
+      } else {
+        // Admin: xem tất cả cư dân
+        res = await residentService.listForAssignment({ status: 'admitted,pending', limit: 200 });
+      }
+      
       const list = res?.data || [];
       // Fetch latest abnormal record for each resident (batch; allow failures)
       const withAbnormal = await Promise.all(
@@ -977,7 +989,7 @@ export default function HealthMonitoringPage() {
     } finally {
       setResLoading(false);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => { loadResidents(); }, [loadResidents]);
 
