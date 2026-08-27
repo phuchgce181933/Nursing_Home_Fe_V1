@@ -97,7 +97,7 @@ function ProfilePage() {
   const startProtectedAction = () => {
     if (spamGuardRef.current) {
       setMessageType('error');
-      setMessage(t('profile.pleaseWait', { defaultValue: 'Vui lòng đợi một chút trước khi thử lại.' }));
+      setMessage(t('profile.pleaseWait'));
       return false;
     }
     spamGuardRef.current = true;
@@ -115,7 +115,7 @@ function ProfilePage() {
     if (state.nextAllowedAt && now < state.nextAllowedAt) {
       const secondsLeft = Math.max(1, Math.ceil((state.nextAllowedAt - now) / 1000));
       setMessageType('error');
-      setMessage(t('profile.otpCooldown', { seconds: secondsLeft, defaultValue: `Vui lòng đợi ${secondsLeft} giây trước khi gửi lại OTP.` }));
+      setMessage(t('profile.otpCooldown', { seconds: secondsLeft }));
       return false;
     }
     return true;
@@ -227,7 +227,7 @@ function ProfilePage() {
           setOtpCode('');
           setOtpError('');
           setMessageType('success');
-          setMessage(t('profile.emailVerifiedContinuePhone') || 'Email đã được xác thực. Vui lòng xác thực số điện thoại.');
+          setMessage(t('profile.emailVerifiedContinuePhone'));
           return;
         }
         setMessageType('success');
@@ -242,7 +242,7 @@ function ProfilePage() {
           setOtpCode('');
           setOtpError('');
           setMessageType('success');
-          setMessage(t('profile.phoneVerifiedContinueEmail') || 'Phone đã được xác thực. Vui lòng xác thực email.');
+          setMessage(t('profile.phoneVerifiedContinueEmail'));
           return;
         }
         setMessageType('success');
@@ -268,7 +268,7 @@ function ProfilePage() {
 
     if (!PASSWORD_POLICY_REGEX.test(passwordForm.newPassword)) {
       setMessageType('error');
-      setMessage(t('profile.passwordRequirements', { defaultValue: 'Mật khẩu phải có ít nhất 8 ký tự, gồm chữ hoa và ký tự đặc biệt.' }));
+      setMessage(t('profile.passwordRequirements'));
       return;
     }
 
@@ -347,9 +347,9 @@ function ProfilePage() {
         <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200 }}>
           <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)' }} onClick={() => setOtpModalVisible(false)} />
           <div style={{ background: '#fff', padding: 20, borderRadius: 6, width: 420, zIndex: 1201 }}>
-            <h3 style={{ marginTop: 0 }}>{t(otpContext === 'phone' ? 'profile.verifyPhoneTitle' : 'profile.verifyEmailTitle') || (otpContext === 'phone' ? 'Xác thực số điện thoại' : 'Xác thực email')}</h3>
-            <p style={{ marginTop: 0, marginBottom: 12 }}>{t('profile.verifyEmailSentTo') || 'Mã xác thực đã được gửi tới'}: <strong>{otpMaskedRecipient}</strong></p>
-            <input className="ap-form__input" value={otpCode} onChange={(e) => setOtpCode(e.target.value)} placeholder={t('profile.enterOtp') || 'Nhập mã OTP'} />
+            <h3 style={{ marginTop: 0 }}>{t(otpContext === 'phone' ? 'profile.verifyPhoneTitle' : 'profile.verifyEmailTitle')}</h3>
+            <p style={{ marginTop: 0, marginBottom: 12 }}>{t('profile.verifyEmailSentTo')}: <strong>{otpMaskedRecipient}</strong></p>
+            <input className="ap-form__input" value={otpCode} onChange={(e) => setOtpCode(e.target.value)} placeholder={t('profile.enterOtp')} />
             {otpError && <div style={{ color: 'red', marginTop: 8 }}>{otpError}</div>}
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
               <button type="button" className="ap-btn ap-btn--outline" onClick={() => setOtpModalVisible(false)}>{t('common.cancel')}</button>

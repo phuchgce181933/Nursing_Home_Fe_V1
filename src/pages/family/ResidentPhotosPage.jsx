@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Loader2, Image as ImageIcon, Calendar, User } from 'lucide-react';
 import residentPhotoService from '../../services/residentPhoto.service';
 import residentService from '../../services/resident.service';
@@ -21,6 +22,7 @@ const formatViDateTime = (dateStr) => {
 };
 
 export default function ResidentPhotosPage() {
+  const { t } = useTranslation();
   const [residents, setResidents] = useState([]);
   const [selectedResidentId, setSelectedResidentId] = useState('');
   const [loadingResidents, setLoadingResidents] = useState(true);
@@ -57,7 +59,7 @@ export default function ResidentPhotosPage() {
         const res = await residentPhotoService.listPhotosForFamily(selectedResidentId);
         setPhotos(Array.isArray(res?.data) ? res.data : []);
       } catch (err) {
-        const msg = err?.response?.data?.message || err?.message || 'Không thể tải album ảnh.';
+        const msg = err?.response?.data?.message || err?.message || t('familyPhotos.errorDefault');
         setError(msg);
         setPhotos([]);
       } finally {
@@ -72,9 +74,9 @@ export default function ResidentPhotosPage() {
       {/* Header Section */}
       <div className="arh-header">
         <div className="arh-header__title-group">
-          <h1 className="arh-header__title">Album ảnh người thân</h1>
+          <h1 className="arh-header__title">{t('familyPhotos.title')}</h1>
           <p className="arh-header__subtitle">
-            Xem những khoảnh khắc thường ngày của người thân do nhân viên chăm sóc chia sẻ.
+            {t('familyPhotos.subtitle')}
           </p>
         </div>
 
@@ -100,25 +102,25 @@ export default function ResidentPhotosPage() {
         {loadingResidents || loadingPhotos ? (
           <div className="arh-loading">
             <Loader2 size={32} className="arh-spinner" />
-            <span>Đang tải album ảnh...</span>
+            <span>{t('familyPhotos.loading')}</span>
           </div>
         ) : error ? (
           <div className="arh-empty">
             <ImageIcon size={48} className="arh-empty__icon" />
-            <h4>Không thể tải album ảnh</h4>
+            <h4>{t('familyPhotos.errorTitle')}</h4>
             <p>{error}</p>
           </div>
         ) : !selectedResidentId ? (
           <div className="arh-empty">
             <User size={48} className="arh-empty__icon" />
-            <h4>Chưa có người thân liên kết</h4>
-            <p>Tài khoản của bạn hiện chưa liên kết với hồ sơ người thân nào.</p>
+            <h4>{t('familyPhotos.noResidentTitle')}</h4>
+            <p>{t('familyPhotos.noResidentDesc')}</p>
           </div>
         ) : photos.length === 0 ? (
           <div className="arh-empty">
             <ImageIcon size={48} className="arh-empty__icon" />
-            <h4>Chưa có ảnh nào</h4>
-            <p>Nhân viên chăm sóc chưa tải lên ảnh nào cho người thân của bạn.</p>
+            <h4>{t('familyPhotos.noPhotosTitle')}</h4>
+            <p>{t('familyPhotos.noPhotosDesc')}</p>
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 p-4">
@@ -131,7 +133,7 @@ export default function ResidentPhotosPage() {
               >
                 <img
                   src={photo.url}
-                  alt={photo.caption || 'Ảnh người thân'}
+                  alt={photo.caption || t('familyPhotos.photoAlt')}
                   className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                   loading="lazy"
                 />
@@ -167,7 +169,7 @@ export default function ResidentPhotosPage() {
                 className="rounded-full border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50"
                 onClick={() => setPreviewPhoto(null)}
               >
-                Đóng
+                {t('familyPhotos.close')}
               </button>
             </div>
           </div>

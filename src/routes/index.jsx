@@ -10,21 +10,6 @@ import SupportRequestsPage from '../pages/shared/SupportRequestsPage';
 import ForgotPasswordPage from '../pages/ForgotPasswordPage';
 import ResetPasswordPage from '../pages/ResetPasswordPage';
 import AdminLayout from '../layouts/AdminLayout';
-import ManagerLayout from '../layouts/ManagerLayout';
-import ManagerDashboardPage from '../pages/manager/DashboardPage';
-import ManagerProfile from '../pages/manager/ManagerProfile';
-import ManagerResidentsPage from '../pages/manager/residents';
-import ManagerFamilyManagementPage from '../pages/manager/residents/family';
-import ManagerResidentsByAreaPage from '../pages/manager/residents/by-area';
-import ManagerInitialHealthPage from '../pages/manager/residents/initial-health';
-import ManagerPreExistingConditionsPage from '../pages/manager/residents/pre-existing-conditions';
-import ManagerDrugAllergiesPage from '../pages/manager/residents/drug-allergies';
-import ManagerTransferResidentPage from '../pages/manager/residents/transfer';
-import ManagerStaffProfilesPage from '../pages/manager/staff/profiles';
-import ManagerShiftManagementPage from '../pages/manager/staff/shifts';
-import ManagerStaffAssignmentPage from '../pages/manager/staff/assignments';
-import ManagerEmergencyAvailabilityPage from '../pages/manager/staff/emergency';
-import ManagerLeaveRequestAdminPage from '../pages/manager/staff/leave-requests';
 import RoleLayout from '../layouts/RoleLayout';
 import DashboardPage from '../pages/admin/DashboardPage';
 import ResidentPage from '../pages/admin/residents';
@@ -116,7 +101,6 @@ import FamilyAppointmentsPage from '../pages/family/FamilyAppointmentsPage';
 import IncidentManagementPage from '../pages/IncidentManagementPage';
 import HealthMonitoringPage from '../pages/shared/HealthMonitoringPage';
 import CareNotesPage from '../pages/shared/CareNotesPage';
-import ManagerActivityDashboard from '../pages/manager/ActivityDashboard';
 import ProtectedRoute from '../components/ProtectedRoute';
 import MessagesPage from '../pages/shared/MessagesPage';
 import IntroPage from '../pages/IntroPage';
@@ -202,39 +186,6 @@ function AppRoutes() {
         <Route path="incidents" element={<IncidentManagementPage />} />
         <Route path="*" element={<PlaceholderPage title={t('common.placeholderAdminTitle')} />} />
       </Route>
-      <Route
-        path="/manager/*"
-        element={
-          <ProtectedRoute requiredRole="manager">
-            <ManagerLayout />
-          </ProtectedRoute>
-        }
-      >
-        <Route index element={<Navigate to="dashboard" replace />} />
-        <Route path="dashboard" element={<ManagerDashboardPage />} />
-        <Route path="profile" element={<ManagerProfile />} />
-        <Route path="residents" element={<ManagerResidentsPage />} />
-        <Route path="residents/family" element={<ManagerFamilyManagementPage />} />
-        <Route path="residents/by-area" element={<ManagerResidentsByAreaPage />} />
-        <Route path="residents/initial-health" element={<ManagerInitialHealthPage />} />
-        <Route path="residents/pre-existing-conditions" element={<ManagerPreExistingConditionsPage />} />
-        <Route path="residents/drug-allergies" element={<ManagerDrugAllergiesPage />} />
-        <Route path="residents/transfer-room" element={<ManagerTransferResidentPage />} />
-        <Route path="staff/profiles" element={<ManagerStaffProfilesPage />} />
-        <Route path="staff/shifts" element={<ManagerShiftManagementPage />} />
-        <Route path="staff/assignments" element={<ManagerStaffAssignmentPage />} />
-        <Route path="staff/assignments/area/:staffId" element={<AreaAssignmentDetailPage />} />
-        <Route path="staff/assignments/residents/:staffId" element={<ResidentAssignmentDetailPage />} />
-        <Route path="staff/emergency" element={<ManagerEmergencyAvailabilityPage />} />
-        <Route path="staff/leave-requests" element={<ManagerLeaveRequestAdminPage />} />
-        <Route path="staff/leave-requests/:id" element={<LeaveRequestDetailPage />} />
-        <Route path="incidents" element={<IncidentManagementPage />} />
-        <Route path="activity-dashboard" element={<ManagerActivityDashboard />} />
-        <Route path="resident-visits" element={<ResidentVisitRequestsPage />} />
-        <Route path="support-requests" element={<SupportRequestsPage />} />
-        <Route path="*" element={<PlaceholderPage title={t('common.placeholderManagerOpsTitle')} />} />
-      </Route>
-
       <Route
         path="/doctor/*"
         element={

@@ -1,23 +1,24 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Calendar, Clock, User, Stethoscope, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import familyPortalService from '../../services/familyPortal.service';
 import axiosClient from '../../api/axiosClient';
 import '../../styles/family/FamilyAppointmentsPage.css';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
-const STATUS_VI = {
-  scheduled: 'Chờ khám',
-  in_progress: 'Đang khám',
-  completed: 'Hoàn thành',
-  cancelled: 'Đã hủy',
+const STATUS_I18N = {
+  scheduled: 'familyAppointments.statusScheduled',
+  in_progress: 'familyAppointments.statusInProgress',
+  completed: 'familyAppointments.statusCompleted',
+  cancelled: 'familyAppointments.statusCancelled',
 };
 
-const STATUS_OPTIONS = [
-  { value: '', label: 'Tất cả trạng thái' },
-  { value: 'scheduled', label: 'Chờ khám' },
-  { value: 'in_progress', label: 'Đang khám' },
-  { value: 'completed', label: 'Hoàn thành' },
-  { value: 'cancelled', label: 'Đã hủy' },
+const STATUS_OPTION_KEYS = [
+  { value: '', i18nKey: 'familyAppointments.allStatuses' },
+  { value: 'scheduled', i18nKey: 'familyAppointments.statusScheduled' },
+  { value: 'in_progress', i18nKey: 'familyAppointments.statusInProgress' },
+  { value: 'completed', i18nKey: 'familyAppointments.statusCompleted' },
+  { value: 'cancelled', i18nKey: 'familyAppointments.statusCancelled' },
 ];
 
 function formatTime(str) {
@@ -44,6 +45,7 @@ function isUpcoming(str) {
 
 // ── Main Component ─────────────────────────────────────────────────────────
 export default function FamilyAppointmentsPage() {
+  const { t } = useTranslation();
   const [residents, setResidents] = useState([]);
   const [selectedResidentId, setSelectedResidentId] = useState('');
   const [appointments, setAppointments] = useState([]);
@@ -86,7 +88,7 @@ export default function FamilyAppointmentsPage() {
       setAppointments(list);
     } catch (err) {
       console.error('Failed to load appointments:', err);
-      setError('Không thể tải lịch khám. Vui lòng thử lại.');
+      setError(t('familyAppointments.error'));
     } finally {
       setLoading(false);
     }
@@ -111,8 +113,8 @@ export default function FamilyAppointmentsPage() {
             <Calendar size={22} color="#fff" />
           </div>
           <div>
-            <h1 className="fap-title">Lịch Khám Của Người Thân</h1>
-            <p className="fap-subtitle">Theo dõi lịch hẹn khám của cư dân</p>
+            <h1 className="fap-title">{t('familyAppointments.title')}</h1>
+            <p className="fap-subtitle">{t('familyAppointments.subtitle')}</p>
           </div>
         </div>
         <button
@@ -126,14 +128,14 @@ export default function FamilyAppointmentsPage() {
           }}
         >
           <RefreshCw size={14} />
-          Làm mới
+          {t('familyAppointments.refresh')}
         </button>
       </div>
 
       {/* Resident Selector */}
       {residents.length > 1 && (
         <div className="fap-resident-bar">
-          <span className="fap-resident-label">Cư dân:</span>
+          <span className="fap-resident-label">{t('familyAppointments.resident')}</span>
           <div className="fap-resident-tabs">
             {residents.map(r => (
               <button
@@ -155,8 +157,8 @@ export default function FamilyAppointmentsPage() {
           value={statusFilter}
           onChange={e => setStatusFilter(e.target.value)}
         >
-          {STATUS_OPTIONS.map(o => (
-            <option key={o.value} value={o.value}>{o.label}</option>
+          {STATUS_OPTION_KEYS.map(o => (
+            <option key={o.value} value={o.value}>{t(o.i18nKey)}</option>
           ))}
         </select>
         <input
@@ -164,16 +166,16 @@ export default function FamilyAppointmentsPage() {
           className="fap-filter-input"
           value={fromFilter}
           onChange={e => setFromFilter(e.target.value)}
-          placeholder="Từ ngày"
-          title="Từ ngày"
+          placeholder={t('familyAppointments.fromDate')}
+          title={t('familyAppointments.fromDate')}
         />
         <input
           type="date"
           className="fap-filter-input"
           value={toFilter}
           onChange={e => setToFilter(e.target.value)}
-          placeholder="Đến ngày"
-          title="Đến ngày"
+          placeholder={t('familyAppointments.toDate')}
+          title={t('familyAppointments.toDate')}
         />
         {(statusFilter || fromFilter || toFilter) && (
           <button
@@ -185,7 +187,7 @@ export default function FamilyAppointmentsPage() {
               color: '#fca5a5', cursor: 'pointer', fontSize: 13,
             }}
           >
-            Xóa bộ lọc
+            {t('familyAppointments.clearFilters')}
           </button>
         )}
       </div>
@@ -195,19 +197,19 @@ export default function FamilyAppointmentsPage() {
         <div className="fap-stats">
           <div className="fap-stat">
             <div className="fap-stat-num" style={{ color: '#a5b4fc' }}>{total}</div>
-            <div className="fap-stat-label">Tổng lịch khám</div>
+            <div className="fap-stat-label">{t('familyAppointments.totalAppointments')}</div>
           </div>
           <div className="fap-stat">
             <div className="fap-stat-num" style={{ color: '#93c5fd' }}>{scheduled}</div>
-            <div className="fap-stat-label">Chờ khám</div>
+            <div className="fap-stat-label">{t('familyAppointments.statusScheduled')}</div>
           </div>
           <div className="fap-stat">
             <div className="fap-stat-num" style={{ color: '#fcd34d' }}>{inProgress}</div>
-            <div className="fap-stat-label">Đang khám</div>
+            <div className="fap-stat-label">{t('familyAppointments.statusInProgress')}</div>
           </div>
           <div className="fap-stat">
             <div className="fap-stat-num" style={{ color: '#6ee7b7' }}>{completed}</div>
-            <div className="fap-stat-label">Hoàn thành</div>
+            <div className="fap-stat-label">{t('familyAppointments.statusCompleted')}</div>
           </div>
         </div>
       )}
@@ -216,7 +218,7 @@ export default function FamilyAppointmentsPage() {
       {loading ? (
         <div className="fap-loading">
           <Loader2 size={20} className="animate-spin" />
-          <span>Đang tải lịch khám...</span>
+          <span>{t('familyAppointments.loading')}</span>
         </div>
       ) : error ? (
         <div className="fap-error">
@@ -227,9 +229,9 @@ export default function FamilyAppointmentsPage() {
         <div className="fap-empty">
           <Calendar size={48} style={{ margin: '0 auto 16px', opacity: 0.25 }} />
           <div style={{ fontSize: 16, marginBottom: 6 }}>
-            {selectedResident ? `${selectedResident.fullName} chưa có lịch khám nào` : 'Chưa có lịch khám'}
+            {selectedResident ? t('familyAppointments.emptyWithName', { name: selectedResident.fullName }) : t('familyAppointments.empty')}
           </div>
-          <div style={{ fontSize: 13, color: '#475569' }}>Lịch khám sẽ hiển thị khi được đặt lịch</div>
+          <div style={{ fontSize: 13, color: '#475569' }}>{t('familyAppointments.emptyHint')}</div>
         </div>
       ) : (
         <div className="fap-list">
@@ -251,7 +253,7 @@ export default function FamilyAppointmentsPage() {
                 <div className="fap-card-body">
                   <div className="fap-card-type">
                     <Stethoscope size={14} style={{ marginRight: 6, verticalAlign: 'middle' }} />
-                    {appt.appointmentType || 'Khám tổng quát'}
+                    {appt.appointmentType || t('familyAppointments.defaultType')}
                   </div>
                   <div className="fap-card-time">
                     <Clock size={12} style={{ marginRight: 5, verticalAlign: 'middle' }} />
@@ -260,21 +262,21 @@ export default function FamilyAppointmentsPage() {
                   {(appt.doctorStaffId?.userId?.fullName) && (
                     <div className="fap-card-staff">
                       <User size={12} style={{ marginRight: 5, verticalAlign: 'middle' }} />
-                      BS. {appt.doctorStaffId.userId.fullName}
+                      {t('familyAppointments.doctorPrefix')} {appt.doctorStaffId.userId.fullName}
                       {appt.nurseStaffId?.userId?.fullName && (
                         <span style={{ color: '#f9a8d4', marginLeft: 10 }}>
-                          · YT. {appt.nurseStaffId.userId.fullName}
+                          · {t('familyAppointments.nursePrefix')} {appt.nurseStaffId.userId.fullName}
                         </span>
                       )}
                     </div>
                   )}
                   <div className="fap-card-tags">
                     <span className={`fap-badge fap-badge-${appt.status}`}>
-                      {STATUS_VI[appt.status] || appt.status}
+                      {STATUS_I18N[appt.status] ? t(STATUS_I18N[appt.status]) : appt.status}
                     </span>
                     {upcoming && appt.status === 'scheduled' && (
                       <span className="fap-upcoming-label">
-                        ⏰ Sắp diễn ra
+                        {t('familyAppointments.upcoming')}
                       </span>
                     )}
                     {appt.notes && (

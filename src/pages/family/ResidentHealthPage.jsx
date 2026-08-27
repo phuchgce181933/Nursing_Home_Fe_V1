@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   HeartPulse, History, ClipboardList, CalendarDays,
   Search, Loader2, AlertCircle, ChevronLeft, ChevronRight, ChevronDown,
@@ -8,22 +9,22 @@ import residentService from '../../services/resident.service';
 import familyPortalService from '../../services/familyPortal.service';
 import '../../styles/family/ResidentHealthPage.css';
 
-const TABS = [
-  { key: 'vitals', label: 'Chỉ số sinh hiệu', icon: HeartPulse },
-  { key: 'history', label: 'Lịch sử sức khỏe', icon: History },
-  { key: 'daily', label: 'Sinh hoạt hàng ngày', icon: ClipboardList },
-  { key: 'schedule', label: 'Lịch chăm sóc', icon: CalendarDays },
-  { key: 'medSchedule', label: 'Lịch dùng thuốc hôm nay', icon: CalendarClock },
-  { key: 'medHistory', label: 'Lịch sử dùng thuốc', icon: Pill },
-  { key: 'careNotes', label: 'Ghi chú chăm sóc', icon: FileText },
+const TAB_KEYS = [
+  { key: 'vitals', i18nKey: 'residentHealth.tabs.vitals', icon: HeartPulse },
+  { key: 'history', i18nKey: 'residentHealth.tabs.history', icon: History },
+  { key: 'daily', i18nKey: 'residentHealth.tabs.daily', icon: ClipboardList },
+  { key: 'schedule', i18nKey: 'residentHealth.tabs.schedule', icon: CalendarDays },
+  { key: 'medSchedule', i18nKey: 'residentHealth.tabs.medSchedule', icon: CalendarClock },
+  { key: 'medHistory', i18nKey: 'residentHealth.tabs.medHistory', icon: Pill },
+  { key: 'careNotes', i18nKey: 'residentHealth.tabs.careNotes', icon: FileText },
 ];
 
 const CARE_NOTE_TYPE_LABELS = {
-  meal: 'Bữa ăn',
-  activity: 'Hoạt động',
-  daily_living: 'Sinh hoạt hàng ngày',
-  health: 'Sức khỏe',
-  general: 'Chung',
+  meal: 'residentHealth.careNoteTypes.meal',
+  activity: 'residentHealth.careNoteTypes.activity',
+  daily_living: 'residentHealth.careNoteTypes.daily_living',
+  health: 'residentHealth.careNoteTypes.health',
+  general: 'residentHealth.careNoteTypes.general',
 };
 
 const CARE_NOTE_TYPE_VARIANT = {
@@ -35,12 +36,16 @@ const CARE_NOTE_TYPE_VARIANT = {
 };
 
 const MED_STATUS_LABELS = {
-  PENDING: 'Chờ uống',
-  TAKEN: 'Đã uống',
-  LATE_TAKEN: 'Uống trễ',
-  MISSED: 'Bỏ lỡ',
-  SKIPPED: 'Bỏ qua',
-  OVERDUE: 'Quá giờ',
+  PENDING: 'residentHealth.medStatus.pending',
+  TAKEN: 'residentHealth.medStatus.taken',
+  LATE_TAKEN: 'residentHealth.medStatus.lateTaken',
+  MISSED: 'residentHealth.medStatus.missed',
+  SKIPPED: 'residentHealth.medStatus.skipped',
+  OVERDUE: 'residentHealth.medStatus.overdue',
+  REFUSED: 'residentHealth.medStatus.refused',
+  HELD: 'residentHealth.medStatus.held',
+  NOT_AVAILABLE: 'residentHealth.medStatus.notAvailable',
+  DISCONTINUED: 'residentHealth.medStatus.discontinued',
 };
 
 const MED_STATUS_VARIANT = {
@@ -50,81 +55,85 @@ const MED_STATUS_VARIANT = {
   MISSED: 'danger',
   SKIPPED: 'danger',
   OVERDUE: 'danger',
+  REFUSED: 'danger',
+  HELD: 'warning',
+  NOT_AVAILABLE: 'warning',
+  DISCONTINUED: 'secondary',
 };
 
-// ── Daily activities / care schedule label maps ──
+// ── Daily activities / care schedule label maps (i18n keys) ──
 const CARE_TASK_TYPE_LABELS = {
-  morning_care: 'Chăm sóc buổi sáng',
-  medication: 'Cho thuốc',
-  physical_therapy: 'Vật lý trị liệu',
-  meal_assistance: 'Hỗ trợ bữa ăn',
-  evening_check: 'Kiểm tra buổi tối',
-  emergency_response: 'Ứng phó khẩn cấp',
+  morning_care: 'residentHealth.careTask.morningCare',
+  medication: 'residentHealth.careTask.medication',
+  physical_therapy: 'residentHealth.careTask.physicalTherapy',
+  meal_assistance: 'residentHealth.careTask.mealAssistance',
+  evening_check: 'residentHealth.careTask.eveningCheck',
+  emergency_response: 'residentHealth.careTask.emergencyResponse',
 };
-const CARE_LEVEL_LABELS = { low: 'Thấp', medium: 'Trung bình', high: 'Cao' };
+const CARE_LEVEL_LABELS = { low: 'residentHealth.careLevel.low', medium: 'residentHealth.careLevel.medium', high: 'residentHealth.careLevel.high' };
 const CARE_TASK_STATUS_LABELS = {
-  pending: 'Chờ thực hiện',
-  in_progress: 'Đang thực hiện',
-  completed: 'Hoàn thành',
-  skipped: 'Bỏ qua',
-  missed: 'Bỏ lỡ',
+  pending: 'residentHealth.taskStatus.pending',
+  in_progress: 'residentHealth.taskStatus.inProgress',
+  completed: 'residentHealth.taskStatus.completed',
+  skipped: 'residentHealth.taskStatus.skipped',
+  missed: 'residentHealth.taskStatus.missed',
 };
 
-const HYGIENE_CATEGORY_LABELS = { personal: 'Vệ sinh cá nhân', environment: 'Dọn dẹp / môi trường' };
+const HYGIENE_CATEGORY_LABELS = { personal: 'residentHealth.hygieneCategory.personal', environment: 'residentHealth.hygieneCategory.environment' };
 const HYGIENE_ACTIVITY_LABELS = {
-  bathing: 'Tắm / rửa người',
-  oral_care: 'Vệ sinh răng miệng',
-  grooming: 'Chải tóc, thay quần áo',
-  toileting: 'Hỗ trợ vệ sinh WC',
-  diaper_change: 'Thay tã / băng vệ sinh',
-  room_tidy: 'Dọn phòng, sắp xếp',
-  bathroom_clean: 'Vệ sinh phòng tắm',
-  linen_change: 'Thay ga, gối, khăn',
-  laundry: 'Giặt / phơi đồ (hỗ trợ)',
+  bathing: 'residentHealth.hygieneActivity.bathing',
+  oral_care: 'residentHealth.hygieneActivity.oralCare',
+  grooming: 'residentHealth.hygieneActivity.grooming',
+  toileting: 'residentHealth.hygieneActivity.toileting',
+  diaper_change: 'residentHealth.hygieneActivity.diaperChange',
+  room_tidy: 'residentHealth.hygieneActivity.roomTidy',
+  bathroom_clean: 'residentHealth.hygieneActivity.bathroomClean',
+  linen_change: 'residentHealth.hygieneActivity.linenChange',
+  laundry: 'residentHealth.hygieneActivity.laundry',
 };
 const HYGIENE_COMPLETION_LABELS = {
-  completed: 'Hoàn thành',
-  partial: 'Một phần',
-  refused: 'Không hợp tác / từ chối',
-  assisted: 'Hỗ trợ hoàn thành',
+  completed: 'residentHealth.hygieneCompletion.completed',
+  partial: 'residentHealth.hygieneCompletion.partial',
+  refused: 'residentHealth.hygieneCompletion.refused',
+  assisted: 'residentHealth.hygieneCompletion.assisted',
 };
 
-const DAILY_MEAL_TYPE_LABELS = { breakfast: 'Bữa sáng', lunch: 'Bữa trưa', dinner: 'Bữa tối' };
-const DAILY_INTAKE_STATUS_LABELS = { full: 'Ăn hết', partial: 'Ăn một phần', refused: 'Từ chối ăn', assisted: 'Hỗ trợ ăn' };
+const DAILY_MEAL_TYPE_LABELS = { breakfast: 'residentHealth.mealType.breakfast', lunch: 'residentHealth.mealType.lunch', dinner: 'residentHealth.mealType.dinner' };
+const DAILY_INTAKE_STATUS_LABELS = { full: 'residentHealth.intakeStatus.full', partial: 'residentHealth.intakeStatus.partial', refused: 'residentHealth.intakeStatus.refused', assisted: 'residentHealth.intakeStatus.assisted' };
 
-const BEHAVIOR_CATEGORY_LABELS = { mood: 'Tâm trạng', behavior: 'Hành vi', abnormal: 'Biểu hiện bất thường' };
+const BEHAVIOR_CATEGORY_LABELS = { mood: 'residentHealth.behaviorCategory.mood', behavior: 'residentHealth.behaviorCategory.behavior', abnormal: 'residentHealth.behaviorCategory.abnormal' };
 const MOOD_LEVEL_LABELS = {
-  calm: 'Bình tĩnh', happy: 'Vui vẻ', neutral: 'Trung tính', anxious: 'Lo âu',
-  sad: 'Buồn', agitated: 'Kích động', confused: 'Lú lẫn', irritable: 'Cáu gắt',
+  calm: 'residentHealth.mood.calm', happy: 'residentHealth.mood.happy', neutral: 'residentHealth.mood.neutral', anxious: 'residentHealth.mood.anxious',
+  sad: 'residentHealth.mood.sad', agitated: 'residentHealth.mood.agitated', confused: 'residentHealth.mood.confused', irritable: 'residentHealth.mood.irritable',
 };
 const BEHAVIOR_TYPE_LABELS = {
-  cooperative: 'Hợp tác', withdrawn: 'Thu mình', restless: 'Bồn chồn', wandering: 'Đi lang thang',
-  verbal_outburst: 'La hét / nói to', physical_resistance: 'Chống đối thể chất',
-  sleep_disturbance: 'Rối loạn giấc ngủ', appetite_change: 'Thay đổi ăn uống',
-  social_withdrawal: 'Tránh giao tiếp', repetitive_behavior: 'Lặp lại hành vi', other: 'Khác',
+  cooperative: 'residentHealth.behavior.cooperative', withdrawn: 'residentHealth.behavior.withdrawn', restless: 'residentHealth.behavior.restless', wandering: 'residentHealth.behavior.wandering',
+  verbal_outburst: 'residentHealth.behavior.verbalOutburst', physical_resistance: 'residentHealth.behavior.physicalResistance',
+  sleep_disturbance: 'residentHealth.behavior.sleepDisturbance', appetite_change: 'residentHealth.behavior.appetiteChange',
+  social_withdrawal: 'residentHealth.behavior.socialWithdrawal', repetitive_behavior: 'residentHealth.behavior.repetitiveBehavior', other: 'residentHealth.behavior.other',
 };
-const SEVERITY_LABELS = { normal: 'Bình thường', mild: 'Nhẹ', moderate: 'Trung bình', urgent: 'Cần xử lý gấp' };
+const SEVERITY_LABELS = { normal: 'residentHealth.severity.normal', mild: 'residentHealth.severity.mild', moderate: 'residentHealth.severity.moderate', urgent: 'residentHealth.severity.urgent' };
 
-// ── Care note metadata label maps (family "Ghi chú chăm sóc" tab detail) ──
-const NOTE_MEAL_TYPE_LABELS = { breakfast: 'Bữa sáng', lunch: 'Bữa trưa', dinner: 'Bữa tối', snack: 'Bữa phụ' };
-const NOTE_INTAKE_AMOUNT_LABELS = { none: 'Không ăn', little: 'Ăn một ít', half: 'Ăn một nửa', most: 'Ăn phần lớn', all: 'Ăn hết' };
-const NOTE_APPETITE_LABELS = { poor: 'Kém', fair: 'Tạm ổn', good: 'Tốt', excellent: 'Rất tốt' };
+// ── Care note metadata label maps (i18n keys) ──
+const NOTE_MEAL_TYPE_LABELS = { breakfast: 'residentHealth.noteMealType.breakfast', lunch: 'residentHealth.noteMealType.lunch', dinner: 'residentHealth.noteMealType.dinner', snack: 'residentHealth.noteMealType.snack' };
+const NOTE_INTAKE_AMOUNT_LABELS = { none: 'residentHealth.noteIntake.none', little: 'residentHealth.noteIntake.little', half: 'residentHealth.noteIntake.half', most: 'residentHealth.noteIntake.most', all: 'residentHealth.noteIntake.all' };
+const NOTE_APPETITE_LABELS = { poor: 'residentHealth.noteAppetite.poor', fair: 'residentHealth.noteAppetite.fair', good: 'residentHealth.noteAppetite.good', excellent: 'residentHealth.noteAppetite.excellent' };
 const NOTE_ACTIVITY_TYPE_LABELS = {
-  walking: 'Đi dạo', exercise: 'Tập thể dục', physiotherapy: 'Vật lý trị liệu', reading: 'Đọc sách',
-  socializing: 'Giao lưu xã hội', entertainment: 'Giải trí', other: 'Khác',
+  walking: 'residentHealth.noteActivity.walking', exercise: 'residentHealth.noteActivity.exercise', physiotherapy: 'residentHealth.noteActivity.physiotherapy', reading: 'residentHealth.noteActivity.reading',
+  socializing: 'residentHealth.noteActivity.socializing', entertainment: 'residentHealth.noteActivity.entertainment', other: 'residentHealth.noteActivity.other',
 };
-const NOTE_PARTICIPATION_LABELS = { refused: 'Từ chối tham gia', assisted: 'Cần hỗ trợ', supervised: 'Cần giám sát', independent: 'Tự lực' };
-const NOTE_MOOD_LABELS = { happy: 'Vui vẻ', neutral: 'Bình thường', sad: 'Buồn bã', agitated: 'Kích động', anxious: 'Lo âu' };
+const NOTE_PARTICIPATION_LABELS = { refused: 'residentHealth.noteParticipation.refused', assisted: 'residentHealth.noteParticipation.assisted', supervised: 'residentHealth.noteParticipation.supervised', independent: 'residentHealth.noteParticipation.independent' };
+const NOTE_MOOD_LABELS = { happy: 'residentHealth.noteMood.happy', neutral: 'residentHealth.noteMood.neutral', sad: 'residentHealth.noteMood.sad', agitated: 'residentHealth.noteMood.agitated', anxious: 'residentHealth.noteMood.anxious' };
 const NOTE_DAILY_LIVING_TYPE_LABELS = {
-  bathing: 'Tắm rửa', grooming: 'Vệ sinh cá nhân', dressing: 'Mặc quần áo', eating: 'Ăn uống',
-  mobility: 'Di chuyển', toileting: 'Đi vệ sinh', sleeping: 'Ngủ nghỉ', other: 'Khác',
+  bathing: 'residentHealth.noteDailyLiving.bathing', grooming: 'residentHealth.noteDailyLiving.grooming', dressing: 'residentHealth.noteDailyLiving.dressing', eating: 'residentHealth.noteDailyLiving.eating',
+  mobility: 'residentHealth.noteDailyLiving.mobility', toileting: 'residentHealth.noteDailyLiving.toileting', sleeping: 'residentHealth.noteDailyLiving.sleeping', other: 'residentHealth.noteDailyLiving.other',
 };
-const NOTE_ASSISTANCE_LEVEL_LABELS = { independent: 'Tự lực', supervised: 'Cần giám sát', assisted: 'Cần hỗ trợ', total_care: 'Hỗ trợ hoàn toàn' };
-const NOTE_COMPLETION_STATUS_LABELS = { completed: 'Hoàn thành', partial: 'Một phần', refused: 'Từ chối' };
-const NOTE_CONSCIOUSNESS_LABELS = { alert: 'Tỉnh táo', confused: 'Mơ hồ/Nhầm lẫn', drowsy: 'Lơ mơ/Buồn ngủ', unresponsive: 'Không phản ứng' };
-const NOTE_FALL_RISK_LABELS = { low: 'Nguy cơ thấp', medium: 'Nguy cơ trung bình', high: 'Nguy cơ cao' };
+const NOTE_ASSISTANCE_LEVEL_LABELS = { independent: 'residentHealth.noteAssistance.independent', supervised: 'residentHealth.noteAssistance.supervised', assisted: 'residentHealth.noteAssistance.assisted', total_care: 'residentHealth.noteAssistance.totalCare' };
+const NOTE_COMPLETION_STATUS_LABELS = { completed: 'residentHealth.noteCompletion.completed', partial: 'residentHealth.noteCompletion.partial', refused: 'residentHealth.noteCompletion.refused' };
+const NOTE_CONSCIOUSNESS_LABELS = { alert: 'residentHealth.noteConsciousness.alert', confused: 'residentHealth.noteConsciousness.confused', drowsy: 'residentHealth.noteConsciousness.drowsy', unresponsive: 'residentHealth.noteConsciousness.unresponsive' };
+const NOTE_FALL_RISK_LABELS = { low: 'residentHealth.noteFallRisk.low', medium: 'residentHealth.noteFallRisk.medium', high: 'residentHealth.noteFallRisk.high' };
 
-const labelOf = (map, value) => (value ? (map[value] || value) : '—');
+const labelOf = (t, map, value) => (value ? (map[value] ? t(map[value]) : value) : '—');
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
@@ -143,6 +152,7 @@ const formatDate = (str) => {
 };
 
 export default function ResidentHealthPage() {
+  const { t } = useTranslation();
   const [residents, setResidents] = useState([]);
   const [selectedResidentId, setSelectedResidentId] = useState('');
   const [loadingResidents, setLoadingResidents] = useState(true);
@@ -159,7 +169,7 @@ export default function ResidentHealthPage() {
         setResidents(list);
         if (list.length > 0) setSelectedResidentId(list[0]._id);
       } catch (err) {
-        setResidentsError(err?.response?.data?.message || err.message || 'Không thể tải danh sách người thân');
+        setResidentsError(err?.response?.data?.message || err.message || t('residentHealth.loadError'));
       } finally {
         setLoadingResidents(false);
       }
@@ -173,7 +183,7 @@ export default function ResidentHealthPage() {
     return (
       <div className="rhp-loading">
         <Loader2 size={28} className="rhp-spin" />
-        <span>Đang tải danh sách người thân...</span>
+        <span>{t('residentHealth.loading')}</span>
       </div>
     );
   }
@@ -191,7 +201,7 @@ export default function ResidentHealthPage() {
     return (
       <div className="rhp-error-screen">
         <AlertCircle size={32} />
-        <p>Chưa có người thân nào được liên kết với tài khoản của bạn.</p>
+        <p>{t('residentHealth.noResidents')}</p>
       </div>
     );
   }
@@ -199,8 +209,8 @@ export default function ResidentHealthPage() {
   return (
     <div className="rhp-page">
       <div className="rhp-header">
-        <h1 className="rhp-header__title">Hồ Sơ Sức Khỏe Người Thân</h1>
-        <p className="rhp-header__sub">Theo dõi chỉ số sức khỏe, sinh hoạt và lịch chăm sóc hàng ngày.</p>
+        <h1 className="rhp-header__title">{t('residentHealth.title')}</h1>
+        <p className="rhp-header__sub">{t('residentHealth.subtitle')}</p>
       </div>
 
       {residents.length > 1 && (
@@ -220,19 +230,19 @@ export default function ResidentHealthPage() {
       {selectedResident && (
         <div className="rhp-resident-banner">
           <span className="rhp-resident-banner__name">{selectedResident.fullName}</span>
-          <span className="rhp-resident-banner__code">Mã: {selectedResident.residentCode}</span>
+          <span className="rhp-resident-banner__code">{t('residentHealth.residentCode', { code: selectedResident.residentCode })}</span>
         </div>
       )}
 
       <div className="rhp-tabs">
-        {TABS.map((tab) => (
+        {TAB_KEYS.map((tab) => (
           <button
             key={tab.key}
             className={`rhp-tab ${activeTab === tab.key ? 'rhp-tab--active' : ''}`}
             onClick={() => setActiveTab(tab.key)}
           >
             <tab.icon size={16} />
-            {tab.label}
+            {t(tab.i18nKey)}
           </button>
         ))}
       </div>
@@ -253,16 +263,17 @@ export default function ResidentHealthPage() {
 /* ══════════════════════ TAB 1: VITALS ══════════════════════ */
 
 const VITAL_FIELDS = [
-  { key: 'bloodPressureSystolic', key2: 'bloodPressureDiastolic', icon: Gauge, label: 'Huyết áp', unit: 'mmHg', combine: true },
-  { key: 'pulse', icon: Activity, label: 'Mạch', unit: 'lần/phút' },
-  { key: 'temperatureCelsius', icon: Thermometer, label: 'Nhiệt độ', unit: '°C' },
-  { key: 'oxygenSaturation', icon: Wind, label: 'SpO2', unit: '%' },
-  { key: 'bloodSugar', icon: Droplet, label: 'Đường huyết', unit: 'mg/dL' },
-  { key: 'weightKg', icon: Scale, label: 'Cân nặng', unit: 'kg' },
+  { key: 'bloodPressureSystolic', key2: 'bloodPressureDiastolic', icon: Gauge, i18nKey: 'residentHealth.vitals.bp', unit: 'mmHg', combine: true },
+  { key: 'pulse', icon: Activity, i18nKey: 'residentHealth.vitals.pulse', unit: 'bpm' },
+  { key: 'temperatureCelsius', icon: Thermometer, i18nKey: 'residentHealth.vitals.temperature', unit: '°C' },
+  { key: 'oxygenSaturation', icon: Wind, i18nKey: 'residentHealth.vitals.spo2', unit: '%' },
+  { key: 'bloodSugar', icon: Droplet, i18nKey: 'residentHealth.vitals.bloodSugar', unit: 'mg/dL' },
+  { key: 'weightKg', icon: Scale, i18nKey: 'residentHealth.vitals.weight', unit: 'kg' },
 ];
 
 function VitalsTab({ residentId }) {
-  const [vitals, setVitals] = useState(undefined); // undefined = loading, null = no data
+  const { t } = useTranslation();
+  const [vitals, setVitals] = useState(undefined);
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -271,21 +282,21 @@ function VitalsTab({ residentId }) {
     setError(null);
     familyPortalService.getVitals(residentId)
       .then((data) => { if (!cancelled) setVitals(data || null); })
-      .catch((err) => { if (!cancelled) setError(err?.response?.data?.message || err.message || 'Không thể tải chỉ số sức khỏe'); });
+      .catch((err) => { if (!cancelled) setError(err?.response?.data?.message || err.message || t('residentHealth.vitals.error')); });
     return () => { cancelled = true; };
   }, [residentId]);
 
   if (error) return <TabError message={error} />;
   if (vitals === undefined) return <TabLoading />;
   if (vitals === null) {
-    return <TabEmpty message="Chưa có dữ liệu đo chỉ số sinh hiệu cho người thân của bạn." />;
+    return <TabEmpty message={t('residentHealth.vitals.empty')} />;
   }
 
   return (
     <div className="rhp-vitals">
       <p className="rhp-vitals__measured-at">
-        Đo lúc: <strong>{formatDateTime(vitals.measuredAt)}</strong>
-        {vitals.abnormalFlag && <span className="rhp-badge rhp-badge--warning">Có chỉ số bất thường</span>}
+        {t('residentHealth.vitals.measuredAt')} <strong>{formatDateTime(vitals.measuredAt)}</strong>
+        {vitals.abnormalFlag && <span className="rhp-badge rhp-badge--warning">{t('residentHealth.vitals.abnormal')}</span>}
       </p>
       <div className="rhp-vitals-grid">
         {VITAL_FIELDS.map((f) => {
@@ -296,7 +307,7 @@ function VitalsTab({ residentId }) {
             <div key={f.key} className="rhp-vital-card">
               <div className="rhp-vital-card__icon"><f.icon size={20} /></div>
               <div className="rhp-vital-card__body">
-                <span className="rhp-vital-card__label">{f.label}</span>
+                <span className="rhp-vital-card__label">{t(f.i18nKey)}</span>
                 <span className="rhp-vital-card__value">
                   {value != null ? value : '—'} <span className="rhp-vital-card__unit">{value != null ? f.unit : ''}</span>
                 </span>
@@ -307,7 +318,7 @@ function VitalsTab({ residentId }) {
       </div>
       {vitals.summary && (
         <div className="rhp-vitals__summary">
-          <strong>Ghi chú của bác sĩ:</strong> {vitals.summary}
+          <strong>{t('residentHealth.vitals.doctorNote')}</strong> {vitals.summary}
         </div>
       )}
     </div>
@@ -317,6 +328,7 @@ function VitalsTab({ residentId }) {
 /* ══════════════════════ TAB 2: HEALTH HISTORY ══════════════════════ */
 
 function HealthHistoryTab({ residentId }) {
+  const { t } = useTranslation();
   const [data, setData] = useState(undefined);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
@@ -327,7 +339,7 @@ function HealthHistoryTab({ residentId }) {
     setError(null);
     familyPortalService.getHealthHistory(residentId, { search: search || undefined, page, limit: 10 })
       .then((res) => setData(res))
-      .catch((err) => setError(err?.response?.data?.message || err.message || 'Không thể tải lịch sử sức khỏe'));
+      .catch((err) => setError(err?.response?.data?.message || err.message || t('residentHealth.history.error')));
   }, [residentId, search, page]);
 
   useEffect(() => { load(); }, [load]);
@@ -346,17 +358,17 @@ function HealthHistoryTab({ residentId }) {
         <Search size={15} />
         <input
           type="text"
-          placeholder="Tìm theo nội dung ghi chú sức khỏe..."
+          placeholder={t('residentHealth.history.searchPlaceholder')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        <button type="submit">Tìm</button>
+        <button type="submit">{t('residentHealth.history.search')}</button>
       </form>
 
       {data === undefined ? (
         <TabLoading />
       ) : data.data.length === 0 ? (
-        <TabEmpty message="Không tìm thấy bản ghi sức khỏe nào." />
+        <TabEmpty message={t('residentHealth.history.empty')} />
       ) : (
         <>
           <div className="rhp-history-list">
@@ -364,13 +376,13 @@ function HealthHistoryTab({ residentId }) {
               <div key={rec._id} className="rhp-history-item">
                 <div className="rhp-history-item__head">
                   <span className="rhp-history-item__date">{formatDateTime(rec.measuredAt)}</span>
-                  {rec.abnormalFlag && <span className="rhp-badge rhp-badge--warning">Bất thường</span>}
+                  {rec.abnormalFlag && <span className="rhp-badge rhp-badge--warning">{t('residentHealth.history.abnormal')}</span>}
                 </div>
                 <div className="rhp-history-item__vitals">
-                  <span>Huyết áp: {rec.bloodPressureSystolic ?? '—'}/{rec.bloodPressureDiastolic ?? '—'} mmHg</span>
-                  <span>Mạch: {rec.pulse ?? '—'} lần/phút</span>
-                  <span>Nhiệt độ: {rec.temperatureCelsius ?? '—'} °C</span>
-                  <span>SpO2: {rec.oxygenSaturation ?? '—'}%</span>
+                  <span>{t('residentHealth.history.bp')}: {rec.bloodPressureSystolic ?? '—'}/{rec.bloodPressureDiastolic ?? '—'} mmHg</span>
+                  <span>{t('residentHealth.history.pulse')}: {rec.pulse ?? '—'} bpm</span>
+                  <span>{t('residentHealth.history.temperature')}: {rec.temperatureCelsius ?? '—'} °C</span>
+                  <span>{t('residentHealth.history.spo2')}: {rec.oxygenSaturation ?? '—'}%</span>
                 </div>
                 {rec.summary && <p className="rhp-history-item__summary">{rec.summary}</p>}
               </div>
@@ -386,6 +398,7 @@ function HealthHistoryTab({ residentId }) {
 /* ══════════════════════ TAB 3: DAILY ACTIVITIES ══════════════════════ */
 
 function DailyActivitiesTab({ residentId }) {
+  const { t } = useTranslation();
   const [date, setDate] = useState(todayStr());
   const [data, setData] = useState(undefined);
   const [error, setError] = useState(null);
@@ -397,7 +410,7 @@ function DailyActivitiesTab({ residentId }) {
     setExpanded(new Set());
     familyPortalService.getDailyActivities(residentId, { date })
       .then((res) => setData(res))
-      .catch((err) => setError(err?.response?.data?.message || err.message || 'Không thể tải nhật ký sinh hoạt'));
+      .catch((err) => setError(err?.response?.data?.message || err.message || t('residentHealth.daily.error')));
   }, [residentId, date]);
 
   const toggle = (key) => {
@@ -421,85 +434,85 @@ function DailyActivitiesTab({ residentId }) {
         <div className="rhp-daily-sections">
           <DailySection
             sectionKey="task"
-            title="Nhiệm vụ chăm sóc"
+            title={t('residentHealth.daily.careTasks')}
             items={data.careTasks}
             expanded={expanded}
             onToggle={toggle}
-            renderSummary={(t) => (
+            renderSummary={(item) => (
               <>
-                <span className="rhp-daily-item__title">{labelOf(CARE_TASK_TYPE_LABELS, t.taskType)}</span>
-                <span className="rhp-daily-item__meta">{t.scheduledTime} · {labelOf(CARE_TASK_STATUS_LABELS, t.status)}</span>
+                <span className="rhp-daily-item__title">{labelOf(t, CARE_TASK_TYPE_LABELS, item.taskType)}</span>
+                <span className="rhp-daily-item__meta">{item.scheduledTime} · {labelOf(t, CARE_TASK_STATUS_LABELS, item.status)}</span>
               </>
             )}
-            renderDetail={(t) => (
+            renderDetail={(item) => (
               <>
-                <DetailRow label="Cấp độ chăm sóc" value={labelOf(CARE_LEVEL_LABELS, t.careLevel)} />
-                <DetailRow label="Thực hiện bởi" value={t.staffProfileId?.userId?.fullName} />
-                <DetailRow label="Ghi chú" value={t.notes} />
+                <DetailRow label={t('residentHealth.labels.careLevel')} value={labelOf(t, CARE_LEVEL_LABELS, item.careLevel)} />
+                <DetailRow label={t('residentHealth.labels.performedBy')} value={item.staffProfileId?.userId?.fullName} />
+                <DetailRow label={t('residentHealth.labels.notes')} value={item.notes} />
               </>
             )}
           />
           <DailySection
             sectionKey="hygiene"
-            title="Vệ sinh cá nhân"
+            title={t('residentHealth.daily.hygiene')}
             items={data.hygieneRecords}
             expanded={expanded}
             onToggle={toggle}
             renderSummary={(h) => (
               <>
-                <span className="rhp-daily-item__title">{labelOf(HYGIENE_ACTIVITY_LABELS, h.activityType)}</span>
-                <span className="rhp-daily-item__meta">{labelOf(HYGIENE_COMPLETION_LABELS, h.completionStatus)}</span>
+                <span className="rhp-daily-item__title">{labelOf(t, HYGIENE_ACTIVITY_LABELS, h.activityType)}</span>
+                <span className="rhp-daily-item__meta">{labelOf(t, HYGIENE_COMPLETION_LABELS, h.completionStatus)}</span>
               </>
             )}
             renderDetail={(h) => (
               <>
-                <DetailRow label="Nhóm" value={labelOf(HYGIENE_CATEGORY_LABELS, h.activityCategory)} />
-                <DetailRow label="Ghi nhận lúc" value={formatDateTime(h.recordedAt)} />
-                <DetailRow label="Ghi nhận bởi" value={h.recordedByStaffId?.userId?.fullName} />
-                <DetailRow label="Ghi chú" value={h.notes} />
+                <DetailRow label={t('residentHealth.labels.group')} value={labelOf(t, HYGIENE_CATEGORY_LABELS, h.activityCategory)} />
+                <DetailRow label={t('residentHealth.labels.recordedAt')} value={formatDateTime(h.recordedAt)} />
+                <DetailRow label={t('residentHealth.labels.recordedBy')} value={h.recordedByStaffId?.userId?.fullName} />
+                <DetailRow label={t('residentHealth.labels.notes')} value={h.notes} />
               </>
             )}
           />
           <DailySection
             sectionKey="meal"
-            title="Bữa ăn"
+            title={t('residentHealth.daily.meals')}
             items={data.mealIntakeNotes}
             expanded={expanded}
             onToggle={toggle}
             renderSummary={(m) => (
               <>
-                <span className="rhp-daily-item__title">{labelOf(DAILY_MEAL_TYPE_LABELS, m.mealType)}</span>
-                <span className="rhp-daily-item__meta">{labelOf(DAILY_INTAKE_STATUS_LABELS, m.intakeStatus)}{m.portionPercent != null ? ` · ${m.portionPercent}%` : ''}</span>
+                <span className="rhp-daily-item__title">{labelOf(t, DAILY_MEAL_TYPE_LABELS, m.mealType)}</span>
+                <span className="rhp-daily-item__meta">{labelOf(t, DAILY_INTAKE_STATUS_LABELS, m.intakeStatus)}{m.portionPercent != null ? ` · ${m.portionPercent}%` : ''}</span>
               </>
             )}
             renderDetail={(m) => (
               <>
-                <DetailRow label="Món ăn" value={m.plannedMealName} />
-                <DetailRow label="Ghi nhận lúc" value={formatDateTime(m.recordedAt)} />
-                <DetailRow label="Ghi nhận bởi" value={m.recordedByStaffId?.userId?.fullName} />
-                <DetailRow label="Ghi chú" value={m.notes} />
+                <DetailRow label={t('residentHealth.labels.dish')} value={m.plannedMealName} />
+                <DetailRow label={t('residentHealth.labels.recordedAt')} value={formatDateTime(m.recordedAt)} />
+                <DetailRow label={t('residentHealth.labels.recordedBy')} value={m.recordedByStaffId?.userId?.fullName} />
+                <DetailRow label={t('residentHealth.labels.notes')} value={m.notes} />
               </>
             )}
           />
           <DailySection
             sectionKey="behavior"
-            title="Quan sát hành vi"
+            title={t('residentHealth.daily.behavior')}
             items={data.behaviorRecords}
             expanded={expanded}
             onToggle={toggle}
             renderSummary={(b) => (
               <>
-                <span className="rhp-daily-item__title">{labelOf(BEHAVIOR_CATEGORY_LABELS, b.observationCategory)}</span>
+                <span className="rhp-daily-item__title">{labelOf(t, BEHAVIOR_CATEGORY_LABELS, b.observationCategory)}</span>
                 <span className="rhp-daily-item__meta">{formatDateTime(b.observedAt)}</span>
               </>
             )}
             renderDetail={(b) => (
               <>
-                <DetailRow label="Tâm trạng" value={labelOf(MOOD_LEVEL_LABELS, b.moodLevel)} />
-                <DetailRow label="Loại hành vi" value={labelOf(BEHAVIOR_TYPE_LABELS, b.behaviorType)} />
-                <DetailRow label="Mức độ" value={labelOf(SEVERITY_LABELS, b.severity)} />
-                <DetailRow label="Ghi nhận bởi" value={b.recordedByStaffId?.userId?.fullName} />
-                <DetailRow label="Ghi chú" value={b.notes} />
+                <DetailRow label={t('residentHealth.noteDetail.mood')} value={labelOf(t, MOOD_LEVEL_LABELS, b.moodLevel)} />
+                <DetailRow label={t('residentHealth.noteDetail.activityType')} value={labelOf(t, BEHAVIOR_TYPE_LABELS, b.behaviorType)} />
+                <DetailRow label={t('residentHealth.noteDetail.status')} value={labelOf(t, SEVERITY_LABELS, b.severity)} />
+                <DetailRow label={t('residentHealth.labels.recordedBy')} value={b.recordedByStaffId?.userId?.fullName} />
+                <DetailRow label={t('residentHealth.labels.notes')} value={b.notes} />
               </>
             )}
           />
@@ -510,11 +523,12 @@ function DailyActivitiesTab({ residentId }) {
 }
 
 function DailySection({ sectionKey, title, items, expanded, onToggle, renderSummary, renderDetail }) {
+  const { t } = useTranslation();
   return (
     <div className="rhp-daily-section">
       <h4 className="rhp-daily-section__title">{title}</h4>
       {(!items || items.length === 0) ? (
-        <p className="rhp-daily-section__empty">Chưa có ghi nhận</p>
+        <p className="rhp-daily-section__empty">{t('residentHealth.daily.noRecords')}</p>
       ) : (
         <div className="rhp-daily-section__list">
           {items.map((item, i) => {
@@ -539,6 +553,7 @@ function DailySection({ sectionKey, title, items, expanded, onToggle, renderSumm
 /* ══════════════════════ TAB 4: CARE SCHEDULE ══════════════════════ */
 
 function CareScheduleTab({ residentId }) {
+  const { t } = useTranslation();
   const [date, setDate] = useState(todayStr());
   const [days, setDays] = useState(undefined);
   const [error, setError] = useState(null);
@@ -550,7 +565,7 @@ function CareScheduleTab({ residentId }) {
     setExpanded(new Set());
     familyPortalService.getCareSchedule(residentId, { date })
       .then((res) => setDays(Array.isArray(res) ? res : []))
-      .catch((err) => setError(err?.response?.data?.message || err.message || 'Không thể tải lịch chăm sóc'));
+      .catch((err) => setError(err?.response?.data?.message || err.message || t('residentHealth.schedule.error')));
   }, [residentId, date]);
 
   const toggle = (id) => {
@@ -571,15 +586,15 @@ function CareScheduleTab({ residentId }) {
       {days === undefined ? (
         <TabLoading />
       ) : days.length === 0 ? (
-        <TabEmpty message="Chưa có lịch chăm sóc nào được công bố cho ngày này." />
+        <TabEmpty message={t('residentHealth.schedule.empty')} />
       ) : (
         days.map((day) => (
           <div key={day._id} className="rhp-schedule-day">
             <h4 className="rhp-schedule-day__title">
-              {day.title || 'Lịch chăm sóc'} — {formatDate(day.workDate)}
+              {day.title || t('residentHealth.schedule.defaultTitle')} — {formatDate(day.workDate)}
             </h4>
             {(!day.entries || day.entries.length === 0) ? (
-              <p className="rhp-daily-section__empty">Chưa có mục nào cho người thân của bạn trong ngày này</p>
+              <p className="rhp-daily-section__empty">{t('residentHealth.schedule.noEntries')}</p>
             ) : (
               <div className="rhp-schedule-entries">
                 {day.entries.map((entry) => {
@@ -588,14 +603,14 @@ function CareScheduleTab({ residentId }) {
                     <div key={entry._id} className={`rhp-schedule-entry-wrap ${isOpen ? 'rhp-schedule-entry-wrap--open' : ''}`}>
                       <button type="button" className="rhp-schedule-entry" onClick={() => toggle(entry._id)}>
                         <span className="rhp-schedule-entry__time">{entry.scheduledTime}</span>
-                        <span className="rhp-schedule-entry__task">{labelOf(CARE_TASK_TYPE_LABELS, entry.taskType)}</span>
-                        <span className="rhp-badge">{labelOf(CARE_LEVEL_LABELS, entry.careLevel)}</span>
+                        <span className="rhp-schedule-entry__task">{labelOf(t, CARE_TASK_TYPE_LABELS, entry.taskType)}</span>
+                        <span className="rhp-badge">{labelOf(t, CARE_LEVEL_LABELS, entry.careLevel)}</span>
                         <ChevronDown size={14} className="rhp-schedule-entry__chevron" />
                       </button>
                       {isOpen && (
                         <div className="rhp-schedule-entry__detail">
-                          <DetailRow label="Thực hiện bởi" value={entry.staffProfileId?.userId?.fullName} />
-                          <DetailRow label="Ghi chú" value={entry.notes} />
+                          <DetailRow label={t('residentHealth.labels.performedBy')} value={entry.staffProfileId?.userId?.fullName} />
+                          <DetailRow label={t('residentHealth.labels.notes')} value={entry.notes} />
                         </div>
                       )}
                     </div>
@@ -613,6 +628,7 @@ function CareScheduleTab({ residentId }) {
 /* ══════════════════════ TAB 5: DAILY MEDICATION SCHEDULE ══════════════════════ */
 
 function DailyMedicationScheduleTab({ residentId }) {
+  const { t } = useTranslation();
   const [date, setDate] = useState(todayStr());
   const [data, setData] = useState(undefined);
   const [error, setError] = useState(null);
@@ -622,7 +638,7 @@ function DailyMedicationScheduleTab({ residentId }) {
     setError(null);
     familyPortalService.getDailyMedicationSchedule(residentId, { date })
       .then((res) => setData(res))
-      .catch((err) => setError(err?.response?.data?.message || err.message || 'Không thể tải lịch dùng thuốc'));
+      .catch((err) => setError(err?.response?.data?.message || err.message || t('residentHealth.medSchedule.error')));
   }, [residentId, date]);
 
   if (error) return <TabError message={error} />;
@@ -634,7 +650,7 @@ function DailyMedicationScheduleTab({ residentId }) {
       {data === undefined ? (
         <TabLoading />
       ) : !data.schedules || data.schedules.length === 0 ? (
-        <TabEmpty message="Không có lịch dùng thuốc nào cho ngày này." />
+        <TabEmpty message={t('residentHealth.medSchedule.empty')} />
       ) : (
         data.schedules.map((s) => (
           <div key={s.id} className="rhp-med-item">
@@ -646,7 +662,7 @@ function DailyMedicationScheduleTab({ residentId }) {
               </div>
             </div>
             <span className={`rhp-badge rhp-badge--${MED_STATUS_VARIANT[s.status] || 'info'}`}>
-              {MED_STATUS_LABELS[s.status] || s.status}
+              {MED_STATUS_LABELS[s.status] ? t(MED_STATUS_LABELS[s.status]) : s.status}
             </span>
           </div>
         ))
@@ -658,6 +674,7 @@ function DailyMedicationScheduleTab({ residentId }) {
 /* ══════════════════════ TAB 6: MEDICATION USAGE HISTORY ══════════════════════ */
 
 function MedicationHistoryTab({ residentId }) {
+  const { t } = useTranslation();
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [data, setData] = useState(undefined);
@@ -668,7 +685,7 @@ function MedicationHistoryTab({ residentId }) {
     setError(null);
     familyPortalService.getMedicationHistory(residentId, { from: from || undefined, to: to || undefined })
       .then((res) => setData(res))
-      .catch((err) => setError(err?.response?.data?.message || err.message || 'Không thể tải lịch sử dùng thuốc'));
+      .catch((err) => setError(err?.response?.data?.message || err.message || t('residentHealth.medHistory.error')));
   }, [residentId, from, to]);
 
   useEffect(() => { load(); }, [load]);
@@ -678,11 +695,11 @@ function MedicationHistoryTab({ residentId }) {
   return (
     <div className="rhp-history">
       <form className="rhp-search-bar" onSubmit={(e) => { e.preventDefault(); load(); }}>
-        <label style={{ fontSize: 13, color: '#475569' }}>Từ ngày</label>
+        <label style={{ fontSize: 13, color: '#475569' }}>{t('residentHealth.medHistory.fromDate')}</label>
         <input type="date" value={from} max={to || todayStr()} onChange={(e) => setFrom(e.target.value)} />
-        <label style={{ fontSize: 13, color: '#475569' }}>Đến ngày</label>
+        <label style={{ fontSize: 13, color: '#475569' }}>{t('residentHealth.medHistory.toDate')}</label>
         <input type="date" value={to} min={from} max={todayStr()} onChange={(e) => setTo(e.target.value)} />
-        <button type="submit">Lọc</button>
+        <button type="submit">{t('residentHealth.medHistory.filter')}</button>
       </form>
 
       {data === undefined ? (
@@ -692,32 +709,32 @@ function MedicationHistoryTab({ residentId }) {
           <div className="rhp-med-compliance">
             <div className="rhp-med-stat-card">
               <span className="rhp-med-stat-card__value">{data.summary.total}</span>
-              <span className="rhp-med-stat-card__label">Tổng số liều</span>
+              <span className="rhp-med-stat-card__label">{t('residentHealth.medHistory.totalDoses')}</span>
             </div>
             <div className="rhp-med-stat-card">
               <span className="rhp-med-stat-card__value">{data.summary.taken}</span>
-              <span className="rhp-med-stat-card__label">Đã uống</span>
+              <span className="rhp-med-stat-card__label">{t('residentHealth.medHistory.taken')}</span>
             </div>
             <div className="rhp-med-stat-card">
               <span className="rhp-med-stat-card__value">{data.summary.missed}</span>
-              <span className="rhp-med-stat-card__label">Bỏ lỡ</span>
+              <span className="rhp-med-stat-card__label">{t('residentHealth.medHistory.missed')}</span>
             </div>
             <div className="rhp-med-stat-card">
               <span className="rhp-med-stat-card__value">
                 {data.summary.complianceRate != null ? `${data.summary.complianceRate}%` : '—'}
               </span>
-              <span className="rhp-med-stat-card__label">Tỷ lệ tuân thủ</span>
+              <span className="rhp-med-stat-card__label">{t('residentHealth.medHistory.complianceRate')}</span>
             </div>
           </div>
 
           {data.lowCompliance && (
             <p className="rhp-badge rhp-badge--warning" style={{ marginBottom: 12, marginLeft: 0 }}>
-              Tỷ lệ tuân thủ dùng thuốc đang thấp hơn 80%
+              {t('residentHealth.medHistory.lowCompliance')}
             </p>
           )}
 
           {data.records.length === 0 ? (
-            <TabEmpty message="Không có bản ghi dùng thuốc nào trong khoảng thời gian này." />
+            <TabEmpty message={t('residentHealth.medHistory.empty')} />
           ) : (
             data.records.map((r) => (
               <div key={r._id} className="rhp-med-item">
@@ -725,11 +742,11 @@ function MedicationHistoryTab({ residentId }) {
                   <div className="rhp-med-item__name">{r.medicationName}</div>
                   <div className="rhp-med-item__meta">
                     {r.dosage} · {r.route || '—'} · {formatDateTime(r.scheduledTime)}
-                    {r.missedReason && ` · Lý do: ${r.missedReason}`}
+                    {r.missedReason && ` · ${t('residentHealth.medHistory.reason', { reason: r.missedReason })}`}
                   </div>
                 </div>
                 <span className={`rhp-badge rhp-badge--${MED_STATUS_VARIANT[r.status] || 'info'}`}>
-                  {MED_STATUS_LABELS[r.status] || r.status}
+                  {MED_STATUS_LABELS[r.status] ? t(MED_STATUS_LABELS[r.status]) : r.status}
                 </span>
               </div>
             ))
@@ -742,37 +759,37 @@ function MedicationHistoryTab({ residentId }) {
 
 /* ══════════════════════ TAB 7: CARE NOTES ══════════════════════ */
 
-function renderNoteMetadata(note) {
+function renderNoteMetadata(note, t) {
   const meta = note.metadata || {};
   const nt = note.noteType;
 
   if (nt === 'meal') {
     return (
       <>
-        <DetailRow label="Bữa ăn" value={labelOf(NOTE_MEAL_TYPE_LABELS, meta.mealType)} />
-        <DetailRow label="Lượng ăn" value={labelOf(NOTE_INTAKE_AMOUNT_LABELS, meta.intakeAmount)} />
-        <DetailRow label="Khả năng ăn uống" value={labelOf(NOTE_APPETITE_LABELS, meta.appetite)} />
+        <DetailRow label={t('residentHealth.noteDetail.mealType')} value={labelOf(t, NOTE_MEAL_TYPE_LABELS, meta.mealType)} />
+        <DetailRow label={t('residentHealth.noteDetail.intakeAmount')} value={labelOf(t, NOTE_INTAKE_AMOUNT_LABELS, meta.intakeAmount)} />
+        <DetailRow label={t('residentHealth.noteDetail.appetite')} value={labelOf(t, NOTE_APPETITE_LABELS, meta.appetite)} />
       </>
     );
   }
   if (nt === 'activity') {
     return (
       <>
-        <DetailRow label="Loại hoạt động" value={labelOf(NOTE_ACTIVITY_TYPE_LABELS, meta.activityType)} />
-        <DetailRow label="Thời lượng" value={meta.duration != null ? `${meta.duration} phút` : null} />
-        <DetailRow label="Mức độ tham gia" value={labelOf(NOTE_PARTICIPATION_LABELS, meta.participationLevel)} />
-        <DetailRow label="Tâm trạng" value={labelOf(NOTE_MOOD_LABELS, meta.mood)} />
+        <DetailRow label={t('residentHealth.noteDetail.activityType')} value={labelOf(t, NOTE_ACTIVITY_TYPE_LABELS, meta.activityType)} />
+        <DetailRow label={t('residentHealth.noteDetail.duration')} value={meta.duration != null ? t('residentHealth.noteDetail.durationMin', { min: meta.duration }) : null} />
+        <DetailRow label={t('residentHealth.noteDetail.participationLevel')} value={labelOf(t, NOTE_PARTICIPATION_LABELS, meta.participationLevel)} />
+        <DetailRow label={t('residentHealth.noteDetail.mood')} value={labelOf(t, NOTE_MOOD_LABELS, meta.mood)} />
       </>
     );
   }
   if (nt === 'daily_living') {
     return (
       <>
-        <DetailRow label="Phân loại" value={labelOf(NOTE_DAILY_LIVING_TYPE_LABELS, meta.activityType)} />
-        <DetailRow label="Mức độ trợ giúp" value={labelOf(NOTE_ASSISTANCE_LEVEL_LABELS, meta.assistanceLevel)} />
-        <DetailRow label="Trạng thái" value={labelOf(NOTE_COMPLETION_STATUS_LABELS, meta.completionStatus)} />
-        <DetailRow label="Thời lượng" value={meta.duration != null ? `${meta.duration} phút` : null} />
-        <DetailRow label="Tâm trạng" value={labelOf(NOTE_MOOD_LABELS, meta.mood)} />
+        <DetailRow label={t('residentHealth.noteDetail.category')} value={labelOf(t, NOTE_DAILY_LIVING_TYPE_LABELS, meta.activityType)} />
+        <DetailRow label={t('residentHealth.noteDetail.assistanceLevel')} value={labelOf(t, NOTE_ASSISTANCE_LEVEL_LABELS, meta.assistanceLevel)} />
+        <DetailRow label={t('residentHealth.noteDetail.status')} value={labelOf(t, NOTE_COMPLETION_STATUS_LABELS, meta.completionStatus)} />
+        <DetailRow label={t('residentHealth.noteDetail.duration')} value={meta.duration != null ? t('residentHealth.noteDetail.durationMin', { min: meta.duration }) : null} />
+        <DetailRow label={t('residentHealth.noteDetail.mood')} value={labelOf(t, NOTE_MOOD_LABELS, meta.mood)} />
       </>
     );
   }
@@ -780,16 +797,16 @@ function renderNoteMetadata(note) {
     return (
       <>
         {Array.isArray(meta.symptoms) && meta.symptoms.length > 0 && (
-          <DetailRow label="Triệu chứng" value={meta.symptoms.join(', ')} />
+          <DetailRow label={t('residentHealth.noteDetail.symptoms')} value={meta.symptoms.join(', ')} />
         )}
-        <DetailRow label="Trạng thái ý thức" value={labelOf(NOTE_CONSCIOUSNESS_LABELS, meta.consciousness)} />
-        <DetailRow label="Nguy cơ té ngã" value={labelOf(NOTE_FALL_RISK_LABELS, meta.fallRisk)} />
-        <DetailRow label="Mức độ đau" value={meta.painLevel != null ? `${meta.painLevel}/10` : null} />
-        <DetailRow label="Nhiệt độ" value={meta.temperature != null ? `${meta.temperature}°C` : null} />
-        <DetailRow label="Mạch" value={meta.pulse != null ? `${meta.pulse} bpm` : null} />
-        <DetailRow label="Tình trạng da" value={meta.skinCondition} />
-        <DetailRow label="Thay đổi thể chất" value={meta.physicalChanges} />
-        <DetailRow label="Quan sát bổ sung" value={meta.observations} />
+        <DetailRow label={t('residentHealth.noteDetail.consciousness')} value={labelOf(t, NOTE_CONSCIOUSNESS_LABELS, meta.consciousness)} />
+        <DetailRow label={t('residentHealth.noteDetail.fallRisk')} value={labelOf(t, NOTE_FALL_RISK_LABELS, meta.fallRisk)} />
+        <DetailRow label={t('residentHealth.noteDetail.painLevel')} value={meta.painLevel != null ? t('residentHealth.noteDetail.painValue', { level: meta.painLevel }) : null} />
+        <DetailRow label={t('residentHealth.noteDetail.temperature')} value={meta.temperature != null ? t('residentHealth.noteDetail.temperatureValue', { temp: meta.temperature }) : null} />
+        <DetailRow label={t('residentHealth.noteDetail.pulse')} value={meta.pulse != null ? t('residentHealth.noteDetail.pulseValue', { pulse: meta.pulse }) : null} />
+        <DetailRow label={t('residentHealth.noteDetail.skinCondition')} value={meta.skinCondition} />
+        <DetailRow label={t('residentHealth.noteDetail.physicalChanges')} value={meta.physicalChanges} />
+        <DetailRow label={t('residentHealth.noteDetail.observations')} value={meta.observations} />
       </>
     );
   }
@@ -797,6 +814,7 @@ function renderNoteMetadata(note) {
 }
 
 function CareNotesTab({ residentId }) {
+  const { t } = useTranslation();
   const [data, setData] = useState(undefined);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
@@ -814,7 +832,7 @@ function CareNotesTab({ residentId }) {
       limit: 10,
     })
       .then((res) => setData(res))
-      .catch((err) => setError(err?.response?.data?.message || err.message || 'Không thể tải ghi chú chăm sóc'));
+      .catch((err) => setError(err?.response?.data?.message || err.message || t('residentHealth.careNotes.error')));
   }, [residentId, search, noteType, page]);
 
   useEffect(() => { load(); }, [load]);
@@ -847,11 +865,11 @@ function CareNotesTab({ residentId }) {
         <Search size={15} />
         <input
           type="text"
-          placeholder="Tìm theo nội dung ghi chú chăm sóc..."
+          placeholder={t('residentHealth.careNotes.searchPlaceholder')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        <button type="submit">Tìm</button>
+        <button type="submit">{t('residentHealth.careNotes.search')}</button>
       </form>
 
       <div className="rhp-type-filter">
@@ -859,7 +877,7 @@ function CareNotesTab({ residentId }) {
           className={`rhp-type-chip ${noteType === '' ? 'rhp-type-chip--active' : ''}`}
           onClick={() => handleTypeFilter('')}
         >
-          Tất cả
+          {t('residentHealth.careNotes.all')}
         </button>
         {Object.entries(CARE_NOTE_TYPE_LABELS).map(([key, label]) => (
           <button
@@ -867,7 +885,7 @@ function CareNotesTab({ residentId }) {
             className={`rhp-type-chip ${noteType === key ? 'rhp-type-chip--active' : ''}`}
             onClick={() => handleTypeFilter(key)}
           >
-            {label}
+            {t(label)}
           </button>
         ))}
       </div>
@@ -875,12 +893,12 @@ function CareNotesTab({ residentId }) {
       {data === undefined ? (
         <TabLoading />
       ) : data.data.length === 0 ? (
-        <TabEmpty message="Không tìm thấy ghi chú chăm sóc nào." />
+        <TabEmpty message={t('residentHealth.careNotes.empty')} />
       ) : (
         <>
           <div className="rhp-history-list">
             {data.data.map((note) => {
-              const metaContent = renderNoteMetadata(note);
+              const metaContent = renderNoteMetadata(note, t);
               const isOpen = expanded.has(note._id);
               return (
                 <div
@@ -893,7 +911,7 @@ function CareNotesTab({ residentId }) {
                 >
                   <div className="rhp-history-item__head">
                     <span className={`rhp-badge rhp-badge--${CARE_NOTE_TYPE_VARIANT[note.noteType] || 'info'}`}>
-                      {CARE_NOTE_TYPE_LABELS[note.noteType] || note.noteType}
+                      {CARE_NOTE_TYPE_LABELS[note.noteType] ? t(CARE_NOTE_TYPE_LABELS[note.noteType]) : note.noteType}
                     </span>
                     <span className="rhp-history-item__date" style={{ marginLeft: 8 }}>
                       {formatDateTime(note.noteAt)}
@@ -904,7 +922,7 @@ function CareNotesTab({ residentId }) {
                     {note.content}
                   </p>
                   <span className="rhp-med-item__meta">
-                    Ghi nhận bởi: {note.authorStaffId?.userId?.fullName || '—'}
+                    {t('residentHealth.careNotes.recordedBy')} {note.authorStaffId?.userId?.fullName || '—'}
                   </span>
                   {isOpen && metaContent && (
                     <div className="rhp-history-item__detail" onClick={(e) => e.stopPropagation()}>
@@ -935,30 +953,33 @@ function DetailRow({ label, value }) {
 }
 
 function DatePickerBar({ date, onChange }) {
+  const { t } = useTranslation();
   return (
     <div className="rhp-date-bar">
-      <label>Chọn ngày:</label>
+      <label>{t('residentHealth.common.selectDate')}</label>
       <input type="date" value={date} onChange={(e) => onChange(e.target.value)} max={todayStr()} />
     </div>
   );
 }
 
 function Pagination({ page, totalPages, onChange }) {
+  const { t } = useTranslation();
   if (totalPages <= 1) return null;
   return (
     <div className="rhp-pagination">
       <button disabled={page <= 1} onClick={() => onChange(page - 1)}><ChevronLeft size={14} /></button>
-      <span>Trang {page} / {totalPages}</span>
+      <span>{t('residentHealth.common.page', { current: page, total: totalPages })}</span>
       <button disabled={page >= totalPages} onClick={() => onChange(page + 1)}><ChevronRight size={14} /></button>
     </div>
   );
 }
 
 function TabLoading() {
+  const { t } = useTranslation();
   return (
     <div className="rhp-tab-loading">
       <Loader2 size={22} className="rhp-spin" />
-      <span>Đang tải...</span>
+      <span>{t('residentHealth.common.loading')}</span>
     </div>
   );
 }

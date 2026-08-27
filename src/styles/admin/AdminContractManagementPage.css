@@ -8,7 +8,7 @@
   padding: 24px;
   max-width: 1600px;
   margin: 0 auto;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: inherit;
   color: #334155;
 }
 
@@ -201,8 +201,8 @@ table {
 }
 
 table thead {
-  background-color: #f8fafc;
-  border-bottom: 1px solid #f1f5f9;
+  background-color: var(--nh-table-header-bg);
+  border-bottom: 1px solid var(--nh-border);
   position: sticky;
   top: 0;
 }
@@ -220,7 +220,7 @@ table td {
 
 table th {
   font-weight: 700;
-  color: #64748b;
+  color: var(--nh-table-header-text);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -273,7 +273,7 @@ table td {
 
 .contract-status-upcoming {
   background-color: #eff6ff;
-  color: #2563eb;
+  color: var(--nh-primary);
   border: 1px solid #bfdbfe;
 }
 
@@ -402,7 +402,7 @@ table td {
 }
 
 .text-blue-600 {
-  color: #2563eb !important;
+  color: var(--nh-primary) !important;
 }
 
 /* Responsive Design */
@@ -580,7 +580,7 @@ table td {
   outline: none;
   background-color: #f8fafc;
   color: #1e293b;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: inherit;
   transition: all 0.2s ease;
 }
 
@@ -637,7 +637,7 @@ table td {
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: inherit;
 }
 
 .btn-cancel:hover {
@@ -655,7 +655,7 @@ table td {
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: inherit;
 }
 
 .btn-submit:hover:not(:disabled) {

@@ -147,7 +147,7 @@ export default function AdminTourRequestsPage() {
       }
     } catch (err) {
       console.error('Failed to load facility tour requests:', err);
-      setError('Không thể tải danh sách yêu cầu tham quan cơ sở. Vui lòng kiểm tra thông tin đăng nhập hoặc kết nối mạng.');
+      setError(t('admin.tourRequests.loadError'));
     } finally {
       setLoading(false);
     }
@@ -228,7 +228,7 @@ export default function AdminTourRequestsPage() {
 
         {/* Pending Card */}
         <div className="adm-card-stat">
-          <div className="adm-stat-icon" style={{ backgroundColor: '#eff6ff', color: '#2563eb' }}>
+          <div className="adm-stat-icon" style={{ backgroundColor: 'rgba(15, 118, 110, 0.08)', color: '#0f766e' }}>
             <Clock size={22} />
           </div>
           <div>

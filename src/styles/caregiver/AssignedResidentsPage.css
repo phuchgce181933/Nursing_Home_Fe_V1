@@ -8,7 +8,7 @@
   margin: 0;
   padding: 18px 22px;
   border-radius: 18px;
-  background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%);
+  background: linear-gradient(135deg, var(--nh-table-header-bg) 0%, var(--nh-primary) 100%);
   color: #f8fafc;
   font-size: 1.75rem;
   font-weight: 700;
@@ -166,7 +166,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 16px 18px;
-  background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%);
+  background: linear-gradient(135deg, var(--nh-table-header-bg) 0%, var(--nh-primary) 100%);
 }
 
 .assigned-residents-page__modal-title {

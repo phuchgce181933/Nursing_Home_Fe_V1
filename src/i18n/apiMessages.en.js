@@ -128,7 +128,7 @@ export const apiErrorsEn = {
   SHIFT_FLEXIBLE_DURATION_MAX: 'Split shift cannot exceed {{maxHours}} hour(s)',
   SHIFT_STAFF_BANNED: 'Cannot assign shift to a banned staff account',
   SHIFT_STAFF_INACTIVE: 'Cannot assign shift to an inactive staff account',
-  SHIFT_ADMIN_NOT_ASSIGNABLE: 'Cannot assign shifts to admin or manager accounts',
+  SHIFT_ADMIN_NOT_ASSIGNABLE: 'Cannot assign shifts to admin accounts',
   SHIFT_ROLE_NOT_ALLOWED: 'Role {{role}} cannot be assigned to {{shiftType}} shifts',
   SHIFT_WEEKLY_HOURS_EXCEEDED: 'Weekly hours would be {{hours}}h, exceeding the 48h limit',
   SHIFT_CONFLICT_CHECK_FAILED: 'Shift conflict check failed. Resolve ERROR-level conflicts first.',

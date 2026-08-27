@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import {
   Users, Pill, ClipboardCheck, AlertTriangle,
@@ -24,13 +25,13 @@ const todayISO = new Date().toISOString().split('T')[0];
 const MED_COLORS = {
   taken: '#10b981',
   late_taken: '#f59e0b',
-  pending: '#3b82f6',
+  pending: '#0f766e',
   missed: '#ef4444',
 };
 
 const TASK_COLORS = {
   completed: '#10b981',
-  in_progress: '#3b5bdb',
+  in_progress: '#0f766e',
   pending: '#f59e0b',
   skipped: '#94a3b8',
   missed: '#ef4444',
@@ -43,18 +44,18 @@ const SEVERITY_COLORS = {
   critical: '#7c3aed',
 };
 
-const SEVERITY_VI = {
-  low: 'Thấp',
-  medium: 'Trung bình',
-  high: 'Cao',
-  critical: 'Nghiêm trọng',
-};
+const getSeverityVI = (t) => ({
+  low: t('nurseDashboard.severity.low'),
+  medium: t('nurseDashboard.severity.medium'),
+  high: t('nurseDashboard.severity.high'),
+  critical: t('nurseDashboard.severity.critical'),
+});
 
-const STATUS_VI = {
-  open: 'Đang mở',
-  in_progress: 'Đang xử lý',
-  resolved: 'Đã giải quyết',
-};
+const getStatusVI = (t) => ({
+  open: t('nurseDashboard.status.open'),
+  in_progress: t('nurseDashboard.status.inProgress'),
+  resolved: t('nurseDashboard.status.resolved'),
+});
 
 const STATUS_COLORS = {
   open: '#ef4444',
@@ -62,24 +63,24 @@ const STATUS_COLORS = {
   resolved: '#10b981',
 };
 
-const TASK_VI = {
-  completed: 'Hoàn thành',
-  in_progress: 'Đang làm',
-  pending: 'Chờ',
-  skipped: 'Bỏ qua',
-  missed: 'Bỏ lỡ',
-};
+const getTaskVI = (t) => ({
+  completed: t('nurseDashboard.taskStatus.completed'),
+  in_progress: t('nurseDashboard.taskStatus.inProgress'),
+  pending: t('nurseDashboard.taskStatus.pending'),
+  skipped: t('nurseDashboard.taskStatus.skipped'),
+  missed: t('nurseDashboard.taskStatus.missed'),
+});
 
 function formatDate(str) {
   if (!str) return '—';
   return new Date(str).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
 }
 
-function greeting() {
+function greeting(t) {
   const h = new Date().getHours();
-  if (h < 12) return 'Chào buổi sáng';
-  if (h < 18) return 'Chào buổi chiều';
-  return 'Chào buổi tối';
+  if (h < 12) return t('nurseDashboard.greetingMorning');
+  if (h < 18) return t('nurseDashboard.greetingAfternoon');
+  return t('nurseDashboard.greetingEvening');
 }
 
 const ChartTooltip = ({ active, payload, label }) => {
@@ -106,8 +107,12 @@ function getWeekLabel(dateStr) {
 }
 
 export default function NurseDashboardPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const SEVERITY_VI = getSeverityVI(t);
+  const STATUS_VI = getStatusVI(t);
+  const TASK_VI = getTaskVI(t);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -211,7 +216,7 @@ export default function NurseDashboardPage() {
     ? Object.entries(medStats)
         .filter(([, v]) => v > 0)
         .map(([k, v]) => ({
-          name: k === 'taken' ? 'Đã dùng' : k === 'late_taken' ? 'Muộn' : k === 'pending' ? 'Chờ phát' : 'Bỏ lỡ',
+          name: k === 'taken' ? t('nurseDashboard.medChart.taken') : k === 'late_taken' ? t('nurseDashboard.medChart.lateTaken') : k === 'pending' ? t('nurseDashboard.medChart.pending') : t('nurseDashboard.medChart.missed'),
           value: v,
           fill: MED_COLORS[k],
         }))
@@ -257,7 +262,7 @@ export default function NurseDashboardPage() {
       return ma !== mb ? ma - mb : da - db;
     })
     .slice(-8)
-    .map(([period, value]) => ({ period, 'Sự cố': value }));
+    .map(([period, value]) => ({ period, incidents: value }));
 
   // ── Derived: shifts ───────────────────────────────────────────
   const todayShifts = myShifts.filter(s => s.workDate?.startsWith(todayISO));
@@ -269,7 +274,7 @@ export default function NurseDashboardPage() {
     return (
       <div className="nd2-loading-screen">
         <Loader2 size={32} className="nd2-spin" />
-        <span>Đang tải dữ liệu...</span>
+        <span>{t('nurseDashboard.loading')}</span>
       </div>
     );
   }
@@ -285,7 +290,7 @@ export default function NurseDashboardPage() {
           </div>
           <div>
             <h1 className="nd2-header__title">
-              {greeting()}, <span>{user?.fullName?.split(' ').pop() || 'Y tá'}</span>
+              {greeting(t)}, <span>{user?.fullName?.split(' ').pop() || t('nurseDashboard.defaultNurse')}</span>
             </h1>
             <p className="nd2-header__date">
               {new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
@@ -298,47 +303,47 @@ export default function NurseDashboardPage() {
           disabled={refreshing}
         >
           <RefreshCw size={15} className={refreshing ? 'nd2-spin' : ''} />
-          Làm mới
+          {t('nurseDashboard.refresh')}
         </button>
       </div>
 
       {/* ═══════════════ KPI GRID ═══════════════ */}
       <div className="nd2-kpi-grid">
         <KpiCard
-          icon={Users} color="#3b5bdb" bg="#eef2ff"
-          label="Bệnh nhân phụ trách"
+          icon={Users} color="#0f766e" bg="rgba(15, 118, 110, 0.08)"
+          label={t('nurseDashboard.kpi.assignedResidents')}
           value={assignedResidentCount}
-          sub="Cư dân được phân công"
+          sub={t('nurseDashboard.kpi.assignedResidentsSub')}
           onClick={() => navigate('/nurse/meal-plans')}
         />
         <KpiCard
           icon={Pill} color="#10b981" bg="#d1fae5"
-          label="Liều thuốc chờ hôm nay"
+          label={t('nurseDashboard.kpi.pendingDoses')}
           value={medStats?.pending ?? 0}
-          sub={`Tổng hôm nay: ${totalDoses} liều · ${medCompletePct}% hoàn thành`}
+          sub={t('nurseDashboard.kpi.dosesTodaySub', { total: totalDoses, pct: medCompletePct })}
           onClick={() => navigate('/nurse/medications')}
         />
         <KpiCard
           icon={ClipboardCheck} color="#f59e0b" bg="#fef3c7"
-          label="Nhiệm vụ chăm sóc hôm nay"
+          label={t('nurseDashboard.kpi.careTasks')}
           value={`${completedTasks}/${todayTasks.length}`}
-          sub={`${todayTasks.length - completedTasks} nhiệm vụ chưa hoàn thành`}
+          sub={t('nurseDashboard.kpi.careTasksSub', { count: todayTasks.length - completedTasks })}
           onClick={() => navigate('/nurse/activity-schedule')}
         />
         <KpiCard
           icon={AlertTriangle} color="#ef4444" bg="#fee2e2"
-          label="Sự cố đang mở"
+          label={t('nurseDashboard.kpi.openIncidents')}
           value={openIncidentCount}
-          sub={`Tổng sự cố 8 tuần: ${allIncidents.length}`}
+          sub={t('nurseDashboard.kpi.incidentsSub', { count: allIncidents.length })}
           onClick={() => navigate('/incidents')}
         />
         <KpiCard
           icon={Clock} color="#8b5cf6" bg="#ede9fe"
-          label="Ca làm việc hôm nay"
+          label={t('nurseDashboard.kpi.shiftToday')}
           value={todayShifts.length}
           sub={todayShifts[0]
-            ? `${todayShifts[0].shiftTemplate?.name || todayShifts[0].templateName || 'Ca làm việc'}`
-            : 'Không có ca hôm nay'}
+            ? `${todayShifts[0].shiftTemplate?.name || todayShifts[0].templateName || t('nurseDashboard.kpi.shiftDefault')}`
+            : t('nurseDashboard.kpi.noShiftToday')}
           onClick={() => navigate('/my-shifts')}
         />
       </div>
@@ -351,9 +356,9 @@ export default function NurseDashboardPage() {
               <Activity size={17} />
             </div>
             <div className="nd2-progress-card__info">
-              <h3 className="nd2-progress-card__title">Tiến độ phát thuốc hôm nay</h3>
+              <h3 className="nd2-progress-card__title">{t('nurseDashboard.medProgress.title')}</h3>
               <p className="nd2-progress-card__sub">
-                Hoàn thành <strong>{doneCount}</strong> / {totalDoses} liều
+                {t('nurseDashboard.medProgress.completed', { done: doneCount, total: totalDoses })}
               </p>
             </div>
             <span className="nd2-progress-card__pct" style={{ color: medCompletePct >= 80 ? '#10b981' : medCompletePct >= 50 ? '#f59e0b' : '#ef4444' }}>
@@ -391,8 +396,8 @@ export default function NurseDashboardPage() {
               <Pill size={17} />
             </div>
             <div>
-              <h3 className="nd2-chart-card__title">Trạng thái thuốc hôm nay</h3>
-              <p className="nd2-chart-card__sub">Tổng {totalDoses} liều</p>
+              <h3 className="nd2-chart-card__title">{t('nurseDashboard.medChart.title')}</h3>
+              <p className="nd2-chart-card__sub">{t('nurseDashboard.medChart.sub', { total: totalDoses })}</p>
             </div>
           </div>
           <div className="nd2-chart-body">
@@ -419,7 +424,7 @@ export default function NurseDashboardPage() {
                 </PieChart>
               </ResponsiveContainer>
             ) : (
-              <div className="nd2-empty-chart">Chưa có lịch thuốc hôm nay</div>
+              <div className="nd2-empty-chart">{t('nurseDashboard.medChart.empty')}</div>
             )}
           </div>
         </div>
@@ -431,8 +436,8 @@ export default function NurseDashboardPage() {
               <ClipboardCheck size={17} />
             </div>
             <div>
-              <h3 className="nd2-chart-card__title">Nhiệm vụ chăm sóc</h3>
-              <p className="nd2-chart-card__sub">Phân loại theo trạng thái</p>
+              <h3 className="nd2-chart-card__title">{t('nurseDashboard.careChart.title')}</h3>
+              <p className="nd2-chart-card__sub">{t('nurseDashboard.careChart.sub')}</p>
             </div>
           </div>
           <div className="nd2-chart-body">
@@ -443,13 +448,13 @@ export default function NurseDashboardPage() {
                   <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
                   <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
                   <Tooltip content={<ChartTooltip />} />
-                  <Bar dataKey="value" name="Số lượng" radius={[6, 6, 0, 0]}>
+                  <Bar dataKey="value" name={t('nurseDashboard.careChart.quantity')} radius={[6, 6, 0, 0]}>
                     {careTaskData.map((d, i) => <Cell key={i} fill={d.fill} />)}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="nd2-empty-chart">Không có dữ liệu nhiệm vụ</div>
+              <div className="nd2-empty-chart">{t('nurseDashboard.careChart.empty')}</div>
             )}
           </div>
         </div>
@@ -461,8 +466,8 @@ export default function NurseDashboardPage() {
               <AlertTriangle size={17} />
             </div>
             <div>
-              <h3 className="nd2-chart-card__title">Sự cố theo mức độ</h3>
-              <p className="nd2-chart-card__sub">Phân loại mức độ nghiêm trọng</p>
+              <h3 className="nd2-chart-card__title">{t('nurseDashboard.incidentChart.title')}</h3>
+              <p className="nd2-chart-card__sub">{t('nurseDashboard.incidentChart.sub')}</p>
             </div>
           </div>
           <div className="nd2-chart-body">
@@ -473,13 +478,13 @@ export default function NurseDashboardPage() {
                   <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
                   <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
                   <Tooltip content={<ChartTooltip />} />
-                  <Bar dataKey="value" name="Số lượng" radius={[6, 6, 0, 0]}>
+                  <Bar dataKey="value" name={t('nurseDashboard.careChart.quantity')} radius={[6, 6, 0, 0]}>
                     {severityData.map((d, i) => <Cell key={i} fill={d.fill} />)}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="nd2-empty-chart">Không có dữ liệu sự cố</div>
+              <div className="nd2-empty-chart">{t('nurseDashboard.incidentChart.empty')}</div>
             )}
           </div>
         </div>
@@ -492,8 +497,8 @@ export default function NurseDashboardPage() {
             <TrendingUp size={17} />
           </div>
           <div>
-            <h3 className="nd2-chart-card__title">Xu hướng sự cố theo tuần</h3>
-            <p className="nd2-chart-card__sub">Biến động số lượng sự cố qua các tuần</p>
+            <h3 className="nd2-chart-card__title">{t('nurseDashboard.trendChart.title')}</h3>
+            <p className="nd2-chart-card__sub">{t('nurseDashboard.trendChart.sub')}</p>
           </div>
         </div>
         <div className="nd2-chart-body">
@@ -511,7 +516,7 @@ export default function NurseDashboardPage() {
                 <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
                 <Tooltip content={<ChartTooltip />} />
                 <Area
-                  type="monotone" dataKey="Sự cố"
+                  type="monotone" dataKey="incidents" name={t('nurseDashboard.trendChart.incidents')}
                   stroke="#8b5cf6" strokeWidth={2.5}
                   fill="url(#nd2TrendGrad)"
                   dot={{ r: 4, fill: '#8b5cf6', strokeWidth: 2, stroke: '#fff' }}
@@ -520,7 +525,7 @@ export default function NurseDashboardPage() {
               </AreaChart>
             </ResponsiveContainer>
           ) : (
-            <div className="nd2-empty-chart">Không có dữ liệu xu hướng</div>
+            <div className="nd2-empty-chart">{t('nurseDashboard.trendChart.empty')}</div>
           )}
         </div>
       </div>
@@ -534,16 +539,16 @@ export default function NurseDashboardPage() {
             <div className="nd2-chart-icon" style={{ background: '#fee2e2', color: '#ef4444' }}>
               <AlertCircle size={17} />
             </div>
-            <h3 className="nd2-list-card__title">Sự cố đang mở gần đây</h3>
+            <h3 className="nd2-list-card__title">{t('nurseDashboard.recentIncidents.title')}</h3>
             <button className="nd2-see-all" onClick={() => navigate('/incidents')}>
-              Xem tất cả <ChevronRight size={14} />
+              {t('nurseDashboard.recentIncidents.seeAll')} <ChevronRight size={14} />
             </button>
           </div>
           <div className="nd2-list-body">
             {recentIncidents.length === 0 ? (
               <div className="nd2-empty-list">
                 <CheckCircle2 size={32} color="#10b981" />
-                <span>Không có sự cố nào đang mở</span>
+                <span>{t('nurseDashboard.recentIncidents.noOpen')}</span>
               </div>
             ) : (
               recentIncidents.map((inc, i) => (
@@ -555,7 +560,7 @@ export default function NurseDashboardPage() {
                     {SEVERITY_VI[inc.severity] || inc.severity || '—'}
                   </div>
                   <div className="nd2-incident-item__body">
-                    <span className="nd2-incident-item__title">{inc.incidentType || inc.title || 'Sự cố'}</span>
+                    <span className="nd2-incident-item__title">{inc.incidentType || inc.title || t('nurseDashboard.recentIncidents.defaultType')}</span>
                     <span className="nd2-incident-item__resident">
                       <Heart size={11} /> {inc.residentId?.fullName || inc.residentName || '—'}
                     </span>
@@ -581,16 +586,16 @@ export default function NurseDashboardPage() {
             <div className="nd2-chart-icon" style={{ background: '#ede9fe', color: '#8b5cf6' }}>
               <Calendar size={17} />
             </div>
-            <h3 className="nd2-list-card__title">Ca làm việc của tôi</h3>
+            <h3 className="nd2-list-card__title">{t('nurseDashboard.myShifts.title')}</h3>
             <button className="nd2-see-all" onClick={() => navigate('/my-shifts')}>
-              Xem tất cả <ChevronRight size={14} />
+              {t('nurseDashboard.myShifts.seeAll')} <ChevronRight size={14} />
             </button>
           </div>
           <div className="nd2-list-body">
             {todayShifts.length === 0 && upcomingShifts.length === 0 ? (
               <div className="nd2-empty-list">
                 <Clock size={32} color="#94a3b8" />
-                <span>Không có ca làm trong 7 ngày tới</span>
+                <span>{t('nurseDashboard.myShifts.noShifts')}</span>
               </div>
             ) : (
               <>
@@ -625,14 +630,15 @@ function KpiCard({ icon: Icon, color, bg, label, value, sub, onClick }) {
 }
 
 function ShiftRow({ shift, isToday }) {
-  const name = shift.shiftTemplate?.name || shift.templateName || 'Ca làm việc';
+  const { t } = useTranslation();
+  const name = shift.shiftTemplate?.name || shift.templateName || t('nurseDashboard.kpi.shiftDefault');
   const start = shift.startTime || shift.shiftTemplate?.startTime || '';
   const end = shift.endTime || shift.shiftTemplate?.endTime || '';
   return (
     <div className={`nd2-shift-row ${isToday ? 'nd2-shift-row--today' : ''}`}>
       <div className="nd2-shift-row__left">
         <span className={`nd2-shift-badge ${isToday ? 'nd2-shift-badge--today' : ''}`}>
-          {isToday ? 'Hôm nay' : formatDate(shift.workDate)}
+          {isToday ? t('nurseDashboard.myShifts.today') : formatDate(shift.workDate)}
         </span>
         <span className="nd2-shift-row__name">{name}</span>
       </div>

@@ -191,7 +191,7 @@ export default function AdminAdmissionRequestsPage() {
       }
     } catch (err) {
       console.error('Failed to load admission requests:', err);
-      setError('Không thể tải danh sách yêu cầu nhập viện. Vui lòng kiểm tra thông tin đăng nhập hoặc kết nối mạng.');
+      setError(t('admin.admissionRequests.loadError'));
     } finally {
       setLoading(false);
     }
@@ -256,7 +256,7 @@ export default function AdminAdmissionRequestsPage() {
             style={{ backgroundColor: '#0f766e' }}
           >
             <UserPlus className="h-4 w-4" />
-            {t('admin.admissionRequests.createWalkIn', 'Tạo hồ sơ nhập viện (khách vãng lai)')}
+            {t('admin.admissionRequests.createWalkIn')}
           </button>
           <button
             onClick={fetchRequests}
@@ -284,7 +284,7 @@ export default function AdminAdmissionRequestsPage() {
 
         {/* New Card */}
         <div className="adm-card-stat">
-          <div className="adm-stat-icon" style={{ backgroundColor: '#eff6ff', color: '#2563eb' }}>
+          <div className="adm-stat-icon" style={{ backgroundColor: 'rgba(15, 118, 110, 0.08)', color: '#0f766e' }}>
             <Clock size={22} />
           </div>
           <div>
@@ -471,7 +471,7 @@ export default function AdminAdmissionRequestsPage() {
                       </div>
                       {row.requestedByPhone && (
                         <div className="text-xs text-slate-500 mt-0.5">
-                          SĐT: {row.requestedByPhone}
+                          {t('admin.admissionRequests.phoneLabel')}: {row.requestedByPhone}
                         </div>
                       )}
                     </td>

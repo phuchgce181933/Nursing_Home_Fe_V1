@@ -45,7 +45,7 @@ function CareTaskDetailModal({ taskId, mode = 'view', ns, onClose, onUpdated }) 
 
   const handleStatus = async (status) => {
     if (status === 'skipped' && !notes.trim()) {
-      setError(t(`${ns}.skipNotesRequired`, { defaultValue: 'Vui lòng nhập lý do trước khi đánh dấu bỏ qua công việc này.' }));
+      setError(t(`${ns}.skipNotesRequired`));
       return;
     }
     setSaving(true);

@@ -4,7 +4,7 @@
   padding: 24px;
   background-color: #f8fafc;
   min-height: 100vh;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: inherit;
 }
 
 .cap-header {
@@ -518,4 +518,14 @@
 @keyframes capSlideUp {
   from { transform: translateY(20px); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .cap-container { padding: 16px; }
+  .cap-header { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .cap-metrics-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .cap-filter-grid { grid-template-columns: 1fr; }
+  .cap-filter-row-secondary { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .cap-filter-date-group { flex-wrap: wrap; }
 }

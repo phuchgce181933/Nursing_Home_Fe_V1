@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Paperclip, Send, X, AlertTriangle } from 'lucide-react';
 
 const MAX_CONTENT_LENGTH = 5000;
@@ -6,6 +7,7 @@ const MAX_ATTACHMENTS = 6;
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
 export default function MessageInput({ onSend }) {
+  const { t } = useTranslation();
   const [text, setText] = useState('');
   const [files, setFiles] = useState([]);
   const [sending, setSending] = useState(false);
@@ -22,7 +24,7 @@ export default function MessageInput({ onSend }) {
       setFiles([]);
       if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (err) {
-      setError(err?.response?.data?.message || err.message || 'Không thể gửi tin nhắn, vui lòng thử lại');
+      setError(err?.response?.data?.message || err.message || t('messagesPage.errorSendMessage'));
     } finally {
       setSending(false);
     }
@@ -31,12 +33,12 @@ export default function MessageInput({ onSend }) {
   const handleFileChange = (e) => {
     const selected = Array.from(e.target.files);
     if (selected.length > MAX_ATTACHMENTS) {
-      setError(`Chỉ được đính kèm tối đa ${MAX_ATTACHMENTS} tệp`);
+      setError(t('messagesPage.maxAttachments', { max: MAX_ATTACHMENTS }));
       return;
     }
     const oversized = selected.find((f) => f.size > MAX_FILE_SIZE);
     if (oversized) {
-      setError(`Tệp "${oversized.name}" vượt quá dung lượng tối đa 10MB`);
+      setError(t('messagesPage.fileTooLarge', { name: oversized.name }));
       return;
     }
     setError(null);
@@ -70,8 +72,8 @@ export default function MessageInput({ onSend }) {
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          title="Đính kèm tệp"
-          data-tooltip="Đính kèm tệp"
+          title={t('messagesPage.attachFile')}
+          data-tooltip={t('messagesPage.attachFile')}
           className="press-effect flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-navy-deep"
         >
           <Paperclip size={18} />
@@ -88,7 +90,7 @@ export default function MessageInput({ onSend }) {
             value={text}
             onChange={(e) => setText(e.target.value.slice(0, MAX_CONTENT_LENGTH))}
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleSend(); } }}
-            placeholder="Nhập tin nhắn..."
+            placeholder={t('messagesPage.messagePlaceholder')}
             maxLength={MAX_CONTENT_LENGTH}
             className="w-full rounded-full border border-outline-variant bg-surface-container-low px-4 py-2.5 text-sm text-slate-700 placeholder:text-slate-400 transition-colors focus:border-navy-deep focus:bg-white focus:outline-none focus:ring-2 focus:ring-navy-deep/10"
           />

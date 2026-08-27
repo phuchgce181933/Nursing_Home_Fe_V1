@@ -24,7 +24,7 @@ import { resolveApiError } from '../../utils/apiMessage';
 import medicalRecordService from '../../services/medicalRecord.service';
 import '../../styles/nurse/ActivitySchedulePage.css';
 
-const formatDurationLabel = (durationMinutes) => {
+const formatDurationLabel = (durationMinutes, t) => {
   const totalMinutes = Number(durationMinutes);
   if (!Number.isFinite(totalMinutes) || totalMinutes <= 0) return '';
 
@@ -34,7 +34,7 @@ const formatDurationLabel = (durationMinutes) => {
   const minutes = remainingMinutes % 60;
 
   const parts = [];
-  if (totalDays > 0) parts.push(`${totalDays} ngày`);
+  if (totalDays > 0) parts.push(t('activitySchedule.durationDays', { count: totalDays }));
   if (hours > 0) parts.push(`${hours}h`);
   if (minutes > 0) parts.push(`${minutes}p`);
 
@@ -58,7 +58,7 @@ const formatActivityDateRange = (activity) => {
     const perDayStart = startTime.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
     const perDayEndDate = new Date(startTime.getTime() + dailyMinutes * 60000);
     const perDayEnd = perDayEndDate.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-    return `${startDate.toLocaleDateString('vi-VN')} → ${endDate.toLocaleDateString('vi-VN')} · mỗi ngày ${perDayStart}–${perDayEnd}`;
+    return `${startDate.toLocaleDateString('vi-VN')} → ${endDate.toLocaleDateString('vi-VN')} · ${perDayStart}–${perDayEnd}`;
   }
 
   return `${startDate.toLocaleString('vi-VN')} → ${endDate.toLocaleString('vi-VN')}`;
@@ -516,7 +516,7 @@ export default function ActivitySchedulePage() {
       if (!a) return;
       if (!canRecordAttendance(a)) {
         setRecordMessageType('error');
-        setRecordMessage('Chỉ có thể điểm danh khi hoạt động đã hoặc đang diễn ra (trong vòng 2 giờ sau khi kết thúc).');
+        setRecordMessage(t('activitySchedule.attendanceTimeExpired'));
         return;
       }
       const MAX_NOTE_LENGTH = 500;
@@ -526,7 +526,7 @@ export default function ActivitySchedulePage() {
         draft.participationRecords.some((r) => (r.comment || '').length > MAX_NOTE_LENGTH || (r.incident || '').length > MAX_NOTE_LENGTH);
       if (tooLong) {
         setRecordMessageType('error');
-        setRecordMessage(`Ghi chú không được vượt quá ${MAX_NOTE_LENGTH} ký tự.`);
+        setRecordMessage(t('activitySchedule.noteTooLong', { max: MAX_NOTE_LENGTH }));
         return;
       }
 
@@ -558,7 +558,7 @@ export default function ActivitySchedulePage() {
         fetchActivities();
         setDraft(buildAttendanceFormFromActivity(result || a));
         setRecordMessageType('success');
-        setRecordMessage('Đã lưu điểm danh và ghi nhận tham gia cho hoạt động.');
+        setRecordMessage(t('activitySchedule.saveSuccess'));
       } catch (err) {
         console.error('Save activity attendance failed:', err);
         setRecordMessageType('error');
@@ -600,7 +600,7 @@ export default function ActivitySchedulePage() {
                 return (
                   <div className="as-detail-row">
                     <Calendar size={16} />
-                    <span className="as-detail-label">Ngày điểm danh</span>
+                    <span className="as-detail-label">{t('activitySchedule.attendanceDateLabel')}</span>
                     <span className="as-detail-value">{d.toLocaleDateString('vi-VN')}</span>
                   </div>
                 );
@@ -616,7 +616,7 @@ export default function ActivitySchedulePage() {
             {a.endAt && (
               <div className="as-detail-row">
                 <Clock size={16} />
-                <span className="as-detail-label">Thời gian kết thúc</span>
+                <span className="as-detail-label">{t('activitySchedule.endTimeLabel')}</span>
                 <span className="as-detail-value">
                   {new Date(a.endAt || a.startAt || a.scheduledAt).toLocaleString('vi-VN')}
                 </span>
@@ -635,7 +635,7 @@ export default function ActivitySchedulePage() {
               <div className="as-detail-row">
                 <Clock size={16} />
                 <span className="as-detail-label">{t('activitySchedule.detail.duration')}</span>
-                <span className="as-detail-value">{formatDurationLabel(a.durationMinutes)}</span>
+                <span className="as-detail-value">{formatDurationLabel(a.durationMinutes, t)}</span>
               </div>
             )}
 
@@ -675,7 +675,7 @@ export default function ActivitySchedulePage() {
                       <User size={14} />
                       <span style={{ marginRight: 8 }}>{residents[rid]?.fullName || t('activitySchedule.residentById', { id: rid })}</span>
                       {residentsAbnormalStatus[rid] && (
-                        <span className="as-abnormal-badge" title="Cảnh báo: chỉ số bất thường" style={{ color: '#b91c1c', fontWeight: 600 }}>
+                        <span className="as-abnormal-badge" title={t('activitySchedule.abnormalWarning')} style={{ color: '#b91c1c', fontWeight: 600 }}>
                           ⚠️
                         </span>
                       )}
@@ -687,10 +687,10 @@ export default function ActivitySchedulePage() {
 
             <div className="as-record-section">
               <div className="as-record-header">
-                <h3>Điểm danh & ghi nhận tham gia</h3>
+                <h3>{t('activitySchedule.attendanceSection')}</h3>
                 <button type="button" className="as-save-record-btn" onClick={handleSaveRecord} disabled={savingRecord || !attendanceAllowed}>
                   {savingRecord ? <Loader2 size={14} className="as-spin-icon" /> : <Save size={14} />}
-                  {savingRecord ? 'Đang lưu...' : 'Lưu'}
+                  {savingRecord ? t('activitySchedule.saving') : t('activitySchedule.save')}
                 </button>
               </div>
 
@@ -704,16 +704,16 @@ export default function ActivitySchedulePage() {
               {!attendanceAllowed && (
                 <div className="as-record-message as-record-message--error">
                   <X size={14} />
-                  Chỉ có thể điểm danh khi hoạt động đã được lên lịch và đang diễn ra.
+                  {t('activitySchedule.attendanceNotAllowed')}
                 </div>
               )}
 
-              <label className="as-record-label">Nhận xét chung</label>
+              <label className="as-record-label">{t('activitySchedule.generalComment')}</label>
               <textarea
                 className="as-record-textarea"
                 value={draft.participantResultNotes}
                 onChange={(e) => updateDraft((prev) => ({ ...prev, participantResultNotes: e.target.value }))}
-                placeholder="Nhập nhận xét chung về hoạt động..."
+                placeholder={t('activitySchedule.generalCommentPlaceholder')}
                 disabled={!attendanceAllowed}
                 maxLength={500}
               />
@@ -731,61 +731,61 @@ export default function ActivitySchedulePage() {
 
                       <div className="as-resident-record-grid">
                         <div>
-                          <label className="as-record-label">Điểm danh</label>
+                          <label className="as-record-label">{t('activitySchedule.attendanceLabel')}</label>
                           <select
                             className="as-record-select"
                             value={record.status}
                             onChange={(e) => handleAttendanceChange(record.residentId, 'status', e.target.value)}
                             disabled={!attendanceAllowed}
                           >
-                            <option value="present">Có mặt</option>
-                            <option value="absent">Vắng mặt</option>
-                            <option value="late">Muộn</option>
-                            <option value="left_early">Về sớm</option>
+                            <option value="present">{t('activitySchedule.statusPresent')}</option>
+                            <option value="absent">{t('activitySchedule.statusAbsent')}</option>
+                            <option value="late">{t('activitySchedule.statusLate')}</option>
+                            <option value="left_early">{t('activitySchedule.statusLeftEarly')}</option>
                           </select>
                         </div>
 
                         <div>
-                          <label className="as-record-label">Mức độ tham gia</label>
+                          <label className="as-record-label">{t('activitySchedule.participationLevel')}</label>
                           <select
                             className="as-record-select"
                             value={participation.participationLevel || 'active'}
                             onChange={(e) => handleParticipationChange(record.residentId, 'participationLevel', e.target.value)}
                             disabled={!attendanceAllowed}
                           >
-                            <option value="passive">Không tham gia</option>
-                            <option value="partial">Tham gia TB</option>
-                            <option value="active">Thường xuyên tham gia</option>
+                            <option value="passive">{t('activitySchedule.participationPassive')}</option>
+                            <option value="partial">{t('activitySchedule.participationPartial')}</option>
+                            <option value="active">{t('activitySchedule.participationActive')}</option>
                           </select>
                         </div>
                       </div>
 
-                      <label className="as-record-label">Nhận xét</label>
+                      <label className="as-record-label">{t('activitySchedule.commentLabel')}</label>
                       <textarea
                         className="as-record-textarea"
                         value={participation.comment || ''}
                         onChange={(e) => handleParticipationChange(record.residentId, 'comment', e.target.value)}
-                        placeholder="Nhập nhận xét..."
+                        placeholder={t('activitySchedule.commentPlaceholder')}
                         disabled={!attendanceAllowed}
                         maxLength={500}
                       />
 
-                      <label className="as-record-label">Sự cố</label>
+                      <label className="as-record-label">{t('activitySchedule.incidentLabel')}</label>
                       <textarea
                         className="as-record-textarea"
                         value={participation.incident || ''}
                         onChange={(e) => handleParticipationChange(record.residentId, 'incident', e.target.value)}
-                        placeholder="Nếu có, ghi rõ sự cố..."
+                        placeholder={t('activitySchedule.incidentPlaceholder')}
                         disabled={!attendanceAllowed}
                         maxLength={500}
                       />
 
-                      <label className="as-record-label">Ghi chú điểm danh</label>
+                      <label className="as-record-label">{t('activitySchedule.attendanceNote')}</label>
                       <textarea
                         className="as-record-textarea"
                         value={record.note || ''}
                         onChange={(e) => handleAttendanceChange(record.residentId, 'note', e.target.value)}
-                        placeholder="Ghi chú thêm về điểm danh..."
+                        placeholder={t('activitySchedule.attendanceNotePlaceholder')}
                         disabled={!attendanceAllowed}
                         maxLength={500}
                       />

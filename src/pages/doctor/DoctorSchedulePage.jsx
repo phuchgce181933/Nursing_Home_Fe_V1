@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Calendar, ChevronLeft, ChevronRight, Stethoscope,
   Clock, User, Activity, Loader2, AlertCircle, CalendarDays,
@@ -7,13 +8,17 @@ import careAppointmentService from '../../services/careAppointment.service';
 import '../../styles/doctor/DoctorSchedulePage.css';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
-const VI_DAYS = ['CN', 'Th 2', 'Th 3', 'Th 4', 'Th 5', 'Th 6', 'Th 7'];
-const STATUS_VI = {
-  scheduled: 'Chờ khám',
-  in_progress: 'Đang khám',
-  completed: 'Hoàn thành',
-  cancelled: 'Đã hủy',
-};
+const getDayAbbrs = (t) => [
+  t('doctorSchedule.days.sun'), t('doctorSchedule.days.mon'), t('doctorSchedule.days.tue'),
+  t('doctorSchedule.days.wed'), t('doctorSchedule.days.thu'), t('doctorSchedule.days.fri'),
+  t('doctorSchedule.days.sat'),
+];
+const getStatusVI = (t) => ({
+  scheduled: t('doctorSchedule.status.scheduled'),
+  in_progress: t('doctorSchedule.status.inProgress'),
+  completed: t('doctorSchedule.status.completed'),
+  cancelled: t('doctorSchedule.status.cancelled'),
+});
 
 function toDateStr(d) {
   // Returns YYYY-MM-DD in local time
@@ -49,6 +54,9 @@ function formatFullDate(dateStr) {
 
 // ── Main Component ─────────────────────────────────────────────────────────
 export default function DoctorSchedulePage() {
+  const { t } = useTranslation();
+  const VI_DAYS = getDayAbbrs(t);
+  const STATUS_VI = getStatusVI(t);
   const [view, setView] = useState('week'); // 'week' | 'day'
   const [currentDate, setCurrentDate] = useState(toDateStr(new Date()));
   const [appointments, setAppointments] = useState([]);
@@ -74,7 +82,7 @@ export default function DoctorSchedulePage() {
       setAppointments(res?.data || []);
     } catch (err) {
       console.error('Failed to load schedule:', err);
-      setError('Không thể tải lịch khám. Vui lòng thử lại.');
+      setError(t('doctorSchedule.error'));
     } finally {
       setLoading(false);
     }
@@ -129,8 +137,8 @@ export default function DoctorSchedulePage() {
             <CalendarDays size={22} color="#fff" />
           </div>
           <div>
-            <h1 className="dsp-title">Lịch Khám Của Tôi</h1>
-            <p className="dsp-subtitle">Xem lịch khám theo ngày hoặc tuần</p>
+            <h1 className="dsp-title">{t('doctorSchedule.title')}</h1>
+            <p className="dsp-subtitle">{t('doctorSchedule.subtitle')}</p>
           </div>
         </div>
         <div className="dsp-view-toggle">
@@ -138,13 +146,13 @@ export default function DoctorSchedulePage() {
             className={`dsp-view-btn${view === 'week' ? ' active' : ''}`}
             onClick={() => setView('week')}
           >
-            Theo tuần
+            {t('doctorSchedule.viewWeek')}
           </button>
           <button
             className={`dsp-view-btn${view === 'day' ? ' active' : ''}`}
             onClick={() => setView('day')}
           >
-            Theo ngày
+            {t('doctorSchedule.viewDay')}
           </button>
         </div>
       </div>
@@ -154,40 +162,40 @@ export default function DoctorSchedulePage() {
         <div className="dsp-stats">
           <div className="dsp-stat-card">
             <div className="dsp-stat-num" style={{ color: '#a5b4fc' }}>{total}</div>
-            <div className="dsp-stat-label">Tổng lịch khám</div>
+            <div className="dsp-stat-label">{t('doctorSchedule.stats.total')}</div>
           </div>
           <div className="dsp-stat-card">
             <div className="dsp-stat-num" style={{ color: '#93c5fd' }}>{scheduled}</div>
-            <div className="dsp-stat-label">Chờ khám</div>
+            <div className="dsp-stat-label">{t('doctorSchedule.stats.scheduled')}</div>
           </div>
           <div className="dsp-stat-card">
             <div className="dsp-stat-num" style={{ color: '#fcd34d' }}>{inProgress}</div>
-            <div className="dsp-stat-label">Đang khám</div>
+            <div className="dsp-stat-label">{t('doctorSchedule.stats.inProgress')}</div>
           </div>
           <div className="dsp-stat-card">
             <div className="dsp-stat-num" style={{ color: '#6ee7b7' }}>{completed}</div>
-            <div className="dsp-stat-label">Hoàn thành</div>
+            <div className="dsp-stat-label">{t('doctorSchedule.stats.completed')}</div>
           </div>
         </div>
       )}
 
       {/* Navigation */}
       <div className="dsp-nav">
-        <button className="dsp-nav-btn" onClick={goPrev} aria-label="Trước">
+        <button className="dsp-nav-btn" onClick={goPrev} aria-label={t('doctorSchedule.prev')}>
           <ChevronLeft size={16} />
         </button>
         <span className="dsp-nav-label">{navLabel}</span>
-        <button className="dsp-nav-btn" onClick={goNext} aria-label="Sau">
+        <button className="dsp-nav-btn" onClick={goNext} aria-label={t('doctorSchedule.next')}>
           <ChevronRight size={16} />
         </button>
-        <button className="dsp-today-btn" onClick={goToday}>Hôm nay</button>
+        <button className="dsp-today-btn" onClick={goToday}>{t('doctorSchedule.today')}</button>
       </div>
 
       {/* Content */}
       {loading ? (
         <div className="dsp-loading">
           <Loader2 size={20} className="animate-spin" />
-          <span>Đang tải lịch khám...</span>
+          <span>{t('doctorSchedule.loading')}</span>
         </div>
       ) : error ? (
         <div className="dsp-error">
@@ -209,7 +217,7 @@ export default function DoctorSchedulePage() {
                 </div>
                 <div className="dsp-day-body">
                   {dayAppts.length === 0 ? (
-                    <div className="dsp-day-empty">Trống</div>
+                    <div className="dsp-day-empty">{t('doctorSchedule.empty')}</div>
                   ) : (
                     dayAppts.map(a => (
                       <div
@@ -235,7 +243,7 @@ export default function DoctorSchedulePage() {
           {getApptsForDay(currentDate).length === 0 ? (
             <div className="dsp-daily-empty">
               <Calendar size={40} style={{ margin: '0 auto 12px', opacity: 0.3 }} />
-              <div>Không có lịch khám nào trong ngày này</div>
+              <div>{t('doctorSchedule.dailyEmpty')}</div>
             </div>
           ) : (
             getApptsForDay(currentDate).map(a => (
@@ -257,7 +265,7 @@ export default function DoctorSchedulePage() {
                   </div>
                   <div className="dsp-card-type">
                     <Stethoscope size={12} style={{ marginRight: 5, verticalAlign: 'middle' }} />
-                    {a.appointmentType || 'Chưa phân loại'}
+                    {a.appointmentType || t('doctorSchedule.uncategorized')}
                   </div>
                   <div className="dsp-card-tags">
                     <span className={`dsp-tag dsp-tag-status-${a.status}`}>
@@ -265,7 +273,7 @@ export default function DoctorSchedulePage() {
                     </span>
                     {a.nurseStaffId?.userId?.fullName && (
                       <span className="dsp-tag dsp-tag-nurse">
-                        Y tá: {a.nurseStaffId.userId.fullName}
+                        {t('doctorSchedule.nurse')}: {a.nurseStaffId.userId.fullName}
                       </span>
                     )}
                   </div>
@@ -282,23 +290,23 @@ export default function DoctorSchedulePage() {
           <div className="dsp-modal" onClick={e => e.stopPropagation()}>
             <div className="dsp-modal-title">
               <Stethoscope size={16} style={{ marginRight: 8, verticalAlign: 'middle' }} />
-              Chi tiết lịch khám
+              {t('doctorSchedule.modal.title')}
             </div>
             {[
-              ['Bệnh nhân', selectedAppt.residentId?.fullName || '—'],
-              ['Loại khám', selectedAppt.appointmentType || '—'],
-              ['Bắt đầu', formatTime(selectedAppt.scheduledStartAt)],
-              ['Kết thúc', formatTime(selectedAppt.scheduledEndAt)],
-              ['Trạng thái', STATUS_VI[selectedAppt.status] || selectedAppt.status],
-              ['Y tá phụ trách', selectedAppt.nurseStaffId?.userId?.fullName || '—'],
-              ['Ghi chú', selectedAppt.notes || '—'],
+              [t('doctorSchedule.modal.patient'), selectedAppt.residentId?.fullName || '—'],
+              [t('doctorSchedule.modal.type'), selectedAppt.appointmentType || '—'],
+              [t('doctorSchedule.modal.start'), formatTime(selectedAppt.scheduledStartAt)],
+              [t('doctorSchedule.modal.end'), formatTime(selectedAppt.scheduledEndAt)],
+              [t('doctorSchedule.modal.status'), STATUS_VI[selectedAppt.status] || selectedAppt.status],
+              [t('doctorSchedule.modal.nurse'), selectedAppt.nurseStaffId?.userId?.fullName || '—'],
+              [t('doctorSchedule.modal.notes'), selectedAppt.notes || '—'],
             ].map(([label, val]) => (
               <div className="dsp-modal-row" key={label}>
                 <div className="dsp-modal-label">{label}</div>
                 <div className="dsp-modal-val">{val}</div>
               </div>
             ))}
-            <button className="dsp-modal-close" onClick={() => setSelectedAppt(null)}>Đóng</button>
+            <button className="dsp-modal-close" onClick={() => setSelectedAppt(null)}>{t('doctorSchedule.modal.close')}</button>
           </div>
         </div>
       )}

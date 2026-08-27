@@ -268,7 +268,7 @@ export default function AdminTourDetailDrawer({ isOpen, onClose, tourId, onActio
                 <div className="ftd-drawer__section-title">Thông tin tài khoản gia đình</div>
                 <div className="ftd-detail-card">
                   <div className="ftd-detail-card__header-row">
-                    <div className="ftd-detail-card__avatar" style={{ backgroundColor: '#eff6ff', color: '#2563eb' }}>
+                    <div className="ftd-detail-card__avatar" style={{ backgroundColor: 'rgba(15, 118, 110, 0.08)', color: '#0f766e' }}>
                       <User size={16} />
                     </div>
                     <div>

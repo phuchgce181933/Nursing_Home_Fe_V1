@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Calendar,
   Eye,
@@ -19,12 +20,12 @@ import StaffVisitDetailDrawer from '../../components/family/ResidentVisit/StaffV
 import '../../styles/admin/AdminAdmissionRequestsPage.css';
 import '../../styles/family/FacilityTourHistoryPage.css';
 
-const STATUS_OPTIONS = [
-  { value: '', label: 'Tất cả trạng thái' },
-  { value: 'pending', label: 'Chờ duyệt' },
-  { value: 'approved', label: 'Đã duyệt' },
-  { value: 'rejected', label: 'Bị từ chối' },
-  { value: 'cancelled', label: 'Đã hủy' },
+const getStatusOptions = (t) => [
+  { value: '', label: t('visitRequests.statusAll') },
+  { value: 'pending', label: t('visitRequests.statusPending') },
+  { value: 'approved', label: t('visitRequests.statusApproved') },
+  { value: 'rejected', label: t('visitRequests.statusRejected') },
+  { value: 'cancelled', label: t('visitRequests.statusCancelled') },
 ];
 
 const getStatusBadgeClass = (status) => {
@@ -42,18 +43,18 @@ const getStatusBadgeClass = (status) => {
   }
 };
 
-const getStatusLabel = (status) => {
+const getStatusLabel = (status, t) => {
   switch (status) {
     case 'pending':
-      return 'Chờ duyệt';
+      return t('visitRequests.statusPending');
     case 'approved':
-      return 'Đã duyệt';
+      return t('visitRequests.statusApproved');
     case 'rejected':
-      return 'Bị từ chối';
+      return t('visitRequests.statusRejected');
     case 'cancelled':
-      return 'Đã hủy';
+      return t('visitRequests.statusCancelled');
     default:
-      return status || 'Không xác định';
+      return status || t('visitRequests.statusUnknown');
   }
 };
 
@@ -69,8 +70,9 @@ const formatViDate = (dateStr) => {
 };
 
 export default function ResidentVisitRequestsPage() {
+  const { t } = useTranslation();
   const { user } = useAuth();
-  const canReview = user?.role === 'manager' || user?.role === 'admin';
+  const canReview = user?.role === 'admin';
 
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -99,11 +101,11 @@ export default function ResidentVisitRequestsPage() {
       setTotalPages(res?.totalPages || 1);
     } catch (err) {
       console.error('Failed to load resident visit requests:', err);
-      setError('Không thể tải danh sách yêu cầu thăm. Vui lòng kiểm tra kết nối và thử lại.');
+      setError(t('visitRequests.errorLoad'));
     } finally {
       setLoading(false);
     }
-  }, [page, limit, status]);
+  }, [page, limit, status, t]);
 
   useEffect(() => {
     fetchVisits();
@@ -126,6 +128,8 @@ export default function ResidentVisitRequestsPage() {
   const pendingCount = data.filter((v) => v.status === 'pending').length;
   const approvedCount = data.filter((v) => v.status === 'approved').length;
 
+  const statusOptions = getStatusOptions(t);
+
   return (
     <div className="adm-container">
       {/* Top Banner Header */}
@@ -133,16 +137,16 @@ export default function ResidentVisitRequestsPage() {
         <div>
           <h1>
             <Calendar className="text-emerald-sage" size={26} />
-            Yêu cầu Thăm Cư dân
+            {t('visitRequests.pageTitle')}
           </h1>
           <p>
-            Quản lý các yêu cầu thăm người thân từ gia đình
-            {canReview ? ' — duyệt hoặc từ chối yêu cầu.' : ' (chỉ xem, cần quản lý hoặc admin để duyệt).'}
+            {t('visitRequests.pageSubtitle')}
+            {canReview ? t('visitRequests.pageSubtitleAdmin') : t('visitRequests.pageSubtitleViewOnly')}
           </p>
         </div>
         <button onClick={fetchVisits} disabled={loading} className="adm-btn-refresh">
           <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          Tải lại
+          {t('visitRequests.btnRefresh')}
         </button>
       </div>
 
@@ -153,17 +157,17 @@ export default function ResidentVisitRequestsPage() {
             <ClipboardList size={22} />
           </div>
           <div>
-            <span className="adm-stat-label">Tổng số yêu cầu</span>
+            <span className="adm-stat-label">{t('visitRequests.statTotal')}</span>
             <span className="adm-stat-value">{total}</span>
           </div>
         </div>
 
         <div className="adm-card-stat">
-          <div className="adm-stat-icon" style={{ backgroundColor: '#eff6ff', color: '#2563eb' }}>
+          <div className="adm-stat-icon" style={{ backgroundColor: 'rgba(15, 118, 110, 0.08)', color: '#0f766e' }}>
             <Clock size={22} />
           </div>
           <div>
-            <span className="adm-stat-label">Chờ duyệt</span>
+            <span className="adm-stat-label">{t('visitRequests.statPending')}</span>
             <span className="adm-stat-value">{pendingCount}</span>
           </div>
         </div>
@@ -173,7 +177,7 @@ export default function ResidentVisitRequestsPage() {
             <CheckCircle size={22} />
           </div>
           <div>
-            <span className="adm-stat-label">Đã duyệt</span>
+            <span className="adm-stat-label">{t('visitRequests.statApproved')}</span>
             <span className="adm-stat-value">{approvedCount}</span>
           </div>
         </div>
@@ -191,7 +195,7 @@ export default function ResidentVisitRequestsPage() {
                 setPage(1);
               }}
             >
-              {STATUS_OPTIONS.map((opt) => (
+              {statusOptions.map((opt) => (
                 <option key={opt.value} value={opt.value}>
                   {opt.label}
                 </option>
@@ -206,18 +210,18 @@ export default function ResidentVisitRequestsPage() {
         {loading && data.length === 0 ? (
           <div className="p-16 flex flex-col items-center justify-center bg-white" style={{ minHeight: '300px' }}>
             <RefreshCw className="animate-spin text-emerald-sage mb-3" size={32} />
-            <p className="text-slate-500 text-sm">Đang tải danh sách yêu cầu thăm...</p>
+            <p className="text-slate-500 text-sm">{t('visitRequests.loading')}</p>
           </div>
         ) : error ? (
           <div className="p-10 flex flex-col items-center justify-center text-center bg-white" style={{ minHeight: '300px' }}>
             <AlertCircle className="text-red-500 mb-3" size={36} />
-            <p className="text-slate-800 font-bold mb-1">Đã xảy ra lỗi</p>
+            <p className="text-slate-800 font-bold mb-1">{t('visitRequests.errorTitle')}</p>
             <p className="text-slate-500 text-sm max-w-md">{error}</p>
             <button
               onClick={fetchVisits}
               className="mt-4 px-5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm rounded-xl font-semibold transition-all"
             >
-              Thử lại
+              {t('visitRequests.btnRetry')}
             </button>
           </div>
         ) : data.length === 0 ? (
@@ -225,9 +229,9 @@ export default function ResidentVisitRequestsPage() {
             <div className="bg-slate-50 p-4 rounded-full text-slate-400 mb-3" style={{ width: 'fit-content' }}>
               <Calendar size={30} />
             </div>
-            <p className="text-slate-700 font-bold mb-1">Không có yêu cầu thăm nào</p>
+            <p className="text-slate-700 font-bold mb-1">{t('visitRequests.emptyTitle')}</p>
             <p className="text-slate-400 text-xs max-w-sm">
-              Không tìm thấy yêu cầu thăm nào khớp với bộ lọc hiện tại.
+              {t('visitRequests.emptyDesc')}
             </p>
           </div>
         ) : (
@@ -235,14 +239,14 @@ export default function ResidentVisitRequestsPage() {
             <table className="adm-table">
               <thead>
                 <tr>
-                  <th>Mã yêu cầu</th>
-                  <th>Người thân</th>
-                  <th>Người đến thăm</th>
-                  <th>Lịch mong muốn</th>
-                  <th style={{ textAlign: 'center' }}>Số khách</th>
-                  <th>Ngày gửi</th>
-                  <th style={{ textAlign: 'center' }}>Trạng thái</th>
-                  <th style={{ textAlign: 'center' }}>Hành động</th>
+                  <th>{t('visitRequests.colCode')}</th>
+                  <th>{t('visitRequests.colResident')}</th>
+                  <th>{t('visitRequests.colVisitor')}</th>
+                  <th>{t('visitRequests.colSchedule')}</th>
+                  <th style={{ textAlign: 'center' }}>{t('visitRequests.colGuests')}</th>
+                  <th>{t('visitRequests.colSubmitted')}</th>
+                  <th style={{ textAlign: 'center' }}>{t('visitRequests.colStatus')}</th>
+                  <th style={{ textAlign: 'center' }}>{t('visitRequests.colActions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -260,7 +264,7 @@ export default function ResidentVisitRequestsPage() {
                     <td style={{ fontWeight: '500', color: '#475569' }}>
                       <div style={{ fontSize: '13px', color: '#1e293b' }}>{formatViDate(row.requestedDate)}</div>
                       <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
-                        {row.requestedTimeSlot || 'Chưa chọn khung giờ'}
+                        {row.requestedTimeSlot || t('visitRequests.noTimeSlot')}
                       </div>
                     </td>
                     <td style={{ textAlign: 'center', fontWeight: '600', color: '#475569' }}>
@@ -270,11 +274,11 @@ export default function ResidentVisitRequestsPage() {
                     <td className="cell-date">{formatViDate(row.createdAt)}</td>
                     <td style={{ textAlign: 'center' }}>
                       <span className={`status-badge-custom-adm ${getStatusBadgeClass(row.status)}`}>
-                        {getStatusLabel(row.status)}
+                        {getStatusLabel(row.status, t)}
                       </span>
                     </td>
                     <td style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
-                      <button onClick={() => handleOpenDetails(row)} className="adm-btn-action" title="Xem chi tiết">
+                      <button onClick={() => handleOpenDetails(row)} className="adm-btn-action" title={t('visitRequests.viewDetail')}>
                         <Eye size={14} />
                       </button>
                     </td>
@@ -289,8 +293,8 @@ export default function ResidentVisitRequestsPage() {
         {total > 0 && (
           <div className="adm-pagination-footer">
             <div className="pagination-info">
-              Hiển thị <span>{(page - 1) * limit + 1}</span> đến{' '}
-              <span>{Math.min(page * limit, total)}</span> trên <span>{total}</span> yêu cầu
+              {t('visitRequests.paginationShowing')} <span>{(page - 1) * limit + 1}</span> {t('visitRequests.paginationTo')}{' '}
+              <span>{Math.min(page * limit, total)}</span> {t('visitRequests.paginationOf')} <span>{total}</span> {t('visitRequests.paginationRequests')}
             </div>
 
             <div className="pagination-controls">
@@ -298,7 +302,7 @@ export default function ResidentVisitRequestsPage() {
                 <ChevronLeft size={16} />
               </button>
               <div className="page-indicator">
-                Trang {page} / {totalPages}
+                {t('visitRequests.paginationPage')} {page} {t('visitRequests.paginationSlash')} {totalPages}
               </div>
               <button
                 disabled={page >= totalPages || loading}

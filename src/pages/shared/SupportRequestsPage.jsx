@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { LifeBuoy, Plus, X, Send, CheckCircle2, XCircle, Clock, User, Phone, MapPin, FileText } from 'lucide-react';
 import supportRequestService from '../../services/supportRequest.service';
 import authService from '../../services/auth.service';
@@ -7,25 +8,26 @@ const INPUT_CLASS =
   'w-full rounded-lg border border-outline-variant bg-white px-3.5 py-2.5 text-sm text-slate-700 placeholder:text-slate-400 transition-colors focus:border-navy-deep focus:outline-none focus:ring-2 focus:ring-navy-deep/10';
 
 const STATUS_META = {
-  open: { label: 'Mới', className: 'bg-status-info/10 text-status-info' },
-  in_progress: { label: 'Đang xử lý', className: 'bg-status-warning/10 text-status-warning' },
-  resolved: { label: 'Đã giải quyết', className: 'bg-status-success/10 text-status-success' },
-  closed: { label: 'Đã đóng', className: 'bg-slate-200 text-slate-500' },
+  open: { i18nKey: 'supportRequests.statusNew', className: 'bg-status-info/10 text-status-info' },
+  in_progress: { i18nKey: 'supportRequests.statusInProgress', className: 'bg-status-warning/10 text-status-warning' },
+  resolved: { i18nKey: 'supportRequests.statusResolved', className: 'bg-status-success/10 text-status-success' },
+  closed: { i18nKey: 'supportRequests.statusClosed', className: 'bg-slate-200 text-slate-500' },
 };
 
 const STATUS_FILTERS = [
-  { value: '', label: 'Tất cả' },
-  { value: 'open', label: 'Mới' },
-  { value: 'in_progress', label: 'Đang xử lý' },
-  { value: 'resolved', label: 'Đã giải quyết' },
-  { value: 'closed', label: 'Đã đóng' },
+  { value: '', i18nKey: 'supportRequests.statusAll' },
+  { value: 'open', i18nKey: 'supportRequests.statusNew' },
+  { value: 'in_progress', i18nKey: 'supportRequests.statusInProgress' },
+  { value: 'resolved', i18nKey: 'supportRequests.statusResolved' },
+  { value: 'closed', i18nKey: 'supportRequests.statusClosed' },
 ];
 
 function StatusBadge({ status }) {
+  const { t } = useTranslation();
   const meta = STATUS_META[status] || STATUS_META.open;
   return (
     <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${meta.className}`}>
-      {meta.label}
+      {t(meta.i18nKey)}
     </span>
   );
 }
@@ -38,6 +40,7 @@ function formatDateTime(dateStr) {
 const emptyForm = { fullName: '', age: '', phone: '', address: '', notes: '' };
 
 export default function SupportRequestsPage() {
+  const { t } = useTranslation();
   const [role, setRole] = useState(null);
   const [currentUserId, setCurrentUserId] = useState(null);
   const [requests, setRequests] = useState([]);
@@ -59,7 +62,7 @@ export default function SupportRequestsPage() {
   const [sendError, setSendError] = useState(null);
   const [closing, setClosing] = useState(false);
 
-  const isStaff = role === 'admin' || role === 'manager';
+  const isStaff = role === 'admin';
 
   useEffect(() => {
     (async () => {
@@ -89,7 +92,7 @@ export default function SupportRequestsPage() {
       const res = await supportRequestService.listSupportRequests(params);
       setRequests(res.items || []);
     } catch (err) {
-      setListError(err?.response?.data?.message || err.message || 'Không thể tải danh sách yêu cầu');
+      setListError(err?.response?.data?.message || err.message || t('supportRequests.errorLoadList'));
     } finally {
       setLoading(false);
     }
@@ -105,7 +108,7 @@ export default function SupportRequestsPage() {
       const full = await supportRequestService.getSupportRequest(req._id);
       setSelected(full);
     } catch (err) {
-      setDetailError(err?.response?.data?.message || err.message || 'Không thể tải chi tiết yêu cầu');
+      setDetailError(err?.response?.data?.message || err.message || t('supportRequests.errorLoadDetail'));
     } finally {
       setDetailLoading(false);
     }
@@ -113,15 +116,15 @@ export default function SupportRequestsPage() {
 
   const validateForm = () => {
     const errors = {};
-    if (!form.fullName.trim()) errors.fullName = 'Vui lòng nhập họ tên';
-    else if (form.fullName.trim().length > 100) errors.fullName = 'Họ tên tối đa 100 ký tự';
+    if (!form.fullName.trim()) errors.fullName = t('supportRequests.validationNameRequired');
+    else if (form.fullName.trim().length > 100) errors.fullName = t('supportRequests.validationNameMax');
     const ageNum = Number(form.age);
-    if (form.age === '' || Number.isNaN(ageNum)) errors.age = 'Vui lòng nhập tuổi';
-    else if (ageNum < 0 || ageNum > 150) errors.age = 'Tuổi không hợp lệ';
-    if (!form.phone.trim()) errors.phone = 'Vui lòng nhập số điện thoại';
-    if (!form.address.trim()) errors.address = 'Vui lòng nhập địa chỉ';
-    else if (form.address.trim().length > 300) errors.address = 'Địa chỉ tối đa 300 ký tự';
-    if (form.notes && form.notes.length > 1000) errors.notes = 'Ghi chú tối đa 1000 ký tự';
+    if (form.age === '' || Number.isNaN(ageNum)) errors.age = t('supportRequests.validationAgeRequired');
+    else if (ageNum < 0 || ageNum > 150) errors.age = t('supportRequests.validationAgeInvalid');
+    if (!form.phone.trim()) errors.phone = t('supportRequests.validationPhoneRequired');
+    if (!form.address.trim()) errors.address = t('supportRequests.validationAddressRequired');
+    else if (form.address.trim().length > 300) errors.address = t('supportRequests.validationAddressMax');
+    if (form.notes && form.notes.length > 1000) errors.notes = t('supportRequests.validationNotesMax');
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -143,7 +146,7 @@ export default function SupportRequestsPage() {
       setFormErrors({});
       await loadRequests();
     } catch (err) {
-      setCreateError(err?.response?.data?.message || err.message || 'Không thể gửi yêu cầu');
+      setCreateError(err?.response?.data?.message || err.message || t('supportRequests.errorCreateRequest'));
     } finally {
       setCreating(false);
     }
@@ -159,7 +162,7 @@ export default function SupportRequestsPage() {
       setMessageText('');
       await loadRequests();
     } catch (err) {
-      setSendError(err?.response?.data?.message || err.message || 'Không thể gửi tin nhắn');
+      setSendError(err?.response?.data?.message || err.message || t('supportRequests.errorSendMessage'));
     } finally {
       setSending(false);
     }
@@ -174,7 +177,7 @@ export default function SupportRequestsPage() {
       setSelected(updated);
       await loadRequests();
     } catch (err) {
-      setSendError(err?.response?.data?.message || err.message || 'Không thể cập nhật trạng thái');
+      setSendError(err?.response?.data?.message || err.message || t('supportRequests.errorUpdateStatus'));
     } finally {
       setClosing(false);
     }
@@ -188,12 +191,12 @@ export default function SupportRequestsPage() {
       <div className="flex w-[360px] flex-shrink-0 flex-col border-r border-slate-100">
         <div className="border-b border-slate-100 p-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-base font-bold text-slate-800">Yêu cầu hỗ trợ</h2>
+            <h2 className="text-base font-bold text-slate-800">{t('supportRequests.title')}</h2>
             {!isStaff && (
               <button
                 type="button"
                 onClick={() => { setCreateOpen((s) => !s); setCreateError(null); }}
-                title="Gửi yêu cầu mới"
+                title={t('supportRequests.newRequestTooltip')}
                 className={`press-effect flex h-8 w-8 items-center justify-center rounded-full transition-colors ${
                   createOpen ? 'bg-navy-deep text-white' : 'bg-navy-deep/10 text-navy-deep hover:bg-navy-deep/15'
                 }`}
@@ -214,7 +217,7 @@ export default function SupportRequestsPage() {
                     statusFilter === f.value ? 'bg-navy-deep text-white' : 'bg-surface-container-low text-slate-500 hover:bg-slate-200'
                   }`}
                 >
-                  {f.label}
+                  {t(f.i18nKey)}
                 </button>
               ))}
             </div>
@@ -227,7 +230,7 @@ export default function SupportRequestsPage() {
               <input
                 value={form.fullName}
                 onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))}
-                placeholder="Họ và tên"
+                placeholder={t('supportRequests.placeholderName')}
                 maxLength={100}
                 className={`${INPUT_CLASS} bg-white ${formErrors.fullName ? 'border-error' : ''}`}
               />
@@ -240,7 +243,7 @@ export default function SupportRequestsPage() {
                 max={150}
                 value={form.age}
                 onChange={(e) => setForm((f) => ({ ...f, age: e.target.value }))}
-                placeholder="Tuổi"
+                placeholder={t('supportRequests.placeholderAge')}
                 className={`${INPUT_CLASS} bg-white ${formErrors.age ? 'border-error' : ''}`}
               />
               {formErrors.age && <p className="mt-1 text-xs text-error">{formErrors.age}</p>}
@@ -249,7 +252,7 @@ export default function SupportRequestsPage() {
               <input
                 value={form.phone}
                 onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-                placeholder="Số điện thoại"
+                placeholder={t('supportRequests.placeholderPhone')}
                 className={`${INPUT_CLASS} bg-white ${formErrors.phone ? 'border-error' : ''}`}
               />
               {formErrors.phone && <p className="mt-1 text-xs text-error">{formErrors.phone}</p>}
@@ -258,7 +261,7 @@ export default function SupportRequestsPage() {
               <input
                 value={form.address}
                 onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
-                placeholder="Địa chỉ"
+                placeholder={t('supportRequests.placeholderAddress')}
                 maxLength={300}
                 className={`${INPUT_CLASS} bg-white ${formErrors.address ? 'border-error' : ''}`}
               />
@@ -268,7 +271,7 @@ export default function SupportRequestsPage() {
               <textarea
                 value={form.notes}
                 onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-                placeholder="Ghi chú (tuỳ chọn)"
+                placeholder={t('supportRequests.placeholderNotes')}
                 rows={2}
                 maxLength={1000}
                 className={`${INPUT_CLASS} resize-none bg-white ${formErrors.notes ? 'border-error' : ''}`}
@@ -283,13 +286,13 @@ export default function SupportRequestsPage() {
                 disabled={creating}
                 className="press-effect flex-1 rounded-lg bg-navy-deep py-2 text-sm font-semibold text-white transition-colors hover:bg-[#132745] disabled:opacity-60"
               >
-                {creating ? 'Đang gửi...' : 'Gửi yêu cầu'}
+                {creating ? t('supportRequests.submitting') : t('supportRequests.submitRequest')}
               </button>
               <button
                 onClick={() => { setCreateOpen(false); setForm(emptyForm); setFormErrors({}); }}
                 className="rounded-lg border border-outline-variant px-3 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100"
               >
-                Hủy
+                {t('supportRequests.cancel')}
               </button>
             </div>
           </div>
@@ -308,7 +311,7 @@ export default function SupportRequestsPage() {
           ) : requests.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 px-6 py-16 text-center text-slate-300">
               <LifeBuoy size={40} strokeWidth={1.5} />
-              <span className="text-sm text-slate-400">Chưa có yêu cầu hỗ trợ nào</span>
+              <span className="text-sm text-slate-400">{t('supportRequests.emptyList')}</span>
             </div>
           ) : (
             <div className="flex flex-col gap-1 p-2">
@@ -348,7 +351,7 @@ export default function SupportRequestsPage() {
         {!selected ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 text-slate-300">
             <LifeBuoy size={48} strokeWidth={1.5} />
-            <span className="text-sm text-slate-400">Chọn một yêu cầu để xem chi tiết</span>
+            <span className="text-sm text-slate-400">{t('supportRequests.selectToView')}</span>
           </div>
         ) : (
           <>
@@ -361,7 +364,7 @@ export default function SupportRequestsPage() {
                 <StatusBadge status={selected.status} />
               </div>
               <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
-                <span className="flex items-center gap-1"><User size={12} /> {selected.age} tuổi</span>
+                <span className="flex items-center gap-1"><User size={12} /> {selected.age} {t('supportRequests.ageUnit')}</span>
                 <span className="flex items-center gap-1"><Phone size={12} /> {selected.phone}</span>
                 <span className="flex items-center gap-1"><MapPin size={12} /> {selected.address}</span>
               </div>
@@ -378,14 +381,14 @@ export default function SupportRequestsPage() {
                     disabled={closing}
                     className="press-effect flex items-center gap-1.5 rounded-lg bg-status-success/10 px-3 py-1.5 text-xs font-semibold text-status-success transition-colors hover:bg-status-success/20 disabled:opacity-60"
                   >
-                    <CheckCircle2 size={14} /> Đánh dấu đã xử lý
+                    <CheckCircle2 size={14} /> {t('supportRequests.markProcessed')}
                   </button>
                   <button
                     onClick={() => handleClose('cancel')}
                     disabled={closing}
                     className="press-effect flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-500 transition-colors hover:bg-slate-200 disabled:opacity-60"
                   >
-                    <XCircle size={14} /> Đóng yêu cầu
+                    <XCircle size={14} /> {t('supportRequests.closeRequest')}
                   </button>
                 </div>
               )}
@@ -396,7 +399,7 @@ export default function SupportRequestsPage() {
                     disabled={closing}
                     className="press-effect flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-500 transition-colors hover:bg-slate-200 disabled:opacity-60"
                   >
-                    <XCircle size={14} /> Hủy yêu cầu
+                    <XCircle size={14} /> {t('supportRequests.cancelRequest')}
                   </button>
                 </div>
               )}
@@ -414,14 +417,14 @@ export default function SupportRequestsPage() {
                 </div>
               ) : (selected.messages || []).length === 0 ? (
                 <div className="flex h-full items-center justify-center text-sm text-slate-400">
-                  Chưa có phản hồi nào cho yêu cầu này.
+                  {t('supportRequests.noReplies')}
                 </div>
               ) : (
                 (selected.messages || []).map((m, i) => {
                   const isMine = String(m.senderId) === String(currentUserId) || (isStaff && m.senderRole && m.senderRole !== 'family');
                   return (
                     <div key={i} className={`animate-fade-in-up flex flex-col ${isMine ? 'items-end' : 'items-start'}`}>
-                      {!isMine && <span className="mb-1 px-1 text-[11px] font-medium text-slate-400">Gia đình</span>}
+                      {!isMine && <span className="mb-1 px-1 text-[11px] font-medium text-slate-400">{t('supportRequests.familyLabel')}</span>}
                       <div
                         className={`max-w-[75%] whitespace-pre-wrap break-words rounded-2xl px-3.5 py-2 text-sm leading-snug shadow-sm ${
                           isMine ? 'rounded-tr-sm bg-navy-deep text-white' : 'rounded-tl-sm bg-surface-container-low text-slate-700'
@@ -444,7 +447,7 @@ export default function SupportRequestsPage() {
 
             {isClosedState ? (
               <div className="border-t border-slate-100 px-5 py-3.5 text-center text-xs text-slate-400">
-                Yêu cầu này đã được đóng, không thể gửi thêm phản hồi.
+                {t('supportRequests.closedMessage')}
               </div>
             ) : (
               <div className="flex items-center gap-2 border-t border-slate-100 px-5 py-3.5">
@@ -452,7 +455,7 @@ export default function SupportRequestsPage() {
                   value={messageText}
                   onChange={(e) => setMessageText(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                  placeholder="Nhập phản hồi..."
+                  placeholder={t('supportRequests.replyPlaceholder')}
                   maxLength={2000}
                   className={`${INPUT_CLASS} flex-1`}
                 />

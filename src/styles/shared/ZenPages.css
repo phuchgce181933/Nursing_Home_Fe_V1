@@ -24,7 +24,7 @@
   --zh-on-error-container:   #93000a;
   --zh-inverse-surface:      #303036;
 
-  font-family: 'Inter', 'Be Vietnam Pro', sans-serif;
+  font-family: inherit;
   background: #fbf8ff !important;
   color: #1b1b21;
 }

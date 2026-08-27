@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Info, HeartPulse, Cpu, Trees, CreditCard, Newspaper, Phone } from 'lucide-react';
+import { Home, Info, HeartPulse, Cpu, Trees, CreditCard, Newspaper, Phone, LogIn } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../hooks/useAuth';
@@ -21,12 +21,10 @@ export default function PublicHeader() {
   const { token, user } = useAuth();
   const location = useLocation();
 
-  const bookPath = (token && user?.role === 'family')
-    ? '/family/admission-requests/new'
-    : '/login';
-
   const getActiveClass = (item) =>
     location.pathname === item.path ? 'active' : '';
+
+  const dashboardPath = user?.role ? `/${user.role}/dashboard` : '/login';
 
   return (
     <header className="home-header">
@@ -55,9 +53,21 @@ export default function PublicHeader() {
         ))}
       </nav>
 
-      <Link to={bookPath} className="home-header__button">
-        {t('home.registerAdmission')}
-      </Link>
+      <div className="home-header__buttons">
+        <Link to="/contact" className="home-header__button">
+          {t('home.registerAdmission')}
+        </Link>
+        {token ? (
+          <Link to={dashboardPath} className="home-header__button home-header__button--login">
+            {t('home.dashboard', 'Dashboard')}
+          </Link>
+        ) : (
+          <Link to="/login" className="home-header__button home-header__button--login">
+            <LogIn size={16} />
+            {t('home.login', 'Đăng nhập')}
+          </Link>
+        )}
+      </div>
     </header>
   );
 }

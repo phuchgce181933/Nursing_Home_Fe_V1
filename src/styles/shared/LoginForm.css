@@ -21,7 +21,7 @@
   background: radial-gradient(circle at 50% 0%, var(--login-primary-soft) 0%, var(--login-surface) 55%, #ffffff 100%);
   position: relative;
   overflow: hidden;
-  font-family: 'Inter', 'Be Vietnam Pro', sans-serif;
+  font-family: inherit;
 }
 
 /* Blurred floating gradient blobs — soft, low-opacity "glass" shapes that

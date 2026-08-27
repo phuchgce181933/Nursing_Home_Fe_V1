@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import facilityService from '../../../services/facility.service';
 
 /**
@@ -13,6 +14,7 @@ import facilityService from '../../../services/facility.service';
  * avoid an unnecessary request.
  */
 export default function useFacilitiesData({ withFloors = true } = {}) {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [stats, setStats] = useState({
@@ -49,7 +51,7 @@ export default function useFacilitiesData({ withFloors = true } = {}) {
       return loadedBuildings || [];
     } catch (err) {
       console.error('Failed to load facility data:', err);
-      setError('Không thể tải thông tin cơ sở vật chất. Vui lòng thử lại sau.');
+      setError(t('facilities.errorLoadFailed'));
       return [];
     } finally {
       setLoading(false);

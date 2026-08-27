@@ -4,7 +4,7 @@
   padding: 30px;
   max-width: 1400px;
   margin: 0 auto;
-  font-family: 'Inter', sans-serif;
+  font-family: inherit;
   color: #1e293b;
 }
 
@@ -407,9 +407,22 @@
 }
 
 .fac-btn-icon--stats {
-  color: #6366f1;
+  color: var(--nh-primary);
 }
 
 .fac-btn-icon--stats:hover {
   background: #e0e7ff;
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .fac-container { padding: 16px; }
+  .fac-header { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .fac-header h1 { font-size: 20px; }
+  .fac-stats-grid { grid-template-columns: 1fr; }
+  .fac-tab-bar { gap: 0; overflow-x: auto; }
+  .fac-tab-btn { padding: 10px 14px; font-size: 13px; white-space: nowrap; }
+  .fac-action-row { flex-direction: column; align-items: stretch; }
+  .fac-search-wrapper { max-width: 100%; }
+  .fac-table-card { overflow-x: auto; }
 }

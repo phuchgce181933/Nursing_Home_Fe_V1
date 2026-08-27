@@ -169,17 +169,17 @@ export default function EquipmentPage() {
 
   const handleCreateEq = async (e) => {
     e.preventDefault();
-    if (!formEqCode.trim()) return setFormError('Mã thiết bị là bắt buộc');
-    if (!formEqName.trim()) return setFormError('Tên thiết bị là bắt buộc');
+    if (!formEqCode.trim()) return setFormError(t('equipment.errCodeRequired'));
+    if (!formEqName.trim()) return setFormError(t('equipment.errNameRequired'));
     if (formEqCategory.trim().startsWith('-') || (!isNaN(formEqCategory.trim()) && Number(formEqCategory.trim()) < 0)) {
-      return setFormError('Danh mục không được là số âm');
+      return setFormError(t('equipment.errCategoryNegative'));
     }
     if (formEqMaintenanceDueAt) {
       const selectedDate = new Date(formEqMaintenanceDueAt + 'T00:00:00');
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       if (selectedDate < today) {
-        return setFormError('Hạn bảo trì không được ở trong quá khứ');
+        return setFormError(t('equipment.errMaintenancePast'));
       }
     }
 
@@ -206,7 +206,7 @@ export default function EquipmentPage() {
       refetch();
     } catch (err) {
       console.error(err);
-      setFormError(err.response?.data?.message || 'Thêm thiết bị thất bại.');
+      setFormError(err.response?.data?.message || t('equipment.errCreateFailed'));
     } finally {
       setSubmitting(false);
     }
@@ -215,17 +215,17 @@ export default function EquipmentPage() {
   const handleUpdateEq = async (e) => {
     e.preventDefault();
     if (!selectedEq?._id) return;
-    if (!formEqCode.trim()) return setFormError('Mã thiết bị là bắt buộc');
-    if (!formEqName.trim()) return setFormError('Tên thiết bị là bắt buộc');
+    if (!formEqCode.trim()) return setFormError(t('equipment.errCodeRequired'));
+    if (!formEqName.trim()) return setFormError(t('equipment.errNameRequired'));
     if (formEqCategory.trim().startsWith('-') || (!isNaN(formEqCategory.trim()) && Number(formEqCategory.trim()) < 0)) {
-      return setFormError('Danh mục không được là số âm');
+      return setFormError(t('equipment.errCategoryNegative'));
     }
     if (formEqMaintenanceDueAt) {
       const selectedDate = new Date(formEqMaintenanceDueAt + 'T00:00:00');
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       if (selectedDate < today) {
-        return setFormError('Hạn bảo trì không được ở trong quá khứ');
+        return setFormError(t('equipment.errMaintenancePast'));
       }
     }
 
@@ -252,7 +252,7 @@ export default function EquipmentPage() {
       refetch();
     } catch (err) {
       console.error(err);
-      setFormError(err.response?.data?.message || 'Cập nhật thiết bị thất bại.');
+      setFormError(err.response?.data?.message || t('equipment.errUpdateFailed'));
     } finally {
       setSubmitting(false);
     }
@@ -270,7 +270,7 @@ export default function EquipmentPage() {
       refetch();
     } catch (err) {
       console.error(err);
-      showToast(err.response?.data?.message || 'Xóa thiết bị thất bại.', 'error');
+      showToast(err.response?.data?.message || t('equipment.errDeleteFailed'), 'error');
     } finally {
       setSubmitting(false);
     }
@@ -378,23 +378,23 @@ export default function EquipmentPage() {
                         eq.status === 'in_use' ? 'fac-badge--warning' :
                         eq.status === 'maintenance' ? 'bg-amber-100 text-amber-700' : 'fac-badge--danger'
                       }`}>
-                        {eq.status === 'available' ? 'Sẵn sàng' :
-                         eq.status === 'in_use' ? 'Đang dùng' :
-                         eq.status === 'maintenance' ? 'Bảo trì' : 'Thanh lý'}
+                        {eq.status === 'available' ? t('facilities.equipStatusAvailable') :
+                         eq.status === 'in_use' ? t('facilities.equipStatusInUse') :
+                         eq.status === 'maintenance' ? t('facilities.equipStatusMaintenance') : t('facilities.equipStatusRetired')}
                       </span>
                     </td>
                     <td style={{ textAlign: 'right' }}>
                       <button
                         onClick={() => handleOpenEditEq(eq)}
                         className="fac-btn-icon fac-btn-icon--edit"
-                        title="Sửa"
+                        title={t('equipment.edit')}
                       >
                         <Edit size={16} />
                       </button>
                       <button
                         onClick={() => handleOpenDeleteEq(eq)}
                         className="fac-btn-icon fac-btn-icon--delete"
-                        title="Xóa"
+                        title={t('equipment.delete')}
                       >
                         <Trash2 size={16} />
                       </button>
@@ -436,7 +436,7 @@ export default function EquipmentPage() {
                         className="text-xs text-blue-600 hover:text-blue-800 font-medium"
                         style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 0 }}
                       >
-                        Tự động tạo mã
+                        {t('equipment.autoGenCode')}
                       </button>
                     </div>
                     <input
@@ -517,7 +517,7 @@ export default function EquipmentPage() {
                 {formEqLocationType !== 'storage' && (
                   <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mt-2 flex flex-col gap-3">
                     <span className="text-xs font-bold text-indigo-900 flex items-center gap-1">
-                      <MapPin size={14} /> Cấu hình vị trí định vị
+                      <MapPin size={14} /> {t('equipment.locationConfig')}
                     </span>
 
                     <div className="fac-form-group mb-1">
@@ -710,7 +710,7 @@ export default function EquipmentPage() {
                 {formEqLocationType !== 'storage' && (
                   <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mt-2 flex flex-col gap-3">
                     <span className="text-xs font-bold text-indigo-900 flex items-center gap-1">
-                      <MapPin size={14} /> Cấu hình vị trí định vị
+                      <MapPin size={14} /> {t('equipment.locationConfig')}
                     </span>
 
                     <div className="fac-form-group mb-1">
@@ -822,10 +822,10 @@ export default function EquipmentPage() {
                 <AlertTriangle size={36} className="text-red-500" style={{ flexShrink: 0 }} />
                 <div>
                   <p style={{ margin: '0 0 10px 0', fontWeight: '600' }}>
-                    Bạn có chắc chắn muốn xóa thiết bị <strong>{selectedEq?.name}</strong> ({selectedEq?.code})?
+                    {t('equipment.deleteConfirm', { name: selectedEq?.name, code: selectedEq?.code })}
                   </p>
                   <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>
-                    Hành động này sẽ xóa hoàn toàn thiết bị này khỏi hệ thống cơ sở vật chất. Đối với thiết bị hỏng hoàn toàn hoặc hết niên hạn sử dụng, hãy cân nhắc cập nhật trạng thái thiết bị thành Hưu trí (Retired) thay vì xóa lịch sử của thiết bị.
+                    {t('equipment.deleteWarning')}
                   </p>
                 </div>
               </div>

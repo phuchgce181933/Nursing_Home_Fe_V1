@@ -128,7 +128,7 @@ export const apiErrorsVi = {
   SHIFT_FLEXIBLE_DURATION_MAX: 'Ca gãy không được vượt quá {{maxHours}} giờ',
   SHIFT_STAFF_BANNED: 'Không thể phân ca cho nhân viên có tài khoản bị khóa',
   SHIFT_STAFF_INACTIVE: 'Không thể phân ca cho nhân viên không hoạt động',
-  SHIFT_ADMIN_NOT_ASSIGNABLE: 'Không thể phân ca cho tài khoản admin hoặc manager',
+  SHIFT_ADMIN_NOT_ASSIGNABLE: 'Không thể phân ca cho tài khoản admin',
   SHIFT_ROLE_NOT_ALLOWED: 'Vai trò {{role}} không được phân ca loại {{shiftType}}',
   SHIFT_WEEKLY_HOURS_EXCEEDED: 'Tổng giờ làm tuần này là {{hours}}h, vượt giới hạn 48h',
   SHIFT_CONFLICT_CHECK_FAILED: 'Kiểm tra xung đột ca thất bại. Vui lòng xử lý các lỗi mức ERROR trước.',

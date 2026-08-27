@@ -128,8 +128,8 @@ export default function BedsPage() {
 
   const handleCreateBed = async (e) => {
     e.preventDefault();
-    if (!selectedRoomId) return setFormError('Vui lòng chọn phòng');
-    if (!formBedCode.trim()) return setFormError('Mã giường là bắt buộc');
+    if (!selectedRoomId) return setFormError(t('beds.errSelectRoom'));
+    if (!formBedCode.trim()) return setFormError(t('beds.errCodeRequired'));
 
     try {
       setSubmitting(true);
@@ -149,7 +149,7 @@ export default function BedsPage() {
       refetch();
     } catch (err) {
       console.error(err);
-      setFormError(err.response?.data?.message || 'Tạo giường thất bại.');
+      setFormError(err.response?.data?.message || t('beds.errCreateFailed'));
     } finally {
       setSubmitting(false);
     }
@@ -158,7 +158,7 @@ export default function BedsPage() {
   const handleUpdateBed = async (e) => {
     e.preventDefault();
     if (!selectedBed?._id) return;
-    if (!formBedCode.trim()) return setFormError('Mã giường là bắt buộc');
+    if (!formBedCode.trim()) return setFormError(t('beds.errCodeRequired'));
 
     try {
       setSubmitting(true);
@@ -178,7 +178,7 @@ export default function BedsPage() {
       refetch();
     } catch (err) {
       console.error(err);
-      setFormError(err.response?.data?.message || 'Cập nhật giường thất bại.');
+      setFormError(err.response?.data?.message || t('beds.errUpdateFailed'));
     } finally {
       setSubmitting(false);
     }
@@ -202,7 +202,7 @@ export default function BedsPage() {
       refetch();
     } catch (err) {
       console.error(err);
-      showToast(err.response?.data?.message || 'Xóa giường thất bại.', 'error');
+      showToast(err.response?.data?.message || t('beds.errDeleteFailed'), 'error');
     } finally {
       setSubmitting(false);
     }
@@ -299,7 +299,7 @@ export default function BedsPage() {
       {!selectedRoomId ? (
         <div className="fac-table-card">
           <div className="fac-empty-box">
-            Vui lòng chọn tòa nhà, tầng và phòng cụ thể để xem danh sách giường.
+            {t('beds.selectRoomPrompt')}
           </div>
         </div>
       ) : loading && beds.length === 0 ? (
@@ -379,12 +379,12 @@ export default function BedsPage() {
                       title={t('facilities.edit')}
                       style={{
                         width: '30px', height: '30px', borderRadius: '8px', border: 'none',
-                        background: '#eff6ff', color: '#3b82f6', cursor: 'pointer',
+                        background: 'rgba(15, 118, 110, 0.08)', color: '#0f766e', cursor: 'pointer',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         transition: 'background 0.15s'
                       }}
-                      onMouseEnter={e => e.currentTarget.style.background = '#dbeafe'}
-                      onMouseLeave={e => e.currentTarget.style.background = '#eff6ff'}
+                      onMouseEnter={e => e.currentTarget.style.background = 'rgba(15, 118, 110, 0.12)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'rgba(15, 118, 110, 0.08)'}
                     >
                       <Edit size={13} />
                     </button>
@@ -532,13 +532,13 @@ export default function BedsPage() {
                           }
                           setFormBedCode(code);
                         } else {
-                          showToast('Vui lòng chọn phòng trước', 'error');
+                          showToast(t('beds.errSelectRoom'), 'error');
                         }
                       }}
                       className="text-xs text-blue-600 hover:text-blue-800 font-medium"
                       style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 0 }}
                     >
-                      Tự động tạo mã
+                      {t('equipment.autoGenCode')}
                     </button>
                   </div>
                   <input
@@ -551,15 +551,15 @@ export default function BedsPage() {
                   />
                 </div>
                 <div className="fac-form-group">
-                  <label>Tình Trạng</label>
+                  <label>{t('beds.condition')}</label>
                   <select
                     className="fac-form-control"
                     value={formBedCondition}
                     onChange={(e) => setFormBedCondition(e.target.value)}
                   >
-                    <option value="good">Tốt</option>
-                    <option value="fair">Trung bình</option>
-                    <option value="broken">Hỏng</option>
+                    <option value="good">{t('beds.conditionGood')}</option>
+                    <option value="fair">{t('beds.conditionFair')}</option>
+                    <option value="broken">{t('beds.conditionBroken')}</option>
                   </select>
                 </div>
                 <div className="fac-form-group">
@@ -614,15 +614,15 @@ export default function BedsPage() {
                   />
                 </div>
                 <div className="fac-form-group">
-                  <label>Tình Trạng</label>
+                  <label>{t('beds.condition')}</label>
                   <select
                     className="fac-form-control"
                     value={formBedCondition}
                     onChange={(e) => setFormBedCondition(e.target.value)}
                   >
-                    <option value="good">Tốt</option>
-                    <option value="fair">Trung bình</option>
-                    <option value="broken">Hỏng</option>
+                    <option value="good">{t('beds.conditionGood')}</option>
+                    <option value="fair">{t('beds.conditionFair')}</option>
+                    <option value="broken">{t('beds.conditionBroken')}</option>
                   </select>
                 </div>
                 <div className="fac-form-group">
@@ -680,10 +680,10 @@ export default function BedsPage() {
                 <AlertTriangle size={36} className="text-red-500" style={{ flexShrink: 0 }} />
                 <div>
                   <p style={{ margin: '0 0 10px 0', fontWeight: '600' }}>
-                    Bạn có chắc chắn muốn xóa giường <strong>{selectedBed?.bedCode}</strong>?
+                    {t('beds.deleteConfirm', { code: selectedBed?.bedCode })}
                   </p>
                   <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>
-                    Hành động này sẽ xóa hoàn toàn giường này khỏi hệ thống cơ sở vật chất. Giường chỉ có thể được xóa khi không có cư dân đang cư trú.
+                    {t('beds.deleteWarning')}
                   </p>
                 </div>
               </div>

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import {
   Calendar,
@@ -24,6 +25,7 @@ const TIME_SLOTS = [
 ];
 
 export default function SubmitResidentVisitPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -69,25 +71,25 @@ export default function SubmitResidentVisitPage() {
 
     switch (name) {
       case 'residentId':
-        if (!val) return 'Vui lòng chọn người thân cần thăm';
+        if (!val) return t('residentVisit.validation.residentRequired');
         return null;
 
       case 'visitorName':
-        if (!val) return 'Tên người đến thăm là bắt buộc';
-        if (val.length < 2 || val.length > 50) return 'Tên phải từ 2 đến 50 ký tự';
+        if (!val) return t('residentVisit.validation.nameRequired');
+        if (val.length < 2 || val.length > 50) return t('residentVisit.validation.nameLength');
         return null;
 
       case 'visitorPhone':
-        if (!val) return 'Số điện thoại là bắt buộc';
-        if (!/^[0-9+\s-]{8,15}$/.test(val)) return 'Định dạng số điện thoại không hợp lệ';
+        if (!val) return t('residentVisit.validation.phoneRequired');
+        if (!/^[0-9+\s-]{8,15}$/.test(val)) return t('residentVisit.validation.phoneInvalid');
         return null;
 
       case 'requestedDate': {
-        if (!val) return 'Ngày mong muốn là bắt buộc';
+        if (!val) return t('residentVisit.validation.dateRequired');
         const dateObj = new Date(val);
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        if (dateObj < today) return 'Ngày mong muốn phải là hôm nay hoặc trong tương lai';
+        if (dateObj < today) return t('residentVisit.validation.dateFuture');
 
         const y = today.getFullYear();
         const m = String(today.getMonth() + 1).padStart(2, '0');
@@ -102,7 +104,7 @@ export default function SubmitResidentVisitPage() {
               const curHour = now.getHours();
               const curMin = now.getMinutes();
               if (curHour > startHour || (curHour === startHour && curMin >= startMinute)) {
-                return 'Khung giờ chọn cho ngày hôm nay đã ở quá khứ';
+                return t('residentVisit.validation.timeSlotPast');
               }
             }
           }
@@ -113,7 +115,7 @@ export default function SubmitResidentVisitPage() {
       case 'numberOfVisitors': {
         const visitors = parseInt(value, 10);
         if (isNaN(visitors) || visitors < 1 || visitors > 20) {
-          return 'Số lượng người đến thăm phải từ 1 đến 20';
+          return t('residentVisit.validation.visitorsRange');
         }
         return null;
       }
@@ -184,7 +186,7 @@ export default function SubmitResidentVisitPage() {
       setSubmittedData(res?.visit || payload);
       setSubmitted(true);
     } catch (err) {
-      const msg = err?.response?.data?.message || err?.message || 'Có lỗi xảy ra. Vui lòng thử lại.';
+      const msg = err?.response?.data?.message || err?.message || t('residentVisit.errorFallback');
       setSubmitError(msg);
     } finally {
       setSubmitting(false);
@@ -198,19 +200,18 @@ export default function SubmitResidentVisitPage() {
           <div className="sftp-success__icon-box">
             <CheckCircle size={48} className="sftp-success__icon" />
           </div>
-          <h2 className="sftp-success__title">Đăng ký lịch thăm thành công</h2>
+          <h2 className="sftp-success__title">{t('residentVisit.successTitle')}</h2>
           <p className="sftp-success__desc">
-            Yêu cầu thăm người thân của bạn đã được gửi thành công. Nhân viên sẽ xem xét và
-            phản hồi trong thời gian sớm nhất.
+            {t('residentVisit.successDesc')}
           </p>
 
           <div className="sftp-success__details">
             <div className="sftp-success__detail-row">
-              <span className="sftp-success__detail-label">Người đến thăm:</span>
+              <span className="sftp-success__detail-label">{t('residentVisit.successVisitor')}</span>
               <strong className="sftp-success__detail-value">{submittedData?.visitorName}</strong>
             </div>
             <div className="sftp-success__detail-row">
-              <span className="sftp-success__detail-label">Ngày mong muốn:</span>
+              <span className="sftp-success__detail-label">{t('residentVisit.successPreferredDate')}</span>
               <strong className="sftp-success__detail-value">
                 {submittedData?.requestedDate
                   ? new Date(submittedData.requestedDate).toLocaleDateString('vi-VN', {
@@ -218,17 +219,17 @@ export default function SubmitResidentVisitPage() {
                       month: 'long',
                       day: 'numeric',
                     })
-                  : 'Chưa xác định'}
+                  : t('residentVisit.successNotDetermined')}
               </strong>
             </div>
             {submittedData?.requestedTimeSlot && (
               <div className="sftp-success__detail-row">
-                <span className="sftp-success__detail-label">Khung giờ:</span>
+                <span className="sftp-success__detail-label">{t('residentVisit.successTimeSlot')}</span>
                 <strong className="sftp-success__detail-value">{submittedData.requestedTimeSlot}</strong>
               </div>
             )}
             <div className="sftp-success__detail-row">
-              <span className="sftp-success__detail-label">Số người:</span>
+              <span className="sftp-success__detail-label">{t('residentVisit.successVisitors')}</span>
               <strong className="sftp-success__detail-value">{submittedData?.numberOfVisitors}</strong>
             </div>
           </div>
@@ -238,13 +239,13 @@ export default function SubmitResidentVisitPage() {
               onClick={() => navigate('/family/resident-visits')}
               className="sftp-btn sftp-btn--primary"
             >
-              Xem lịch sử đặt lịch thăm
+              {t('residentVisit.viewHistory')}
             </button>
             <button
               onClick={() => navigate('/family/dashboard')}
               className="sftp-btn sftp-btn--outline"
             >
-              Quay lại trang chủ
+              {t('residentVisit.backToHome')}
             </button>
           </div>
         </div>
@@ -256,10 +257,9 @@ export default function SubmitResidentVisitPage() {
     <form className="sftp-page" onSubmit={handleSubmit} noValidate>
       {/* ── Header ── */}
       <div className="sftp-header">
-        <h1 className="sftp-header__title">Đặt lịch thăm người thân</h1>
+        <h1 className="sftp-header__title">{t('residentVisit.title')}</h1>
         <p className="sftp-header__subtitle">
-          Đăng ký lịch thăm người thân đang lưu trú tại Viện dưỡng lão An Nhiên. Nhân viên sẽ
-          xem xét và xác nhận lịch hẹn của bạn.
+          {t('residentVisit.subtitle')}
         </p>
       </div>
 
@@ -268,7 +268,7 @@ export default function SubmitResidentVisitPage() {
         <div className="sftp-grid">
           {/* Resident Picker */}
           <div className={`sftp-group sftp-group--full ${errors.residentId && touched.residentId ? 'has-error' : ''}`}>
-            <label className="sftp-label">Người thân cần thăm <span className="sftp-required">*</span></label>
+            <label className="sftp-label">{t('residentVisit.labelResident')} <span className="sftp-required">*</span></label>
             <div className="sftp-input-wrap">
               <User size={16} className="sftp-input-icon" />
               <select
@@ -279,7 +279,7 @@ export default function SubmitResidentVisitPage() {
                 disabled={submitting || loadingResidents}
               >
                 <option value="">
-                  {loadingResidents ? 'Đang tải danh sách người thân...' : '-- Chọn người thân --'}
+                  {loadingResidents ? t('residentVisit.loadingResidents') : t('residentVisit.selectResident')}
                 </option>
                 {residents.map((r) => (
                   <option key={r._id} value={r._id}>
@@ -295,13 +295,13 @@ export default function SubmitResidentVisitPage() {
 
           {/* Visitor Name */}
           <div className={`sftp-group ${errors.visitorName && touched.visitorName ? 'has-error' : ''}`}>
-            <label className="sftp-label">Tên người đến thăm <span className="sftp-required">*</span></label>
+            <label className="sftp-label">{t('residentVisit.labelVisitorName')} <span className="sftp-required">*</span></label>
             <div className="sftp-input-wrap">
               <User size={16} className="sftp-input-icon" />
               <input
                 type="text"
                 className="sftp-input"
-                placeholder="Nhập họ và tên"
+                placeholder={t('residentVisit.placeholderName')}
                 value={formData.visitorName}
                 onChange={(e) => setField('visitorName', e.target.value)}
                 onBlur={() => handleBlur('visitorName')}
@@ -315,13 +315,13 @@ export default function SubmitResidentVisitPage() {
 
           {/* Visitor Phone */}
           <div className={`sftp-group ${errors.visitorPhone && touched.visitorPhone ? 'has-error' : ''}`}>
-            <label className="sftp-label">Số điện thoại <span className="sftp-required">*</span></label>
+            <label className="sftp-label">{t('residentVisit.labelPhone')} <span className="sftp-required">*</span></label>
             <div className="sftp-input-wrap">
               <Phone size={16} className="sftp-input-icon" />
               <input
                 type="tel"
                 className="sftp-input"
-                placeholder="Nhập số điện thoại"
+                placeholder={t('residentVisit.placeholderPhone')}
                 value={formData.visitorPhone}
                 onChange={(e) => setField('visitorPhone', e.target.value)}
                 onBlur={() => handleBlur('visitorPhone')}
@@ -336,9 +336,9 @@ export default function SubmitResidentVisitPage() {
           {/* Requested Date */}
           <div className={`sftp-group ${errors.requestedDate && touched.requestedDate ? 'has-error' : ''}`}>
             <label className="sftp-label">
-              Ngày mong muốn *{' '}
+              {t('residentVisit.labelPreferredDate')} *{' '}
               <span style={{ fontSize: '13px', color: '#64748b', fontWeight: 'normal', marginLeft: '4px' }}>
-                (Chọn ngày hôm nay hoặc tương lai)
+                {t('residentVisit.dateHint')}
               </span>
             </label>
             <div className="sftp-input-wrap">
@@ -359,7 +359,7 @@ export default function SubmitResidentVisitPage() {
 
           {/* Requested Time Slot */}
           <div className="sftp-group">
-            <label className="sftp-label">Khung giờ mong muốn</label>
+            <label className="sftp-label">{t('residentVisit.labelTimeSlot')}</label>
             <div className="sftp-input-wrap">
               <Clock size={16} className="sftp-input-icon" />
               <select
@@ -379,7 +379,7 @@ export default function SubmitResidentVisitPage() {
 
           {/* Number of Visitors */}
           <div className={`sftp-group ${errors.numberOfVisitors && touched.numberOfVisitors ? 'has-error' : ''}`}>
-            <label className="sftp-label">Số lượng người đến thăm <span className="sftp-required">*</span></label>
+            <label className="sftp-label">{t('residentVisit.labelVisitors')} <span className="sftp-required">*</span></label>
             <div className="sftp-input-wrap">
               <Users size={16} className="sftp-input-icon" />
               <input
@@ -401,12 +401,12 @@ export default function SubmitResidentVisitPage() {
 
         {/* Additional Notes */}
         <div className="sftp-group sftp-group--full">
-          <label className="sftp-label">Ghi chú thêm</label>
+          <label className="sftp-label">{t('residentVisit.labelNotes')}</label>
           <div className="sftp-input-wrap sftp-textarea-wrap">
             <MessageSquare size={16} className="sftp-input-icon sftp-textarea-icon" />
             <textarea
               className="sftp-input sftp-textarea"
-              placeholder="Cho chúng tôi biết nếu bạn có bất kỳ yêu cầu đặc biệt nào..."
+              placeholder={t('residentVisit.placeholderNotes')}
               rows={4}
               value={formData.notes}
               onChange={(e) => setField('notes', e.target.value)}
@@ -432,7 +432,7 @@ export default function SubmitResidentVisitPage() {
             disabled={submitting}
           >
             <ChevronLeft size={16} />
-            Quay lại
+            {t('residentVisit.back')}
           </button>
 
           <button
@@ -443,12 +443,12 @@ export default function SubmitResidentVisitPage() {
             {submitting ? (
               <>
                 <Loader2 size={16} className="sftp-spinner" />
-                Đang gửi yêu cầu...
+                {t('residentVisit.submitting')}
               </>
             ) : (
               <>
                 <Send size={16} />
-                Đặt lịch thăm
+                {t('residentVisit.submit')}
               </>
             )}
           </button>

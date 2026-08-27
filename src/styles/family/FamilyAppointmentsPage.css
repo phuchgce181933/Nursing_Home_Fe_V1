@@ -3,7 +3,7 @@
   min-height: 100vh;
   background: linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #0c2340 100%);
   padding: 28px 24px;
-  font-family: 'Inter', 'Segoe UI', sans-serif;
+  font-family: inherit;
   color: #f1f5f9;
 }
 
@@ -19,7 +19,7 @@
 .fap-title-block { display: flex; align-items: center; gap: 14px; }
 .fap-title-icon {
   width: 48px; height: 48px;
-  background: linear-gradient(135deg, #0ea5e9, #6366f1);
+  background: linear-gradient(135deg, #1e293b, #334155);
   border-radius: 14px;
   display: flex; align-items: center; justify-content: center;
   box-shadow: 0 8px 20px rgba(14,165,233,0.35);
@@ -112,7 +112,7 @@
   transition: all 0.2s;
 }
 .fap-card:hover { background: rgba(255,255,255,0.09); transform: translateY(-1px); box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
-.fap-card.scheduled { border-left-color: #3b82f6; }
+.fap-card.scheduled { border-left-color: var(--nh-info); }
 .fap-card.in_progress { border-left-color: #f59e0b; }
 .fap-card.completed { border-left-color: #10b981; }
 .fap-card.cancelled { border-left-color: #475569; opacity: 0.65; }

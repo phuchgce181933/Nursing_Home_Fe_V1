@@ -1,6 +1,8 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Trash2, User } from 'lucide-react';
 import { isConversationUnread } from '../../hooks/useUnreadConversations';
+import { formatDisplayTime, formatDisplayDate } from '../../utils/formatLocale';
 
 const AVATAR_PALETTE = [
   'bg-navy-deep', 'bg-sage-healing', 'bg-status-info', 'bg-status-success', 'bg-status-warning', 'bg-status-error',
@@ -19,13 +21,10 @@ function initials(name) {
   return chars.join('').toUpperCase();
 }
 
-function displayName(c, currentUserId) {
+function displayName(c, currentUserId, fallback) {
   if (c.guestName) return c.guestName;
-  // Show the OTHER participant, not whichever one happens to be first in the array —
-  // matters once a conversation has 2+ participants (e.g. family + their assigned
-  // nurse/doctor), otherwise a viewer could see their own name instead of the other party's.
   const other = (c.participantUserIds || []).find((p) => String(p?._id) !== String(currentUserId));
-  return other?.fullName || c.participantUserIds?.[0]?.fullName || c.subject || 'Không có tên';
+  return other?.fullName || c.participantUserIds?.[0]?.fullName || c.subject || fallback;
 }
 
 function formatTime(dateStr) {
@@ -34,8 +33,8 @@ function formatTime(dateStr) {
   const now = new Date();
   const sameDay = date.toDateString() === now.toDateString();
   return sameDay
-    ? date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
-    : date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+    ? formatDisplayTime(dateStr)
+    : formatDisplayDate(dateStr, { day: '2-digit', month: '2-digit' });
 }
 
 function ConversationSkeletonRow({ delay }) {
@@ -51,6 +50,8 @@ function ConversationSkeletonRow({ delay }) {
 }
 
 export default function ConversationList({ items = [], loading = false, onSelect, selectedId, onDelete, currentUserId }) {
+  const { t } = useTranslation();
+
   if (loading) {
     return (
       <div className="flex-1 overflow-y-auto">
@@ -64,7 +65,7 @@ export default function ConversationList({ items = [], loading = false, onSelect
   if (items.length === 0) {
     return (
       <div className="flex flex-1 items-center justify-center px-6 py-10 text-center text-sm text-slate-400">
-        Chưa có cuộc trò chuyện nào
+        {t('messagesPage.noConversations')}
       </div>
     );
   }
@@ -72,7 +73,7 @@ export default function ConversationList({ items = [], loading = false, onSelect
   return (
     <div className="flex-1 overflow-y-auto">
       {items.map((c, i) => {
-        const name = displayName(c, currentUserId);
+        const name = displayName(c, currentUserId, t('messagesPage.noName'));
         const active = selectedId === c._id;
         const unread = isConversationUnread(c);
         return (
@@ -99,7 +100,7 @@ export default function ConversationList({ items = [], loading = false, onSelect
               </div>
               <div className="mt-0.5 flex items-center justify-between gap-2">
                 <span className={`truncate text-xs ${unread ? 'font-semibold text-slate-600' : 'text-slate-400'}`}>
-                  {c.subject && c.guestName ? c.subject : c.isGuest ? 'Khách liên hệ' : 'Cuộc trò chuyện'}
+                  {c.subject && c.guestName ? c.subject : c.isGuest ? t('messagesPage.guestContact') : t('messagesPage.defaultConversation')}
                 </span>
               </div>
             </div>
@@ -107,8 +108,8 @@ export default function ConversationList({ items = [], loading = false, onSelect
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); if (onDelete) onDelete(c); }}
-              title="Xóa cuộc trò chuyện"
-              data-tooltip="Xóa"
+              title={t('messagesPage.deleteConversationTitle')}
+              data-tooltip={t('messagesPage.deleteTooltip')}
               className="flex-shrink-0 rounded-full p-1.5 text-slate-300 opacity-0 transition-all hover:bg-status-error/10 hover:text-status-error group-hover:opacity-100"
             >
               <Trash2 size={15} />

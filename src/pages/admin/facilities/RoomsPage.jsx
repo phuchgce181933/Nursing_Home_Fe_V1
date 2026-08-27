@@ -79,13 +79,13 @@ export default function RoomsPage() {
 
   const handleCreateRoom = async (e) => {
     e.preventDefault();
-    if (!formRoomBuildingId) return setFormError('Vui lòng chọn tòa nhà');
-    if (!formRoomFloorId) return setFormError('Vui lòng chọn tầng');
-    if (!formRoomNumber.trim()) return setFormError('Số phòng là bắt buộc');
+    if (!formRoomBuildingId) return setFormError(t('rooms.errSelectBuilding'));
+    if (!formRoomFloorId) return setFormError(t('rooms.errSelectFloor'));
+    if (!formRoomNumber.trim()) return setFormError(t('rooms.errRoomNumberRequired'));
     if (formRoomNumber.trim().startsWith('-') || (!isNaN(formRoomNumber.trim()) && Number(formRoomNumber.trim()) <= 0)) {
-      return setFormError('Số phòng phải lớn hơn 0');
+      return setFormError(t('rooms.errRoomNumberPositive'));
     }
-    if (formRoomCapacity < 1) return setFormError('Sức chứa phải từ 1 trở lên');
+    if (formRoomCapacity < 1) return setFormError(t('rooms.errCapacityMin'));
 
     try {
       setSubmitting(true);
@@ -108,7 +108,7 @@ export default function RoomsPage() {
       refetch();
     } catch (err) {
       console.error(err);
-      setFormError(err.response?.data?.message || 'Tạo phòng thất bại.');
+      setFormError(err.response?.data?.message || t('rooms.errCreateFailed'));
     } finally {
       setSubmitting(false);
     }
@@ -138,11 +138,11 @@ export default function RoomsPage() {
   const handleUpdateRoom = async (e) => {
     e.preventDefault();
     if (!selectedRoom?._id) return;
-    if (!formRoomNumber.trim()) return setFormError('Số phòng là bắt buộc');
+    if (!formRoomNumber.trim()) return setFormError(t('rooms.errRoomNumberRequired'));
     if (formRoomNumber.trim().startsWith('-') || (!isNaN(formRoomNumber.trim()) && Number(formRoomNumber.trim()) <= 0)) {
-      return setFormError('Số phòng phải lớn hơn 0');
+      return setFormError(t('rooms.errRoomNumberPositive'));
     }
-    if (formRoomCapacity < 1) return setFormError('Sức chứa phải từ 1 trở lên');
+    if (formRoomCapacity < 1) return setFormError(t('rooms.errCapacityMin'));
 
     try {
       setSubmitting(true);
@@ -164,7 +164,7 @@ export default function RoomsPage() {
       refetch();
     } catch (err) {
       console.error(err);
-      setFormError(err.response?.data?.message || 'Cập nhật phòng thất bại.');
+      setFormError(err.response?.data?.message || t('rooms.errUpdateFailed'));
     } finally {
       setSubmitting(false);
     }
@@ -185,7 +185,7 @@ export default function RoomsPage() {
       refetch();
     } catch (err) {
       console.error(err);
-      showToast(err.response?.data?.message || 'Đóng phòng thất bại.', 'error');
+      showToast(err.response?.data?.message || t('rooms.errCloseFailed'), 'error');
     } finally {
       setSubmitting(false);
     }
@@ -214,7 +214,7 @@ export default function RoomsPage() {
               setSelectedFloorId('');
             }}
           >
-            <option value="">Chọn Tòa nhà...</option>
+            <option value="">{t('facilities.selectBuilding')}</option>
             {buildings.map(b => (
               <option key={b._id} value={b._id}>{b.name}</option>
             ))}
@@ -227,35 +227,35 @@ export default function RoomsPage() {
             onChange={(e) => setSelectedFloorId(e.target.value)}
             disabled={!selectedBuildingId}
           >
-            <option value="">Chọn Tầng...</option>
+            <option value="">{t('facilities.selectFloor')}</option>
             {floors
               .filter(f => (f.buildingId === selectedBuildingId || f.buildingId?._id === selectedBuildingId) && f.isActive !== false)
               .map(f => (
-                <option key={f._id} value={f._id}>{f.name || `Tầng ${f.floorNumber}`}</option>
+                <option key={f._id} value={f._id}>{f.name || `${t('facilities.floor')} ${f.floorNumber}`}</option>
               ))}
           </select>
         </div>
         <div className="bg-blue-50 border border-blue-200 text-blue-800 text-xs px-3 py-2 rounded-xl flex items-center gap-2">
           <Activity size={14} />
-          <span>Quản lý danh sách phòng và giường.</span>
+          <span>{t('rooms.manageDesc')}</span>
         </div>
       </div>
 
       {!selectedFloorId ? (
         <div className="fac-table-card">
           <div className="fac-empty-box">
-            Vui lòng chọn tòa nhà và tầng cụ thể để xem danh sách phòng.
+            {t('facilities.manageBuildingDesc')}
           </div>
         </div>
       ) : loading && rooms.length === 0 ? (
         <div className="fac-loading-box">
           <Loader2 className="animate-spin mb-3 text-indigo-600" size={32} />
-          <p>Đang tải danh sách phòng...</p>
+          <p>{t('facilities.loadingRooms')}</p>
         </div>
       ) : rooms.length === 0 ? (
         <div className="fac-table-card">
           <div className="fac-empty-box">
-            Không tìm thấy phòng nào ở tầng này. Bạn có thể nhấn nút "Thêm Phòng" để tạo mới.
+            {t('facilities.emptyRooms')}
           </div>
         </div>
       ) : (
@@ -263,18 +263,18 @@ export default function RoomsPage() {
           <table className="fac-table">
             <thead>
               <tr>
-                <th>Số Phòng</th>
-                <th>Loại Phòng</th>
-                <th>Sức Chứa</th>
-                <th>Đang Ở</th>
-                <th>Trạng thái</th>
-                <th style={{ textAlign: 'right' }}>Hành động</th>
+                <th>{t('facilities.colRoomNumber')}</th>
+                <th>{t('facilities.colRoomType')}</th>
+                <th>{t('facilities.colCapacity')}</th>
+                <th>{t('facilities.colOccupied')}</th>
+                <th>{t('facilities.colStatus')}</th>
+                <th style={{ textAlign: 'right' }}>{t('facilities.colActions')}</th>
               </tr>
             </thead>
             <tbody>
               {rooms.map((r) => (
                 <tr key={r._id}>
-                  <td style={{ fontWeight: '600' }}>Phòng {r.roomNumber}</td>
+                  <td style={{ fontWeight: '600' }}>{t('rooms.roomLabel', { number: r.roomNumber })}</td>
                   <td style={{ textTransform: 'capitalize' }}>
                     {r.roomType === 'standard' ? t('facilities.roomTypeStandard') :
                      r.roomType === 'premium' ? t('facilities.roomTypePremium') :
@@ -282,23 +282,23 @@ export default function RoomsPage() {
                      r.roomType === 'isolation' ? t('facilities.roomTypeIsolation') :
                      r.roomType}
                   </td>
-                  <td>{r.capacity} giường</td>
+                  <td>{t('rooms.bedCount', { count: r.capacity })}</td>
                   <td>{r.occupiedCount || 0}</td>
                   <td>
                     <span className={`fac-badge ${
                       r.status === 'available' ? 'fac-badge--success' :
                       r.status === 'full' ? 'fac-badge--warning' : 'fac-badge--danger'
                     }`}>
-                      {r.status === 'available' ? 'Còn giường' :
-                       r.status === 'full' ? 'Đã đầy' :
-                       r.status === 'maintenance' ? 'Bảo trì' : 'Đóng'}
+                      {r.status === 'available' ? t('facilities.statusAvailable') :
+                       r.status === 'full' ? t('facilities.statusFull') :
+                       r.status === 'maintenance' ? t('facilities.statusMaintenance') : t('facilities.statusClosed')}
                     </span>
                   </td>
                   <td style={{ textAlign: 'right' }}>
                     <button
                       onClick={() => handleOpenEditRoom(r)}
                       className="fac-btn-icon fac-btn-icon--edit"
-                      title="Sửa"
+                      title={t('facilities.edit')}
                     >
                       <Edit size={16} />
                     </button>
@@ -306,7 +306,7 @@ export default function RoomsPage() {
                       <button
                         onClick={() => handleOpenDeleteRoom(r)}
                         className="fac-btn-icon fac-btn-icon--delete"
-                        title="Xóa"
+                        title={t('facilities.delete')}
                       >
                         <Trash2 size={16} />
                       </button>
@@ -337,7 +337,7 @@ export default function RoomsPage() {
                   </div>
                 )}
                 <div className="fac-form-group">
-                  <label>Chọn Tòa Nhà *</label>
+                  <label>{t('rooms.labelSelectBuilding')}</label>
                   <select
                     className="fac-form-control"
                     value={formRoomBuildingId}
@@ -355,7 +355,7 @@ export default function RoomsPage() {
                   </select>
                 </div>
                 <div className="fac-form-group">
-                  <label>Chọn Tầng *</label>
+                  <label>{t('rooms.labelSelectFloor')}</label>
                   <select
                     className="fac-form-control"
                     value={formRoomFloorId}
@@ -544,10 +544,10 @@ export default function RoomsPage() {
                 <AlertTriangle size={36} className="text-red-500" style={{ flexShrink: 0 }} />
                 <div>
                   <p style={{ margin: '0 0 10px 0', fontWeight: '600' }}>
-                    Bạn có chắc chắn muốn đóng phòng <strong>{selectedRoom?.roomNumber}</strong>?
+                    {t('rooms.confirmCloseTitle', { number: selectedRoom?.roomNumber })}
                   </p>
                   <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>
-                    Hành động này sẽ thiết lập trạng thái phòng thành Đóng (Closed) và tự động chuyển toàn bộ giường trong phòng này sang trạng thái Bảo trì (Maintenance).
+                    {t('rooms.confirmCloseBody')}
                   </p>
                 </div>
               </div>

@@ -22,7 +22,7 @@ const localDateStr = (d) => {
 
 const MISSED_REASONS = ['refused', 'asleep', 'vomiting', 'hospitalized', 'other'];
 
-const AVATAR_COLORS = ['#3b5bdb', '#e64980', '#0ca678', '#f76707', '#7048e8', '#1098ad', '#d6336c', '#5c7cfa'];
+const AVATAR_COLORS = ['#0f766e', '#e64980', '#0ca678', '#f76707', '#7048e8', '#1098ad', '#d6336c', '#5c7cfa'];
 const getAvatarColor = (name) => {
   let hash = 0;
   for (let i = 0; i < (name || '').length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
@@ -35,11 +35,20 @@ const getInitials = (name) => {
   return parts[0][0].toUpperCase();
 };
 
-const RX_STATUS_KEYS = { ACTIVE: 'statusActive', COMPLETED: 'statusCompleted', CANCELLED: 'statusCancelled' };
+const RX_STATUS_KEYS = {
+  DRAFT: 'statusDraft', ACTIVE: 'statusActive', SUSPENDED: 'statusSuspended',
+  COMPLETED: 'statusCompleted', CANCELLED: 'statusCancelled', EXPIRED: 'statusExpired',
+};
 const SCHED_STATUS_KEYS = {
   PENDING: 'schedPending', TAKEN: 'schedTaken', LATE_TAKEN: 'schedLateTaken',
   MISSED: 'schedMissed', SKIPPED: 'schedSkipped', OVERDUE: 'schedOverdue',
+  REFUSED: 'schedRefused', HELD: 'schedHeld', NOT_AVAILABLE: 'schedNotAvailable',
+  DISCONTINUED: 'schedDiscontinued',
 };
+
+const REFUSED_REASONS = ['patient_refused', 'side_effects', 'allergy_concern', 'other'];
+const HELD_REASONS = ['vital_signs_abnormal', 'npo_order', 'pending_lab_results', 'doctor_order', 'other'];
+const NOT_AVAILABLE_REASONS = ['out_of_stock', 'pharmacy_delay', 'supply_issue', 'other'];
 
 const STAT_ICONS = {
   PENDING: (
@@ -97,18 +106,56 @@ function Modal({ title, onClose, children, footer, size }) {
 /* ── MarkModal ── */
 function MarkModal({ schedule, action, onConfirm, onClose, saving }) {
   const { t } = useTranslation();
-  const isMissed = action === 'missed';
+  const needsReason = action !== 'taken';
   const [reason, setReason] = useState('');
   const [notes, setNotes] = useState('');
 
+  const REASON_MAP = {
+    missed: MISSED_REASONS,
+    refused: REFUSED_REASONS,
+    held: HELD_REASONS,
+    not_available: NOT_AVAILABLE_REASONS,
+  };
+  const reasons = REASON_MAP[action] || [];
+
+  const TITLE_MAP = {
+    taken: t('medication.confirmTaken'),
+    missed: t('medication.confirmMissed'),
+    refused: t('medication.confirmRefused'),
+    held: t('medication.confirmHeld'),
+    not_available: t('medication.confirmNotAvailable'),
+  };
+  const LABEL_MAP = {
+    missed: t('medication.missedReasonLabel'),
+    refused: t('medication.refusedReasonLabel'),
+    held: t('medication.heldReasonLabel'),
+    not_available: t('medication.notAvailableReasonLabel'),
+  };
+  const REASON_I18N_PREFIX = {
+    missed: 'medication.reason',
+    refused: 'medication.refuseReason_',
+    held: 'medication.holdReason_',
+    not_available: 'medication.naReason_',
+  };
+
+  const btnClass = action === 'taken' ? 'med-btn--primary' : 'med-btn--danger';
+
   const handleConfirm = () => {
-    if (isMissed && !reason) return;
+    if (needsReason && !reason) return;
     onConfirm(schedule._scheduleId, action, reason, notes);
+  };
+
+  const formatReasonLabel = (r) => {
+    const prefix = REASON_I18N_PREFIX[action];
+    if (action === 'missed') {
+      return t(`${prefix}${r.charAt(0).toUpperCase() + r.slice(1)}`);
+    }
+    return t(`${prefix}${r}`, r.replace(/_/g, ' '));
   };
 
   return (
     <Modal
-      title={isMissed ? t('medication.confirmMissed') : t('medication.confirmTaken')}
+      title={TITLE_MAP[action] || action}
       onClose={onClose}
       footer={
         <>
@@ -116,9 +163,9 @@ function MarkModal({ schedule, action, onConfirm, onClose, saving }) {
             {t('medication.cancelBtn')}
           </button>
           <button
-            className={`med-btn ${isMissed ? 'med-btn--danger' : 'med-btn--primary'}`}
+            className={`med-btn ${btnClass}`}
             onClick={handleConfirm}
-            disabled={saving || (isMissed && !reason)}
+            disabled={saving || (needsReason && !reason)}
           >
             {saving ? t('medication.loading') : t('medication.confirmBtn')}
           </button>
@@ -161,10 +208,10 @@ function MarkModal({ schedule, action, onConfirm, onClose, saving }) {
         </div>
       </div>
 
-      {isMissed && (
+      {needsReason && reasons.length > 0 && (
         <div className="med-form-group">
           <label className="med-form-label">
-            {t('medication.missedReasonLabel')} <span className="med-form-required-star">*</span>
+            {LABEL_MAP[action] || 'Reason'} <span className="med-form-required-star">*</span>
           </label>
           <select
             className="med-form-select"
@@ -172,10 +219,8 @@ function MarkModal({ schedule, action, onConfirm, onClose, saving }) {
             onChange={(e) => setReason(e.target.value)}
           >
             <option value="">—</option>
-            {MISSED_REASONS.map((r) => (
-              <option key={r} value={r}>
-                {t(`medication.reason${r.charAt(0).toUpperCase() + r.slice(1)}`)}
-              </option>
+            {reasons.map((r) => (
+              <option key={r} value={r}>{formatReasonLabel(r)}</option>
             ))}
           </select>
         </div>
@@ -273,23 +318,31 @@ function ScheduleTab() {
   const handleConfirm = async (id, action, reason, notes) => {
     setSaving(true);
     try {
+      const payload = {};
+      if (notes) payload.notes = notes;
+      if (reason) payload.reason = reason;
+
       if (action === 'taken') {
-        const payload = {};
-        if (notes) payload.notes = notes;
         await medicationService.markTaken(id, payload);
-      } else {
-        const payload = { reason };
-        if (notes) payload.notes = notes;
+      } else if (action === 'missed') {
         await medicationService.markMissed(id, payload);
+      } else if (action === 'refused') {
+        await medicationService.markRefused(id, payload);
+      } else if (action === 'held') {
+        await medicationService.markHeld(id, payload);
+      } else if (action === 'not_available') {
+        await medicationService.markNotAvailable(id, payload);
       }
       setMarkModal(null);
       load();
-      showToast(
-        action === 'taken'
-          ? t('medication.markTakenSuccess', 'Đã đánh dấu đã dùng thuốc')
-          : t('medication.markMissedSuccess', 'Đã đánh dấu bỏ lỡ liều thuốc'),
-        'success'
-      );
+      const msgs = {
+        taken: t('medication.markTakenSuccess'),
+        missed: t('medication.markMissedSuccess'),
+        refused: t('medication.markRefusedSuccess'),
+        held: t('medication.markHeldSuccess'),
+        not_available: t('medication.markNotAvailableSuccess'),
+      };
+      showToast(msgs[action] || 'Success', 'success');
     } catch (err) {
       showToast(err.response?.data?.message || t('medication.markError'), 'error');
     } finally {
@@ -301,7 +354,7 @@ function ScheduleTab() {
     <div className="med-tab-content">
       {/* Date navigation */}
       <div className="med-date-nav">
-        <button className="med-date-nav__btn" onClick={() => shiftDate(-1)} aria-label="Ngày trước">
+        <button className="med-date-nav__btn" onClick={() => shiftDate(-1)} aria-label={t('medication.previousDay')}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="15 18 9 12 15 6"/>
           </svg>
@@ -312,7 +365,7 @@ function ScheduleTab() {
           </svg>
           <span className="med-date-nav__label">{fmtDayLabel(date)}</span>
         </div>
-        <button className="med-date-nav__btn" onClick={() => shiftDate(1)} aria-label="Ngày sau">
+        <button className="med-date-nav__btn" onClick={() => shiftDate(1)} aria-label={t('medication.nextDay')}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="9 18 15 12 9 6"/>
           </svg>
@@ -470,10 +523,11 @@ function ScheduleTab() {
                     </td>
                     <td>
                       {(s.status === 'PENDING' || s.status === 'OVERDUE') && (
-                        <div className="med-action-group">
+                        <div className="med-action-group med-action-group--wrap">
                           <button
                             className="med-action-btn med-action-btn--taken"
                             onClick={() => setMarkModal({ schedule: s, action: 'taken' })}
+                            title={t('medication.schedTaken')}
                           >
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                               <polyline points="20 6 9 17 4 12"/>
@@ -483,13 +537,53 @@ function ScheduleTab() {
                           <button
                             className="med-action-btn med-action-btn--missed"
                             onClick={() => setMarkModal({ schedule: s, action: 'missed' })}
+                            title={t('medication.schedMissed')}
                           >
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                               <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
                             </svg>
                             {t('medication.schedMissed')}
                           </button>
+                          <button
+                            className="med-action-btn med-action-btn--refused"
+                            onClick={() => setMarkModal({ schedule: s, action: 'refused' })}
+                            title={t('medication.schedRefused')}
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+                            </svg>
+                            {t('medication.schedRefused')}
+                          </button>
+                          <button
+                            className="med-action-btn med-action-btn--held"
+                            onClick={() => setMarkModal({ schedule: s, action: 'held' })}
+                            title={t('medication.schedHeld')}
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>
+                            </svg>
+                            {t('medication.schedHeld')}
+                          </button>
+                          <button
+                            className="med-action-btn med-action-btn--not-available"
+                            onClick={() => setMarkModal({ schedule: s, action: 'not_available' })}
+                            title={t('medication.schedNotAvailable')}
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/><line x1="1" y1="1" x2="23" y2="23"/>
+                            </svg>
+                            {t('medication.schedNotAvailable')}
+                          </button>
                         </div>
+                      )}
+                      {s.status === 'REFUSED' && s.refusedReason && (
+                        <div className="med-reason-note">({t(`medication.refuseReason_${s.refusedReason}`, s.refusedReason)})</div>
+                      )}
+                      {s.status === 'HELD' && s.heldReason && (
+                        <div className="med-reason-note">({t(`medication.holdReason_${s.heldReason}`, s.heldReason)})</div>
+                      )}
+                      {s.status === 'NOT_AVAILABLE' && s.notAvailableReason && (
+                        <div className="med-reason-note">({t(`medication.naReason_${s.notAvailableReason}`, s.notAvailableReason)})</div>
                       )}
                     </td>
                   </tr>
@@ -518,11 +612,13 @@ function ScheduleTab() {
    ════════════════════════════════════════ */
 function PrescriptionsTab() {
   const { t } = useTranslation();
+  const { showToast } = useToast();
   const [prescriptions, setPrescriptions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ACTIVE');
   const [expanded, setExpanded] = useState(new Set());
+  const [prnSaving, setPrnSaving] = useState(false);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -535,6 +631,26 @@ function PrescriptionsTab() {
       .catch(() => setPrescriptions([]))
       .finally(() => setLoading(false));
   }, []);
+
+  const handleAdministerPRN = async (prescriptionId, item) => {
+    if (prnSaving) return;
+    setPrnSaving(true);
+    try {
+      await medicationService.administerPRN({
+        prescriptionId,
+        medicationName: item.medicationName,
+        dosage: item.dosage,
+        notes: item.prnReason || '',
+      });
+      showToast(t('medication.prnAdministerSuccess'), 'success');
+      load();
+    } catch (err) {
+      const msg = err.response?.data?.message || t('medication.markError');
+      showToast(msg, 'error');
+    } finally {
+      setPrnSaving(false);
+    }
+  };
 
   useEffect(() => { load(); }, [load]);
 
@@ -652,23 +768,45 @@ function PrescriptionsTab() {
                           <th>{t('medication.frequencyLabel')}</th>
                           <th>{t('medication.times')}</th>
                           <th>{t('medication.startDate')}</th>
+                          <th>{t('medication.colActions')}</th>
                         </tr>
                       </thead>
                       <tbody>
                         {p.items.map((it) => (
                           <tr key={it._id}>
-                            <td><span className="med-drug-name">{it.medicationName}</span></td>
+                            <td>
+                              <span className="med-drug-name">{it.medicationName}</span>
+                              {it.isPRN && <span className="med-badge med-badge--prn">PRN</span>}
+                            </td>
                             <td>{it.dosage}</td>
                             <td>{it.unit || '—'}</td>
-                            <td>{it.frequency}</td>
+                            <td>{it.isPRN ? (it.prnReason || 'PRN') : it.frequency}</td>
                             <td>
-                              <div className="med-time-chips">
-                                {(it.times || []).map((tm) => (
-                                  <span key={tm} className="med-time-chip">{tm}</span>
-                                ))}
-                              </div>
+                              {it.isPRN ? (
+                                <span className="med-dosage">{t('medication.maxDailyDoses')}: {it.maxDailyDoses || '—'}</span>
+                              ) : (
+                                <div className="med-time-chips">
+                                  {(it.times || []).map((tm) => (
+                                    <span key={tm} className="med-time-chip">{tm}</span>
+                                  ))}
+                                </div>
+                              )}
                             </td>
                             <td>{it.startDate ? fmtDate(it.startDate) : '—'}</td>
+                            <td>
+                              {it.isPRN && it.isActive && p.status === 'ACTIVE' && (
+                                <button
+                                  className="med-action-btn med-action-btn--taken"
+                                  onClick={() => handleAdministerPRN(p._id, it)}
+                                  disabled={prnSaving}
+                                >
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M12 5v14M5 12h14"/>
+                                  </svg>
+                                  {t('medication.prnAdminister')}
+                                </button>
+                              )}
+                            </td>
                           </tr>
                         ))}
                       </tbody>

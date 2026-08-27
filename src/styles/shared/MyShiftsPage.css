@@ -83,7 +83,7 @@
   flex-shrink: 0;
 }
 .ms-stat-card__icon--total     { background: #ede9fe; color: #7c3aed; }
-.ms-stat-card__icon--published { background: #dbeafe; color: #3b82f6; }
+.ms-stat-card__icon--published { background: var(--nh-primary-light); color: var(--nh-primary); }
 .ms-stat-card__icon--confirmed { background: #dcfce7; color: #16a34a; }
 .ms-stat-card__icon--completed { background: #ccfbf1; color: #0d9488; }
 .ms-stat-card__value {
@@ -113,7 +113,7 @@
   font-family: inherit;
 }
 .ms-btn--primary {
-  background: #3b5bdb;
+  background: var(--nh-primary);
   color: #fff;
 }
 .ms-btn--primary:hover { background: #364fc7; box-shadow: 0 4px 14px rgba(59,91,219,0.25); }
@@ -195,7 +195,7 @@
   background: #fff;
 }
 .ms-filter-field__input:focus {
-  border-color: #3b5bdb;
+  border-color: var(--nh-primary);
   box-shadow: 0 0 0 3px rgba(59,91,219,0.12);
 }
 .ms-status-pills {
@@ -216,9 +216,9 @@
 }
 .ms-pill:hover { background: #f1f5f9; }
 .ms-pill--active {
-  background: #3b5bdb;
+  background: var(--nh-primary);
   color: #fff;
-  border-color: #3b5bdb;
+  border-color: var(--nh-primary);
 }
 .ms-pill--active:hover { background: #364fc7; }
 
@@ -327,7 +327,7 @@
   background: #f8fafc;
   padding: 8px 12px;
   border-radius: 8px;
-  border-left: 3px solid #3b5bdb;
+  border-left: 3px solid var(--nh-primary);
 }
 .ms-shift-card__actions {
   display: flex;
@@ -373,7 +373,7 @@
   animation: ms-badgePop 0.3s ease;
 }
 .ms-badge--draft     { background: #f1f5f9; color: #64748b; }
-.ms-badge--published { background: #dbeafe; color: #2563eb; }
+.ms-badge--published { background: var(--nh-primary-light); color: var(--nh-primary); }
 .ms-badge--confirmed { background: #dcfce7; color: #15803d; }
 .ms-badge--completed { background: #ccfbf1; color: #0d9488; }
 .ms-badge--cancelled { background: #fee2e2; color: #dc2626; }

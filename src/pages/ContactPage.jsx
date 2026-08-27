@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { MapPin, Phone, Mail, Clock } from 'lucide-react';
 import PublicHeader from '../components/homepage/PublicHeader';
 import PublicFooter from '../components/homepage/PublicFooter';
@@ -8,46 +9,48 @@ import '../styles/shared/ZenPages.css';
 
 const MAP_IMG = 'https://i0.wp.com/imageearthtravel.com/wp-content/uploads/2015/09/cantho.png?ssl=1';
 
-const INFO = [
+const getInfo = (t) => [
   {
     icon: <MapPin size={18} />,
-    title: 'Địa Chỉ',
-    content: '68 Đường Nguyễn Văn Cừ, Phường An Khánh, Quận Ninh Kiều, TP. Cần Thơ',
+    title: t('contact.info.address'),
+    content: t('contact.info.addressContent'),
     isHotline: false,
   },
   {
     icon: <Phone size={18} />,
-    title: 'Hotline',
-    content: '1800 1234 (miễn phí)',
+    title: t('contact.info.hotline'),
+    content: t('contact.info.hotlineContent'),
     isHotline: true,
   },
   {
     icon: <Mail size={18} />,
-    title: 'Email',
+    title: t('contact.info.email'),
     content: 'annhiencarehome@gmail.com',
     isHotline: false,
   },
   {
     icon: <Clock size={18} />,
-    title: 'Giờ Hoạt Động',
-    content: '8h00 - 20h00 ( bao gồm ngày Lễ, Tết )',
+    title: t('contact.info.hours'),
+    content: t('contact.info.hoursContent'),
     isHotline: false,
   },
 ];
 
 const SERVICES = [
-  'Tư vấn dịch vụ',
-  'Tư vấn chi phí',
-  'Chăm sóc ngắn hạn',
-  'Chăm sóc dài hạn',
-  'Phục hồi chức năng',
-  'Tham quan cơ sở',
-  'Đăng ký nhập viện',
-  'Khác',
+  { value: 'Tư vấn dịch vụ', i18nKey: 'contact.services.serviceConsult' },
+  { value: 'Tư vấn chi phí', i18nKey: 'contact.services.costConsult' },
+  { value: 'Chăm sóc ngắn hạn', i18nKey: 'contact.services.shortTerm' },
+  { value: 'Chăm sóc dài hạn', i18nKey: 'contact.services.longTerm' },
+  { value: 'Phục hồi chức năng', i18nKey: 'contact.services.rehabilitation' },
+  { value: 'Tham quan cơ sở', i18nKey: 'contact.services.facilityTour' },
+  { value: 'Đăng ký nhập viện', i18nKey: 'contact.services.admission' },
+  { value: 'Khác', i18nKey: 'contact.services.other' },
 ];
 
 export default function ContactPage() {
+  const { t } = useTranslation();
   const { showToast } = useToast();
+  const INFO = getInfo(t);
   const [form, setForm] = useState({ name: '', email: '', phone: '', service: '', otherService: '', message: '' });
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
@@ -70,38 +73,38 @@ export default function ContactPage() {
     const phoneRegex = /^0\d{9}$/;
 
     if (!trimmedName) {
-      nextErrors.name = 'Vui lòng nhập họ và tên.';
+      nextErrors.name = t('contact.errors.nameRequired');
     } else if (!nameRegex.test(trimmedName)) {
-      nextErrors.name = 'Họ và tên không được chứa số hoặc ký tự đặc biệt.';
+      nextErrors.name = t('contact.errors.nameInvalid');
     }
 
     if (!trimmedEmail) {
-      nextErrors.email = 'Vui lòng nhập địa chỉ email.';
+      nextErrors.email = t('contact.errors.emailRequired');
     } else if (!emailRegex.test(trimmedEmail)) {
-      nextErrors.email = 'Email không đúng định dạng.';
+      nextErrors.email = t('contact.errors.emailInvalid');
     }
 
     if (!trimmedPhone) {
-      nextErrors.phone = 'Vui lòng nhập số điện thoại.';
+      nextErrors.phone = t('contact.errors.phoneRequired');
     } else if (!phoneRegex.test(trimmedPhone)) {
-      nextErrors.phone = 'Số điện thoại phải bắt đầu bằng 0 và gồm 10 chữ số.';
+      nextErrors.phone = t('contact.errors.phoneInvalid');
     }
 
     if (!trimmedService) {
-      nextErrors.service = 'Vui lòng chọn nhu cầu tư vấn mong muốn.';
+      nextErrors.service = t('contact.errors.serviceRequired');
     }
 
     if (trimmedService === 'Khác') {
       const trimmedOtherService = form.otherService.trim();
       if (!trimmedOtherService) {
-        nextErrors.otherService = 'Vui lòng mô tả nhu cầu tư vấn khác.';
+        nextErrors.otherService = t('contact.errors.otherServiceRequired');
       } else if (trimmedOtherService.length > 50) {
-        nextErrors.otherService = 'Vui lòng nhập tối đa 50 ký tự.';
+        nextErrors.otherService = t('contact.errors.maxChars50');
       }
     }
 
     if (form.message && form.message.trim().length > 200) {
-      nextErrors.message = 'Vui lòng nhập tối đa 200 ký tự.';
+      nextErrors.message = t('contact.errors.maxChars200');
     }
 
     return nextErrors;
@@ -122,15 +125,15 @@ export default function ContactPage() {
         fullName: form.name.trim(),
         email: form.email.trim(),
         phone: form.phone.trim(),
-        serviceInterest: form.service === 'Khác' ? form.otherService.trim() : form.service,
+        serviceInterest: form.service === 'Khác' ? form.otherService.trim() : SERVICES.find(s => s.value === form.service)?.value || form.service,
         message: form.message.trim(),
       });
-      showToast('Chúng tôi đã tiếp nhận yêu cầu tư vấn của bạn. Đội ngũ chuyên viên sẽ nhanh chóng xem xét và liên hệ để hỗ trợ trong thời gian sớm nhất.', 'success');
+      showToast(t('contact.toast.success'), 'success');
       setForm({ name: '', email: '', phone: '', service: '', otherService: '', message: '' });
       setErrors({});
     } catch (error) {
       console.error(error);
-      showToast('Không thể gửi yêu cầu. Vui lòng thử lại sau.', 'error');
+      showToast(t('contact.toast.error'), 'error');
     } finally {
       setSubmitting(false);
     }
@@ -145,10 +148,10 @@ export default function ContactPage() {
         {/* ── HERO ── */}
         <div className="cp2-hero">
           <h1>
-            <span>Liên Hệ Với Chúng Tôi</span>
+            <span>{t('contact.hero.title')}</span>
           </h1>
           <p>
-            Chúng tôi luôn sẵn sàng lắng nghe, tư vấn và đồng hành cùng bạn, mang đến giải pháp chăm sóc phù hợp nhất cho người thân yêu.
+            {t('contact.hero.subtitle')}
           </p>
         </div>
 
@@ -187,24 +190,24 @@ export default function ContactPage() {
           <div className="cp2-form-card">
             <h2>
               <bold>
-                Đăng Ký Tư Vấn Dịch Vụ
+                {t('contact.form.title')}
               </bold>
             </h2>
             <form className="cp2-form" onSubmit={handleSubmit}>
               <div className="cp2-form__row">
                 <div className="cp2-form__field">
-                  <strong>Họ và tên *</strong>
+                  <strong>{t('contact.form.name')} *</strong>
                   <input
                     name="name"
                     type="text"
-                    placeholder="Nguyễn Văn A"
+                    placeholder={t('contact.form.namePlaceholder')}
                     value={form.name}
                     onChange={handleChange}
                   />
                   {errors.name && <p className="cp2-form__error">{errors.name}</p>}
                 </div>
                 <div className="cp2-form__field">
-                  <strong>Địa chỉ email *</strong>
+                  <strong>{t('contact.form.email')} *</strong>
                   <input
                     name="email"
                     type="email"
@@ -217,7 +220,7 @@ export default function ContactPage() {
               </div>
               <div className="cp2-form__row">
                 <div className="cp2-form__field">
-                  <strong>Số điện thoại *</strong>
+                  <strong>{t('contact.form.phone')} *</strong>
                   <input
                     name="phone"
                     type="tel"
@@ -230,11 +233,11 @@ export default function ContactPage() {
               </div>
 
               <div className="cp2-form__field">
-                <strong>Nhu cầu tư vấn *</strong>
+                <strong>{t('contact.form.service')} *</strong>
                 <select name="service" value={form.service} onChange={handleChange}>
-                  <option value="">-- Chọn nhu cầu --</option>
+                  <option value="">{t('contact.form.servicePlaceholder')}</option>
                   {SERVICES.map((s) => (
-                    <option key={s} value={s}>{s}</option>
+                    <option key={s.value} value={s.value}>{t(s.i18nKey)}</option>
                   ))}
                 </select>
                 {errors.service && <p className="cp2-form__error">{errors.service}</p>}
@@ -242,11 +245,11 @@ export default function ContactPage() {
 
               {form.service === 'Khác' && (
                 <div className="cp2-form__field">
-                  <strong>Nhu cầu tư vấn khác *</strong>
+                  <strong>{t('contact.form.otherService')} *</strong>
                   <input
                     name="otherService"
                     type="text"
-                    placeholder="Mô tả nhu cầu tư vấn khác"
+                    placeholder={t('contact.form.otherServicePlaceholder')}
                     value={form.otherService}
                     maxLength={51}
                     onChange={handleChange}
@@ -256,21 +259,21 @@ export default function ContactPage() {
               )}
 
               <div className="cp2-form__field">
-                <strong>Lời nhắn</strong>
+                <strong>{t('contact.form.message')}</strong>
                 <textarea
                   name="message"
                   rows={6}
-                  placeholder="Tôi muốn tìm hiểu thêm về..."
+                  placeholder={t('contact.form.messagePlaceholder')}
                   value={form.message}
                   maxLength={200}
                   onChange={handleChange}
                 />
-                <p className="cp2-form__hint">Tối đa 200 ký tự. ({form.message.length}/200)</p>
+                <p className="cp2-form__hint">{t('contact.form.messageHint', { count: form.message.length })}</p>
                 {errors.message && <p className="cp2-form__error">{errors.message}</p>}
               </div>
 
               <button type="submit" className="cp2-form__submit" disabled={submitting}>
-                {submitting ? 'Đang gửi...' : 'Gửi Thông Tin'}
+                {submitting ? t('contact.form.submitting') : t('contact.form.submit')}
               </button>
             </form>
           </div>

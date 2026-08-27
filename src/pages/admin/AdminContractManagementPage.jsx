@@ -64,7 +64,7 @@ const getStatusTranslation = (statusKey, t) => {
     upcoming: 'admin.contractManagement.statusUpcoming',
     cancelled: 'admin.contractManagement.statusCancelled',
   };
-  return t(statusMap[statusKey] || statusKey, statusKey === 'cancelled' ? 'Đã hủy' : statusKey);
+  return t(statusMap[statusKey] || statusKey);
 };
 
 const isContractOverdueUnpaid = (contract) => {
@@ -231,18 +231,18 @@ export default function AdminContractManagementPage() {
     today.setHours(0, 0, 0, 0);
 
     if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
-      return 'Ngày kỳ tính phí không hợp lệ.';
+      return t('admin.contractManagement.billingDateInvalid');
     }
     if (start < today) {
-      return 'Kỳ tính phí từ không được chọn trong quá khứ.';
+      return t('admin.contractManagement.billingStartPast');
     }
     if (end <= start) {
-      return 'Kỳ tính phí đến phải sau kỳ tính phí từ.';
+      return t('admin.contractManagement.billingEndBeforeStart');
     }
 
     const diffDays = Math.round((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000));
     if (diffDays < 30) {
-      return 'Kỳ tính phí phải kéo dài ít nhất 30 ngày.';
+      return t('admin.contractManagement.billingMinDays');
     }
     return '';
   };
@@ -275,7 +275,7 @@ export default function AdminContractManagementPage() {
       setPendingReleaseContract(null);
       await fetchContracts();
     } catch (err) {
-      setError(resolveApiError(err) || 'Không thể giải phóng phòng/giường cư dân.');
+      setError(resolveApiError(err) || t('admin.contractManagement.releaseResidentFailed'));
       console.error('Release resident failed:', err);
     } finally {
       setIsReleasingResident(false);
@@ -354,10 +354,9 @@ export default function AdminContractManagementPage() {
           };
         });
 
-      console.log('Contract data fetched:', contractData[0]); // Debug log to check latestInvoice field
       setContracts(contractData);
     } catch (err) {
-      setError(err.message || 'Không thể tải danh sách hợp đồng');
+      setError(err.message || t('admin.contractManagement.loadContractsFailed'));
       console.error('Error fetching contracts:', err);
     } finally {
       setIsLoading(false);
@@ -402,7 +401,7 @@ export default function AdminContractManagementPage() {
       const response = await servicePackageService.getServicePackageList({ isActive: true, page: 1, limit: 100 }, 'admin');
       setAvailablePackages(Array.isArray(response) ? response : response?.data || []);
     } catch (err) {
-      setPackageError(err.response?.data?.message || 'Không thể tải danh sách gói dịch vụ.');
+      setPackageError(err.response?.data?.message || t('admin.contractManagement.loadPackagesFailed'));
     } finally {
       setPackageLoading(false);
     }
@@ -410,11 +409,11 @@ export default function AdminContractManagementPage() {
 
   const handleChangeContractPackage = async () => {
     if (!selectedContract || !selectedPackageId) {
-      setPackageError('Vui lòng chọn gói dịch vụ mới.');
+      setPackageError(t('admin.contractManagement.selectNewPackage'));
       return;
     }
     if (selectedPackageId === selectedContract.servicePackageId) {
-      setPackageError('Vui lòng chọn gói dịch vụ khác với gói hiện tại.');
+      setPackageError(t('admin.contractManagement.selectDifferentPackage'));
       return;
     }
     try {
@@ -424,7 +423,7 @@ export default function AdminContractManagementPage() {
       setSelectedContract(null);
       await fetchContracts();
     } catch (err) {
-      setPackageError(err.response?.data?.message || 'Không thể thay đổi gói dịch vụ.');
+      setPackageError(err.response?.data?.message || t('admin.contractManagement.changePackageFailed'));
     } finally {
       setIsChangingPackage(false);
     }
@@ -447,7 +446,7 @@ export default function AdminContractManagementPage() {
       setCancellationReason('');
       await fetchContracts();
     } catch (err) {
-      setError(err.response?.data?.message || 'Không thể hủy hợp đồng.');
+      setError(err.response?.data?.message || t('admin.contractManagement.cancelContractFailed'));
     } finally {
       setIsCancellingContract(false);
     }
@@ -506,7 +505,7 @@ export default function AdminContractManagementPage() {
       setMedError('');
     } catch (err) {
       console.error('Failed to load prescriptions for medication invoice:', err);
-      setMedError(err.response?.data?.message || 'Không thể tải đơn thuốc.');
+      setMedError(err.response?.data?.message || t('admin.contractManagement.loadPrescriptionsFailed'));
     } finally {
       setMedLoading(false);
     }
@@ -552,7 +551,7 @@ export default function AdminContractManagementPage() {
       setMedEstimatedCost(cost);
     } catch (err) {
       console.warn('Estimate failed:', err);
-      setMedError(err.response?.data?.message || 'Không thể ước tính chi phí thuốc.');
+      setMedError(err.response?.data?.message || t('admin.contractManagement.estimateMedCostFailed'));
     }
   };
 
@@ -575,7 +574,7 @@ export default function AdminContractManagementPage() {
   };
 
   const handleCreateMedicationInvoice = async () => {
-    if (!selectedContract || !medSelectedId) { showToast('Vui lòng chọn đơn thuốc.', 'error'); return; }
+    if (!selectedContract || !medSelectedId) { showToast(t('admin.contractManagement.selectPrescription'), 'error'); return; }
     try {
       setMedCreatingInvoice(true);
       setMedConflictMessage('');
@@ -590,7 +589,7 @@ export default function AdminContractManagementPage() {
         ));
         if (existingMed) {
           const invNum = existingMed.invoiceNumber || existingMed._id || '';
-          const message = `Đã có hóa đơn thuốc cho đơn này (${invNum}). Không thể tạo thêm.`;
+          const message = t('admin.contractManagement.medInvoiceExists', { invNum });
           setMedConflictMessage(message);
           showToast(message, 'error');
           return;
@@ -600,7 +599,7 @@ export default function AdminContractManagementPage() {
       }
       const selectedPrescription = getSelectedPrescriptionDetails();
       if (!isPrescriptionInvoiceable(selectedPrescription)) {
-        showToast('Đơn thuốc này không hợp lệ để tạo hóa đơn thuốc. Vui lòng chọn đơn còn hiệu lực và có thuốc đang được dùng.', 'error');
+        showToast(t('admin.contractManagement.prescriptionInvalid'), 'error');
         return;
       }
       const body = { prescriptionId: medSelectedId };
@@ -641,7 +640,7 @@ export default function AdminContractManagementPage() {
       setExtensionFloors(floorsList);
     } catch (err) {
       console.error('Failed to load floors:', err);
-      setExtensionBedsError('Không thể tải danh sách tòa nhà. Vui lòng thử lại.');
+      setExtensionBedsError(t('admin.contractManagement.loadFloorsFailed'));
     } finally {
       setExtensionBedsLoading(false);
     }
@@ -671,11 +670,11 @@ export default function AdminContractManagementPage() {
 
       setExtensionRooms(filteredRooms);
       if (filteredRooms.length === 0) {
-        setExtensionSelectionError('Gói dịch vụ này không có phòng phù hợp để chọn.');
+        setExtensionSelectionError(t('admin.contractManagement.noMatchingRooms'));
       }
     } catch (err) {
       console.error('Failed to load rooms:', err);
-      setExtensionBedsError('Không thể tải danh sách phòng. Vui lòng thử lại.');
+      setExtensionBedsError(t('admin.contractManagement.loadRoomsFailed'));
     } finally {
       setExtensionBedsLoading(false);
     }
@@ -698,7 +697,7 @@ export default function AdminContractManagementPage() {
       setExtensionAvailableBeds(bedsList);
     } catch (err) {
       console.error('Failed to load beds:', err);
-      setExtensionBedsError('Không thể tải danh sách giường. Vui lòng thử lại.');
+      setExtensionBedsError(t('admin.contractManagement.loadBedsFailed'));
     } finally {
       setExtensionBedsLoading(false);
     }
@@ -712,7 +711,7 @@ export default function AdminContractManagementPage() {
       const response = await servicePackageService.getServicePackageList({ isActive: true, page: 1, limit: 100 }, 'admin');
       setExtensionAvailablePackages(Array.isArray(response) ? response : response?.data || []);
     } catch (err) {
-      setExtensionPackageError(err.response?.data?.message || 'Không thể tải danh sách gói dịch vụ.');
+      setExtensionPackageError(err.response?.data?.message || t('admin.contractManagement.loadPackagesFailed'));
     } finally {
       setExtensionPackageLoading(false);
     }
@@ -789,11 +788,11 @@ export default function AdminContractManagementPage() {
 
   const handleExtendContract = async () => {
     if (!selectedContract || !extensionData.newEndDate || !extensionData.contractStartDate) {
-      showToast('Vui lòng nhập đầy đủ thông tin ngày bắt đầu và ngày hết hạn.', 'error');
+      showToast(t('admin.contractManagement.enterDateInfo'), 'error');
       return;
     }
     if (!extensionData.selectedNewPackageId) {
-      showToast('Vui lòng chọn gói dịch vụ mới.', 'error');
+      showToast(t('admin.contractManagement.selectNewPackage'), 'error');
       return;
     }
 
@@ -804,12 +803,12 @@ export default function AdminContractManagementPage() {
 
     // Validate start date is not in the past
     if (startDate < today) {
-      showToast('Ngày bắt đầu hợp đồng mới không thể là quá khứ.', 'error');
+      showToast(t('admin.contractManagement.contractStartPast'), 'error');
       return;
     }
 
     if (endDate <= startDate) {
-      showToast('Ngày hết hạn phải sau ngày bắt đầu.', 'error');
+      showToast(t('admin.contractManagement.endDateAfterStart'), 'error');
       return;
     }
 
@@ -817,7 +816,7 @@ export default function AdminContractManagementPage() {
     let monthsDiff = (endDate.getFullYear() - startDate.getFullYear()) * 12;
     monthsDiff += endDate.getMonth() - startDate.getMonth();
     if (monthsDiff <= 0) {
-      showToast('Khoảng thời gian gia hạn phải tối thiểu 1 tháng.', 'error');
+      showToast(t('admin.contractManagement.extendMinOneMonth'), 'error');
       return;
     }
 
@@ -853,15 +852,15 @@ export default function AdminContractManagementPage() {
 
       await paymentService.createInvoice(selectedContract.residentId, invoiceBody);
 
-      const discountText = discountPercent > 0 ? ` (giảm ${discountPercent}%)` : '';
-      showToast(`Gia hạn hợp đồng và tạo hóa đơn thành công! Chi phí gia hạn: ${finalServiceCost.toLocaleString('vi-VN')} VND${discountText}`, 'success');
+      const discountText = discountPercent > 0 ? t('admin.contractManagement.discountTextFormat', { percent: discountPercent }) : '';
+      showToast(t('admin.contractManagement.extendSuccessToast', { cost: finalServiceCost.toLocaleString('vi-VN'), discount: discountText }), 'success');
 
       setShowExtensionModal(false);
       setSelectedContract(null);
       await fetchContracts();
     } catch (err) {
       console.error('Error extending contract:', err);
-      showToast(resolveApiError(err, t, 'admin.contractManagement.extendFailed') || ('Lỗi khi gia hạn hợp đồng: ' + (err.message || 'Unknown error')), 'error');
+      showToast(resolveApiError(err, t, 'admin.contractManagement.extendFailed') || t('admin.contractManagement.extendErrorFallback', { message: err.message || 'Unknown error' }), 'error');
     } finally {
       setIsExtendingContract(false);
     }
@@ -920,7 +919,7 @@ export default function AdminContractManagementPage() {
         ));
         if (duplicateService) {
           const invNum = duplicateService.invoiceNumber || duplicateService._id || '';
-          const message = `Đã có hóa đơn dịch vụ cho kỳ ${startIso} → ${endIso} (${invNum}). Chi phí dịch vụ chăm sóc (VND) sẽ không được gia hạn.`;
+          const message = t('admin.contractManagement.serviceInvoiceExists', { start: startIso, end: endIso, number: invNum });
           setRenewalServiceBlockedMessage(message);
           // Also set a general conflict so UI can disable if desired
           setRenewalConflictMessage(message);
@@ -940,7 +939,7 @@ export default function AdminContractManagementPage() {
           ));
           if (existingMedInv) {
             const invNum = existingMedInv.invoiceNumber || existingMedInv._id || '';
-            const message = `Đã có hóa đơn thuốc cho đơn thuốc chọn (số: ${invNum}). Chi phí thuốc (VND) sẽ không được gia hạn.`;
+            const message = t('admin.contractManagement.medInvoiceExistsForPrescription', { number: invNum });
             setRenewalMedBlockedMessage(message);
           }
         }
@@ -994,7 +993,7 @@ export default function AdminContractManagementPage() {
         selectedContract?.outstandingAmount > 0 &&
         renewalData.paymentPlan === 'FULL'
       ) {
-        showToast('Cư dân hiện có hóa đơn chưa thanh toán. Vui lòng xử lý phần nợ còn lại trước khi tạo hóa đơn đầy đủ mới.', 'error');
+        showToast(t('admin.contractManagement.outstandingAmountError'), 'error');
         return;
       }
 
@@ -1082,7 +1081,7 @@ export default function AdminContractManagementPage() {
             <option value="active">{t('admin.contractManagement.statusActive')}</option>
             <option value="expired">{t('admin.contractManagement.statusExpired')}</option>
             <option value="upcoming">{t('admin.contractManagement.statusUpcoming')}</option>
-            <option value="cancelled">{t('admin.contractManagement.statusCancelled', 'Đã hủy')}</option>
+            <option value="cancelled">{t('admin.contractManagement.statusCancelled')}</option>
           </select>
         </div>
 
@@ -1107,7 +1106,7 @@ export default function AdminContractManagementPage() {
                   <th>{t('admin.contractManagement.colResidentName')}</th>
                   <th>{t('admin.contractManagement.colStartDate')}</th>
                   <th>{t('admin.contractManagement.colEndDate')}</th>
-                  <th>Trạng thái hóa đơn</th>
+                  <th>{t('admin.contractManagement.colInvoiceStatus')}</th>
                   <th>{t('admin.contractManagement.colStatus')}</th>
                   <th>{t('admin.contractManagement.colSignedDate')}</th>
                   <th>{t('admin.contractManagement.colActions')}</th>
@@ -1125,27 +1124,27 @@ export default function AdminContractManagementPage() {
                         <div className="inline-flex flex-col gap-1">
                           <div className="inline-block px-3 py-1 rounded-full text-xs font-semibold">
                             {contract.latestInvoiceStatus === 'paid' ? (
-                              <span className="bg-emerald-100 text-emerald-700">✓ Đã thanh toán</span>
+                              <span className="bg-emerald-100 text-emerald-700">{t('admin.contractManagement.invoiceStatusPaid')}</span>
                             ) : contract.latestInvoiceStatus === 'partially_paid' ? (
-                              <span className="bg-amber-100 text-amber-700">◐ Thanh toán một phần</span>
+                              <span className="bg-amber-100 text-amber-700">{t('admin.contractManagement.invoiceStatusPartiallyPaid')}</span>
                             ) : (
-                              <span className="bg-red-100 text-red-700">✗ Chưa thanh toán</span>
+                              <span className="bg-red-100 text-red-700">{t('admin.contractManagement.invoiceStatusUnpaid')}</span>
                             )}
                           </div>
                           {contract.outstandingAmount > 0 && (
                             <div className="inline-block px-2 py-1 rounded-full text-[11px] font-semibold bg-sky-100 text-sky-700">
-                              Còn lại {contract.outstandingAmount.toLocaleString('vi-VN')}₫
+                              {t('admin.contractManagement.outstandingAmountRemaining', { amount: contract.outstandingAmount.toLocaleString('vi-VN') })}
                             </div>
                           )}
                         </div>
                       ) : (
                         <div className="inline-block px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600">
-                          − Chưa có hóa đơn
+                          {t('admin.contractManagement.noInvoice')}
                         </div>
                       )}
                       {isContractOverdueUnpaid(contract) && (
                         <div className="inline-block mt-1 px-2 py-1 rounded-full text-[11px] font-semibold bg-red-100 text-red-700">
-                          Hợp đồng quá 30 ngày chưa thanh toán
+                          {t('admin.contractManagement.overdueUnpaid')}
                         </div>
                       )}
                     </td>
@@ -1182,7 +1181,7 @@ export default function AdminContractManagementPage() {
                         {!contract.isReleased && contract.contractStatus !== 'cancelled' && (
                           <button
                             className="btn-icon-secondary"
-                            title="Tạo hóa đơn thuốc"
+                            title={t('admin.contractManagement.createMedInvoiceTitle')}
                             onClick={() => openMedicationInvoiceModal(contract)}
                           >
                             🩺
@@ -1192,14 +1191,14 @@ export default function AdminContractManagementPage() {
                           <>
                             <button
                               className="btn-icon-secondary"
-                              title="Thay đổi gói dịch vụ"
+                              title={t('admin.contractManagement.changePackageTitle')}
                               onClick={() => openPackageChangeModal(contract)}
                             >
                               <RefreshCw className="w-4 h-4" />
                             </button>
                             <button
                               className="btn-icon-secondary"
-                              title="Hủy hợp đồng"
+                              title={t('admin.contractManagement.cancelContractTitle')}
                               onClick={() => openCancelContractModal(contract)}
                               style={{ color: '#dc2626' }}
                             >
@@ -1210,7 +1209,7 @@ export default function AdminContractManagementPage() {
                         {contract.isReleased && (
                           <button
                             className="btn-icon-primary"
-                            title="Gia hạn lại"
+                            title={t('admin.contractManagement.renewContractTitle')}
                             onClick={() => handleOpenExtensionModal(contract)}
                             style={{ background: '#f59e0b', color: 'white' }}
                           >
@@ -1220,7 +1219,7 @@ export default function AdminContractManagementPage() {
                         {!contract.isReleased && isOverdueReleaseEligible(contract) && (
                           <button
                             className="btn-icon-secondary"
-                            title="Giải phóng phòng/giường"
+                            title={t('admin.contractManagement.releaseRoomTitle')}
                             onClick={() => handleReleaseResident(contract)}
                             disabled={isReleasingResident}
                             style={{ background: '#ef4444', color: 'white' }}
@@ -1231,9 +1230,9 @@ export default function AdminContractManagementPage() {
                         {!contract.isReleased && getContractStatusLabel(contract.startDate, contract.endDate, contract.contractStatus) === 'expired' && contract.contractStatus !== 'cancelled' && (
                           <button
                             className="btn-icon-primary"
-                            title="Gia hạn hợp đồng"
+                            title={t('admin.contractManagement.extendContractTitle')}
                             onClick={() => handleOpenExtensionModal(contract)}
-                            style={{ background: '#3b82f6', color: 'white' }}
+                            style={{ background: '#0f766e', color: 'white' }}
                           >
                             ↻
                           </button>
@@ -1382,17 +1381,17 @@ export default function AdminContractManagementPage() {
                   </div>
 
                   <div className="form-group">
-                    <label>Gói dịch vụ trong hợp đồng</label>
+                    <label>{t('admin.contractManagement.contractServicePackage')}</label>
                     <div className="form-input readonly" style={{ minHeight: 'auto' }}>
                       <div className="font-semibold text-slate-800">{selectedContract.servicePackageName || 'N/A'}</div>
                       <div className="text-xs text-slate-500 mt-1">
-                        Giá theo tháng: {formatCurrency(selectedContract.servicePackagePrice || 0)}
+                        {t('admin.contractManagement.monthlyPrice', { price: formatCurrency(selectedContract.servicePackagePrice || 0) })}
                       </div>
                     </div>
                   </div>
 
                   <div className="form-group">
-                    <label>Số tháng trong hợp đồng</label>
+                    <label>{t('admin.contractManagement.contractMonths')}</label>
                     <div className="flex flex-col gap-2">
                       <div className="flex gap-2 flex-wrap">
                         {[1, 3, 6, 12].map((preset) => (
@@ -1410,7 +1409,7 @@ export default function AdminContractManagementPage() {
                               color: '#0f172a',
                             }}
                           >
-                            {preset} tháng
+                            {t('admin.contractManagement.monthsLabel', { count: preset })}
                           </button>
                         ))}
                       </div>
@@ -1425,7 +1424,7 @@ export default function AdminContractManagementPage() {
                   </div>
 
                   <div className="form-group">
-                    <label>% Giảm giá gói dịch vụ</label>
+                    <label>{t('admin.contractManagement.serviceDiscountPercent')}</label>
                     <input
                       type="number"
                       min="0"
@@ -1441,7 +1440,7 @@ export default function AdminContractManagementPage() {
                       }}
                       className="form-input"
                     />
-                    <p className="form-note">Giảm giá chỉ áp dụng cho phần gói dịch vụ, không giảm thuốc.</p>
+                    <p className="form-note">{t('admin.contractManagement.discountNote')}</p>
                   </div>
 
                   <div className="form-group">
@@ -1478,10 +1477,10 @@ export default function AdminContractManagementPage() {
                         return `${net.toLocaleString('vi-VN')} VND`;
                       })()}
                       <div className="text-xs text-slate-500 mt-1">
-                        {`Thời hạn đang chọn: ${renewalData.computedServiceFeeBreakdown?.durationMonths || 1} tháng`}
+                        {t('admin.contractManagement.selectedDuration', { months: renewalData.computedServiceFeeBreakdown?.durationMonths || 1 })}
                       </div>
                       {renewalData.computedServiceFeeBreakdown?.discountPercent ? (
-                        <div className="text-xs text-slate-500 mt-1">(Đã áp dụng giảm giá {renewalData.computedServiceFeeBreakdown.discountPercent}%)</div>
+                        <div className="text-xs text-slate-500 mt-1">{t('admin.contractManagement.discountApplied', { percent: renewalData.computedServiceFeeBreakdown.discountPercent })}</div>
                       ) : null}
                       {renewalServiceBlockedMessage && (
                         <div className="form-note" style={{ color: '#b91c1c', marginTop: 8 }}>{renewalServiceBlockedMessage}</div>
@@ -1595,11 +1594,11 @@ export default function AdminContractManagementPage() {
         <div className="modal-overlay">
           <div className="modal-content">
             <div className="modal-header">
-              <h2>Tạo hóa đơn thuốc</h2>
+              <h2>{t('admin.contractManagement.createMedInvoiceTitle')}</h2>
               <div className="flex gap-2">
                 <button
                   className="btn-icon-secondary"
-                  title="Làm mới danh sách đơn thuốc"
+                  title={t('admin.contractManagement.refreshPrescriptions')}
                   onClick={() => selectedContract && refreshMedicationPrescriptions(selectedContract.residentId)}
                   disabled={medLoading}
                 >
@@ -1619,13 +1618,13 @@ export default function AdminContractManagementPage() {
 
             <div className="modal-body">
               {medLoading ? (
-                <div>Đang tải đơn thuốc...</div>
+                <div>{t('admin.contractManagement.loadingPrescriptions')}</div>
               ) : medError ? (
                 <div className="alert alert-error">{medError}</div>
               ) : (
                 <>
                   <div className="form-group">
-                    <label>Chọn đơn thuốc</label>
+                    <label>{t('admin.contractManagement.selectPrescriptionLabel')}</label>
                     <select
                       value={medSelectedId || ''}
                       onChange={(e) => {
@@ -1634,9 +1633,9 @@ export default function AdminContractManagementPage() {
                       }}
                       className="form-select"
                     >
-                      <option value="">-- Chọn --</option>
+                      <option value="">{t('admin.contractManagement.choosePlaceholder')}</option>
                       {medPrescriptions.map((p) => (
-                        <option key={p._id || p.id} value={p._id || p.id}>{`${p.prescriptionDate ? formatDate(p.prescriptionDate) : '---'} — ${p.doctorId?.fullName || 'Bác sĩ'}`}</option>
+                        <option key={p._id || p.id} value={p._id || p.id}>{`${p.prescriptionDate ? formatDate(p.prescriptionDate) : '---'} — ${p.doctorId?.fullName || t('admin.contractManagement.defaultDoctor')}`}</option>
                       ))}
                     </select>
                   </div>
@@ -1654,16 +1653,16 @@ export default function AdminContractManagementPage() {
                         {isExpired && (
                           <div className="alert alert-warning" style={{ marginBottom: '16px' }}>
                             <AlertCircle className="inline w-4 h-4 mr-2" />
-                            <strong>⚠️ Cảnh báo:</strong> Đơn thuốc này đã quá hạn (hết hiệu lực: {formatDate(selectedPrx.validUntil)})
+                            <strong>{t('admin.contractManagement.warningLabel')}</strong> {t('admin.contractManagement.prescriptionExpiredMsg', { date: formatDate(selectedPrx.validUntil) })}
                           </div>
                         )}
 
                         {/* Prescription Status and Payment Info */}
                         <div className="form-group">
-                          <label>Thông tin đơn thuốc</label>
+                          <label>{t('admin.contractManagement.prescriptionInfoLabel')}</label>
                           <div style={{ background: '#f3f4f6', padding: '12px', borderRadius: '6px', fontSize: '14px' }}>
                             <div style={{ marginBottom: '8px' }}>
-                              <strong>Trạng thái:</strong> {' '}
+                              <strong>{t('admin.contractManagement.statusLabel')}</strong> {' '}
                               <span style={{
                                 display: 'inline-block',
                                 padding: '2px 8px',
@@ -1673,14 +1672,14 @@ export default function AdminContractManagementPage() {
                                 fontSize: '12px',
                                 fontWeight: 'bold'
                               }}>
-                                {isExpired ? '❌ Đã quá hạn' : '✓ Còn hiệu lực'}
+                                {isExpired ? t('admin.contractManagement.prescriptionExpiredStatus') : t('admin.contractManagement.prescriptionValidStatus')}
                               </span>
                             </div>
                             <div style={{ marginBottom: '8px' }}>
-                              <strong>Hết hiệu lực:</strong> {selectedPrx.validUntil ? formatDate(selectedPrx.validUntil) : '—'}
+                              <strong>{t('admin.contractManagement.expiresLabel')}</strong> {selectedPrx.validUntil ? formatDate(selectedPrx.validUntil) : '—'}
                             </div>
                             <div>
-                              <strong>Thanh toán:</strong> {' '}
+                              <strong>{t('admin.contractManagement.paymentStatusLabel')}</strong> {' '}
                               <span style={{
                                 display: 'inline-block',
                                 padding: '2px 8px',
@@ -1690,19 +1689,19 @@ export default function AdminContractManagementPage() {
                                 fontSize: '12px',
                                 fontWeight: 'bold'
                               }}>
-                                {paymentStatus === 'paid' ? '✓ Đã thanh toán' : paymentStatus === 'partially_paid' ? '◐ Thanh toán một phần' : '✗ Chưa thanh toán'}
+                                {paymentStatus === 'paid' ? t('admin.contractManagement.invoiceStatusPaid') : paymentStatus === 'partially_paid' ? t('admin.contractManagement.invoiceStatusPartiallyPaid') : t('admin.contractManagement.invoiceStatusUnpaid')}
                               </span>
                             </div>
                           </div>
                         </div>
 
                         <div className="form-group">
-                          <label>Chi tiết đơn thuốc</label>
+                          <label>{t('admin.contractManagement.prescriptionDetailsLabel')}</label>
                           <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '6px', fontSize: '14px' }}>
                             {selectedPrx.items?.length ? (
                               <>
                                 <div style={{ marginBottom: '8px' }}>
-                                  <strong>Từ ngày:</strong>{' '}
+                                  <strong>{t('admin.contractManagement.fromDateLabel')}</strong>{' '}
                                   {selectedPrx.items
                                     .filter((it) => it.startDate)
                                     .map((it) => it.startDate)
@@ -1712,7 +1711,7 @@ export default function AdminContractManagementPage() {
                                         .map((it) => it.startDate)
                                         .sort()[0])
                                     : '—'}
-                                  {' '}<strong>Đến ngày:</strong>{' '}
+                                  {' '}<strong>{t('admin.contractManagement.toDateLabel')}</strong>{' '}
                                   {(() => {
                                     const itemEndDates = selectedPrx.items
                                       .filter((it) => it.endDate)
@@ -1726,22 +1725,22 @@ export default function AdminContractManagementPage() {
                                   })()}
                                 </div>
                                 <div style={{ marginBottom: '8px' }}>
-                                  <strong>Thuốc:</strong>{' '}
+                                  <strong>{t('admin.contractManagement.medicationsLabel')}</strong>{' '}
                                   {selectedPrx.items.map((item) => item.medicationName).filter(Boolean).join(', ') || '—'}
                                 </div>
                                 <div>
-                                  <strong>Chi tiết từng thuốc:</strong>
+                                  <strong>{t('admin.contractManagement.medicationItemsLabel')}</strong>
                                   <ul style={{ marginTop: 8, paddingLeft: '18px' }}>
                                     {selectedPrx.items.map((item) => (
                                       <li key={item._id || item.medicationId || item.medicationName} style={{ marginBottom: 4 }}>
-                                        {item.medicationName || 'N/A'} — {item.dosage || '—'} {item.unit || ''} — {item.frequency ? `${item.frequency} lần/ngày` : '—'}{item.startDate ? ` — ${formatDate(item.startDate)}` : ''}{item.endDate ? ` đến ${formatDate(item.endDate)}` : ''}
+                                        {item.medicationName || 'N/A'} — {item.dosage || '—'} {item.unit || ''} — {item.frequency ? t('admin.contractManagement.timesPerDay', { count: item.frequency }) : '—'}{item.startDate ? ` — ${formatDate(item.startDate)}` : ''}{item.endDate ? ` ${t('admin.contractManagement.toDate', { date: formatDate(item.endDate) })}` : ''}
                                       </li>
                                     ))}
                                   </ul>
                                 </div>
                               </>
                             ) : (
-                              <div>Không có thông tin chi tiết đơn thuốc.</div>
+                              <div>{t('admin.contractManagement.noPrescriptionDetails')}</div>
                             )}
                           </div>
                         </div>
@@ -1750,7 +1749,7 @@ export default function AdminContractManagementPage() {
                   })()}
 
                   <div className="form-group">
-                    <label>Ước tính chi phí thuốc</label>
+                    <label>{t('admin.contractManagement.estimatedMedCostLabel')}</label>
                     <div className="form-input readonly">{medEstimatedCost != null ? `${medEstimatedCost.toLocaleString('vi-VN')} VND` : '—'}</div>
                   </div>
                   {medConflictMessage && (
@@ -1777,7 +1776,7 @@ export default function AdminContractManagementPage() {
                 onClick={handleCreateMedicationInvoice}
                 disabled={medCreatingInvoice || !medSelectedId || Boolean(medConflictMessage)}
               >
-                {medCreatingInvoice ? 'Đang tạo...' : 'Tạo hóa đơn'}
+                {medCreatingInvoice ? t('admin.contractManagement.creatingInvoice') : t('admin.contractManagement.createInvoiceButton')}
               </button>
             </div>
           </div>
@@ -1788,7 +1787,7 @@ export default function AdminContractManagementPage() {
         <div className="modal-overlay" onClick={() => setShowPackageModal(false)}>
           <div className="modal-content" onClick={(event) => event.stopPropagation()}>
             <div className="modal-header">
-              <h2>Thay đổi gói dịch vụ</h2>
+              <h2>{t('admin.contractManagement.changePackageModalTitle')}</h2>
               <button className="modal-close" onClick={() => setShowPackageModal(false)}>
                 <X className="w-5 h-5" />
               </button>
@@ -1796,27 +1795,27 @@ export default function AdminContractManagementPage() {
             <div className="modal-body">
               {selectedContract && (
                 <p className="form-note" style={{ marginBottom: '16px' }}>
-                  Hợp đồng <strong>{selectedContract.contractNumber}</strong> của cư dân {selectedContract.residentName}.
+                  {t('admin.contractManagement.packageContractOf', { number: selectedContract.contractNumber, name: selectedContract.residentName })}
                 </p>
               )}
               {packageError && <div className="alert alert-error">{packageError}</div>}
               <div className="form-group">
-                <label>Gói dịch vụ mới</label>
+                <label>{t('admin.contractManagement.newPackageLabel')}</label>
                 <p className="form-note" style={{ marginTop: '4px', marginBottom: '8px' }}>
-                  Khi đổi gói, phòng hiện tại của cư dân phải phù hợp với loại phòng được phép của gói mới.
+                  {t('admin.contractManagement.changePackageNote')}
                 </p>
                 {packageLoading ? (
-                  <div className="form-note">Đang tải danh sách gói dịch vụ...</div>
+                  <div className="form-note">{t('admin.contractManagement.loadingPackages')}</div>
                 ) : (
                   <select
                     className="form-select"
                     value={selectedPackageId}
                     onChange={(event) => setSelectedPackageId(event.target.value)}
                   >
-                    <option value="">-- Chọn gói dịch vụ --</option>
+                    <option value="">{t('admin.contractManagement.choosePackagePlaceholder')}</option>
                     {availablePackages.map((pkg) => (
                       <option key={pkg._id} value={pkg._id}>
-                        {pkg.name || pkg.packageCode} - {(pkg.monthlyPrice || 0).toLocaleString('vi-VN')} VND/tháng
+                        {pkg.name || pkg.packageCode} - {(pkg.monthlyPrice || 0).toLocaleString('vi-VN')} {t('admin.contractManagement.vndPerMonth')}
                       </option>
                     ))}
                   </select>
@@ -1824,9 +1823,9 @@ export default function AdminContractManagementPage() {
               </div>
             </div>
             <div className="modal-footer">
-              <button className="btn-cancel" onClick={() => setShowPackageModal(false)}>Đóng</button>
+              <button className="btn-cancel" onClick={() => setShowPackageModal(false)}>{t('admin.contractManagement.closeButton')}</button>
               <button className="btn-submit" onClick={handleChangeContractPackage} disabled={packageLoading || isChangingPackage || !selectedPackageId}>
-                {isChangingPackage ? 'Đang cập nhật...' : 'Lưu gói dịch vụ'}
+                {isChangingPackage ? t('admin.contractManagement.updatingButton') : t('admin.contractManagement.savePackageButton')}
               </button>
             </div>
           </div>
@@ -1837,30 +1836,30 @@ export default function AdminContractManagementPage() {
         <div className="modal-overlay" onClick={() => setShowCancelModal(false)}>
           <div className="modal-content" onClick={(event) => event.stopPropagation()}>
             <div className="modal-header">
-              <h2>Hủy hợp đồng</h2>
+              <h2>{t('admin.contractManagement.cancelContractModalTitle')}</h2>
               <button className="modal-close" onClick={() => setShowCancelModal(false)}>
                 <X className="w-5 h-5" />
               </button>
             </div>
             <div className="modal-body">
               <p className="form-note" style={{ marginBottom: '16px' }}>
-                Bạn đang hủy hợp đồng <strong>{selectedContract?.contractNumber}</strong>. Thao tác này sẽ chuyển trạng thái hợp đồng thành “Đã hủy”.
+                {t('admin.contractManagement.cancelContractConfirm', { number: selectedContract?.contractNumber })}
               </p>
               <div className="form-group">
-                <label>Lý do hủy hợp đồng *</label>
+                <label>{t('admin.contractManagement.cancellationReasonLabel')}</label>
                 <textarea
                   className="form-input"
                   rows="4"
                   value={cancellationReason}
                   onChange={(event) => setCancellationReason(event.target.value)}
-                  placeholder="Nhập lý do hủy hợp đồng..."
+                  placeholder={t('admin.contractManagement.cancellationReasonPlaceholder')}
                 />
               </div>
             </div>
             <div className="modal-footer">
-              <button className="btn-cancel" onClick={() => setShowCancelModal(false)}>Đóng</button>
+              <button className="btn-cancel" onClick={() => setShowCancelModal(false)}>{t('admin.contractManagement.closeButton')}</button>
               <button className="btn-submit" style={{ background: '#dc2626' }} onClick={handleCancelContract} disabled={isCancellingContract || !cancellationReason.trim()}>
-                {isCancellingContract ? 'Đang hủy...' : 'Xác nhận hủy'}
+                {isCancellingContract ? t('admin.contractManagement.cancellingButton') : t('admin.contractManagement.confirmCancelButton')}
               </button>
             </div>
           </div>
@@ -1872,7 +1871,7 @@ export default function AdminContractManagementPage() {
         <div className="modal-overlay">
           <div className="modal-content">
             <div className="modal-header">
-              <h2>Gia hạn hợp đồng</h2>
+              <h2>{t('admin.contractManagement.extendContractModalTitle')}</h2>
               <button
                 className="modal-close"
                 onClick={() => {
@@ -1888,7 +1887,7 @@ export default function AdminContractManagementPage() {
               {selectedContract && (
                 <>
                   <div className="form-group">
-                    <label>Số hợp đồng</label>
+                    <label>{t('admin.contractManagement.contractNumberLabel')}</label>
                     <input
                       type="text"
                       value={selectedContract.contractNumber}
@@ -1898,7 +1897,7 @@ export default function AdminContractManagementPage() {
                   </div>
 
                   <div className="form-group">
-                    <label>Tên cư dân</label>
+                    <label>{t('admin.contractManagement.residentNameLabel')}</label>
                     <input
                       type="text"
                       value={selectedContract.residentName}
@@ -1909,9 +1908,9 @@ export default function AdminContractManagementPage() {
 
                   {/* Service Package Selection */}
                   <div className="form-group">
-                    <label>Gói dịch vụ *</label>
+                    <label>{t('admin.contractManagement.servicePackageRequired')}</label>
                     {extensionPackageLoading ? (
-                      <div className="form-input" style={{ color: '#999' }}>Đang tải...</div>
+                      <div className="form-input" style={{ color: '#999' }}>{t('admin.contractManagement.loadingLabel')}</div>
                     ) : extensionPackageError ? (
                       <div style={{ color: '#dc2626', fontSize: '14px' }}>{extensionPackageError}</div>
                     ) : (
@@ -1928,10 +1927,10 @@ export default function AdminContractManagementPage() {
                         }}
                         className="form-input"
                       >
-                        <option value="">-- Chọn gói dịch vụ --</option>
+                        <option value="">{t('admin.contractManagement.choosePackagePlaceholder')}</option>
                         {extensionAvailablePackages.map((pkg) => (
                           <option key={pkg._id} value={pkg._id}>
-                            {pkg.name} - {pkg.monthlyPrice.toLocaleString('vi-VN')} VND/tháng
+                            {pkg.name} - {pkg.monthlyPrice.toLocaleString('vi-VN')} {t('admin.contractManagement.vndPerMonth')}
                           </option>
                         ))}
                       </select>
@@ -1943,9 +1942,9 @@ export default function AdminContractManagementPage() {
                     <>
                       {/* Floor Selection */}
                       <div className="form-group">
-                        <label>Tòa nhà</label>
+                        <label>{t('admin.contractManagement.buildingLabel')}</label>
                         {extensionBedsLoading && !extensionSelectedFloorId ? (
-                          <div className="form-input" style={{ color: '#999' }}>Đang tải...</div>
+                          <div className="form-input" style={{ color: '#999' }}>{t('admin.contractManagement.loadingLabel')}</div>
                         ) : extensionBedsError && !extensionSelectedFloorId ? (
                           <div style={{ color: '#dc2626', fontSize: '14px' }}>{extensionBedsError}</div>
                         ) : (
@@ -1954,9 +1953,9 @@ export default function AdminContractManagementPage() {
                             onChange={(e) => handleExtensionFloorChange(e.target.value)}
                             className="form-input"
                           >
-                            <option value="">-- Chọn tòa nhà --</option>
+                            <option value="">{t('admin.contractManagement.chooseBuildingPlaceholder')}</option>
                             {extensionFloors.map((floor) => {
-                              const floorLabel = floor.name || floor.label || `Tầng ${floor.floorNumber || ''}`.trim();
+                              const floorLabel = floor.name || floor.label || t('admin.contractManagement.floorLabel', { number: floor.floorNumber || '' }).trim();
                               return (
                                 <option key={floor._id} value={floor._id}>
                                   {floorLabel}
@@ -1970,9 +1969,9 @@ export default function AdminContractManagementPage() {
                       {/* Room Selection */}
                       {extensionSelectedFloorId && (
                         <div className="form-group">
-                          <label>Phòng</label>
+                          <label>{t('admin.contractManagement.roomLabel')}</label>
                           {extensionBedsLoading && extensionSelectedFloorId && !extensionSelectedRoomId ? (
-                            <div className="form-input" style={{ color: '#999' }}>Đang tải...</div>
+                            <div className="form-input" style={{ color: '#999' }}>{t('admin.contractManagement.loadingLabel')}</div>
                           ) : extensionBedsError && extensionSelectedFloorId && !extensionSelectedRoomId ? (
                             <div style={{ color: '#dc2626', fontSize: '14px' }}>{extensionBedsError}</div>
                           ) : (
@@ -1981,9 +1980,9 @@ export default function AdminContractManagementPage() {
                               onChange={(e) => handleExtensionRoomChange(e.target.value)}
                               className="form-input"
                             >
-                              <option value="">-- Chọn phòng --</option>
+                              <option value="">{t('admin.contractManagement.chooseRoomPlaceholder')}</option>
                               {extensionRooms.map((room) => {
-                                const roomLabel = room.label || room.roomNumber || room.name || `Phòng ${room.roomNumber || room.number || room._id?.slice(-4)}`;
+                                const roomLabel = room.label || room.roomNumber || room.name || t('admin.contractManagement.roomDefault', { id: room.roomNumber || room.number || room._id?.slice(-4) });
                                 return (
                                   <option key={room._id} value={room._id}>
                                     {roomLabel}
@@ -2001,9 +2000,9 @@ export default function AdminContractManagementPage() {
                       {/* Bed Selection */}
                       {extensionSelectedRoomId && (
                         <div className="form-group">
-                          <label>Giường</label>
+                          <label>{t('admin.contractManagement.bedLabel')}</label>
                           {extensionBedsLoading && extensionSelectedRoomId ? (
-                            <div className="form-input" style={{ color: '#999' }}>Đang tải...</div>
+                            <div className="form-input" style={{ color: '#999' }}>{t('admin.contractManagement.loadingLabel')}</div>
                           ) : extensionBedsError && extensionSelectedRoomId ? (
                             <div style={{ color: '#dc2626', fontSize: '14px' }}>{extensionBedsError}</div>
                           ) : (
@@ -2012,9 +2011,9 @@ export default function AdminContractManagementPage() {
                               onChange={(e) => setExtensionData({ ...extensionData, selectedNewBedId: e.target.value })}
                               className="form-input"
                             >
-                              <option value="">-- Không đổi giường --</option>
+                              <option value="">{t('admin.contractManagement.keepCurrentBed')}</option>
                               {extensionAvailableBeds.map((bed) => {
-                                const bedLabel = bed.label || bed.bedCode || bed.code || bed.bedNumber || `Giường ${bed.bedCode || bed._id?.slice(-4)}`;
+                                const bedLabel = bed.label || bed.bedCode || bed.code || bed.bedNumber || t('admin.contractManagement.bedDefault', { id: bed.bedCode || bed._id?.slice(-4) });
                                 return (
                                   <option key={bed._id} value={bed._id}>
                                     {bedLabel}
@@ -2030,7 +2029,7 @@ export default function AdminContractManagementPage() {
 
                   <div className="form-row">
                     <div className="form-group">
-                      <label>Ngày hết hạn hiện tại</label>
+                      <label>{t('admin.contractManagement.currentEndDateLabel')}</label>
                       <input
                         type="date"
                         value={new Date(selectedContract.endDate).toISOString().split('T')[0]}
@@ -2039,7 +2038,7 @@ export default function AdminContractManagementPage() {
                       />
                     </div>
                     <div className="form-group">
-                      <label>Ngày bắt đầu hợp đồng mới *</label>
+                      <label>{t('admin.contractManagement.newContractStartDate')}</label>
                       <input
                         type="date"
                         value={extensionData.contractStartDate}
@@ -2056,7 +2055,7 @@ export default function AdminContractManagementPage() {
 
                   <div className="form-row">
                     <div className="form-group">
-                      <label>Ngày hết hạn mới *</label>
+                      <label>{t('admin.contractManagement.newEndDateLabel')}</label>
                       <input
                         type="date"
                         value={extensionData.newEndDate}
@@ -2077,13 +2076,13 @@ export default function AdminContractManagementPage() {
                             style={{ padding: '6px 10px', fontSize: '12px', minWidth: '70px' }}
                             onClick={() => handleExtensionDurationSelect(months)}
                           >
-                            {months} tháng
+                            {t('admin.contractManagement.monthsLabel', { count: months })}
                           </button>
                         ))}
                       </div>
                     </div>
                     <div className="form-group">
-                      <label>% Giảm giá *</label>
+                      <label>{t('admin.contractManagement.discountPercentLabel')}</label>
                       <input
                         type="number"
                         value={extensionData.discountPercent}
@@ -2104,7 +2103,7 @@ export default function AdminContractManagementPage() {
                   {/* Cost Calculation Display */}
                   {extensionData.newEndDate && extensionData.contractStartDate && extensionData.selectedNewPackageId && selectedContract && (
                     <div className="form-group">
-                      <label>Chi phí gia hạn (sau giảm giá)</label>
+                      <label>{t('admin.contractManagement.extensionCostLabel')}</label>
                       <div className="form-input readonly">
                         <div style={{ fontSize: '14px', color: '#666' }}>
                           {(() => {
@@ -2126,7 +2125,7 @@ export default function AdminContractManagementPage() {
                             
                             const baseServiceCost = packagePrice * monthsDiff;
                             
-                            return `${monthsDiff} tháng × ${packagePrice.toLocaleString('vi-VN')} = ${baseServiceCost.toLocaleString('vi-VN')} VND`;
+                            return t('admin.contractManagement.extensionCostBreakdown', { months: monthsDiff, price: packagePrice.toLocaleString('vi-VN'), total: baseServiceCost.toLocaleString('vi-VN') });
                           })()}
                         </div>
                         <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#1e40af', marginTop: '8px' }}>
@@ -2166,7 +2165,7 @@ export default function AdminContractManagementPage() {
                 onClick={handleExtendContract}
                 disabled={isExtendingContract}
               >
-                {isExtendingContract ? 'Đang xử lý...' : 'Gia hạn'}
+                {isExtendingContract ? t('admin.contractManagement.processingButton') : t('admin.contractManagement.extendButton')}
               </button>
             </div>
           </div>
@@ -2177,78 +2176,78 @@ export default function AdminContractManagementPage() {
         <div className="modal-overlay" onClick={() => setShowContractDetailModal(false)}>
           <div className="modal-content" onClick={(event) => event.stopPropagation()}>
             <div className="modal-header">
-              <h2>Chi tiết hợp đồng</h2>
+              <h2>{t('admin.contractManagement.contractDetailModalTitle')}</h2>
               <button className="modal-close" onClick={() => setShowContractDetailModal(false)}>
                 <X className="w-5 h-5" />
               </button>
             </div>
             <div className="modal-body">
               <div className="form-group">
-                <label>Số hợp đồng</label>
+                <label>{t('admin.contractManagement.contractNumberLabel')}</label>
                 <div className="form-input readonly">{selectedContract.contractNumber || '-'}</div>
               </div>
               <div className="form-group">
-                <label>Cư dân</label>
+                <label>{t('admin.contractManagement.residentLabel')}</label>
                 <div className="form-input readonly">{selectedContract.residentName || '-'}</div>
               </div>
               <div className="form-row">
                 <div className="form-group">
-                  <label>Ngày bắt đầu</label>
+                  <label>{t('admin.contractManagement.colStartDate')}</label>
                   <div className="form-input readonly">{formatDate(selectedContract.startDate)}</div>
                 </div>
                 <div className="form-group">
-                  <label>Ngày kết thúc</label>
+                  <label>{t('admin.contractManagement.endDateLabel')}</label>
                   <div className="form-input readonly">{formatDate(selectedContract.endDate)}</div>
                 </div>
               </div>
               <div className="form-row">
                 <div className="form-group">
-                  <label>Trạng thái hợp đồng</label>
+                  <label>{t('admin.contractManagement.contractStatusLabel')}</label>
                   <div className="form-input readonly">{getStatusTranslation(getContractStatusLabel(selectedContract.startDate, selectedContract.endDate, selectedContract.contractStatus), t)}</div>
                 </div>
                 <div className="form-group">
-                  <label>Ngày ký</label>
+                  <label>{t('admin.contractManagement.colSignedDate')}</label>
                   <div className="form-input readonly">{formatDate(selectedContract.signedAt)}</div>
                 </div>
               </div>
               <div className="form-group">
-                <label>Gói dịch vụ</label>
+                <label>{t('admin.contractManagement.servicePackageLabel')}</label>
                 <div className="form-input readonly">{selectedContract.servicePackageName || '-'}</div>
               </div>
               <div className="form-row">
                 <div className="form-group">
-                  <label>Giá dịch vụ</label>
+                  <label>{t('admin.contractManagement.servicePriceLabel')}</label>
                   <div className="form-input readonly">{formatCurrency(selectedContract.servicePackagePrice)}</div>
                 </div>
                 <div className="form-group">
-                  <label>Giảm giá hợp đồng</label>
+                  <label>{t('admin.contractManagement.contractDiscountLabel')}</label>
                   <div className="form-input readonly">{selectedContract.contractDiscountPercent != null ? `${selectedContract.contractDiscountPercent}%` : '-'}</div>
                 </div>
               </div>
               <div className="form-group">
-                <label>Hóa đơn mới nhất</label>
+                <label>{t('admin.contractManagement.latestInvoiceLabel')}</label>
                 <div className="form-input readonly">
                   {selectedContract.latestInvoice ? (
                     <>
                       <div>{selectedContract.latestInvoice.invoiceNumber || '—'}</div>
                       <div style={{ marginTop: 8, fontSize: '0.95rem', color: '#475569' }}>
-                        {selectedContract.latestInvoiceStatus === 'paid' ? 'Đã thanh toán' : selectedContract.latestInvoiceStatus === 'partially_paid' ? 'Thanh toán một phần' : 'Chưa thanh toán'}
+                        {selectedContract.latestInvoiceStatus === 'paid' ? t('admin.contractManagement.paidLabel') : selectedContract.latestInvoiceStatus === 'partially_paid' ? t('admin.contractManagement.partiallyPaidLabel') : t('admin.contractManagement.unpaidLabel')}
                       </div>
                       {selectedContract.outstandingAmount > 0 && (
                         <div style={{ marginTop: 6, fontSize: '0.92rem', color: '#0f172a' }}>
-                          Tổng nợ chưa thanh toán: {selectedContract.outstandingAmount.toLocaleString('vi-VN')}₫
+                          {t('admin.contractManagement.totalOutstandingDebt', { amount: selectedContract.outstandingAmount.toLocaleString('vi-VN') })}
                         </div>
                       )}
                     </>
                   ) : (
-                    'Chưa có hóa đơn'
+                    t('admin.contractManagement.noInvoiceSimple')
                   )}
                 </div>
               </div>
             </div>
             <div className="modal-footer">
               <button className="btn-submit" onClick={() => setShowContractDetailModal(false)}>
-                Đóng
+                {t('admin.contractManagement.closeButton')}
               </button>
             </div>
           </div>
@@ -2257,7 +2256,7 @@ export default function AdminContractManagementPage() {
 
       <ConfirmDialog
         open={!!pendingReleaseContract}
-        message={`Bạn có muốn giải phóng phòng/giường cho cư dân ${pendingReleaseContract?.residentName || ''}?`}
+        message={t('admin.contractManagement.releaseResidentConfirm', { name: pendingReleaseContract?.residentName || '' })}
         loading={isReleasingResident}
         onConfirm={confirmReleaseResident}
         onCancel={() => setPendingReleaseContract(null)}

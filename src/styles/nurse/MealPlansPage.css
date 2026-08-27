@@ -1,5 +1,5 @@
 /* ===== MealPlansPage — mp- prefix design system ===== */
-/* Primary: #3b5bdb | Bg: #f8fafc | Border: #e2e8f0 */
+/* Primary: var(--nh-primary) | Bg: #f8fafc | Border: #e2e8f0 */
 
 /* ---------- Animations ---------- */
 @keyframes mp-fadeIn {
@@ -40,7 +40,7 @@
   margin: 0;
   padding: 20px 24px;
   border-radius: 14px;
-  background: linear-gradient(135deg, #3b5bdb 0%, #5c7cfa 100%);
+  background: linear-gradient(135deg, var(--nh-primary) 0%, var(--nh-primary-dark) 100%);
   color: #ffffff;
   font-size: 1.7rem;
   font-weight: 700;
@@ -75,13 +75,13 @@
 }
 
 .mp-tab-btn:hover:not(.mp-tab-btn--active) {
-  color: #3b5bdb;
+  color: var(--nh-primary);
   background: rgba(59, 91, 219, 0.06);
 }
 
 .mp-tab-btn--active {
   background: #ffffff;
-  color: #3b5bdb;
+  color: var(--nh-primary);
   box-shadow: 0 2px 8px rgba(59, 91, 219, 0.13), 0 1px 3px rgba(0, 0, 0, 0.06);
 }
 
@@ -104,7 +104,7 @@
   border-radius: 12px;
   background: #eef2ff;
   border: 1px solid #c7d2fe;
-  color: #3b5bdb;
+  color: var(--nh-primary);
   font-size: 0.88rem;
   font-weight: 500;
   animation: mp-slideUp 0.52s ease;
@@ -164,7 +164,7 @@
 .mp-toolbar select:focus,
 .mp-page .mp-table input:focus,
 .mp-page .mp-table select:focus {
-  border-color: #3b5bdb;
+  border-color: var(--nh-primary);
   background: #ffffff;
   box-shadow: 0 0 0 3px rgba(59, 91, 219, 0.12);
 }
@@ -228,7 +228,7 @@
 }
 
 .mp-resident-item input[type='checkbox'] {
-  accent-color: #3b5bdb;
+  accent-color: var(--nh-primary);
   width: 15px;
   height: 15px;
   cursor: pointer;
@@ -261,7 +261,7 @@
 
 .mp-btn-primary {
   border: none;
-  background: #3b5bdb;
+  background: var(--nh-primary);
   color: #ffffff;
   box-shadow: 0 4px 14px rgba(59, 91, 219, 0.24);
 }
@@ -291,8 +291,8 @@
 }
 
 .mp-btn-secondary:hover {
-  border-color: #3b5bdb;
-  color: #3b5bdb;
+  border-color: var(--nh-primary);
+  color: var(--nh-primary);
   background: #f8f9ff;
   transform: translateY(-1px);
 }
@@ -310,7 +310,7 @@
 .mp-btn-sm--edit {
   border: 1px solid rgba(59, 91, 219, 0.22);
   background: rgba(59, 91, 219, 0.08);
-  color: #3b5bdb;
+  color: var(--nh-primary);
 }
 
 .mp-btn-sm--edit:hover {
@@ -346,7 +346,7 @@
 .mp-btn-sm--view {
   border: 1px solid rgba(59, 91, 219, 0.22);
   background: rgba(59, 91, 219, 0.08);
-  color: #3b5bdb;
+  color: var(--nh-primary);
 }
 
 .mp-btn-sm--view:hover {
@@ -363,11 +363,11 @@
 }
 
 .mp-table thead tr {
-  background: #f8fafc;
+  background: var(--nh-table-header-bg);
 }
 
 .mp-table th {
-  color: #475569;
+  color: var(--nh-table-header-text);
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -455,7 +455,7 @@
 }
 
 .mp-date-switch input[type='date']:focus {
-  border-color: #3b5bdb;
+  border-color: var(--nh-primary);
   box-shadow: 0 0 0 2px rgba(59, 91, 219, 0.1);
 }
 
@@ -562,7 +562,7 @@
   padding: 2px 6px;
   border-radius: 5px;
   font-size: 12px;
-  color: #3b5bdb;
+  color: var(--nh-primary);
 }
 
 /* ---------- Published text ---------- */

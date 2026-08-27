@@ -125,7 +125,7 @@ export default function DashboardPage() {
     {
       title: t('dashboard.kpi.revenue'),
       value: formatCurrency(summary?.invoiceSummary?.totalAmount ?? 0),
-      sub: t('dashboard.kpi.revenueSub', { amount: formatCurrency(summary?.invoiceSummary?.outstandingAmount ?? 0) + 'đ' }),
+      sub: t('dashboard.kpi.revenueSub', { amount: formatCurrency(summary?.invoiceSummary?.outstandingAmount ?? 0) + '₫' }),
       icon: DollarSign,
       color: '#E07A2F',
       bg: '#FFF7ED',
@@ -208,7 +208,7 @@ export default function DashboardPage() {
               <div className="dashboard-kpi-card__content">
                 <span className="dashboard-kpi-card__title">{card.title}</span>
                 <span className="dashboard-kpi-card__value" style={{ color: card.color }}>
-                  {card.isCurrency ? `${card.value}đ` : card.value}
+                  {card.isCurrency ? `${card.value}₫` : card.value}
                 </span>
                 <span className="dashboard-kpi-card__sub">{card.sub}</span>
               </div>

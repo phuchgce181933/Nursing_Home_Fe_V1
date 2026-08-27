@@ -1,28 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Bell, CheckCheck } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import notificationsService from '../../services/notifications.service';
+import { timeAgoLocale } from '../../utils/formatLocale';
 
 const POLL_INTERVAL_MS = 20000;
-// Only roles that actually have a /{role}/notifications destination — manager and
-// pharmacist don't have a notifications page today, so the bell stays hidden for them
-// rather than linking to a dead end.
 const SUPPORTED_ROLES = ['admin', 'doctor', 'nurse', 'caregiver', 'family'];
 
-function timeAgo(dateStr) {
-  if (!dateStr) return '';
-  const diffMs = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diffMs / 60000);
-  if (mins < 1) return 'Vừa xong';
-  if (mins < 60) return `${mins} phút trước`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours} giờ trước`;
-  const days = Math.floor(hours / 24);
-  return `${days} ngày trước`;
-}
-
 export default function NotificationBell() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const navigate = useNavigate();
   const role = user?.role;
@@ -115,7 +103,7 @@ export default function NotificationBell() {
     <div ref={rootRef} className="relative">
       <button
         type="button"
-        title="Thông báo"
+        title={t('notifications.title')}
         onClick={toggleOpen}
         className={`press-effect relative flex h-9 w-9 items-center justify-center rounded-full transition-colors ${
           open ? 'bg-navy-deep text-white' : 'bg-surface-container-low text-slate-500 hover:bg-slate-200'
@@ -132,13 +120,13 @@ export default function NotificationBell() {
       {open && (
         <div className="animate-scale-in absolute right-0 top-[calc(100%+8px)] z-30 w-80 overflow-hidden rounded-xl border border-slate-100 bg-white shadow-xl">
           <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-            <span className="text-sm font-bold text-slate-800">Thông báo</span>
+            <span className="text-sm font-bold text-slate-800">{t('notifications.title')}</span>
             {unreadCount > 0 && (
               <button
                 onClick={handleMarkAllRead}
                 className="flex items-center gap-1 text-xs font-medium text-navy-deep hover:underline"
               >
-                <CheckCheck size={12} /> Đánh dấu đã đọc
+                <CheckCheck size={12} /> {t('notifications.markAllRead')}
               </button>
             )}
           </div>
@@ -151,7 +139,7 @@ export default function NotificationBell() {
             ) : items.length === 0 ? (
               <div className="flex flex-col items-center gap-2 px-4 py-10 text-center text-slate-300">
                 <Bell size={32} strokeWidth={1.5} />
-                <span className="text-xs text-slate-400">Bạn không có thông báo nào</span>
+                <span className="text-xs text-slate-400">{t('notifications.bellEmpty')}</span>
               </div>
             ) : (
               items.map((n, i) => (
@@ -167,7 +155,7 @@ export default function NotificationBell() {
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-xs font-semibold text-slate-800">{n.title}</div>
                     <div className="line-clamp-2 text-xs text-slate-500">{n.content}</div>
-                    <div className="mt-0.5 text-[11px] text-slate-400">{timeAgo(n.updatedAt || n.createdAt)}</div>
+                    <div className="mt-0.5 text-[11px] text-slate-400">{timeAgoLocale(n.updatedAt || n.createdAt)}</div>
                   </div>
                 </button>
               ))
@@ -179,7 +167,7 @@ export default function NotificationBell() {
             onClick={() => { setOpen(false); navigate(`/${role}/notifications`); }}
             className="block w-full border-t border-slate-100 py-2.5 text-center text-xs font-semibold text-navy-deep hover:bg-slate-50"
           >
-            Xem tất cả
+            {t('notifications.bellViewAll')}
           </button>
         </div>
       )}

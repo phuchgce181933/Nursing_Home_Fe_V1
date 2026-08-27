@@ -2,7 +2,7 @@
   padding: 24px;
   max-width: 1600px;
   margin: 0 auto;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: inherit;
   color: #0f172a;
 }
 
@@ -130,7 +130,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: #2563eb;
+  color: var(--nh-primary);
   margin-bottom: 4px;
 }
 
@@ -411,7 +411,7 @@
 .adm-chart-bar {
   width: 100%;
   min-height: 8px;
-  background: linear-gradient(180deg, #2563eb 0%, #3b82f6 100%);
+  background: linear-gradient(180deg, var(--nh-primary) 0%, #14b8a6 100%);
   border-radius: 14px;
   transition: height 0.2s ease;
 }
@@ -451,7 +451,7 @@
 }
 
 .adm-chart-legend-dot--current {
-  background: #2563eb;
+  background: var(--nh-primary);
 }
 
 .adm-chart-legend-dot--previous {
@@ -488,7 +488,7 @@
 }
 
 .adm-compare-bar--current {
-  background: #2563eb;
+  background: var(--nh-primary);
 }
 
 .adm-compare-bar--previous {

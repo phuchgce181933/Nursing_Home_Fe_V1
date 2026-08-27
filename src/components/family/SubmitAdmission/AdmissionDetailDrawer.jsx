@@ -258,7 +258,7 @@ export default function AdmissionDetailDrawer({
   const userRole = user?.role || '';
   const isDoctorRole = userRole === 'doctor';
   const isNurseRole = userRole === 'nurse';
-  const isAdminRole = ['admin', 'manager'].includes(userRole);
+  const isAdminRole = userRole === 'admin';
   const isDoctorOrNurseRole = isDoctorRole || isNurseRole;
 
   const [loading, setLoading] = useState(false);
@@ -1730,7 +1730,7 @@ const getStepIcon = (key) => {
                         type="button"
                         onClick={() => setShowScheduleModal(true)}
                         className="adm-btn-apply"
-                        style={{ padding: '8px 16px', fontSize: '12px', borderRadius: '10px', boxShadow: 'none', background: '#2563eb' }}
+                        style={{ padding: '8px 16px', fontSize: '12px', borderRadius: '10px', boxShadow: 'none', background: '#0f766e' }}
                       >
                         Lên lịch khám
                       </button>

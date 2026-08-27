@@ -1,50 +1,54 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Award, Users, ThumbsUp, Clock } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import PublicHeader from '../components/homepage/PublicHeader';
 import PublicFooter from '../components/homepage/PublicFooter';
 import '../styles/shared/ZenPages.css';
 
-const STATS = [
-  { icon: <Award size={36} color="#000666" />, number: '10+', unit: 'Năm', label: 'Kinh nghiệm' },
-  { icon: <Users size={36} color="#003731" />, number: '500+', unit: '', label: 'Cư dân tin tưởng' },
-  { icon: <Clock size={36} color="#000666" />, number: '24/7', unit: '', label: 'Theo dõi sức khỏe' },
-  { icon: <ThumbsUp size={36} color="#003731" />, number: '98%', unit: '', label: 'Gia đình hài lòng' },
+const getStats = (t) => [
+  { icon: <Award size={36} color="#000666" />, number: '10+', unit: t('home.stats.yearsUnit'), label: t('home.stats.experience') },
+  { icon: <Users size={36} color="#003731" />, number: '500+', unit: '', label: t('home.stats.trustedResidents') },
+  { icon: <Clock size={36} color="#000666" />, number: '24/7', unit: '', label: t('home.stats.healthMonitoring') },
+  { icon: <ThumbsUp size={36} color="#003731" />, number: '98%', unit: '', label: t('home.stats.familySatisfaction') },
 ];
 
-const TESTIMONIALS = [
+const getTestimonials = (t) => [
   {
-    text: 'Môi trường ở đây rất yên tĩnh và trong lành. Các điều dưỡng viên chăm sóc mẹ tôi vô cùng chu đáo, tôi hoàn toàn yên tâm khi đi công tác xa.',
+    text: t('home.testimonials.t1.text'),
     initials: 'NH',
-    name: 'Nguyễn Hoàng',
-    role: 'Người nhà cư dân',
+    name: t('home.testimonials.t1.name'),
+    role: t('home.testimonials.t1.role'),
     avatarBg: '#d3e2ed',
     avatarColor: '#000666',
   },
   {
-    text: 'Hệ thống AI theo dõi sức khỏe rất ấn tượng. Các bác sĩ được cảnh báo ngay lập tức nếu có bất thường. Cơ sở vật chất sạch sẽ, mang đậm phong cách tối giản dễ chịu.',
+    text: t('home.testimonials.t2.text'),
     initials: 'TM',
-    name: 'Trần Minh',
-    role: 'Con trai cư dân',
+    name: t('home.testimonials.t2.name'),
+    role: t('home.testimonials.t2.role'),
     avatarBg: '#1a237e',
     avatarColor: '#8690ee',
     elevated: true,
   },
   {
-    text: 'Tôi thấy khỏe hơn nhiều từ khi vào đây. Mọi người thân thiện, phòng ốc sáng sủa và các hoạt động tập thể giúp tôi không còn cảm thấy cô đơn.',
+    text: t('home.testimonials.t3.text'),
     initials: 'LH',
-    name: 'Lê Hạnh',
-    role: 'Cư dân, 78 tuổi',
+    name: t('home.testimonials.t3.name'),
+    role: t('home.testimonials.t3.role'),
     avatarBg: '#003731',
     avatarColor: '#ffffff',
   },
 ];
 
 export default function HomePage() {
+  const { t } = useTranslation();
   const { token, user } = useAuth();
-  const tourPath = (token && user?.role === 'family') ? '/family/facility-tours/new' : '/login';
-  const bookPath = (token && user?.role === 'family') ? '/family/admission-requests/new' : '/login';
+  const STATS = getStats(t);
+  const TESTIMONIALS = getTestimonials(t);
+  const tourPath = (token && user?.role === 'family') ? '/family/facility-tours/new' : '/contact';
+  const bookPath = '/contact';
 
   return (
     <div className="zh-page home-page">
@@ -54,21 +58,20 @@ export default function HomePage() {
         {/* ── HERO ── */}
         <section className="hp2-hero">
           <div className="hp2-hero__text">
-            <h1>Cuộc Sống An Lành, Hạnh Phúc Trọn Vẹn</h1>
+            <h1>{t('home.hero.title')}</h1>
             <p>
-              Nơi người cao tuổi được yêu thương, tôn trọng và chăm sóc toàn diện —
-              kết hợp tinh hoa y tế Nhật Bản và trái tim Việt Nam.
+              {t('home.hero.desc')}
             </p>
             <div className="hp2-hero__actions">
-              <Link to={tourPath} className="hp2-btn hp2-btn--primary">Đặt Lịch Tham Quan</Link>
-              <Link to="/intro" className="hp2-btn hp2-btn--outline">Tìm Hiểu Thêm</Link>
+              <Link to={tourPath} className="hp2-btn hp2-btn--primary">{t('home.hero.bookTour')}</Link>
+              <Link to="/intro" className="hp2-btn hp2-btn--outline">{t('home.hero.learnMore')}</Link>
             </div>
           </div>
 
           <div className="hp2-hero__image">
             <img
               src="https://lh3.googleusercontent.com/aida-public/AB6AXuBWF-HrnchU-JNzFU5FArTuAPxYmgjova9VX1L_Lsf41zI_FzpfvaMUnIjOfBueshP0-G8k4-4pWfW77NtgSEsm--gLNb2aqmGJJpp3ZsiH8UCxLf-h1CMXTifs70kIDuCTTMG-H7jSSjNoqpmuC17MZuiG4I5VtuXficmUZK0TR7uZAJ0a0Cu4oKz432ZfZ0aXrNA46NF3s9G6vV3OFfPgZ_dTEBdncDmR6zNgACoxBs_ckzEqStovxcurrGX9yNZKMlxF15p4cLG9"
-              alt="An Nhiên Care Home — không gian sống cao cấp"
+              alt={t('home.hero.imgAlt')}
             />
           </div>
         </section>
@@ -91,24 +94,24 @@ export default function HomePage() {
         {/* ── TESTIMONIALS ── */}
         <div className="hp2-testimonials">
           <div className="hp2-testimonials__head">
-            <h2>Gia Đình Nói Gì Về Chúng Tôi</h2>
-            <p>Những chia sẻ chân thật từ gia đình và cư dân đang sinh sống tại An Nhiên Care Home.</p>
+            <h2>{t('home.testimonials.title')}</h2>
+            <p>{t('home.testimonials.subtitle')}</p>
           </div>
           <div className="hp2-testimonials__grid">
-            {TESTIMONIALS.map((t, i) => (
-              <div key={i} className={`hp2-tcard${t.elevated ? ' hp2-tcard--elevated' : ''}`}>
+            {TESTIMONIALS.map((item, i) => (
+              <div key={i} className={`hp2-tcard${item.elevated ? ' hp2-tcard--elevated' : ''}`}>
                 <div className="hp2-tcard__quote">"</div>
-                <p className="hp2-tcard__text">{t.text}</p>
+                <p className="hp2-tcard__text">{item.text}</p>
                 <div className="hp2-tcard__author">
                   <div
                     className="hp2-tcard__avatar"
-                    style={{ background: t.avatarBg, color: t.avatarColor }}
+                    style={{ background: item.avatarBg, color: item.avatarColor }}
                   >
-                    {t.initials}
+                    {item.initials}
                   </div>
                   <div>
-                    <p className="hp2-tcard__name">{t.name}</p>
-                    <p className="hp2-tcard__role">{t.role}</p>
+                    <p className="hp2-tcard__name">{item.name}</p>
+                    <p className="hp2-tcard__role">{item.role}</p>
                   </div>
                 </div>
               </div>

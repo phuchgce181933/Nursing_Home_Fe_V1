@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   RefreshCw,
   Search,
@@ -13,6 +14,7 @@ import residentService from '../../services/resident.service';
 import '../../styles/admin/AdminCommon.css';
 
 export default function AdminMedicalChargesPage() {
+  const { t } = useTranslation();
   const [charges, setCharges] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -36,11 +38,11 @@ export default function AdminMedicalChargesPage() {
       setSelectedCharges(new Set());
     } catch (err) {
       console.error(err);
-      setError(err.response?.data?.message || 'Không thể tải danh sách khoản phí.');
+      setError(err.response?.data?.message || t('adminMedicalCharges.cannotLoadCharges'));
     } finally {
       setLoading(false);
     }
-  }, [statusFilter]);
+  }, [statusFilter, t]);
 
   const loadResidents = useCallback(async () => {
     try {
@@ -96,10 +98,10 @@ export default function AdminMedicalChargesPage() {
 
   const getStatusBadge = (status) => {
     const statusMap = {
-      PENDING: { color: '#f59e0b', label: 'Chờ tạo hóa đơn', icon: AlertCircle },
-      BILLED: { color: '#3b82f6', label: 'Đã lập hóa đơn', icon: FileText },
-      PAID: { color: '#10b981', label: 'Đã thanh toán', icon: CheckCircle },
-      CANCELLED: { color: '#ef4444', label: 'Hủy', icon: AlertCircle },
+      PENDING: { color: '#f59e0b', label: t('adminMedicalCharges.statusPending'), icon: AlertCircle },
+      BILLED: { color: '#0f766e', label: t('adminMedicalCharges.statusBilled'), icon: FileText },
+      PAID: { color: '#10b981', label: t('adminMedicalCharges.statusPaid'), icon: CheckCircle },
+      CANCELLED: { color: '#ef4444', label: t('adminMedicalCharges.statusCancelled'), icon: AlertCircle },
     };
     const config = statusMap[status] || { color: '#6b7280', label: status };
     const Icon = config.icon || AlertCircle;
@@ -125,7 +127,7 @@ export default function AdminMedicalChargesPage() {
 
   const handleGenerateInvoice = async () => {
     if (selectedCharges.size === 0) {
-      setError('Vui lòng chọn ít nhất một khoản phí.');
+      setError(t('adminMedicalCharges.pleaseSelectCharge'));
       return;
     }
 
@@ -142,7 +144,7 @@ export default function AdminMedicalChargesPage() {
     });
 
     if (Object.keys(groupedByResident).length > 1) {
-      setError('Vui lòng chỉ chọn khoản phí của một cư dân để tạo hóa đơn.');
+      setError(t('adminMedicalCharges.pleaseSelectOneResident'));
       return;
     }
 
@@ -168,7 +170,9 @@ export default function AdminMedicalChargesPage() {
       const result = await adminInvoiceService.createInvoice(residentId, invoiceData);
 
       setSuccess(
-        `Tạo hóa đơn thành công! Số hóa đơn: ${result.data?.invoiceNumber || 'N/A'}`
+        t('adminMedicalCharges.createInvoiceSuccess', {
+          invoiceNumber: result.data?.invoiceNumber || 'N/A',
+        })
       );
       setSelectedCharges(new Set());
 
@@ -178,7 +182,7 @@ export default function AdminMedicalChargesPage() {
       }, 1500);
     } catch (err) {
       console.error(err);
-      setError(err.response?.data?.message || 'Không thể tạo hóa đơn.');
+      setError(err.response?.data?.message || t('adminMedicalCharges.cannotCreateInvoice'));
     } finally {
       setGeneratingInvoice(false);
     }
@@ -194,12 +198,9 @@ export default function AdminMedicalChargesPage() {
       <div className="adm-header">
         <div>
           <h1>
-            <DollarSign size={28} /> Khoản Phí Y Tế
+            <DollarSign size={28} /> {t('adminMedicalCharges.pageTitle')}
           </h1>
-          <p>
-            Xem các khoản phí tự động tạo khi bác sĩ hoàn tất khám. Chọn để tạo hóa đơn gửi gia
-            đình.
-          </p>
+          <p>{t('adminMedicalCharges.pageSubtitle')}</p>
         </div>
         <div className="adm-header__buttons">
           <button
@@ -207,10 +208,10 @@ export default function AdminMedicalChargesPage() {
             onClick={handleGenerateInvoice}
             disabled={selectedCharges.size === 0 || generatingInvoice}
           >
-            <FileText size={16} /> Tạo hóa đơn ({selectedCharges.size})
+            <FileText size={16} /> {t('adminMedicalCharges.createInvoiceBtn', { count: selectedCharges.size })}
           </button>
           <button className="adm-btn-refresh" onClick={loadCharges}>
-            <RefreshCw size={16} /> Làm mới
+            <RefreshCw size={16} /> {t('adminMedicalCharges.refreshBtn')}
           </button>
         </div>
       </div>
@@ -221,7 +222,7 @@ export default function AdminMedicalChargesPage() {
       <div className="adm-filters">
         <input
           type="text"
-          placeholder="Tìm theo tên dịch vụ hoặc cư dân..."
+          placeholder={t('adminMedicalCharges.searchPlaceholder')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="adm-filter-input"
@@ -231,10 +232,10 @@ export default function AdminMedicalChargesPage() {
           onChange={(e) => setStatusFilter(e.target.value)}
           className="adm-filter-select"
         >
-          <option value="PENDING">Chờ tạo hóa đơn</option>
-          <option value="BILLED">Đã lập hóa đơn</option>
-          <option value="PAID">Đã thanh toán</option>
-          <option value="">Tất cả</option>
+          <option value="PENDING">{t('adminMedicalCharges.statusPending')}</option>
+          <option value="BILLED">{t('adminMedicalCharges.statusBilled')}</option>
+          <option value="PAID">{t('adminMedicalCharges.statusPaid')}</option>
+          <option value="">{t('adminMedicalCharges.allStatus')}</option>
         </select>
       </div>
 
@@ -252,7 +253,10 @@ export default function AdminMedicalChargesPage() {
           }}
         >
           <span style={{ color: '#166534', fontWeight: '600' }}>
-            Đã chọn {selectedCharges.size} khoản. Tổng: {formatCurrency(totalSelected)}
+            {t('adminMedicalCharges.selectedSummary', {
+              count: selectedCharges.size,
+              total: formatCurrency(totalSelected),
+            })}
           </span>
           <button
             style={{
@@ -267,7 +271,7 @@ export default function AdminMedicalChargesPage() {
             onClick={handleGenerateInvoice}
             disabled={generatingInvoice}
           >
-            {generatingInvoice ? 'Đang tạo...' : 'Tạo hóa đơn ngay'}
+            {generatingInvoice ? t('adminMedicalCharges.generating') : t('adminMedicalCharges.createInvoiceNow')}
           </button>
         </div>
       )}
@@ -287,27 +291,27 @@ export default function AdminMedicalChargesPage() {
                   onChange={toggleAllSelection}
                 />
               </th>
-              <th>Cư dân</th>
-              <th>Dịch vụ</th>
-              <th>Danh mục</th>
-              <th>Số lượng</th>
-              <th>Đơn giá</th>
-              <th>Tổng tiền</th>
-              <th>Ngày thực hiện</th>
-              <th>Trạng thái</th>
+              <th>{t('adminMedicalCharges.colResident')}</th>
+              <th>{t('adminMedicalCharges.colService')}</th>
+              <th>{t('adminMedicalCharges.colCategory')}</th>
+              <th>{t('adminMedicalCharges.colQuantity')}</th>
+              <th>{t('adminMedicalCharges.colUnitPrice')}</th>
+              <th>{t('adminMedicalCharges.colTotal')}</th>
+              <th>{t('adminMedicalCharges.colPerformedAt')}</th>
+              <th>{t('adminMedicalCharges.colStatus')}</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
                 <td colSpan="9" style={{ textAlign: 'center', padding: '20px' }}>
-                  Đang tải...
+                  {t('adminMedicalCharges.loading')}
                 </td>
               </tr>
             ) : filteredCharges.length === 0 ? (
               <tr>
                 <td colSpan="9" style={{ textAlign: 'center', padding: '20px' }}>
-                  Không có khoản phí nào.
+                  {t('adminMedicalCharges.noCharges')}
                 </td>
               </tr>
             ) : (

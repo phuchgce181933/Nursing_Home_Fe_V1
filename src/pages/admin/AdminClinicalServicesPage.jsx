@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Plus,
   Edit2,
@@ -14,19 +15,20 @@ import clinicalServiceService from '../../services/clinicalService.service';
 import '../../styles/admin/AdminCommon.css';
 
 const CATEGORIES = [
-  { value: 'PHYSICAL_EXAM', label: 'Khám tổng quát' },
-  { value: 'ECG', label: 'ECG' },
-  { value: 'IMAGING', label: 'Hình ảnh' },
-  { value: 'LAB_RESULT', label: 'Xét nghiệm' },
-  { value: 'COGNITIVE', label: 'Đánh giá nhận thức' },
-  { value: 'FUNCTIONAL', label: 'Đánh giá chức năng' },
-  { value: 'FALL_RISK', label: 'Đánh giá nguy hiểm rơi' },
-  { value: 'NUTRITION', label: 'Đánh giá dinh dưỡng' },
+  { value: 'PHYSICAL_EXAM', i18nKey: 'adminClinicalServices.catPhysicalExam' },
+  { value: 'ECG', i18nKey: 'adminClinicalServices.catEcg' },
+  { value: 'IMAGING', i18nKey: 'adminClinicalServices.catImaging' },
+  { value: 'LAB_RESULT', i18nKey: 'adminClinicalServices.catLabResult' },
+  { value: 'COGNITIVE', i18nKey: 'adminClinicalServices.catCognitive' },
+  { value: 'FUNCTIONAL', i18nKey: 'adminClinicalServices.catFunctional' },
+  { value: 'FALL_RISK', i18nKey: 'adminClinicalServices.catFallRisk' },
+  { value: 'NUTRITION', i18nKey: 'adminClinicalServices.catNutrition' },
 ];
 
 const SERVICE_NAME_REGEX = /^[A-Za-zÀ-ỹ0-9\s(),.+\/\-]+$/;
 
 export default function AdminClinicalServicesPage() {
+  const { t } = useTranslation();
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -94,7 +96,7 @@ export default function AdminClinicalServicesPage() {
       (field.femaleMax !== '' && field.femaleMax !== undefined && field.femaleMax !== null);
 
     if (hasCommon && (hasMale || hasFemale)) {
-      return `Trường "${field.label}" không thể vừa dùng ngưỡng chung vừa dùng ngưỡng riêng cho nam/nữ.`;
+      return t('adminClinicalServices.validationMixedThresholds', { label: field.label });
     }
 
     if (hasMale || hasFemale) {
@@ -104,15 +106,15 @@ export default function AdminClinicalServicesPage() {
       const femaleMax = field.femaleMax === '' || field.femaleMax === undefined || field.femaleMax === null ? null : Number(field.femaleMax);
 
       if (maleMin === null || maleMax === null || femaleMin === null || femaleMax === null) {
-        return `Trường "${field.label}" khi dùng ngưỡng riêng cho nam/nữ cần nhập đầy đủ Min/Max cho cả nam và nữ.`;
+        return t('adminClinicalServices.validationGenderThresholdsIncomplete', { label: field.label });
       }
 
       if ([maleMin, maleMax, femaleMin, femaleMax].some((value) => Number.isNaN(value) || value <= 1)) {
-        return `Trường "${field.label}" cần có giá trị ngưỡng riêng lớn hơn 1.`;
+        return t('adminClinicalServices.validationGenderThresholdsAbove1', { label: field.label });
       }
 
       if (maleMin >= maleMax || femaleMin >= femaleMax) {
-        return `Trường "${field.label}" có Min lớn hơn hoặc bằng Max.`;
+        return t('adminClinicalServices.validationGenderMinMax', { label: field.label });
       }
     }
 
@@ -120,13 +122,13 @@ export default function AdminClinicalServicesPage() {
       const min = field.min === '' || field.min === undefined || field.min === null ? null : Number(field.min);
       const max = field.max === '' || field.max === undefined || field.max === null ? null : Number(field.max);
       if (min === null || max === null) {
-        return `Trường "${field.label}" khi dùng ngưỡng chung cần nhập đầy đủ Min chung và Max chung.`;
+        return t('adminClinicalServices.validationCommonThresholdsIncomplete', { label: field.label });
       }
       if ([min, max].some((value) => Number.isNaN(value) || value <= 1)) {
-        return `Trường "${field.label}" cần có giá trị ngưỡng chung lớn hơn 1.`;
+        return t('adminClinicalServices.validationCommonThresholdsAbove1', { label: field.label });
       }
       if (min >= max) {
-        return `Trường "${field.label}" có Min chung lớn hơn hoặc bằng Max chung.`;
+        return t('adminClinicalServices.validationCommonMinMax', { label: field.label });
       }
     }
 
@@ -144,11 +146,11 @@ export default function AdminClinicalServicesPage() {
       setServices(result.data || []);
     } catch (err) {
       console.error(err);
-      setError(err.response?.data?.message || 'Không thể tải danh sách dịch vụ.');
+      setError(err.response?.data?.message || t('adminClinicalServices.errorLoad'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     loadServices();
@@ -190,52 +192,52 @@ export default function AdminClinicalServicesPage() {
 
   const handleSave = async () => {
     if (!formData.serviceCode?.trim()) {
-      setError('Vui lòng nhập mã dịch vụ.');
+      setError(t('adminClinicalServices.validationServiceCode'));
       return;
     }
     if (!formData.serviceName?.trim()) {
-      setError('Vui lòng nhập tên dịch vụ.');
+      setError(t('adminClinicalServices.validationServiceName'));
       return;
     }
     if (!SERVICE_NAME_REGEX.test(formData.serviceName.trim())) {
-      setError('Tên dịch vụ chỉ được chứa chữ, số, khoảng trắng và ký tự (),.+/-');
+      setError(t('adminClinicalServices.validationServiceNameChars'));
       return;
     }
     if (!formData.category) {
-      setError('Vui lòng chọn danh mục.');
+      setError(t('adminClinicalServices.validationCategory'));
       return;
     }
     if (formData.unitPrice === '' || formData.unitPrice < 0) {
-      setError('Vui lòng nhập đơn giá hợp lệ.');
+      setError(t('adminClinicalServices.validationUnitPrice'));
       return;
     }
     if (formData.fields && formData.fields.length > 0) {
       const codes = new Set();
       for (const [index, field] of formData.fields.entries()) {
         if (!field.label?.trim()) {
-          setError(`Vui lòng nhập nhãn cho trường thứ ${index + 1}.`);
+          setError(t('adminClinicalServices.validationFieldLabel', { index: index + 1 }));
           return;
         }
         if (!field.fieldCode?.trim()) {
-          setError(`Vui lòng nhập mã trường cho "${field.label}".`);
+          setError(t('adminClinicalServices.validationFieldCode', { label: field.label }));
           return;
         }
         if (codes.has(field.fieldCode)) {
-          setError(`Mã trường "${field.fieldCode}" bị trùng. Vui lòng đổi lại.`);
+          setError(t('adminClinicalServices.validationFieldCodeDuplicate', { code: field.fieldCode }));
           return;
         }
         if (field.type === 'NUMBER') {
           const thresholds = [
-            ['Min chung', field.min],
-            ['Max chung', field.max],
-            ['Min nam', field.maleMin],
-            ['Max nam', field.maleMax],
-            ['Min nữ', field.femaleMin],
-            ['Max nữ', field.femaleMax],
+            ['adminClinicalServices.thresholdMinCommon', field.min],
+            ['adminClinicalServices.thresholdMaxCommon', field.max],
+            ['adminClinicalServices.thresholdMinMale', field.maleMin],
+            ['adminClinicalServices.thresholdMaxMale', field.maleMax],
+            ['adminClinicalServices.thresholdMinFemale', field.femaleMin],
+            ['adminClinicalServices.thresholdMaxFemale', field.femaleMax],
           ];
-          for (const [label, value] of thresholds) {
+          for (const [thresholdKey, value] of thresholds) {
             if (value !== '' && value !== undefined && value !== null && Number.isNaN(Number(value))) {
-              setError(`Giá trị ${label} phải là số hợp lệ cho trường "${field.label}".`);
+              setError(t('adminClinicalServices.validationThresholdNotNumber', { label: t(thresholdKey), field: field.label }));
               return;
             }
           }
@@ -249,7 +251,7 @@ export default function AdminClinicalServicesPage() {
         if (field.type === 'DROPDOWN') {
           const options = Array.isArray(field.options) ? field.options.filter(Boolean) : [];
           if (options.length === 0) {
-            setError(`Vui lòng nhập ít nhất một lựa chọn cho Dropdown "${field.label}".`);
+            setError(t('adminClinicalServices.validationDropdownOptions', { label: field.label }));
             return;
           }
         }
@@ -264,10 +266,10 @@ export default function AdminClinicalServicesPage() {
 
       if (editingId) {
         await clinicalServiceService.updateService(editingId, formData);
-        setSuccess('Cập nhật dịch vụ thành công!');
+        setSuccess(t('adminClinicalServices.successUpdate'));
       } else {
         await clinicalServiceService.createService(formData);
-        setSuccess('Tạo dịch vụ mới thành công!');
+        setSuccess(t('adminClinicalServices.successCreate'));
       }
 
       loadServices();
@@ -277,29 +279,29 @@ export default function AdminClinicalServicesPage() {
       }, 1500);
     } catch (err) {
       console.error(err);
-      setError(err.response?.data?.message || 'Không thể lưu dịch vụ.');
+      setError(err.response?.data?.message || t('adminClinicalServices.errorSave'));
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Bạn có chắc muốn xóa dịch vụ này không?')) return;
+    if (!window.confirm(t('adminClinicalServices.confirmDelete'))) return;
 
     try {
       setError('');
       await clinicalServiceService.deleteService(id);
-      setSuccess('Xóa dịch vụ thành công!');
+      setSuccess(t('adminClinicalServices.successDelete'));
       loadServices();
       setTimeout(() => setSuccess(''), 1500);
     } catch (err) {
       console.error(err);
-      setError(err.response?.data?.message || 'Không thể xóa dịch vụ.');
+      setError(err.response?.data?.message || t('adminClinicalServices.errorDelete'));
     }
   };
 
   const handleReopen = async (service) => {
-    if (!window.confirm('Bạn có chắc muốn mở lại dịch vụ này không?')) return;
+    if (!window.confirm(t('adminClinicalServices.confirmReopen'))) return;
 
     try {
       setError('');
@@ -307,12 +309,12 @@ export default function AdminClinicalServicesPage() {
         ...service,
         active: true,
       });
-      setSuccess('Mở lại dịch vụ thành công!');
+      setSuccess(t('adminClinicalServices.successReopen'));
       loadServices();
       setTimeout(() => setSuccess(''), 1500);
     } catch (err) {
       console.error(err);
-      setError(err.response?.data?.message || 'Không thể mở lại dịch vụ.');
+      setError(err.response?.data?.message || t('adminClinicalServices.errorReopen'));
     }
   };
 
@@ -329,16 +331,16 @@ export default function AdminClinicalServicesPage() {
       <div className="adm-header">
         <div>
           <h1>
-            <DollarSign size={28} /> Quản lý Dịch vụ Lâm sàng
+            <DollarSign size={28} /> {t('adminClinicalServices.pageTitle')}
           </h1>
-          <p>Quản lý danh mục dịch vụ và đơn giá.</p>
+          <p>{t('adminClinicalServices.pageSubtitle')}</p>
         </div>
         <div className="adm-header__buttons">
           <button className="adm-btn-primary" onClick={() => handleOpenModal()}>
-            <Plus size={16} /> Thêm dịch vụ
+            <Plus size={16} /> {t('adminClinicalServices.btnAdd')}
           </button>
           <button className="adm-btn-refresh" onClick={loadServices}>
-            <RefreshCw size={16} /> Làm mới
+            <RefreshCw size={16} /> {t('adminClinicalServices.btnRefresh')}
           </button>
         </div>
       </div>
@@ -350,7 +352,7 @@ export default function AdminClinicalServicesPage() {
         <div className="adm-modal-overlay">
           <div className="adm-modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="adm-modal-header">
-              <h2>{editingId ? 'Chỉnh sửa dịch vụ' : 'Thêm dịch vụ mới'}</h2>
+              <h2>{editingId ? t('adminClinicalServices.modalEditTitle') : t('adminClinicalServices.modalAddTitle')}</h2>
               <button
                 className="adm-btn-close"
                 onClick={handleCloseModal}
@@ -369,10 +371,10 @@ export default function AdminClinicalServicesPage() {
             )}
             <div className="adm-modal-body">
               <div className="adm-form-group">
-                <label>Mã dịch vụ *</label>
+                <label>{t('adminClinicalServices.labelServiceCode')}</label>
                 <input
                   type="text"
-                  placeholder="VD: ECG_12LEAD, X_RAY_CHEST"
+                  placeholder={t('adminClinicalServices.placeholderServiceCode')}
                   value={formData.serviceCode}
                   onChange={(e) =>
                     setFormData({ ...formData, serviceCode: e.target.value })
@@ -382,15 +384,15 @@ export default function AdminClinicalServicesPage() {
                 />
                 {editingId && (
                   <small style={{ color: '#6b7280' }}>
-                    (Không thể thay đổi mã dịch vụ đã tồn tại)
+                    {t('adminClinicalServices.noteCannotChangeCode')}
                   </small>
                 )}
               </div>
               <div className="adm-form-group">
-                <label>Tên dịch vụ *</label>
+                <label>{t('adminClinicalServices.labelServiceName')}</label>
                 <input
                   type="text"
-                  placeholder="VD: ECG 12 Leads"
+                  placeholder={t('adminClinicalServices.placeholderServiceName')}
                   value={formData.serviceName}
                   onChange={(e) =>
                     setFormData((prev) => {
@@ -409,7 +411,7 @@ export default function AdminClinicalServicesPage() {
                 />
               </div>
               <div className="adm-form-group">
-                <label>Danh mục *</label>
+                <label>{t('adminClinicalServices.labelCategory')}</label>
                 <select
                   value={formData.category}
                   onChange={(e) =>
@@ -426,18 +428,18 @@ export default function AdminClinicalServicesPage() {
                   className="adm-form-input"
                   disabled={!!editingId}
                 >
-                  <option value="">-- Chọn danh mục --</option>
+                  <option value="">{t('adminClinicalServices.optionSelectCategory')}</option>
                   {CATEGORIES.map((cat) => (
                     <option key={cat.value} value={cat.value}>
-                      {cat.label}
+                      {t(cat.i18nKey)}
                     </option>
                   ))}
                 </select>
               </div>
               <div className="adm-form-group">
-                <label>Mô tả</label>
+                <label>{t('adminClinicalServices.labelDescription')}</label>
                 <textarea
-                  placeholder="Mô tả chi tiết dịch vụ"
+                  placeholder={t('adminClinicalServices.placeholderDescription')}
                   value={formData.description}
                   onChange={(e) =>
                     setFormData({ ...formData, description: e.target.value })
@@ -448,12 +450,12 @@ export default function AdminClinicalServicesPage() {
               </div>
 
               <div className="adm-form-group">
-                <label>Trường dịch vụ bổ sung</label>
+                <label>{t('adminClinicalServices.labelAdditionalFields')}</label>
                 {formData.fields.map((field, idx) => (
                   <div key={idx} style={{ marginBottom: 12, padding: 10, border: '1px solid #e5e7eb', borderRadius: 8 }}>
                     <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                       <div style={{ flex: '1 1 240px' }}>
-                        <label className="adm-form-label">Nhãn</label>
+                        <label className="adm-form-label">{t('adminClinicalServices.labelFieldLabel')}</label>
                         <input
                           type="text"
                           className="adm-form-input"
@@ -470,7 +472,7 @@ export default function AdminClinicalServicesPage() {
                         />
                       </div>
                       <div style={{ flex: '1 1 180px' }}>
-                        <label className="adm-form-label">Mã trường</label>
+                        <label className="adm-form-label">{t('adminClinicalServices.labelFieldCode')}</label>
                         <input
                           type="text"
                           className="adm-form-input"
@@ -484,7 +486,7 @@ export default function AdminClinicalServicesPage() {
                         />
                       </div>
                       <div style={{ flex: '1 1 140px' }}>
-                        <label className="adm-form-label">Loại</label>
+                        <label className="adm-form-label">{t('adminClinicalServices.labelFieldType')}</label>
                         <select
                           className="adm-form-input"
                           value={field.type}
@@ -504,14 +506,14 @@ export default function AdminClinicalServicesPage() {
                             setFormData({ ...formData, fields: nextFields });
                           }}
                         >
-                          <option value="TEXT">Văn bản</option>
-                          <option value="NUMBER">Số</option>
-                          <option value="DROPDOWN">Dropdown</option>
-                          <option value="IMAGE">Ảnh URL</option>
+                          <option value="TEXT">{t('adminClinicalServices.typeText')}</option>
+                          <option value="NUMBER">{t('adminClinicalServices.typeNumber')}</option>
+                          <option value="DROPDOWN">{t('adminClinicalServices.typeDropdown')}</option>
+                          <option value="IMAGE">{t('adminClinicalServices.typeImage')}</option>
                         </select>
                       </div>
                       <div style={{ flex: '1 1 180px' }}>
-                        <label className="adm-form-label">Placeholder</label>
+                        <label className="adm-form-label">{t('adminClinicalServices.labelFieldPlaceholder')}</label>
                         <input
                           type="text"
                           className="adm-form-input"
@@ -534,7 +536,7 @@ export default function AdminClinicalServicesPage() {
                             setFormData({ ...formData, fields: nextFields });
                           }}
                         >
-                          Xóa trường
+                          {t('adminClinicalServices.btnDeleteField')}
                         </button>
                       </div>
                     </div>
@@ -542,7 +544,7 @@ export default function AdminClinicalServicesPage() {
                       <div style={{ marginTop: 10 }}>
                         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 8 }}>
                           <div style={{ flex: '1 1 180px' }}>
-                            <label className="adm-form-label">Min chung</label>
+                            <label className="adm-form-label">{t('adminClinicalServices.labelMinCommon')}</label>
                             <input
                               type="number"
                               className="adm-form-input"
@@ -555,7 +557,7 @@ export default function AdminClinicalServicesPage() {
                             />
                           </div>
                           <div style={{ flex: '1 1 180px' }}>
-                            <label className="adm-form-label">Max chung</label>
+                            <label className="adm-form-label">{t('adminClinicalServices.labelMaxCommon')}</label>
                             <input
                               type="number"
                               className="adm-form-input"
@@ -570,7 +572,7 @@ export default function AdminClinicalServicesPage() {
                         </div>
                         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                           <div style={{ flex: '1 1 180px' }}>
-                            <label className="adm-form-label">Min nam</label>
+                            <label className="adm-form-label">{t('adminClinicalServices.labelMinMale')}</label>
                             <input
                               type="number"
                               className="adm-form-input"
@@ -583,7 +585,7 @@ export default function AdminClinicalServicesPage() {
                             />
                           </div>
                           <div style={{ flex: '1 1 180px' }}>
-                            <label className="adm-form-label">Max nam</label>
+                            <label className="adm-form-label">{t('adminClinicalServices.labelMaxMale')}</label>
                             <input
                               type="number"
                               className="adm-form-input"
@@ -596,7 +598,7 @@ export default function AdminClinicalServicesPage() {
                             />
                           </div>
                           <div style={{ flex: '1 1 180px' }}>
-                            <label className="adm-form-label">Min nữ</label>
+                            <label className="adm-form-label">{t('adminClinicalServices.labelMinFemale')}</label>
                             <input
                               type="number"
                               className="adm-form-input"
@@ -609,7 +611,7 @@ export default function AdminClinicalServicesPage() {
                             />
                           </div>
                           <div style={{ flex: '1 1 180px' }}>
-                            <label className="adm-form-label">Max nữ</label>
+                            <label className="adm-form-label">{t('adminClinicalServices.labelMaxFemale')}</label>
                             <input
                               type="number"
                               className="adm-form-input"
@@ -626,7 +628,7 @@ export default function AdminClinicalServicesPage() {
                     )}
                     {field.type === 'DROPDOWN' && (
                       <div style={{ marginTop: 10 }}>
-                        <label className="adm-form-label">Lựa chọn (phân tách bằng dấu phẩy)</label>
+                        <label className="adm-form-label">{t('adminClinicalServices.labelDropdownOptions')}</label>
                         <textarea
                           className="adm-form-input"
                           rows={2}
@@ -642,12 +644,12 @@ export default function AdminClinicalServicesPage() {
                             };
                             setFormData({ ...formData, fields: nextFields });
                           }}
-                          placeholder="VD: Bình thường, Bất thường, Chưa xác định"
+                          placeholder={t('adminClinicalServices.placeholderDropdownOptions')}
                         />
                       </div>
                     )}
                     <div style={{ marginTop: 8 }}>
-                      <label className="adm-form-label">Bắt buộc</label>
+                      <label className="adm-form-label">{t('adminClinicalServices.labelRequired')}</label>
                       <input
                         type="checkbox"
                         checked={field.required || false}
@@ -665,12 +667,12 @@ export default function AdminClinicalServicesPage() {
                   className="adm-btn-secondary"
                   onClick={() => setFormData({ ...formData, fields: [...(formData.fields || []), createEmptyField()] })}
                 >
-                  + Thêm trường
+                  {t('adminClinicalServices.btnAddField')}
                 </button>
               </div>
 
               <div className="adm-form-group">
-                <label>Đơn giá (VND) *</label>
+                <label>{t('adminClinicalServices.labelUnitPrice')}</label>
                 <input
                   type="number"
                   placeholder="0"
@@ -695,7 +697,7 @@ export default function AdminClinicalServicesPage() {
                       setFormData({ ...formData, active: e.target.checked })
                     }
                   />
-                  Kích hoạt
+                  {t('adminClinicalServices.labelActive')}
                 </label>
               </div>
             </div>
@@ -705,14 +707,14 @@ export default function AdminClinicalServicesPage() {
                 onClick={handleCloseModal}
                 disabled={submitting}
               >
-                Hủy
+                {t('adminClinicalServices.btnCancel')}
               </button>
               <button
                 className="adm-btn-primary"
                 onClick={handleSave}
                 disabled={submitting}
               >
-                {submitting ? 'Đang lưu...' : 'Lưu'}
+                {submitting ? t('adminClinicalServices.btnSaving') : t('adminClinicalServices.btnSave')}
               </button>
             </div>
           </div>
@@ -722,7 +724,7 @@ export default function AdminClinicalServicesPage() {
       <div className="adm-filters">
         <input
           type="text"
-          placeholder="Tìm theo mã hoặc tên dịch vụ..."
+          placeholder={t('adminClinicalServices.placeholderSearch')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="adm-filter-input"
@@ -732,10 +734,10 @@ export default function AdminClinicalServicesPage() {
           onChange={(e) => setCategoryFilter(e.target.value)}
           className="adm-filter-select"
         >
-          <option value="">Tất cả danh mục</option>
+          <option value="">{t('adminClinicalServices.optionAllCategories')}</option>
           {CATEGORIES.map((cat) => (
             <option key={cat.value} value={cat.value}>
-              {cat.label}
+              {t(cat.i18nKey)}
             </option>
           ))}
         </select>
@@ -745,26 +747,26 @@ export default function AdminClinicalServicesPage() {
         <table className="adm-table">
           <thead>
             <tr>
-              <th>Mã dịch vụ</th>
-              <th>Tên dịch vụ</th>
-              <th>Danh mục</th>
-              <th>Ngày tạo</th>
-              <th>Đơn giá</th>
-              <th>Trạng thái</th>
-              <th>Hành động</th>
+              <th>{t('adminClinicalServices.colServiceCode')}</th>
+              <th>{t('adminClinicalServices.colServiceName')}</th>
+              <th>{t('adminClinicalServices.colCategory')}</th>
+              <th>{t('adminClinicalServices.colCreatedAt')}</th>
+              <th>{t('adminClinicalServices.colUnitPrice')}</th>
+              <th>{t('adminClinicalServices.colStatus')}</th>
+              <th>{t('adminClinicalServices.colActions')}</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
                 <td colSpan="7" style={{ textAlign: 'center', padding: '20px' }}>
-                  Đang tải...
+                  {t('adminClinicalServices.statusLoading')}
                 </td>
               </tr>
             ) : filteredServices.length === 0 ? (
               <tr>
                 <td colSpan="7" style={{ textAlign: 'center', padding: '20px' }}>
-                  Không có dịch vụ nào.
+                  {t('adminClinicalServices.statusEmpty')}
                 </td>
               </tr>
             ) : (
@@ -776,7 +778,7 @@ export default function AdminClinicalServicesPage() {
                       <code style={{ fontSize: '12px' }}>{service.serviceCode}</code>
                     </td>
                     <td>{service.serviceName}</td>
-                    <td>{category?.label || service.category}</td>
+                    <td>{category ? t(category.i18nKey) : service.category}</td>
                     <td>{service.createdAt ? new Date(service.createdAt).toLocaleDateString('vi-VN') : '---'}</td>
                     <td style={{ fontWeight: '600', color: '#059669' }}>
                       {new Intl.NumberFormat('vi-VN', {
@@ -787,13 +789,11 @@ export default function AdminClinicalServicesPage() {
                     <td>
                       {service.active ? (
                         <span style={{ color: '#10b981' }}>
-                          <CheckCircle size={16} style={{ display: 'inline' }} /> Kích
-                          hoạt
+                          <CheckCircle size={16} style={{ display: 'inline' }} /> {t('adminClinicalServices.statusActive')}
                         </span>
                       ) : (
                         <span style={{ color: '#ef4444' }}>
-                          <AlertCircle size={16} style={{ display: 'inline' }} /> Vô
-                          hiệu
+                          <AlertCircle size={16} style={{ display: 'inline' }} /> {t('adminClinicalServices.statusInactive')}
                         </span>
                       )}
                     </td>
@@ -801,7 +801,7 @@ export default function AdminClinicalServicesPage() {
                       <button
                         className="adm-btn-small"
                         onClick={() => handleOpenModal(service)}
-                        title="Chỉnh sửa"
+                        title={t('adminClinicalServices.titleEdit')}
                       >
                         <Edit2 size={14} />
                       </button>
@@ -809,7 +809,7 @@ export default function AdminClinicalServicesPage() {
                         <button
                           className="adm-btn-small adm-btn-danger"
                           onClick={() => handleDelete(service._id)}
-                          title="Xóa"
+                          title={t('adminClinicalServices.titleDelete')}
                         >
                           <Trash2 size={14} />
                         </button>
@@ -817,9 +817,9 @@ export default function AdminClinicalServicesPage() {
                         <button
                           className="adm-btn-small adm-btn-secondary"
                           onClick={() => handleReopen(service)}
-                          title="Mở lại"
+                          title={t('adminClinicalServices.titleReopen')}
                         >
-                          Mở lại
+                          {t('adminClinicalServices.btnReopen')}
                         </button>
                       )}
                     </td>
