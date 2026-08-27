@@ -1,10 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import AttachmentList from './AttachmentList';
-
-function formatTime(dateStr) {
-  if (!dateStr) return '';
-  return new Date(dateStr).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-}
+import { formatDisplayTime } from '../../utils/formatLocale';
 
 function MessageSkeletonRow({ mine, delay }) {
   return (
@@ -15,6 +12,7 @@ function MessageSkeletonRow({ mine, delay }) {
 }
 
 export default function MessageList({ items = [], loading = false, currentUserId, onLoadMore }) {
+  const { t } = useTranslation();
   const ref = useRef();
   const loadingMoreRef = useRef(false);
   const [isAtBottom, setIsAtBottom] = useState(true);
@@ -60,7 +58,7 @@ export default function MessageList({ items = [], loading = false, currentUserId
   if (items.length === 0) {
     return (
       <div ref={ref} className="flex flex-1 items-center justify-center overflow-y-auto px-6 text-sm text-slate-400">
-        Chưa có tin nhắn nào. Hãy bắt đầu cuộc trò chuyện!
+        {t('messagesPage.noMessages')}
       </div>
     );
   }
@@ -69,7 +67,7 @@ export default function MessageList({ items = [], loading = false, currentUserId
     <div ref={ref} className="flex-1 space-y-3 overflow-y-auto px-5 py-4">
       {items.map((m) => {
         const isMine = m.senderUserId && String(m.senderUserId._id) === String(currentUserId);
-        const senderLabel = m.senderUserId?.fullName || m.senderUserId?.email || m.guestName || m.guestEmail || 'Khách';
+        const senderLabel = m.senderUserId?.fullName || m.senderUserId?.email || m.guestName || m.guestEmail || t('messagesPage.guest');
         return (
           <div key={m._id} className={`animate-fade-in-up flex flex-col ${isMine ? 'items-end' : 'items-start'}`}>
             {!isMine && (
@@ -83,7 +81,7 @@ export default function MessageList({ items = [], loading = false, currentUserId
               {m.content}
               <AttachmentList attachments={m.attachments} hasText={!!m.content} isMine={isMine} />
             </div>
-            <span className="mt-1 px-1 text-[10px] text-slate-400">{formatTime(m.sentAt || m.createdAt)}</span>
+            <span className="mt-1 px-1 text-[10px] text-slate-400">{formatDisplayTime(m.sentAt || m.createdAt)}</span>
           </div>
         );
       })}

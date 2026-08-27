@@ -28,23 +28,23 @@ export default function AdminConsultationRequestsPage() {
   const [saving, setSaving] = useState(false);
 
   const STATUS_OPTIONS = [
-    { value: '', label: t('admin.consultationRequests.allStatuses', 'Tất cả trạng thái') },
-    { value: 'open', label: t('admin.consultationRequests.statusNew', 'Yêu cầu mới') },
-    { value: 'in_progress', label: t('admin.consultationRequests.statusInProgress', 'Đang xử lý') },
-    { value: 'resolved', label: t('admin.consultationRequests.statusResolved', 'Đã xử lý') },
-    { value: 'closed', label: t('admin.consultationRequests.statusClosed', 'Đã đóng') },
+    { value: '', label: t('admin.consultationRequests.allStatuses') },
+    { value: 'open', label: t('admin.consultationRequests.statusNew') },
+    { value: 'in_progress', label: t('admin.consultationRequests.statusInProgress') },
+    { value: 'resolved', label: t('admin.consultationRequests.statusResolved') },
+    { value: 'closed', label: t('admin.consultationRequests.statusClosed') },
   ];
 
   const getStatusLabel = (value) => {
     switch (value) {
       case 'open':
-        return t('admin.consultationRequests.statusNew', 'Yêu cầu mới');
+        return t('admin.consultationRequests.statusNew');
       case 'in_progress':
-        return t('admin.consultationRequests.statusInProgress', 'Đang xử lý');
+        return t('admin.consultationRequests.statusInProgress');
       case 'resolved':
-        return t('admin.consultationRequests.statusResolved', 'Đã xử lý');
+        return t('admin.consultationRequests.statusResolved');
       case 'closed':
-        return t('admin.consultationRequests.statusClosed', 'Đã đóng');
+        return t('admin.consultationRequests.statusClosed');
       default:
         return value || '-';
     }
@@ -67,10 +67,10 @@ export default function AdminConsultationRequestsPage() {
 
   const getAllowedStatusOptions = (currentStatus) => {
     const ordered = [
-      { value: 'open', label: t('admin.consultationRequests.statusNew', 'Yêu cầu mới') },
-      { value: 'in_progress', label: t('admin.consultationRequests.statusInProgress', 'Đang xử lý') },
-      { value: 'resolved', label: t('admin.consultationRequests.statusResolved', 'Đã xử lý') },
-      { value: 'closed', label: t('admin.consultationRequests.statusClosed', 'Đã đóng') },
+      { value: 'open', label: t('admin.consultationRequests.statusNew') },
+      { value: 'in_progress', label: t('admin.consultationRequests.statusInProgress') },
+      { value: 'resolved', label: t('admin.consultationRequests.statusResolved') },
+      { value: 'closed', label: t('admin.consultationRequests.statusClosed') },
     ];
     const currentIndex = ordered.findIndex((opt) => opt.value === currentStatus);
     return currentIndex === -1 ? ordered : ordered.slice(currentIndex);
@@ -94,7 +94,7 @@ export default function AdminConsultationRequestsPage() {
       setTotalPages(res?.totalPages || 1);
     } catch (err) {
       console.error(err);
-      setError(err.response?.data?.message || err.message || t('admin.consultationRequests.loadError', 'Không thể tải danh sách yêu cầu tư vấn.'));
+      setError(err.response?.data?.message || err.message || t('admin.consultationRequests.loadError'));
     } finally {
       setLoading(false);
     }
@@ -154,7 +154,7 @@ export default function AdminConsultationRequestsPage() {
       .catch((err) => {
         console.error(err);
         if (!cancelled) {
-          showToast(err.response?.data?.message || err.message || t('admin.consultationRequests.loadError', 'Không thể tải danh sách yêu cầu tư vấn.'), 'error');
+          showToast(err.response?.data?.message || err.message || t('admin.consultationRequests.loadError'), 'error');
         }
       })
       .finally(() => {
@@ -186,10 +186,10 @@ export default function AdminConsultationRequestsPage() {
       setEditStatus('');
       setEditNotes('');
       fetchRequests();
-      showToast(t('admin.consultationRequests.saveSuccess', 'Đã cập nhật yêu cầu tư vấn thành công.'), 'success');
+      showToast(t('admin.consultationRequests.saveSuccess'), 'success');
     } catch (err) {
       console.error(err);
-      showToast(err.response?.data?.message || err.message || t('admin.consultationRequests.saveError', 'Không thể cập nhật yêu cầu tư vấn.'), 'error');
+      showToast(err.response?.data?.message || err.message || t('admin.consultationRequests.saveError'), 'error');
     } finally {
       setSaving(false);
     }
@@ -217,22 +217,22 @@ export default function AdminConsultationRequestsPage() {
     <div className="adm-container admin-consultation-requests-page">
       <div className="adm-header">
         <div>
-          <h1>{t('admin.consultationRequests.title', 'Yêu cầu tư vấn')}</h1>
-          <p>{t('admin.consultationRequests.subtitle', 'Xem và quản lý các yêu cầu tư vấn được gửi từ khách hàng tiềm năng.')}</p>
+          <h1>{t('admin.consultationRequests.title')}</h1>
+          <p>{t('admin.consultationRequests.subtitle')}</p>
         </div>
         <button onClick={fetchRequests} disabled={loading} className="adm-btn-refresh">
           <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          {t('admin.consultationRequests.reloadData', 'Reload Data')}
+          {t('admin.consultationRequests.reloadData')}
         </button>
       </div>
 
       <div className="adm-metrics-grid">
         <div className="adm-card-stat">
-          <div className="adm-stat-icon" style={{ backgroundColor: '#eff6ff', color: '#2563eb' }}>
+          <div className="adm-stat-icon" style={{ backgroundColor: 'rgba(15, 118, 110, 0.08)', color: '#0f766e' }}>
             <Search size={22} />
           </div>
           <div>
-            <span className="adm-stat-label">{t('admin.consultationRequests.totalRequests', 'Total Requests')}</span>
+            <span className="adm-stat-label">{t('admin.consultationRequests.totalRequests')}</span>
             <span className="adm-stat-value">{total}</span>
           </div>
         </div>
@@ -241,7 +241,7 @@ export default function AdminConsultationRequestsPage() {
             <MessageCircle size={22} />
           </div>
           <div>
-            <span className="adm-stat-label">{t('admin.consultationRequests.statusNew', 'New Requests')}</span>
+            <span className="adm-stat-label">{t('admin.consultationRequests.statusNew')}</span>
             <span className="adm-stat-value">{data.filter((item) => item.status === 'open').length}</span>
           </div>
         </div>
@@ -250,7 +250,7 @@ export default function AdminConsultationRequestsPage() {
             <Filter size={22} />
           </div>
           <div>
-            <span className="adm-stat-label">{t('admin.consultationRequests.statusInProgress', 'In Progress')}</span>
+            <span className="adm-stat-label">{t('admin.consultationRequests.statusInProgress')}</span>
             <span className="adm-stat-value">{data.filter((item) => item.status === 'in_progress').length}</span>
           </div>
         </div>
@@ -259,7 +259,7 @@ export default function AdminConsultationRequestsPage() {
             <CheckCircle size={22} />
           </div>
           <div>
-            <span className="adm-stat-label">{t('admin.consultationRequests.statusResolved', 'Resolved')}</span>
+            <span className="adm-stat-label">{t('admin.consultationRequests.statusResolved')}</span>
             <span className="adm-stat-value">{data.filter((item) => item.status === 'resolved').length}</span>
           </div>
         </div>
@@ -274,7 +274,7 @@ export default function AdminConsultationRequestsPage() {
                 <input
                   type="text"
                   className="adm-filter-input"
-                  placeholder={t('admin.consultationRequests.searchPlaceholder', 'Search name, phone, email, service...')}
+                  placeholder={t('admin.consultationRequests.searchPlaceholder')}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
@@ -291,14 +291,14 @@ export default function AdminConsultationRequestsPage() {
 
           <div className="adm-filter-row-secondary">
             <div className="adm-filter-date-group">
-              <span className="adm-date-title"><Calendar size={13} className="text-slate-400" /> {t('admin.consultationRequests.createdRange', 'Created Date Range:')}</span>
+              <span className="adm-date-title"><Calendar size={13} className="text-slate-400" /> {t('admin.consultationRequests.createdRange')}</span>
               <input type="date" className="adm-date-input" value={from} onChange={(e) => setFrom(e.target.value)} />
-              <span className="text-slate-400 text-xs font-semibold">{t('admin.consultationRequests.to', 'to')}</span>
+              <span className="text-slate-400 text-xs font-semibold">{t('admin.consultationRequests.to')}</span>
               <input type="date" className="adm-date-input" value={to} onChange={(e) => setTo(e.target.value)} />
             </div>
             <div className="adm-filter-actions">
-              <button type="button" onClick={handleResetFilters} className="adm-btn-clear">{t('admin.consultationRequests.clearFilters', 'Clear Filters')}</button>
-              <button type="submit" className="adm-btn-apply">{t('admin.consultationRequests.applyFilters', 'Apply Filters')}</button>
+              <button type="button" onClick={handleResetFilters} className="adm-btn-clear">{t('admin.consultationRequests.clearFilters')}</button>
+              <button type="submit" className="adm-btn-apply">{t('admin.consultationRequests.applyFilters')}</button>
             </div>
           </div>
         </form>
@@ -308,31 +308,31 @@ export default function AdminConsultationRequestsPage() {
         {loading && data.length === 0 ? (
           <div className="p-16 flex flex-col items-center justify-center bg-white" style={{ minHeight: '260px' }}>
             <RefreshCw className="animate-spin text-emerald-sage mb-3" size={32} />
-            <p className="text-slate-500 text-sm">{t('admin.consultationRequests.loading', 'Loading consultation requests...')}</p>
+            <p className="text-slate-500 text-sm">{t('admin.consultationRequests.loading')}</p>
           </div>
         ) : error ? (
           <div className="p-10 flex flex-col items-center justify-center text-center bg-white" style={{ minHeight: '260px' }}>
             <AlertCircle className="text-red-500 mb-3" size={36} />
-            <p className="text-slate-800 font-bold mb-1">{t('admin.consultationRequests.errorOccurred', 'An error occurred')}</p>
+            <p className="text-slate-800 font-bold mb-1">{t('admin.consultationRequests.errorOccurred')}</p>
             <p className="text-slate-500 text-sm max-w-md">{error}</p>
           </div>
         ) : data.length === 0 ? (
           <div className="p-16 text-center flex flex-col items-center justify-center bg-white" style={{ minHeight: '260px' }}>
             <div className="bg-slate-50 p-4 rounded-full text-slate-400 mb-3" style={{ width: 'fit-content' }}><Search size={30} /></div>
-            <p className="text-slate-700 font-bold mb-1">{t('admin.consultationRequests.noRequestsFound', 'No consultation requests found')}</p>
-            <p className="text-slate-400 text-xs max-w-sm">{t('admin.consultationRequests.noRequestsDesc', "We couldn't find any consultation requests matching your filters.")}</p>
+            <p className="text-slate-700 font-bold mb-1">{t('admin.consultationRequests.noRequestsFound')}</p>
+            <p className="text-slate-400 text-xs max-w-sm">{t('admin.consultationRequests.noRequestsDesc')}</p>
           </div>
         ) : (
           <div className="adm-table-responsive">
             <table className="adm-table">
               <thead>
                 <tr>
-                  <th>{t('admin.consultationRequests.colName', 'Name')}</th>
-                  <th>{t('admin.consultationRequests.colContact', 'Contact')}</th>
-                  <th>{t('admin.consultationRequests.colServiceInterest', 'Service Interest')}</th>
-                  <th>{t('admin.consultationRequests.colCreatedAt', 'Created')}</th>
-                  <th>{t('admin.consultationRequests.colStatus', 'Status')}</th>
-                  <th>{t('admin.consultationRequests.colActions', 'Actions')}</th>
+                  <th>{t('admin.consultationRequests.colName')}</th>
+                  <th>{t('admin.consultationRequests.colContact')}</th>
+                  <th>{t('admin.consultationRequests.colServiceInterest')}</th>
+                  <th>{t('admin.consultationRequests.colCreatedAt')}</th>
+                  <th>{t('admin.consultationRequests.colStatus')}</th>
+                  <th>{t('admin.consultationRequests.colActions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -356,7 +356,7 @@ export default function AdminConsultationRequestsPage() {
                       <button
                         type="button"
                         className="adm-btn-action adm-btn-action-icon"
-                        title={t('admin.consultationRequests.manageTooltip', 'Quản lý yêu cầu')}
+                        title={t('admin.consultationRequests.manageTooltip')}
                         onClick={() => handleEdit(item)}
                       >
                         <Eye size={16} />
@@ -372,12 +372,12 @@ export default function AdminConsultationRequestsPage() {
         {total > 0 && (
           <div className="adm-pagination-footer">
             <div className="pagination-info">
-              {t('admin.consultationRequests.showing', 'Showing')} <span>{(page - 1) * limit + 1}</span> {t('admin.consultationRequests.to', 'to')} <span>{Math.min(page * limit, total)}</span> {t('admin.consultationRequests.of', 'of')} <span>{total}</span>
+              {t('admin.consultationRequests.showing')} <span>{(page - 1) * limit + 1}</span> {t('admin.consultationRequests.to')} <span>{Math.min(page * limit, total)}</span> {t('admin.consultationRequests.of')} <span>{total}</span>
             </div>
             <div className="pagination-controls">
-              <button type="button" disabled={page <= 1 || loading} onClick={() => setPage((p) => Math.max(p - 1, 1))}>{t('common.prev', 'Prev')}</button>
+              <button type="button" disabled={page <= 1 || loading} onClick={() => setPage((p) => Math.max(p - 1, 1))}>{t('common.prev')}</button>
               <span>{page} / {totalPages}</span>
-              <button type="button" disabled={page >= totalPages || loading} onClick={() => setPage((p) => Math.min(p + 1, totalPages))}>{t('common.next', 'Next')}</button>
+              <button type="button" disabled={page >= totalPages || loading} onClick={() => setPage((p) => Math.min(p + 1, totalPages))}>{t('common.next')}</button>
             </div>
           </div>
         )}
@@ -388,8 +388,8 @@ export default function AdminConsultationRequestsPage() {
           <div className="adm-edit-section" onClick={(e) => e.stopPropagation()}>
             <div className="adm-edit-header">
               <div>
-                <h2>{t('admin.consultationRequests.editTitle', 'Edit Consultation Request')}</h2>
-                <p>{t('admin.consultationRequests.editSubtitle', 'Update status and add admin notes for the selected request.')}</p>
+                <h2>{t('admin.consultationRequests.editTitle')}</h2>
+                <p>{t('admin.consultationRequests.editSubtitle')}</p>
               </div>
               <div className="adm-edit-current-status">
                 <span className={`adm-status-badge ${getStatusBadgeClass(editingRequest.status)}`}>
@@ -400,29 +400,29 @@ export default function AdminConsultationRequestsPage() {
             <div className="adm-edit-panel">
               <div className="adm-request-detail-summary">
                 <div>
-                  <span>{t('admin.consultationRequests.colName', 'Name')}</span>
+                  <span>{t('admin.consultationRequests.colName')}</span>
                   <p>{editingRequest.fullName || '-'}</p>
                 </div>
                 <div>
-                  <span>{t('admin.consultationRequests.colPhone', 'Phone')}</span>
+                  <span>{t('admin.consultationRequests.colPhone')}</span>
                   <p>{editingRequest.phone || '-'}</p>
                 </div>
                 <div>
-                  <span>{t('admin.consultationRequests.colEmail', 'Email')}</span>
+                  <span>{t('admin.consultationRequests.colEmail')}</span>
                   <p>{editingRequest.email || '-'}</p>
                 </div>
                 <div>
-                  <span>{t('admin.consultationRequests.colCreatedAt', 'Created')}</span>
+                  <span>{t('admin.consultationRequests.colCreatedAt')}</span>
                   <p>{formatDate(editingRequest.createdAt)}</p>
                 </div>
                 <div className="adm-request-detail-message">
-                  <span>{t('admin.consultationRequests.colMessage', 'Message')}</span>
-                  <p>{editingRequest.message ? editingRequest.message : t('admin.consultationRequests.noMessage', 'No message provided')}</p>
+                  <span>{t('admin.consultationRequests.colMessage')}</span>
+                  <p>{editingRequest.message ? editingRequest.message : t('admin.consultationRequests.noMessage')}</p>
                 </div>
               </div>
               <div className="adm-edit-grid">
                 <div className="adm-edit-field">
-                  <label className="adm-edit-label">{t('admin.consultationRequests.fieldStatus', 'Status')}</label>
+                  <label className="adm-edit-label">{t('admin.consultationRequests.fieldStatus')}</label>
                   <select className="adm-edit-select" value={editStatus} onChange={(e) => setEditStatus(e.target.value)}>
                     {getAllowedStatusOptions(editingRequest?.status || editStatus).map((opt) => (
                       <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -430,7 +430,7 @@ export default function AdminConsultationRequestsPage() {
                   </select>
                 </div>
                 <div className="adm-edit-field adm-edit-field--notes">
-                  <label className="adm-edit-label">{t('admin.consultationRequests.fieldAdminNotes', 'Admin Notes')}</label>
+                  <label className="adm-edit-label">{t('admin.consultationRequests.fieldAdminNotes')}</label>
                   <textarea
                     className="adm-edit-textarea"
                     value={editNotes}
@@ -441,14 +441,14 @@ export default function AdminConsultationRequestsPage() {
               </div>
               <div className="adm-edit-actions">
                 <button type="button" className="adm-btn-apply" disabled={saving || !isEditDirty} onClick={handleSave}>
-                  {saving ? t('admin.consultationRequests.saving', 'Saving...') : t('admin.consultationRequests.save', 'Save')}
+                  {saving ? t('admin.consultationRequests.saving') : t('admin.consultationRequests.save')}
                 </button>
                 <button type="button" className="adm-btn-clear" disabled={saving} onClick={() => setEditingRequest(null)}>
-                  {t('admin.consultationRequests.cancel', 'Cancel')}
+                  {t('admin.consultationRequests.cancel')}
                 </button>
               </div>
               {!isEditDirty && (
-                <p className="adm-edit-note">{t('admin.consultationRequests.editNoChanges', 'Vui lòng thay đổi trạng thái hoặc ghi chú trước khi lưu.')}</p>
+                <p className="adm-edit-note">{t('admin.consultationRequests.editNoChanges')}</p>
               )}
             </div>
           </div>

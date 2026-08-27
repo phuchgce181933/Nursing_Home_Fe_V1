@@ -13,7 +13,7 @@
   --pharmacy-focus: rgba(15, 118, 110, 0.12);
   position: relative;
   padding: 32px;
-  font-family: 'Archivo', 'Helvetica Neue', Arial, sans-serif;
+  font-family: inherit;
   color: var(--pharmacy-ink);
   min-height: calc(100vh - 120px);
   background: radial-gradient(circle at top left, rgba(14, 116, 144, 0.08), transparent 55%),
@@ -42,7 +42,7 @@
 }
 
 .pharmacy-header h1 {
-  font-family: 'Space Grotesk', 'Trebuchet MS', sans-serif;
+  font-family: inherit;
   font-size: clamp(28px, 3vw, 38px);
   letter-spacing: -0.02em;
   margin-bottom: 8px;
@@ -129,7 +129,7 @@
 
 .summary-card strong {
   font-size: 22px;
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: inherit;
 }
 
 .summary-card__icon {
@@ -250,7 +250,7 @@
 }
 
 .pharmacy-card__header h3 {
-  font-family: 'Space Grotesk', 'Trebuchet MS', sans-serif;
+  font-family: inherit;
   margin-bottom: 4px;
 }
 
@@ -922,7 +922,7 @@
 }
 
 .supplier-card__header h3 {
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: inherit;
   font-size: 16px;
   font-weight: 600;
   margin: 0 0 8px;
@@ -1020,7 +1020,7 @@
 }
 
 .reports-title h2 {
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: inherit;
   font-size: 24px;
   font-weight: 600;
   margin: 0 0 6px;

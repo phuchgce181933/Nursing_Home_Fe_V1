@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Search, X, Plus, MessageCircle, User, Mail, Phone, FileText, Clock, AlertTriangle } from 'lucide-react';
 import ConversationList from '../../components/chat/ConversationList';
 import MessageList from '../../components/chat/MessageList';
@@ -17,7 +18,7 @@ function otherParticipant(c, currentUserId) {
 
 function conversationDisplayName(c, currentUserId) {
   if (c?.guestName) return c.guestName;
-  return otherParticipant(c, currentUserId)?.fullName || c?.subject || 'Cuộc trò chuyện';
+  return otherParticipant(c, currentUserId)?.fullName || c?.subject || null;
 }
 
 function formatDateTime(dateStr) {
@@ -26,6 +27,7 @@ function formatDateTime(dateStr) {
 }
 
 export default function MessagesPage() {
+  const { t } = useTranslation();
   const [conversations, setConversations] = useState([]);
   const [conversationsLoading, setConversationsLoading] = useState(true);
   const [selected, setSelected] = useState(null);
@@ -170,7 +172,7 @@ export default function MessagesPage() {
       }
     } catch (err) {
       console.error('Xóa thất bại', err);
-      setPageError(err.response?.data?.message || err.message || 'Không thể xóa cuộc trò chuyện');
+      setPageError(err.response?.data?.message || err.message || t('messagesPage.errorDeleteConversation'));
     } finally {
       setConfirmDeleteConv(null);
     }
@@ -192,7 +194,7 @@ export default function MessagesPage() {
       await loadConversations();
     } catch (err) {
       console.error(err);
-      const message = err.response?.data?.message || err.message || 'Không thể gửi tin nhắn';
+      const message = err.response?.data?.message || err.message || t('messagesPage.errorSendMessage');
       setPageError(message);
       // Re-throw so MessageInput knows the send failed and keeps the drafted text/files
       // instead of clearing them as if it had succeeded.
@@ -254,7 +256,7 @@ export default function MessagesPage() {
       if (conv && conv._id) setSelected(conv);
     } catch (err) {
       console.error('Tạo cuộc trò chuyện thất bại', err);
-      setPageError(err.response?.data?.message || err.message || 'Không thể tạo cuộc trò chuyện');
+      setPageError(err.response?.data?.message || err.message || t('messagesPage.errorCreateConversation'));
     }
   };
 
@@ -278,20 +280,20 @@ export default function MessagesPage() {
         <>
           <div className="absolute inset-0 z-40 bg-slate-900/20" onClick={() => setConfirmDeleteConv(null)} />
           <div className="animate-scale-in absolute left-1/2 top-1/2 z-50 w-80 -translate-x-1/2 -translate-y-1/2 rounded-xl bg-white p-5 shadow-2xl">
-            <div className="text-sm font-bold text-slate-800">Xóa cuộc trò chuyện?</div>
-            <p className="mt-1.5 text-sm text-slate-500">Toàn bộ tin nhắn trong cuộc trò chuyện này sẽ bị xóa vĩnh viễn.</p>
+            <div className="text-sm font-bold text-slate-800">{t('messagesPage.deleteConversationTitle')}</div>
+            <p className="mt-1.5 text-sm text-slate-500">{t('messagesPage.deleteConversationDesc')}</p>
             <div className="mt-4 flex justify-end gap-2">
               <button
                 onClick={() => setConfirmDeleteConv(null)}
                 className="rounded-lg border border-outline-variant px-3 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-50"
               >
-                Hủy
+                {t('messagesPage.cancel')}
               </button>
               <button
                 onClick={handleDeleteConversation}
                 className="press-effect rounded-lg bg-error px-3 py-1.5 text-xs font-semibold text-white"
               >
-                Xóa
+                {t('messagesPage.delete')}
               </button>
             </div>
           </div>
@@ -302,11 +304,11 @@ export default function MessagesPage() {
       <div className="flex w-[340px] flex-shrink-0 flex-col border-r border-slate-100">
         <div className="border-b border-slate-100 p-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-base font-bold text-slate-800">Giao tiếp</h2>
+            <h2 className="text-base font-bold text-slate-800">{t('messagesPage.title')}</h2>
             <button
               type="button"
               onClick={openNewChat}
-              title="Mở cuộc trò chuyện mới"
+              title={t('messagesPage.newChatTooltip')}
               className={`press-effect flex h-8 w-8 items-center justify-center rounded-full transition-colors ${
                 newChatOpen ? 'bg-navy-deep text-white' : 'bg-navy-deep/10 text-navy-deep hover:bg-navy-deep/15'
               }`}
@@ -321,7 +323,7 @@ export default function MessagesPage() {
               value={convQuery}
               onChange={(e) => setConvQuery(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSearchConversations()}
-              placeholder="Tìm cuộc trò chuyện"
+              placeholder={t('messagesPage.searchConversation')}
               className={`${INPUT_CLASS} pl-9`}
             />
             {convQuery && (
@@ -343,22 +345,22 @@ export default function MessagesPage() {
                 <input
                   value={newChatSubject}
                   onChange={(e) => setNewChatSubject(e.target.value)}
-                  placeholder="Tiêu đề (tuỳ chọn)"
+                  placeholder={t('messagesPage.subjectPlaceholder')}
                   className={`${INPUT_CLASS} mb-2 bg-white`}
                 />
-                <div className="mb-2 text-xs font-medium text-slate-500">Gửi cho quản trị viên</div>
+                <div className="mb-2 text-xs font-medium text-slate-500">{t('messagesPage.sendToAdmin')}</div>
                 <div className="flex gap-2">
                   <button
                     onClick={handleCreateConversation}
                     className="press-effect flex-1 rounded-lg bg-navy-deep py-2 text-sm font-semibold text-white transition-colors hover:bg-[#132745]"
                   >
-                    Tạo
+                    {t('messagesPage.create')}
                   </button>
                   <button
                     onClick={() => setNewChatOpen(false)}
                     className="rounded-lg border border-outline-variant px-3 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100"
                   >
-                    Hủy
+                    {t('messagesPage.cancel')}
                   </button>
                 </div>
               </>
@@ -369,13 +371,13 @@ export default function MessagesPage() {
                   <input
                     value={staffQuery}
                     onChange={(e) => setStaffQuery(e.target.value)}
-                    placeholder="Tìm đồng nghiệp theo tên..."
+                    placeholder={t('messagesPage.searchStaff')}
                     className={`${INPUT_CLASS} bg-white pl-9`}
                   />
                 </div>
                 <div className="mb-2 max-h-40 overflow-y-auto rounded-lg border border-outline-variant bg-white">
                   {filteredStaffDirectory.length === 0 ? (
-                    <div className="px-3 py-3 text-center text-xs text-slate-400">Không tìm thấy đồng nghiệp phù hợp</div>
+                    <div className="px-3 py-3 text-center text-xs text-slate-400">{t('messagesPage.noStaffFound')}</div>
                   ) : (
                     filteredStaffDirectory.map((u) => (
                       <button
@@ -398,13 +400,13 @@ export default function MessagesPage() {
                     disabled={!selectedTargetUserId}
                     className="press-effect flex-1 rounded-lg bg-navy-deep py-2 text-sm font-semibold text-white transition-colors hover:bg-[#132745] disabled:cursor-not-allowed disabled:opacity-40"
                   >
-                    Bắt đầu trò chuyện
+                    {t('messagesPage.startChat')}
                   </button>
                   <button
                     onClick={() => setNewChatOpen(false)}
                     className="rounded-lg border border-outline-variant px-3 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100"
                   >
-                    Hủy
+                    {t('messagesPage.cancel')}
                   </button>
                 </div>
               </>
@@ -436,7 +438,7 @@ export default function MessagesPage() {
                   <User size={17} />
                 </div>
                 <div className="min-w-0">
-                  <div className="truncate text-sm font-bold text-slate-800">{conversationDisplayName(selected, currentUserId)}</div>
+                  <div className="truncate text-sm font-bold text-slate-800">{conversationDisplayName(selected, currentUserId) || t('messagesPage.defaultConversation')}</div>
                   {selected.subject && selected.guestName && (
                     <div className="truncate text-xs text-slate-400">{selected.subject}</div>
                   )}
@@ -445,8 +447,8 @@ export default function MessagesPage() {
               <button
                 type="button"
                 onClick={() => setSearchOpen((s) => !s)}
-                title="Tìm tin nhắn"
-                data-tooltip="Tìm tin nhắn"
+                title={t('messagesPage.searchMessages')}
+                data-tooltip={t('messagesPage.searchMessages')}
                 className={`press-effect flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full transition-colors ${
                   searchOpen ? 'bg-navy-deep text-white' : 'text-slate-400 hover:bg-slate-100'
                 }`}
@@ -463,8 +465,8 @@ export default function MessagesPage() {
                         <User size={19} />
                       </div>
                       <div className="min-w-0">
-                        <div className="truncate text-sm font-bold text-slate-800">{conversationDisplayName(selected, currentUserId)}</div>
-                        <div className="text-xs text-slate-400">{selected.isGuest ? 'Khách liên hệ' : 'Người dùng hệ thống'}</div>
+                        <div className="truncate text-sm font-bold text-slate-800">{conversationDisplayName(selected, currentUserId) || t('messagesPage.defaultConversation')}</div>
+                        <div className="text-xs text-slate-400">{selected.isGuest ? t('messagesPage.guestContact') : t('messagesPage.systemUser')}</div>
                       </div>
                     </div>
 
@@ -489,10 +491,10 @@ export default function MessagesPage() {
                       )}
                       <div className="flex items-center gap-2">
                         <Clock size={14} className="flex-shrink-0 text-slate-400" />
-                        <span>Bắt đầu lúc {formatDateTime(selected.createdAt)}</span>
+                        <span>{t('messagesPage.startedAt', { time: formatDateTime(selected.createdAt) })}</span>
                       </div>
                       {!selected.guestEmail && !selected.guestPhone && !otherParticipant(selected, currentUserId)?.email && (
-                        <span className="text-xs italic text-slate-400">Không có thông tin liên hệ bổ sung</span>
+                        <span className="text-xs italic text-slate-400">{t('messagesPage.noContactInfo')}</span>
                       )}
                     </div>
                   </div>
@@ -506,7 +508,7 @@ export default function MessagesPage() {
                   value={msgQuery}
                   onChange={(e) => setMsgQuery(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSearchMessages()}
-                  placeholder="Tìm tin nhắn (toàn bộ hoặc trong 1 cuộc)"
+                  placeholder={t('messagesPage.searchMessagesPlaceholder')}
                   className={`${INPUT_CLASS} flex-1 bg-white`}
                 />
                 <button
@@ -514,20 +516,20 @@ export default function MessagesPage() {
                   disabled={searchingMessages}
                   className="press-effect flex-shrink-0 rounded-lg bg-navy-deep px-3.5 py-2.5 text-sm font-medium text-white hover:bg-[#132745] disabled:opacity-60"
                 >
-                  Tìm
+                  {t('messagesPage.search')}
                 </button>
                 <button
                   onClick={() => { setMsgQuery(''); setMessageResults([]); }}
                   className="flex-shrink-0 rounded-lg border border-outline-variant px-3.5 py-2.5 text-sm font-medium text-slate-500 hover:bg-slate-100"
                 >
-                  Xóa
+                  {t('messagesPage.clear')}
                 </button>
               </div>
             )}
 
             {messageResults.length > 0 ? (
               <div className="flex-1 overflow-y-auto p-4">
-                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Kết quả tìm kiếm tin nhắn</div>
+                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">{t('messagesPage.messageSearchResults')}</div>
                 <div className="flex flex-col gap-1">
                   {messageResults.map((m, i) => (
                     <div
@@ -550,7 +552,7 @@ export default function MessagesPage() {
                     >
                       <div className="text-sm text-slate-700">{m.content}</div>
                       <div className="mt-1 text-xs text-slate-400">
-                        {m.isGuest ? `Khách: ${m.guestName || m.guestEmail || ''}` : (m.senderUserId?.fullName || m.senderUserId?.email || '')}
+                        {m.isGuest ? `${t('messagesPage.guestLabel')}${m.guestName || m.guestEmail || ''}` : (m.senderUserId?.fullName || m.senderUserId?.email || '')}
                         {' • '}
                         {m.sentAt ? new Date(m.sentAt).toLocaleString('vi-VN') : ''}
                       </div>
@@ -568,7 +570,7 @@ export default function MessagesPage() {
         ) : (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 text-slate-300">
             <MessageCircle size={48} strokeWidth={1.5} />
-            <span className="text-sm text-slate-400">Chọn một cuộc trò chuyện để xem nội dung</span>
+            <span className="text-sm text-slate-400">{t('messagesPage.selectConversation')}</span>
           </div>
         )}
       </div>

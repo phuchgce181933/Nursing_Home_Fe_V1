@@ -219,7 +219,7 @@
 .resident-page .section-title {
   font-size: 1rem;
   font-weight: 700;
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: inherit;
   color: #0f172a;
   margin: 0;
 }

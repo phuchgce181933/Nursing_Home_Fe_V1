@@ -11,12 +11,18 @@
 
 /* Admin Styles */
 @import './styles/admin/AdminLayout.css';
-@import './styles/manager/ManagerLayout.css';
+@import './styles/admin/AdminCommon.css';
 @import './styles/admin/Sidebar.css';
 @import './styles/admin/DashboardPage.css';
 @import './styles/admin/ResidentPage.css';
 @import './styles/admin/ProfilePage.css';
 @import './styles/admin/AdminAdmissionRequestsPage.css';
+
+/* Component Styles */
+@import './styles/components/ConfirmDialog.css';
+@import './styles/components/ResidentContextBlock.css';
+@import './styles/components/FloorRoomSelect.css';
+@import './styles/components/FamilyAccountPicker.css';
 
 /* Family Styles */
 @import './styles/family/SubmitAdmissionPage.css';
@@ -46,6 +52,59 @@
   --color-surface-container-highest: #d3e4fe;
   --color-outline-variant: #c4c6cf;
   --color-outline: #74777f;
+}
+
+:root {
+  /* ── Primary action color (teal) ── */
+  --nh-primary: #0f766e;
+  --nh-primary-dark: #0a5c56;
+  --nh-primary-light: rgba(15, 118, 110, 0.12);
+  --nh-primary-shadow: rgba(15, 118, 110, 0.25);
+
+  /* ── Brand color (navy) ── */
+  --nh-brand: #1B365D;
+
+  /* ── Neutral / text ── */
+  --nh-text: #0f172a;
+  --nh-text-secondary: #475569;
+  --nh-text-muted: #64748b;
+  --nh-text-placeholder: #94a3b8;
+
+  /* ── Surfaces ── */
+  --nh-surface: #ffffff;
+  --nh-surface-subtle: #f8fafc;
+  --nh-surface-hover: #f1f5f9;
+  --nh-border: #e2e8f0;
+  --nh-border-dark: #cbd5e1;
+
+  /* ── Semantic ── */
+  --nh-danger: #dc2626;
+  --nh-danger-dark: #b91c1c;
+  --nh-danger-light: #fee2e2;
+  --nh-danger-border: #fecaca;
+  --nh-success: #047857;
+  --nh-success-light: #ecfdf5;
+  --nh-success-border: #a7f3d0;
+  --nh-warning: #c2410c;
+  --nh-warning-light: rgba(249, 115, 22, 0.15);
+  --nh-info: #0284c7;
+  --nh-info-light: rgba(14, 165, 233, 0.12);
+
+  /* ── Table header ── */
+  --nh-table-header-bg: #0f172a;
+  --nh-table-header-text: #f8fafc;
+
+  /* ── Radius ── */
+  --nh-radius-sm: 10px;
+  --nh-radius-md: 12px;
+  --nh-radius-lg: 16px;
+  --nh-radius-xl: 20px;
+  --nh-radius-pill: 999px;
+
+  /* ── Shadow ── */
+  --nh-shadow-sm: 0 8px 18px rgba(15, 23, 42, 0.06);
+  --nh-shadow-md: 0 12px 24px rgba(15, 23, 42, 0.04);
+  --nh-shadow-lg: 0 24px 48px rgba(15, 23, 42, 0.3);
 }
 
 @layer base {

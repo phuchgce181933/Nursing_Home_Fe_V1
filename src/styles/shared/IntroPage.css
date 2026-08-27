@@ -14,7 +14,7 @@
   --ip-outline-variant:     #c6c5d4;
   --ip-secondary-container: #d3e2ed;
 
-  font-family: 'Inter', 'Be Vietnam Pro', sans-serif;
+  font-family: inherit;
   background: var(--ip-surface) !important;
   color: var(--ip-on-surface);
 }

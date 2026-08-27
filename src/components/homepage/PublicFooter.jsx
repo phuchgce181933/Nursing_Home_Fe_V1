@@ -12,9 +12,9 @@ export default function PublicFooter() {
       </div>
       <div className="footer-links">
         <Link to="/">{t('home.footerHome')}</Link>
-        <Link to="/intro">Giới thiệu</Link>
-        <Link to="/services">Dịch vụ</Link>
-        <Link to="/contact">Liên hệ</Link>
+        <Link to="/intro">{t('home.footerIntro')}</Link>
+        <Link to="/services">{t('home.footerServices')}</Link>
+        <Link to="/contact">{t('home.footerContact')}</Link>
       </div>
       <div>
         <p className="footer-caption">{t('home.footerCopyright')}</p>

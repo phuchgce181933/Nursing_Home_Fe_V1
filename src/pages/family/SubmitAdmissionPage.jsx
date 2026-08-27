@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import {
   User,
@@ -31,14 +32,15 @@ const BACKEND_FIELD_ERROR_MAP = [
   { test: /^notes/i, field: 'additionalNotes', step: 3 },
 ];
 
-const STEP_LABELS = [
-  { label: 'Thông tin cá nhân', Icon: User },
-  { label: 'Hồ sơ sức khỏe',   Icon: Stethoscope },
-  { label: 'Chi tiết tiếp nhận', Icon: ClipboardCheck },
+const STEP_KEYS = [
+  { i18nKey: 'submitAdmission.steps.personalInfo', Icon: User },
+  { i18nKey: 'submitAdmission.steps.healthRecord',   Icon: Stethoscope },
+  { i18nKey: 'submitAdmission.steps.admissionDetails', Icon: ClipboardCheck },
 ];
 
 /* ─── main page ─────────────────────────────── */
 export default function SubmitAdmissionPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [submitted, setSubmitted] = useState(false);
@@ -95,25 +97,25 @@ export default function SubmitAdmissionPage() {
 
     switch (name) {
       case 'fullName':
-        if (!val) return 'Họ và tên là bắt buộc';
-        if (val.length < 2 || val.length > 50) return 'Họ và tên phải từ 2 đến 50 ký tự';
+        if (!val) return t('submitAdmission.validation.fullNameRequired');
+        if (val.length < 2 || val.length > 50) return t('submitAdmission.validation.fullNameLength');
         if (!/^[a-zA-ZÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚĂĐĨŨƠàáâãèéêìíòóôõùúăđĩũơƯĂÂÊÔƠƯưăâêôơưẠ-ỹ\s]+$/.test(val))
-          return 'Họ và tên chỉ được chứa chữ cái và khoảng trắng';
+          return t('submitAdmission.validation.fullNameLettersOnly');
         return null;
 
       case 'dob': {
         if (val === 'INVALID_DATE') {
-          return 'Ngày sinh không hợp lệ hoặc không đúng định dạng (ngày/tháng/năm)';
+          return t('submitAdmission.validation.dobInvalidFormat');
         }
         if (!val) {
-          return 'Ngày sinh là bắt buộc';
+          return t('submitAdmission.validation.dobRequired');
         }
         const dobDate = new Date(val);
         if (isNaN(dobDate.getTime())) {
-          return 'Ngày sinh không hợp lệ';
+          return t('submitAdmission.validation.dobInvalid');
         }
         if (dobDate >= new Date()) {
-          return 'Ngày sinh phải ở trong quá khứ';
+          return t('submitAdmission.validation.dobPast');
         }
         const today = new Date();
         let age = today.getFullYear() - dobDate.getFullYear();
@@ -122,66 +124,66 @@ export default function SubmitAdmissionPage() {
           age--;
         }
         if (age < 50 || age > 110) {
-          return 'Người đăng ký nhập viện phải từ 50 đến 110 tuổi';
+          return t('submitAdmission.validation.dobAge');
         }
         return null;
       }
 
       case 'gender':
-        if (!val) return 'Giới tính là bắt buộc';
+        if (!val) return t('submitAdmission.validation.genderRequired');
         return null;
 
       case 'idNumber':
-        if (!val) return 'Số định danh (CCCD/Hộ chiếu) là bắt buộc';
+        if (!val) return t('submitAdmission.validation.idRequired');
         const isCccd = /^\d{12}$/.test(val);
         const isPassport = /^[A-Z0-9]{8,12}$/i.test(val);
         if (!isCccd && !isPassport)
-          return 'Số định danh không hợp lệ. Phải là 12 chữ số CCCD hoặc 8-12 ký tự Hộ chiếu.';
+          return t('submitAdmission.validation.idInvalid');
         return null;
 
       case 'address':
-        if (!val) return 'Địa chỉ hiện tại là bắt buộc';
-        if (val.length < 5 || val.length > 150) return 'Địa chỉ phải từ 5 đến 150 ký tự';
+        if (!val) return t('submitAdmission.validation.addressRequired');
+        if (val.length < 5 || val.length > 150) return t('submitAdmission.validation.addressLength');
         return null;
 
       case 'relationship':
-        if (!val) return 'Mối quan hệ là bắt buộc';
+        if (!val) return t('submitAdmission.validation.relationshipRequired');
         return null;
 
       case 'phone':
         if (val) {
           if (!/^(0|\+84)(3|5|7|8|9)\d{8}$/.test(val)) {
-            return 'Số điện thoại không hợp lệ (di động 10 chữ số).';
+            return t('submitAdmission.validation.phoneInvalid');
           }
         }
         return null;
 
       case 'healthCondition':
-        if (!val) return 'Tóm tắt sức khỏe hiện tại là bắt buộc';
-        if (val.length < 10 || val.length > 500) return 'Tóm tắt sức khỏe phải từ 10 đến 500 ký tự';
+        if (!val) return t('submitAdmission.validation.healthRequired');
+        if (val.length < 10 || val.length > 500) return t('submitAdmission.validation.healthLength');
         return null;
 
       case 'preferredDate':
-        if (!val) return 'Ngày nhập viện mong muốn là bắt buộc';
+        if (!val) return t('submitAdmission.validation.preferredDateRequired');
         const prefDate = new Date(val);
-        if (isNaN(prefDate.getTime())) return 'Ngày không hợp lệ';
+        if (isNaN(prefDate.getTime())) return t('submitAdmission.validation.dateInvalid');
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        if (prefDate < today) return 'Ngày mong muốn phải là ngày hôm nay hoặc trong tương lai';
+        if (prefDate < today) return t('submitAdmission.validation.preferredDateFuture');
         return null;
 
       case 'contactPhone':
-        if (!val) return 'Số điện thoại liên hệ là bắt buộc';
+        if (!val) return t('submitAdmission.validation.contactPhoneRequired');
         if (!/^(0|\+84)(3|5|7|8|9)\d{8}$/.test(val))
-          return 'Số điện thoại không hợp lệ (di động 10 chữ số bắt đầu bằng 03, 05, 07, 08 hoặc 09).';
+          return t('submitAdmission.validation.contactPhoneInvalid');
         return null;
 
       case 'admissionReason':
-        if (!val) return 'Lý do nhập viện là bắt buộc';
+        if (!val) return t('submitAdmission.validation.admissionReasonRequired');
         return null;
 
       case 'additionalNotes':
-        if (val && val.length > 500) return 'Ghi chú thêm không được vượt quá 500 ký tự';
+        if (val && val.length > 500) return t('submitAdmission.validation.additionalNotesMax');
         return null;
 
       default:
@@ -265,7 +267,7 @@ export default function SubmitAdmissionPage() {
 
   const handleNext = () => {
     if (validateStep(step)) {
-      if (step < STEP_LABELS.length) setStep(step + 1);
+      if (step < STEP_KEYS.length) setStep(step + 1);
     }
   };
 
@@ -280,7 +282,7 @@ export default function SubmitAdmissionPage() {
   const handleSubmit = async (e) => {
     if (e) e.preventDefault();
 
-    if (step < STEP_LABELS.length) {
+    if (step < STEP_KEYS.length) {
       handleNext();
       return;
     }
@@ -338,7 +340,7 @@ export default function SubmitAdmissionPage() {
       const msg =
         err?.response?.data?.message ||
         err?.message ||
-        'Đã xảy ra lỗi. Vui lòng thử lại.';
+        t('submitAdmission.errorFallback');
 
       if (err?.response?.status === 409 || msg.toLowerCase().includes('already have a pending') || msg.toLowerCase().includes('trùng')) {
         const dup = checkDuplicateRequest(formData.fullName, formData.idNumber);
@@ -390,7 +392,7 @@ export default function SubmitAdmissionPage() {
   }
 
   const renderStepIndicator = ({ step: stepNum, currentStep: current, onStepClick }) => {
-    const stepInfo = STEP_LABELS[stepNum - 1];
+    const stepInfo = STEP_KEYS[stepNum - 1];
     if (!stepInfo) return null;
     const { Icon } = stepInfo;
     const status = current === stepNum ? 'active' : current > stepNum ? 'complete' : 'inactive';
@@ -413,7 +415,7 @@ export default function SubmitAdmissionPage() {
           )}
         </div>
         <span className={`sap-stepper-indicator-label sap-stepper-indicator-label--${status}`}>
-          {stepInfo.label}
+          {t(stepInfo.i18nKey)}
         </span>
       </div>
     );
@@ -422,9 +424,9 @@ export default function SubmitAdmissionPage() {
   return (
     <form className="sap-page" onSubmit={handleSubmit} noValidate>
       <div className="sap-page__header">
-        <h1 className="sap-page__title">Đăng ký tiếp nhận cư dân</h1>
+        <h1 className="sap-page__title">{t('submitAdmission.title')}</h1>
         <p className="sap-page__subtitle">
-          Vui lòng hoàn thành các bước bên dưới để chúng tôi hỗ trợ người thân của bạn tốt nhất.
+          {t('submitAdmission.subtitle')}
         </p>
       </div>
 
@@ -467,12 +469,12 @@ export default function SubmitAdmissionPage() {
             disabled={submitting}
           >
             <ChevronLeft size={16} />
-            Quay lại
+            {t('submitAdmission.back')}
           </button>
 
-          {step < STEP_LABELS.length ? (
+          {step < STEP_KEYS.length ? (
             <button key="btn-next" type="button" className="sap-btn sap-btn--primary" onClick={handleNext}>
-              Tiếp tục
+              {t('submitAdmission.next')}
               <ChevronRight size={16} />
             </button>
           ) : (
@@ -485,12 +487,12 @@ export default function SubmitAdmissionPage() {
               {submitting ? (
                 <>
                   <Loader2 size={16} className="sap-spinner" />
-                  Đang gửi...
+                  {t('submitAdmission.submitting')}
                 </>
               ) : (
                 <>
                   <Send size={16} />
-                  Gửi yêu cầu tiếp nhận
+                  {t('submitAdmission.submit')}
                 </>
               )}
             </button>
@@ -504,9 +506,9 @@ export default function SubmitAdmissionPage() {
             <Phone size={20} />
           </div>
           <div>
-            <h4 className="sap-help-card__title">Cần hỗ trợ?</h4>
+            <h4 className="sap-help-card__title">{t('submitAdmission.helpTitle')}</h4>
             <p className="sap-help-card__desc">
-              Gọi <strong>1900 1234</strong> để được hướng dẫn trực tiếp 24/7 về thủ tục tiếp nhận.
+              {t('submitAdmission.helpCall')} <strong>1900 1234</strong> {t('submitAdmission.helpCallSuffix')}
             </p>
           </div>
         </div>
@@ -515,9 +517,9 @@ export default function SubmitAdmissionPage() {
             <ClipboardCheck size={20} />
           </div>
           <div>
-            <h4 className="sap-help-card__title">Hồ sơ chuẩn bị</h4>
+            <h4 className="sap-help-card__title">{t('submitAdmission.docsTitle')}</h4>
             <p className="sap-help-card__desc">
-              Vui lòng chuẩn bị CCCD/Hộ chiếu gốc của cư dân và tóm tắt lịch sử y tế.
+              {t('submitAdmission.docsDesc')}
             </p>
           </div>
         </div>

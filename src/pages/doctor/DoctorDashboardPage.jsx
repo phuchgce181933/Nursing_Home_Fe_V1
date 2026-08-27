@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import {
   Users, Pill, CalendarCheck,
@@ -20,29 +21,29 @@ const todayISO = new Date().toISOString().split('T')[0];
 const MED_COLORS = {
   taken: '#10b981',
   late_taken: '#f59e0b',
-  pending: '#3b82f6',
+  pending: '#0f766e',
   missed: '#ef4444',
 };
 
-const APPT_STATUS_VI = {
-  scheduled: 'Chờ khám',
-  in_progress: 'Đang khám',
-  completed: 'Hoàn thành',
-  cancelled: 'Đã hủy',
-};
+const getApptStatusVI = (t) => ({
+  scheduled: t('doctorDashboard.apptStatus.scheduled'),
+  in_progress: t('doctorDashboard.apptStatus.inProgress'),
+  completed: t('doctorDashboard.apptStatus.completed'),
+  cancelled: t('doctorDashboard.apptStatus.cancelled'),
+});
 
 const APPT_STATUS_COLORS = {
-  scheduled: '#3b82f6',
+  scheduled: '#0f766e',
   in_progress: '#f59e0b',
   completed: '#10b981',
   cancelled: '#94a3b8',
 };
 
-function greeting() {
+function greeting(t) {
   const h = new Date().getHours();
-  if (h < 12) return 'Chào buổi sáng';
-  if (h < 18) return 'Chào buổi chiều';
-  return 'Chào buổi tối';
+  if (h < 12) return t('doctorDashboard.greetingMorning');
+  if (h < 18) return t('doctorDashboard.greetingAfternoon');
+  return t('doctorDashboard.greetingEvening');
 }
 
 function formatTime(str) {
@@ -66,8 +67,10 @@ const ChartTooltip = ({ active, payload, label }) => {
 };
 
 export default function DoctorDashboardPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const APPT_STATUS_VI = getApptStatusVI(t);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -152,7 +155,7 @@ export default function DoctorDashboardPage() {
     ? Object.entries(medStats)
         .filter(([, v]) => v > 0)
         .map(([k, v]) => ({
-          name: k === 'taken' ? 'Đã dùng' : k === 'late_taken' ? 'Muộn' : k === 'pending' ? 'Chờ phát' : 'Bỏ lỡ',
+          name: k === 'taken' ? t('doctorDashboard.medTaken') : k === 'late_taken' ? t('doctorDashboard.medLate') : k === 'pending' ? t('doctorDashboard.medPending') : t('doctorDashboard.medMissed'),
           value: v,
           fill: MED_COLORS[k],
         }))
@@ -162,7 +165,7 @@ export default function DoctorDashboardPage() {
     return (
       <div className="dd-loading-screen">
         <Loader2 size={32} className="dd-spin" />
-        <span>Đang tải dữ liệu...</span>
+        <span>{t('doctorDashboard.loading')}</span>
       </div>
     );
   }
@@ -178,7 +181,7 @@ export default function DoctorDashboardPage() {
           </div>
           <div>
             <h1 className="dd-header__title">
-              {greeting()}, <span>BS. {user?.fullName?.split(' ').pop() || ''}</span>
+              {greeting(t)}, <span>BS. {user?.fullName?.split(' ').pop() || ''}</span>
             </h1>
             <p className="dd-header__date">
               {new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
@@ -191,31 +194,31 @@ export default function DoctorDashboardPage() {
           disabled={refreshing}
         >
           <RefreshCw size={15} className={refreshing ? 'dd-spin' : ''} />
-          Làm mới
+          {t('doctorDashboard.refresh')}
         </button>
       </div>
 
       {/* ═══════════════ KPI GRID ═══════════════ */}
       <div className="dd-kpi-grid">
         <KpiCard
-          icon={Users} color="#3b5bdb" bg="#eef2ff"
-          label="Bệnh nhân phụ trách"
+          icon={Users} color="#0f766e" bg="rgba(15, 118, 110, 0.08)"
+          label={t('doctorDashboard.kpi.assignedResidents')}
           value={assignedResidentCount}
-          sub="Cư dân được phân công"
+          sub={t('doctorDashboard.kpi.assignedResidentsSub')}
           onClick={() => navigate('/doctor/health-monitoring')}
         />
         <KpiCard
           icon={CalendarCheck} color="#0891b2" bg="#e0f2fe"
-          label="Cuộc hẹn hôm nay"
+          label={t('doctorDashboard.kpi.todayAppointments')}
           value={todayAppointments.length}
-          sub={`${todayPendingCount} chưa hoàn thành`}
+          sub={t('doctorDashboard.kpi.pendingCount', { count: todayPendingCount })}
           onClick={() => navigate('/doctor/appointments')}
         />
         <KpiCard
           icon={Pill} color="#10b981" bg="#d1fae5"
-          label="Liều thuốc chờ hôm nay"
+          label={t('doctorDashboard.kpi.pendingDoses')}
           value={medStats?.pending ?? 0}
-          sub={`Tổng hôm nay: ${totalDoses} liều`}
+          sub={t('doctorDashboard.kpi.totalDoses', { total: totalDoses })}
           onClick={() => navigate('/doctor/medications')}
         />
       </div>
@@ -229,8 +232,8 @@ export default function DoctorDashboardPage() {
               <CalendarCheck size={17} />
             </div>
             <div>
-              <h3 className="dd-chart-card__title">Cuộc hẹn khám (30 ngày)</h3>
-              <p className="dd-chart-card__sub">Phân loại theo trạng thái</p>
+              <h3 className="dd-chart-card__title">{t('doctorDashboard.apptChart.title')}</h3>
+              <p className="dd-chart-card__sub">{t('doctorDashboard.apptChart.sub')}</p>
             </div>
           </div>
           <div className="dd-chart-body">
@@ -241,13 +244,13 @@ export default function DoctorDashboardPage() {
                   <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
                   <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
                   <Tooltip content={<ChartTooltip />} />
-                  <Bar dataKey="value" name="Số lượng" radius={[6, 6, 0, 0]}>
+                  <Bar dataKey="value" name={t('doctorDashboard.quantity')} radius={[6, 6, 0, 0]}>
                     {apptStatusData.map((d, i) => <Cell key={i} fill={d.fill} />)}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="dd-empty-chart">Không có cuộc hẹn nào trong 30 ngày qua</div>
+              <div className="dd-empty-chart">{t('doctorDashboard.apptChart.empty')}</div>
             )}
           </div>
         </div>
@@ -258,8 +261,8 @@ export default function DoctorDashboardPage() {
               <Pill size={17} />
             </div>
             <div>
-              <h3 className="dd-chart-card__title">Trạng thái thuốc hôm nay</h3>
-              <p className="dd-chart-card__sub">Tổng {totalDoses} liều cho bệnh nhân phụ trách</p>
+              <h3 className="dd-chart-card__title">{t('doctorDashboard.medChart.title')}</h3>
+              <p className="dd-chart-card__sub">{t('doctorDashboard.medChart.sub', { total: totalDoses })}</p>
             </div>
           </div>
           <div className="dd-chart-body">
@@ -286,7 +289,7 @@ export default function DoctorDashboardPage() {
                 </PieChart>
               </ResponsiveContainer>
             ) : (
-              <div className="dd-empty-chart">Chưa có lịch thuốc hôm nay</div>
+              <div className="dd-empty-chart">{t('doctorDashboard.medChart.empty')}</div>
             )}
           </div>
         </div>
@@ -301,16 +304,16 @@ export default function DoctorDashboardPage() {
             <div className="dd-chart-icon" style={{ background: '#e0f2fe', color: '#0891b2' }}>
               <Clock size={17} />
             </div>
-            <h3 className="dd-list-card__title">Lịch khám hôm nay</h3>
+            <h3 className="dd-list-card__title">{t('doctorDashboard.todayAppt.title')}</h3>
             <button className="dd-see-all" onClick={() => navigate('/doctor/appointments')}>
-              Xem tất cả <ChevronRight size={14} />
+              {t('doctorDashboard.todayAppt.seeAll')} <ChevronRight size={14} />
             </button>
           </div>
           <div className="dd-list-body">
             {todayAppointments.length === 0 ? (
               <div className="dd-empty-list">
                 <CheckCircle2 size={32} color="#10b981" />
-                <span>Không có cuộc hẹn nào hôm nay</span>
+                <span>{t('doctorDashboard.todayAppt.empty')}</span>
               </div>
             ) : (
               todayAppointments.map((a, i) => (
@@ -320,8 +323,8 @@ export default function DoctorDashboardPage() {
                     {formatTime(a.scheduledStartAt)}
                   </div>
                   <div className="dd-appt-item__body">
-                    <span className="dd-appt-item__resident">{a.residentId?.fullName || 'Cư dân'}</span>
-                    <span className="dd-appt-item__type">{a.appointmentType || 'Khám bệnh'}</span>
+                    <span className="dd-appt-item__resident">{a.residentId?.fullName || t('doctorDashboard.todayAppt.resident')}</span>
+                    <span className="dd-appt-item__type">{a.appointmentType || t('doctorDashboard.todayAppt.examination')}</span>
                   </div>
                   <span
                     className="dd-status-badge"

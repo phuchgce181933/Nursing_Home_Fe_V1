@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import {
   Plus,
@@ -44,22 +45,15 @@ const getStatusBadgeClass = (status) => {
   }
 };
 
-const getStatusLabel = (status) => {
-  switch (status) {
-    case 'pending':
-      return 'Chờ duyệt';
-    case 'approved':
-      return 'Đã duyệt';
-    case 'rejected':
-      return 'Bị từ chối';
-    case 'cancelled':
-      return 'Đã hủy';
-    default:
-      return status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Chờ duyệt';
-  }
+const VISIT_STATUS_I18N = {
+  pending: 'visitHistory.statusPending',
+  approved: 'visitHistory.statusApproved',
+  rejected: 'visitHistory.statusRejected',
+  cancelled: 'visitHistory.statusCancelled',
 };
 
 export default function ResidentVisitHistoryPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
 
   const [visits, setVisits] = useState([]);
@@ -135,9 +129,9 @@ export default function ResidentVisitHistoryPage() {
         {/* Header Section */}
         <div className="arh-header">
           <div className="arh-header__title-group">
-            <h1 className="arh-header__title">Lịch sử Đặt lịch Thăm</h1>
+            <h1 className="arh-header__title">{t('visitHistory.title')}</h1>
             <p className="arh-header__subtitle">
-              Quản lý và theo dõi các lịch thăm người thân của bạn tại Viện dưỡng lão An Nhiên.
+              {t('visitHistory.subtitle')}
             </p>
           </div>
           <button
@@ -145,7 +139,7 @@ export default function ResidentVisitHistoryPage() {
             onClick={() => navigate('/family/resident-visits/new')}
           >
             <Plus size={16} />
-            Đặt lịch thăm mới
+            {t('visitHistory.newVisit')}
           </button>
         </div>
 
@@ -156,7 +150,7 @@ export default function ResidentVisitHistoryPage() {
               <div className="arh-stat-card__icon-box arh-stat-card__icon-box--pending">
                 <Clock size={20} />
               </div>
-              <span className="arh-stat-card__label">Đang chờ duyệt</span>
+              <span className="arh-stat-card__label">{t('visitHistory.statsPending')}</span>
             </div>
             <div className="arh-stat-card__value">{String(stats.active).padStart(2, '0')}</div>
           </div>
@@ -166,7 +160,7 @@ export default function ResidentVisitHistoryPage() {
               <div className="arh-stat-card__icon-box arh-stat-card__icon-box--completed">
                 <CheckCircle size={20} />
               </div>
-              <span className="arh-stat-card__label">Đã được duyệt</span>
+              <span className="arh-stat-card__label">{t('visitHistory.statsApproved')}</span>
             </div>
             <div className="arh-stat-card__value">{String(stats.approved).padStart(2, '0')}</div>
           </div>
@@ -176,7 +170,7 @@ export default function ResidentVisitHistoryPage() {
               <div className="arh-stat-card__icon-box arh-stat-card__icon-box--appointment">
                 <Calendar size={20} />
               </div>
-              <span className="arh-stat-card__label">Tổng lượt đặt lịch</span>
+              <span className="arh-stat-card__label">{t('visitHistory.statsTotal')}</span>
             </div>
             <div className="arh-stat-card__value">{String(stats.total).padStart(2, '0')}</div>
           </div>
@@ -193,11 +187,11 @@ export default function ResidentVisitHistoryPage() {
                 setPage(1);
               }}
             >
-              <option value="">Tất cả trạng thái</option>
-              <option value="pending">Chờ duyệt</option>
-              <option value="approved">Đã duyệt</option>
-              <option value="rejected">Bị từ chối</option>
-              <option value="cancelled">Đã hủy</option>
+              <option value="">{t('visitHistory.allStatuses')}</option>
+              <option value="pending">{t('visitHistory.statusPending')}</option>
+              <option value="approved">{t('visitHistory.statusApproved')}</option>
+              <option value="rejected">{t('visitHistory.statusRejected')}</option>
+              <option value="cancelled">{t('visitHistory.statusCancelled')}</option>
             </select>
           </div>
         </div>
@@ -207,18 +201,18 @@ export default function ResidentVisitHistoryPage() {
           {loading ? (
             <div className="arh-loading">
               <Loader2 size={32} className="arh-spinner" />
-              <span>Đang tải lịch sử đặt lịch thăm...</span>
+              <span>{t('visitHistory.loading')}</span>
             </div>
           ) : visits.length === 0 ? (
             <div className="arh-empty">
               <Inbox size={48} className="arh-empty__icon" />
-              <h4>Không tìm thấy lịch thăm nào</h4>
-              <p>Bạn chưa đặt lịch thăm nào hoặc không có yêu cầu nào khớp với bộ lọc hiện tại.</p>
+              <h4>{t('visitHistory.emptyTitle')}</h4>
+              <p>{t('visitHistory.emptyDesc')}</p>
               <button
                 className="arh-btn arh-btn--primary mt-4"
                 onClick={() => navigate('/family/resident-visits/new')}
               >
-                Đặt lịch thăm mới
+                {t('visitHistory.newVisit')}
               </button>
             </div>
           ) : (
@@ -228,13 +222,13 @@ export default function ResidentVisitHistoryPage() {
                 <table className="arh-table">
                   <thead>
                     <tr>
-                      <th>Người thân</th>
-                      <th>Người đến thăm</th>
-                      <th>Ngày mong muốn</th>
-                      <th>Khung giờ</th>
-                      <th>Khách</th>
-                      <th>Trạng thái</th>
-                      <th className="text-right">Hành động</th>
+                      <th>{t('visitHistory.colResident')}</th>
+                      <th>{t('visitHistory.colVisitor')}</th>
+                      <th>{t('visitHistory.colPreferredDate')}</th>
+                      <th>{t('visitHistory.colTimeSlot')}</th>
+                      <th>{t('visitHistory.colVisitors')}</th>
+                      <th>{t('visitHistory.colStatus')}</th>
+                      <th className="text-right">{t('visitHistory.colActions')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -248,10 +242,10 @@ export default function ResidentVisitHistoryPage() {
                         <td>{v.requestedTimeSlot || 'N/A'}</td>
                         <td>{v.numberOfVisitors}</td>
                         <td>
-                          <span className={getStatusBadgeClass(v.status)}>{getStatusLabel(v.status)}</span>
+                          <span className={getStatusBadgeClass(v.status)}>{t(VISIT_STATUS_I18N[v.status] || 'visitHistory.statusPending')}</span>
                         </td>
                         <td className="text-right">
-                          <button className="arh-action-btn" title="Xem chi tiết" onClick={() => handleOpenDetail(v)}>
+                          <button className="arh-action-btn" title={t('visitHistory.viewDetail')} onClick={() => handleOpenDetail(v)}>
                             <Eye size={16} />
                           </button>
                         </td>
@@ -267,24 +261,24 @@ export default function ResidentVisitHistoryPage() {
                   <div key={v._id} className="arh-mobile-card">
                     <div className="arh-mobile-card__header">
                       <strong className="text-slate-800 text-[15px]">{v.resident?.fullName || 'N/A'}</strong>
-                      <span className={getStatusBadgeClass(v.status)}>{getStatusLabel(v.status)}</span>
+                      <span className={getStatusBadgeClass(v.status)}>{t(VISIT_STATUS_I18N[v.status] || 'visitHistory.statusPending')}</span>
                     </div>
 
                     <div className="arh-mobile-card__body">
                       <div className="arh-mobile-card__row">
-                        <span>Người đến thăm:</span>
+                        <span>{t('visitHistory.mobileVisitor')}</span>
                         <strong>{v.visitorName}</strong>
                       </div>
                       <div className="arh-mobile-card__row">
-                        <span>Ngày:</span>
+                        <span>{t('visitHistory.mobileDate')}</span>
                         <strong>{formatViDate(v.requestedDate)}</strong>
                       </div>
                       <div className="arh-mobile-card__row">
-                        <span>Khung giờ:</span>
+                        <span>{t('visitHistory.mobileTimeSlot')}</span>
                         <strong>{v.requestedTimeSlot || 'N/A'}</strong>
                       </div>
                       <div className="arh-mobile-card__row">
-                        <span>Khách:</span>
+                        <span>{t('visitHistory.mobileVisitors')}</span>
                         <strong>{v.numberOfVisitors}</strong>
                       </div>
                     </div>
@@ -292,7 +286,7 @@ export default function ResidentVisitHistoryPage() {
                     <div className="arh-mobile-card__footer">
                       <button className="arh-action-btn w-full" onClick={() => handleOpenDetail(v)}>
                         <Eye size={16} />
-                        Xem chi tiết lịch thăm
+                        {t('visitHistory.viewDetailFull')}
                       </button>
                     </div>
                   </div>
@@ -303,7 +297,7 @@ export default function ResidentVisitHistoryPage() {
               {totalPages > 1 && (
                 <div className="arh-pagination">
                   <span className="arh-pagination__total">
-                    Hiển thị <strong>{visits.length}</strong> trên <strong>{total}</strong> lịch thăm
+                    {t('visitHistory.paginationInfo', { shown: visits.length, total })}
                   </span>
 
                   <div className="arh-pagination__controls">

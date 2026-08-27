@@ -9,7 +9,7 @@
 .bell-notification-panel .panel-header .meta strong { font-size: 18px; color: #0f1724; }
 .bell-notification-panel .bell-tabs { margin-top: 12px; }
 .bell-notification-panel .tab-btn { padding: 10px 14px; border-radius: 999px; background: #f4f6ff; border: 1px solid transparent; color: #1f2937; }
-.bell-notification-panel .tab-btn.active { background: #4338ca; color: #fff; }
+.bell-notification-panel .tab-btn.active { background: var(--nh-primary); color: #fff; }
 .bell-notification-panel .notification-item { background: #f8fafc; border-color: transparent; }
 .bell-notification-panel .notification-item.unread { background: #eef2ff; }
 .bell-notification-panel .notification-title { color: #111827; }
@@ -38,7 +38,7 @@
 .notification-item.unread { background: rgba(14,165,160,0.04); }
 .notification-item .left { display: flex; gap: 10px; align-items: flex-start; }
 .notification-dot { width: 10px; height: 10px; border-radius: 99px; margin-top: 6px; }
-.notification-dot.unseen { background: #3b82f6; box-shadow: 0 0 6px rgba(59,130,246,0.35); }
+.notification-dot.unseen { background: var(--nh-info); box-shadow: 0 0 6px rgba(2, 132, 199, 0.35); }
 .notification-title { font-weight: 600; color: #e6eef6; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .notification-content { color: #c7d6de; margin-top: 6px; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; white-space: normal; overflow: hidden; text-overflow: ellipsis; font-size: 13px; }
 .notification-time { color: #94a3b8; margin-top: 8px; font-size: 12px; }
@@ -142,4 +142,17 @@
 .pager-btn.prev { background: #ffffff; color: #0f6b3e; border: 1px solid #0f6b3e; }
 .pager-btn.next { background: #ffffff; color: #0f1724; border: 1px solid rgba(15,23,36,0.08); }
 .pager-btn[disabled] { opacity: 0.6; cursor: not-allowed; }
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .notification-panel { width: calc(100vw - 32px); right: -60px; }
+  .notification-header { flex-direction: column; align-items: flex-start; }
+  .notification-filter-controls { flex-direction: column; align-items: flex-start; }
+  .notification-bulk-actions { justify-content: flex-start; }
+  .notification-item { flex-direction: column; gap: 10px; }
+  .notification-item-actions { justify-content: flex-start; }
+  .settings-checkbox-list { grid-template-columns: 1fr; }
+  .page-title { font-size: 22px; }
+  .notification-footer { flex-direction: column; align-items: flex-start; }
+}
 

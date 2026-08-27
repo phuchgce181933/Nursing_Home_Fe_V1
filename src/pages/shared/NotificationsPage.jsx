@@ -1,16 +1,17 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { Settings, Bell, Trash2, CheckCheck, AlertTriangle, ChevronLeft, ChevronRight, X, Search } from 'lucide-react';
 import notificationsService from '../../services/notifications.service';
 
-const CATEGORY_LABELS = {
-  incident: 'Sự cố',
-  health: 'Sức khỏe',
-  appointment: 'Cuộc hẹn',
-  activity: 'Hoạt động',
-  billing: 'Thanh toán',
-  message: 'Tin nhắn',
-  system: 'Hệ thống',
+const CATEGORY_I18N = {
+  incident: 'notifications.catIncident',
+  health: 'notifications.catHealth',
+  appointment: 'notifications.catAppointment',
+  activity: 'notifications.catActivity',
+  billing: 'notifications.catBilling',
+  message: 'notifications.catMessage',
+  system: 'notifications.catSystem',
 };
 
 const SELECT_CLASS =
@@ -29,6 +30,7 @@ function NotificationSkeletonRow({ delay }) {
 }
 
 function NotificationsPage({ role = 'family' }) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -47,8 +49,8 @@ function NotificationsPage({ role = 'family' }) {
   const [markingAll, setMarkingAll] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(null); // { type: 'one'|'bulk', id? }
 
-  const getNotificationTitle = (item) => item.title || item.subject || item.message || CATEGORY_LABELS[item.category] || 'Thông báo mới';
-  const getNotificationContent = (item) => item.content || item.message || item.body || item.description || item.text || 'Nội dung đang cập nhật...';
+  const getNotificationTitle = (item) => item.title || item.subject || item.message || (CATEGORY_I18N[item.category] ? t(CATEGORY_I18N[item.category]) : null) || t('notifications.defaultTitle');
+  const getNotificationContent = (item) => item.content || item.message || item.body || item.description || item.text || t('notifications.defaultContent');
 
   const buildQuery = (p = 1) => {
     const q = { page: p, limit };
@@ -81,7 +83,7 @@ function NotificationsPage({ role = 'family' }) {
       setPage(res.page || p);
       setSelected(new Set());
     } catch (err) {
-      setError(err?.response?.data?.message || err.message || 'Không thể tải danh sách thông báo');
+      setError(err?.response?.data?.message || err.message || t('notifications.errorLoadList'));
     } finally {
       setLoading(false);
     }
@@ -216,14 +218,14 @@ function NotificationsPage({ role = 'family' }) {
             <Bell size={19} />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-slate-800">Thông báo</h2>
-            <p className="text-sm text-slate-400">Xem, lọc, đánh dấu và xóa thông báo của bạn</p>
+            <h2 className="text-lg font-bold text-slate-800">{t('notifications.title')}</h2>
+            <p className="text-sm text-slate-400">{t('notifications.subtitle')}</p>
           </div>
         </div>
 
         <div className="relative">
           <button
-            title="Cài đặt thông báo"
+            title={t('notifications.settingsTooltip')}
             onClick={() => { setShowSettingsPanel((s) => !s); if (!showSettingsPanel) loadSettings(); }}
             className={`press-effect flex h-9 w-9 items-center justify-center rounded-full transition-colors ${
               showSettingsPanel ? 'bg-navy-deep text-white' : 'bg-surface-container-low text-slate-500 hover:bg-slate-200'
@@ -235,7 +237,7 @@ function NotificationsPage({ role = 'family' }) {
             <>
               <div className="fixed inset-0 z-10" onClick={() => setShowSettingsPanel(false)} />
               <div className="animate-scale-in absolute right-0 top-[calc(100%+8px)] z-20 w-80 rounded-xl border border-slate-100 bg-white p-4 shadow-xl">
-                <div className="mb-3 text-sm font-bold text-slate-800">Cài đặt thông báo</div>
+                <div className="mb-3 text-sm font-bold text-slate-800">{t('notifications.settingsTitle')}</div>
                 <label className="flex items-center gap-2 text-sm text-slate-600">
                   <input
                     type="checkbox"
@@ -243,11 +245,11 @@ function NotificationsPage({ role = 'family' }) {
                     onChange={(e) => setSettings((s) => ({ ...s, doNotDisturb: e.target.checked }))}
                     className="h-4 w-4 rounded border-outline-variant"
                   />
-                  Không làm phiền (tắt toàn bộ thông báo đẩy)
+                  {t('notifications.doNotDisturb')}
                 </label>
                 <div className="mt-3">
                   <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">
-                    Loại thông báo muốn nhận
+                    {t('notifications.categoryPrefsTitle')}
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {categories.map((c) => (
@@ -267,7 +269,7 @@ function NotificationsPage({ role = 'family' }) {
                           }}
                           className="h-3.5 w-3.5"
                         />
-                        {CATEGORY_LABELS[c] || c}
+                        {CATEGORY_I18N[c] ? t(CATEGORY_I18N[c]) : c}
                       </label>
                     ))}
                   </div>
@@ -276,7 +278,7 @@ function NotificationsPage({ role = 'family' }) {
                   onClick={async () => { await notificationsService.updateSettings(settings, role); setShowSettingsPanel(false); }}
                   className="press-effect mt-4 w-full rounded-lg bg-navy-deep py-2 text-sm font-semibold text-white transition-colors hover:bg-[#132745]"
                 >
-                  Lưu cài đặt
+                  {t('notifications.saveSettings')}
                 </button>
               </div>
             </>
@@ -293,18 +295,18 @@ function NotificationsPage({ role = 'family' }) {
               onChange={(e) => setSearchInput(e.target.value)}
               onKeyDown={handleSearchKeyDown}
               onBlur={handleApplyFilters}
-              placeholder="Tìm thông báo"
+              placeholder={t('notifications.searchPlaceholder')}
               className="w-36 border-none bg-transparent text-sm text-slate-600 outline-none placeholder:text-slate-400"
             />
           </div>
           <select value={filterRead} onChange={(e) => setFilterRead(e.target.value)} className={SELECT_CLASS}>
-            <option value="all">Tất cả</option>
-            <option value="unread">Chưa đọc</option>
-            <option value="read">Đã đọc</option>
+            <option value="all">{t('notifications.filterAll')}</option>
+            <option value="unread">{t('notifications.filterUnread')}</option>
+            <option value="read">{t('notifications.filterRead')}</option>
           </select>
           <select value={category} onChange={(e) => setCategory(e.target.value)} className={SELECT_CLASS}>
-            <option value="">Tất cả loại</option>
-            {categories.map((c) => (<option key={c} value={c}>{CATEGORY_LABELS[c] || c}</option>))}
+            <option value="">{t('notifications.filterAllTypes')}</option>
+            {categories.map((c) => (<option key={c} value={c}>{CATEGORY_I18N[c] ? t(CATEGORY_I18N[c]) : c}</option>))}
           </select>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -313,28 +315,28 @@ function NotificationsPage({ role = 'family' }) {
             disabled={!items.length}
             className="rounded-lg border border-outline-variant px-3 py-2 text-xs font-medium text-slate-500 transition-colors hover:bg-slate-50 disabled:opacity-40"
           >
-            {allOnPageSelected ? 'Bỏ chọn trang này' : 'Chọn trang này'}
+            {allOnPageSelected ? t('notifications.deselectPage') : t('notifications.selectPage')}
           </button>
           <button
             onClick={handleBulkMarkRead}
             disabled={!selected.size}
             className="press-effect flex items-center gap-1.5 rounded-lg bg-status-success/10 px-3 py-2 text-xs font-semibold text-status-success transition-colors hover:bg-status-success/20 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            <CheckCheck size={13} /> Đánh dấu đã đọc ({selected.size})
+            <CheckCheck size={13} /> {t('notifications.markReadCount', { count: selected.size })}
           </button>
           <button
             onClick={() => selected.size && setConfirmDelete({ type: 'bulk' })}
             disabled={!selected.size}
             className="press-effect flex items-center gap-1.5 rounded-lg bg-error/10 px-3 py-2 text-xs font-semibold text-error transition-colors hover:bg-error/20 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            <Trash2 size={13} /> Xóa ({selected.size})
+            <Trash2 size={13} /> {t('notifications.deleteCount', { count: selected.size })}
           </button>
           <button
             onClick={handleMarkAllInInbox}
             disabled={markingAll}
             className="press-effect rounded-lg border border-navy-deep/20 px-3 py-2 text-xs font-semibold text-navy-deep transition-colors hover:bg-navy-deep/5 disabled:opacity-60"
           >
-            {markingAll ? 'Đang xử lý...' : 'Đánh dấu tất cả đã đọc'}
+            {markingAll ? t('notifications.processing') : t('notifications.markAllRead')}
           </button>
         </div>
       </div>
@@ -348,20 +350,20 @@ function NotificationsPage({ role = 'family' }) {
       {confirmDelete && (
         <div className="animate-scale-in mb-4 flex items-center justify-between gap-3 rounded-xl border border-error/30 bg-error/5 px-4 py-3">
           <span className="text-sm text-error">
-            {confirmDelete.type === 'bulk' ? `Xóa ${selected.size} thông báo đã chọn?` : 'Xóa thông báo này?'}
+            {confirmDelete.type === 'bulk' ? t('notifications.confirmDeleteBulk', { count: selected.size }) : t('notifications.confirmDeleteOne')}
           </span>
           <div className="flex flex-shrink-0 gap-2">
             <button
               onClick={() => (confirmDelete.type === 'bulk' ? handleBulkDelete() : handleDelete(confirmDelete.id))}
               className="press-effect rounded-lg bg-error px-3 py-1.5 text-xs font-semibold text-white"
             >
-              Xóa
+              {t('notifications.delete')}
             </button>
             <button
               onClick={() => setConfirmDelete(null)}
               className="rounded-lg border border-outline-variant px-3 py-1.5 text-xs font-medium text-slate-500"
             >
-              Hủy
+              {t('notifications.cancel')}
             </button>
           </div>
         </div>
@@ -374,7 +376,7 @@ function NotificationsPage({ role = 'family' }) {
       ) : !error && items.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-outline-variant py-16 text-center">
           <Bell size={40} strokeWidth={1.5} className="text-slate-300" />
-          <span className="text-sm text-slate-400">Không có thông báo nào phù hợp</span>
+          <span className="text-sm text-slate-400">{t('notifications.emptyMessage')}</span>
         </div>
       ) : !error ? (
         <ul className="space-y-2.5">
@@ -401,18 +403,18 @@ function NotificationsPage({ role = 'family' }) {
                   <div className="flex flex-wrap items-center gap-2">
                     <strong className="text-sm font-bold text-slate-800">{getNotificationTitle(n)}</strong>
                     {!n.isRead && (
-                      <span className="rounded-full bg-status-success px-2 py-0.5 text-[11px] font-semibold text-white">Mới</span>
+                      <span className="rounded-full bg-status-success px-2 py-0.5 text-[11px] font-semibold text-white">{t('notifications.newBadge')}</span>
                     )}
                     {n.category && (
                       <span className="rounded-full bg-surface-container-low px-2 py-0.5 text-[11px] font-medium text-slate-500">
-                        {CATEGORY_LABELS[n.category] || n.category}
+                        {CATEGORY_I18N[n.category] ? t(CATEGORY_I18N[n.category]) : n.category}
                       </span>
                     )}
                   </div>
                   <div className="mt-1.5 whitespace-pre-wrap text-sm text-slate-600">{getNotificationContent(n)}</div>
                   <div className="mt-1.5 text-xs text-slate-400">{new Date(n.updatedAt || n.createdAt).toLocaleString('vi-VN')}</div>
                   {getDetailLink(n) && (
-                    <div className="mt-1 text-xs font-semibold text-navy-deep">Xem chi tiết yêu cầu →</div>
+                    <div className="mt-1 text-xs font-semibold text-navy-deep">{t('notifications.viewDetailLink')}</div>
                   )}
                 </div>
               </div>
@@ -421,7 +423,7 @@ function NotificationsPage({ role = 'family' }) {
                 {!n.isRead && (
                   <button
                     onClick={() => handleMarkRead(n._id)}
-                    title="Đánh dấu đã đọc"
+                    title={t('notifications.markReadTooltip')}
                     className="press-effect flex h-7 w-7 items-center justify-center rounded-full bg-status-info/10 text-status-info transition-colors hover:bg-status-info/20"
                   >
                     <CheckCheck size={14} />
@@ -429,7 +431,7 @@ function NotificationsPage({ role = 'family' }) {
                 )}
                 <button
                   onClick={() => setConfirmDelete({ type: 'one', id: n._id })}
-                  title="Xóa"
+                  title={t('notifications.deleteTooltip')}
                   className="press-effect flex h-7 w-7 items-center justify-center rounded-full bg-error/10 text-error transition-colors hover:bg-error/20"
                 >
                   <X size={14} />
@@ -442,7 +444,7 @@ function NotificationsPage({ role = 'family' }) {
 
       {!loading && total > 0 && (
         <div className="mt-4 flex items-center justify-between gap-3 text-sm text-slate-500">
-          <span>Trang {page}/{totalPages} — {total} thông báo{unreadOnPage > 0 ? ` (${unreadOnPage} chưa đọc trên trang này)` : ''}</span>
+          <span>{t('notifications.pageInfo', { page, totalPages, total })}{unreadOnPage > 0 ? t('notifications.unreadOnPage', { count: unreadOnPage }) : ''}</span>
           <div className="flex gap-2">
             <button
               onClick={() => fetch(Math.max(1, page - 1))}

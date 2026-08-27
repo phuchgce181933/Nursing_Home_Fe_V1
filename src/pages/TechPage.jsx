@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import {
   Monitor, AlertTriangle, FileText, Brain, Users, Check,
@@ -20,24 +21,24 @@ const CHART_BARS = [
   { day: 'CN', height: 88, active: false },
 ];
 
-const EHR_ITEMS = [
-  'Hồ sơ y tế điện tử',
-  'Đơn thuốc tự động',
-  'Kế hoạch chăm sóc',
-  'Lịch sử điều trị',
+const getEhrItems = (t) => [
+  t('tech.ehr.item1'), t('tech.ehr.item2'), t('tech.ehr.item3'), t('tech.ehr.item4'),
 ];
 
-const AI_CHIPS = [
-  { label: 'Phân tích ECG', teal: true },
-  { label: 'Dự báo té ngã', teal: false },
-  { label: 'Theo dõi SpO2', teal: true },
-  { label: 'Nhận diện gương mặt', teal: false },
-  { label: 'Phân tích giấc ngủ', teal: false },
-  { label: 'Cảnh báo dị ứng', teal: true },
+const getAiChips = (t) => [
+  { label: t('tech.ai.ecg'), teal: true },
+  { label: t('tech.ai.fallPredict'), teal: false },
+  { label: t('tech.ai.spo2'), teal: true },
+  { label: t('tech.ai.faceId'), teal: false },
+  { label: t('tech.ai.sleep'), teal: false },
+  { label: t('tech.ai.allergy'), teal: true },
 ];
 
 export default function TechPage() {
+  const { t } = useTranslation();
   const { token, user } = useAuth();
+  const EHR_ITEMS = getEhrItems(t);
+  const AI_CHIPS = getAiChips(t);
   const tourPath = (token && user?.role === 'family') ? '/family/facility-tours/new' : '/login';
 
   return (
@@ -49,14 +50,13 @@ export default function TechPage() {
         {/* ── HERO ── */}
         <section className="tp2-hero">
           <div className="tp2-hero__text">
-            <h1>Công Nghệ Chăm Sóc <span>Thông Minh</span></h1>
+            <h1>{t('tech.hero.title')} <span>{t('tech.hero.titleHighlight')}</span></h1>
             <p>
-              Sự kết hợp hoàn hảo giữa công nghệ tiên tiến và tình yêu thương, mang đến
-              sự an tâm tuyệt đối cho gia đình và cuộc sống trọn vẹn cho người cao tuổi.
+              {t('tech.hero.desc')}
             </p>
           </div>
           <div className="tp2-hero__img">
-            <img src={HERO_IMG} alt="Công nghệ chăm sóc thông minh tại An Nhiên" />
+            <img src={HERO_IMG} alt={t('tech.hero.imgAlt')} />
           </div>
         </section>
 
@@ -70,11 +70,10 @@ export default function TechPage() {
               <div className="tp2-card__icon-box tp2-card__icon-box--primary">
                 <Monitor size={24} />
               </div>
-              <h2 className="tp2-card__title">Bảng Điều Khiển Sức Khỏe</h2>
+              <h2 className="tp2-card__title">{t('tech.dashboard.title')}</h2>
             </div>
             <p className="tp2-card__body">
-              Màn hình tổng quan theo dõi liên tục nhịp tim, huyết áp, nồng độ oxy và chất
-              lượng giấc ngủ của từng cư dân — tất cả trong một giao diện trực quan.
+              {t('tech.dashboard.desc')}
             </p>
             <div className="tp2-chart">
               {CHART_BARS.map((bar, i) => (
@@ -98,11 +97,10 @@ export default function TechPage() {
               <div className="tp2-card__icon-box tp2-card__icon-box--error">
                 <AlertTriangle size={24} />
               </div>
-              <h2 className="tp2-card__title">Cảm Biến Té Ngã</h2>
+              <h2 className="tp2-card__title">{t('tech.fallSensor.title')}</h2>
             </div>
             <p className="tp2-card__body">
-              Công nghệ radar và AI phân tích chuyển động, lập tức cảnh báo nhân viên y tế
-              khi có sự cố, không xâm phạm quyền riêng tư.
+              {t('tech.fallSensor.desc')}
             </p>
             <div className="tp2-ping-wrap">
               <div className="tp2-ping-ring" />
@@ -118,11 +116,10 @@ export default function TechPage() {
               <div className="tp2-card__icon-box tp2-card__icon-box--sec">
                 <FileText size={24} />
               </div>
-              <h2 className="tp2-card__title">Hồ Sơ Điện Tử</h2>
+              <h2 className="tp2-card__title">{t('tech.ehr.title')}</h2>
             </div>
             <p className="tp2-card__body">
-              Toàn bộ dữ liệu y tế được số hoá, bảo mật và đồng bộ thời gian thực giữa
-              bác sĩ, điều dưỡng và gia đình.
+              {t('tech.ehr.desc')}
             </p>
             <div className="tp2-checklist">
               {EHR_ITEMS.map((item, i) => (
@@ -141,11 +138,10 @@ export default function TechPage() {
               <div className="tp2-card__icon-box tp2-card__icon-box--teal">
                 <Brain size={24} />
               </div>
-              <h2 className="tp2-card__title">Trí Tuệ Nhân Tạo Y Tế</h2>
+              <h2 className="tp2-card__title">{t('tech.ai.title')}</h2>
             </div>
             <p className="tp2-card__body">
-              Mô hình AI phân tích hàng nghìn điểm dữ liệu mỗi giờ, phát hiện sớm nguy cơ
-              đột quỵ, suy tim và các bất thường sức khỏe trước 24–48 giờ.
+              {t('tech.ai.desc')}
             </p>
             <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start' }}>
               <div className="tp2-chips" style={{ flex: 1 }}>
@@ -163,7 +159,7 @@ export default function TechPage() {
                   <Brain size={32} />
                 </div>
                 <p className="tp2-status-box__label">98.7%</p>
-                <p style={{ fontSize: 12, color: '#454652', textAlign: 'center', position: 'relative', zIndex: 1 }}>Độ chính xác</p>
+                <p style={{ fontSize: 12, color: '#454652', textAlign: 'center', position: 'relative', zIndex: 1 }}>{t('tech.ai.accuracy')}</p>
               </div>
             </div>
           </div>
@@ -174,20 +170,18 @@ export default function TechPage() {
               <div className="tp2-card__icon-box tp2-card__icon-box--light">
                 <Users size={24} />
               </div>
-              <h2 className="tp2-card__title">Kết Nối Gia Đình</h2>
+              <h2 className="tp2-card__title">{t('tech.family.title')}</h2>
             </div>
             <div className="tp2-family-row">
               <p className="tp2-card__body">
-                Ứng dụng gia đình cho phép theo dõi tình trạng sức khoẻ, lịch sinh hoạt,
-                đơn thuốc và trò chuyện trực tiếp với đội ngũ chăm sóc mọi lúc, mọi nơi —
-                tăng cường kết nối yêu thương không khoảng cách.
+                {t('tech.family.desc')}
               </p>
               <div className="tp2-family-btns">
                 <Link to={tourPath} className="tp2-family-btn tp2-family-btn--solid">
-                  Tham Quan Ngay
+                  {t('tech.family.tour')}
                 </Link>
                 <Link to="/contact" className="tp2-family-btn tp2-family-btn--outline">
-                  Liên Hệ
+                  {t('tech.family.contact')}
                 </Link>
               </div>
             </div>

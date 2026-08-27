@@ -25,7 +25,7 @@
   margin: 0 0 10px;
   font-size: 0.9rem;
   color: #0f172a;
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: inherit;
 }
 
 .transfer-card p {

@@ -5,7 +5,7 @@
   padding: 24px;
   max-width: 1600px;
   margin: 0 auto;
-  font-family: 'Manrope', sans-serif;
+  font-family: inherit;
   color: #1f2937;
   background: radial-gradient(circle at top left, rgba(14, 116, 144, 0.08), transparent 55%),
     linear-gradient(180deg, #f8fafc 0%, #ffffff 50%, #f9fafb 100%);
@@ -23,7 +23,7 @@
 .resident-page__title {
   font-size: clamp(1.8rem, 2.4vw, 2.4rem);
   font-weight: 700;
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: inherit;
   color: #0f172a;
   margin: 0;
 }
@@ -265,6 +265,7 @@
   border: 1px solid #e2e8f0;
   border-radius: 16px;
   overflow: hidden;
+  overflow-x: auto;
   box-shadow: 0 12px 24px rgba(15, 23, 42, 0.04);
 }
 
@@ -433,7 +434,7 @@
 .resident-modal__header h2 {
   margin: 0;
   font-size: 1.5rem;
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: inherit;
 }
 
 .resident-modal__header p {
@@ -489,7 +490,7 @@
   padding: 10px 12px;
   background: #f8fafc;
   font-size: 14px;
-  font-family: 'Manrope', sans-serif;
+  font-family: inherit;
 }
 
 .resident-form-section {
@@ -513,7 +514,7 @@
 .resident-form-section h3,
 .resident-form-section h4 {
   margin: 0;
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: inherit;
 }
 
 .resident-form-empty {
@@ -570,7 +571,7 @@
 
 .resident-detail-card h3 {
   margin: 0;
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: inherit;
 }
 
 .resident-detail-card p {
@@ -612,7 +613,7 @@
   margin: 0 0 6px;
   font-size: 1.15rem;
   font-weight: 700;
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: inherit;
   color: #0f172a;
 }
 
@@ -750,7 +751,7 @@
 .modal__title {
   margin: 0 0 16px;
   font-size: 1.35rem;
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: inherit;
   color: #0f172a;
 }
 

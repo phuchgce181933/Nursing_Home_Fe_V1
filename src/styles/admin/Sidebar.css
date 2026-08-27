@@ -144,7 +144,7 @@
 }
 
 .sidebar__item--active {
-  background: #2563eb;
+  background: var(--nh-primary);
   color: #ffffff;
   box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
 }
@@ -312,4 +312,112 @@
 
 .sidebar__subitem--active .sidebar__subitem-icon {
   opacity: 1;
+}
+
+/* ─── Hamburger / Close / Backdrop (base — hidden on desktop) ─── */
+.sidebar__hamburger {
+  display: none;
+}
+
+.sidebar__close {
+  display: none;
+}
+
+.sidebar__backdrop {
+  display: none;
+}
+
+/* ═══ Responsive — tablets & mobile (< 1024px) ═══ */
+@media (max-width: 1023px) {
+
+  /* Sidebar becomes a fixed overlay that slides in from the left */
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 50;
+    height: 100dvh;       /* dynamic viewport height for mobile browsers */
+    transform: translateX(-100%);
+    transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1),
+                box-shadow 0.3s ease;
+    box-shadow: none;
+    /* width stays at 280px from the base rule */
+  }
+
+  .sidebar--open {
+    transform: translateX(0);
+    box-shadow: var(--nh-shadow-lg);
+  }
+
+  /* ── Hamburger button ── */
+  .sidebar__hamburger {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    top: 14px;
+    left: 14px;
+    z-index: 40;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    border: 1px solid var(--nh-border);
+    background: var(--nh-surface);
+    color: var(--nh-text);
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
+    transition: background 0.2s ease, transform 0.15s ease;
+    flex-shrink: 0;
+  }
+
+  .sidebar__hamburger:hover {
+    background: #f1f5f9;
+  }
+
+  .sidebar__hamburger:active {
+    transform: scale(0.93);
+  }
+
+  /* ── Close (X) button inside sidebar ── */
+  .sidebar__close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 1;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    border: none;
+    background: #1e293b;
+    color: #94a3b8;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease;
+    flex-shrink: 0;
+  }
+
+  .sidebar__close:hover {
+    background: #334155;
+    color: #ffffff;
+  }
+
+  /* ── Backdrop ── */
+  .sidebar__backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 45;
+    background: rgba(15, 23, 42, 0);
+    pointer-events: none;
+    transition: background 0.3s ease;
+  }
+
+  .sidebar__backdrop--visible {
+    background: rgba(15, 23, 42, 0.55);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    pointer-events: auto;
+  }
 }

@@ -54,7 +54,7 @@
 .leave-stat__value {
   font-size: 1.5rem;
   font-weight: 700;
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: inherit;
   color: #0f172a;
 }
 
@@ -278,7 +278,7 @@
 .leave-detail-card__name {
   margin: 0 0 8px;
   font-size: 1.4rem;
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: inherit;
   color: #0f172a;
 }
 
@@ -313,7 +313,7 @@
   font-size: 1.25rem;
   font-weight: 700;
   color: #0f766e;
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: inherit;
 }
 
 .leave-detail-section {
@@ -404,7 +404,7 @@
 .leave-modal__title {
   margin: 0 0 6px;
   font-size: 1.35rem;
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: inherit;
   color: #0f172a;
 }
 

@@ -22,10 +22,9 @@ const emptyForm = () => ({
 export default function InitialHealthPage() {
   const { t } = useTranslation();
   const location = useLocation();
-  const currentRoleBase = ['/manager', '/doctor', '/nurse'].find((base) => location.pathname.startsWith(base)) || '/admin';
+  const currentRoleBase = ['/doctor', '/nurse'].find((base) => location.pathname.startsWith(base)) || '/admin';
   const residentBase = currentRoleBase;
-  // Pre-existing conditions stays admin/manager-only; drug allergies is admin/manager/doctor (not nurse).
-  const canViewPreExisting = currentRoleBase === '/admin' || currentRoleBase === '/manager';
+  const canViewPreExisting = currentRoleBase === '/admin';
   const canViewDrugAllergies = canViewPreExisting || currentRoleBase === '/doctor';
   const [residents, setResidents] = useState([]);
   const [total, setTotal] = useState(0);

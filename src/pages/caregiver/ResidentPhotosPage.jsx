@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Loader2, Image as ImageIcon, Calendar, User, Trash2, Upload, X } from 'lucide-react';
 import residentPhotoService from '../../services/residentPhoto.service';
 import caregiverResidentService from '../../services/caregiverResident.service';
@@ -21,6 +22,7 @@ const formatViDateTime = (dateStr) => {
 };
 
 export default function ResidentPhotosPage() {
+  const { t } = useTranslation();
   const fileInputRef = useRef(null);
 
   const [residents, setResidents] = useState([]);
@@ -64,7 +66,7 @@ export default function ResidentPhotosPage() {
       const res = await residentPhotoService.listPhotosForCaregiver(selectedResidentId);
       setPhotos(Array.isArray(res?.data) ? res.data : []);
     } catch (err) {
-      const msg = err?.response?.data?.message || err?.message || 'Không thể tải album ảnh.';
+      const msg = err?.response?.data?.message || err?.message || t('residentPhotos.errLoadAlbum');
       setError(msg);
       setPhotos([]);
     } finally {
@@ -98,7 +100,7 @@ export default function ResidentPhotosPage() {
       handleClearSelection();
       await loadPhotos();
     } catch (err) {
-      const msg = err?.response?.data?.message || err?.message || 'Không thể tải ảnh lên.';
+      const msg = err?.response?.data?.message || err?.message || t('residentPhotos.errUpload');
       setUploadError(msg);
     } finally {
       setUploading(false);
@@ -113,7 +115,7 @@ export default function ResidentPhotosPage() {
       setPhotoToDelete(null);
       await loadPhotos();
     } catch (err) {
-      const msg = err?.response?.data?.message || err?.message || 'Không thể xóa ảnh.';
+      const msg = err?.response?.data?.message || err?.message || t('residentPhotos.errDelete');
       setError(msg);
       setPhotoToDelete(null);
     } finally {
@@ -126,9 +128,9 @@ export default function ResidentPhotosPage() {
       {/* Header Section */}
       <div className="arh-header">
         <div className="arh-header__title-group">
-          <h1 className="arh-header__title">Album ảnh cư dân</h1>
+          <h1 className="arh-header__title">{t('residentPhotos.title')}</h1>
           <p className="arh-header__subtitle">
-            Đăng tải và quản lý ảnh sinh hoạt hằng ngày của cư dân được phân công.
+            {t('residentPhotos.subtitle')}
           </p>
         </div>
 
@@ -157,7 +159,7 @@ export default function ResidentPhotosPage() {
             <div className="flex flex-wrap items-center gap-3">
               <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
                 <Upload size={15} />
-                Chọn ảnh
+                {t('residentPhotos.selectPhotos')}
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -169,8 +171,8 @@ export default function ResidentPhotosPage() {
               </label>
               <span className="text-xs text-slate-500">
                 {selectedFiles.length > 0
-                  ? `Đã chọn ${selectedFiles.length} ảnh`
-                  : 'Chưa có ảnh nào được chọn (tối đa 10 ảnh/lần)'}
+                  ? t('residentPhotos.selectedCount', { count: selectedFiles.length })
+                  : t('residentPhotos.noFilesSelected')}
               </span>
             </div>
 
@@ -180,7 +182,7 @@ export default function ResidentPhotosPage() {
                   type="text"
                   className="arh-filters__select"
                   style={{ width: '100%' }}
-                  placeholder="Chú thích chung cho các ảnh (không bắt buộc)"
+                  placeholder={t('residentPhotos.captionPlaceholder')}
                   value={caption}
                   onChange={(e) => setCaption(e.target.value)}
                 />
@@ -195,10 +197,10 @@ export default function ResidentPhotosPage() {
                   >
                     {uploading ? (
                       <span className="flex items-center gap-1.5">
-                        <Loader2 size={14} className="animate-spin" /> Đang tải lên...
+                        <Loader2 size={14} className="animate-spin" /> {t('residentPhotos.uploading')}
                       </span>
                     ) : (
-                      'Tải ảnh lên'
+                      t('residentPhotos.uploadBtn')
                     )}
                   </button>
                   <button
@@ -207,7 +209,7 @@ export default function ResidentPhotosPage() {
                     onClick={handleClearSelection}
                     disabled={uploading}
                   >
-                    Hủy
+                    {t('common.cancel')}
                   </button>
                 </div>
               </>
@@ -220,25 +222,25 @@ export default function ResidentPhotosPage() {
         {loadingResidents || loadingPhotos ? (
           <div className="arh-loading">
             <Loader2 size={32} className="arh-spinner" />
-            <span>Đang tải album ảnh...</span>
+            <span>{t('residentPhotos.loadingAlbum')}</span>
           </div>
         ) : error ? (
           <div className="arh-empty">
             <ImageIcon size={48} className="arh-empty__icon" />
-            <h4>Không thể tải album ảnh</h4>
+            <h4>{t('residentPhotos.errLoadAlbum')}</h4>
             <p>{error}</p>
           </div>
         ) : !selectedResidentId ? (
           <div className="arh-empty">
             <User size={48} className="arh-empty__icon" />
-            <h4>Chưa có cư dân nào được phân công</h4>
-            <p>Bạn hiện chưa được phân công chăm sóc cư dân nào.</p>
+            <h4>{t('residentPhotos.noResidentAssigned')}</h4>
+            <p>{t('residentPhotos.noResidentAssignedHint')}</p>
           </div>
         ) : photos.length === 0 ? (
           <div className="arh-empty">
             <ImageIcon size={48} className="arh-empty__icon" />
-            <h4>Chưa có ảnh nào</h4>
-            <p>Hãy tải lên ảnh đầu tiên cho cư dân này.</p>
+            <h4>{t('residentPhotos.noPhotos')}</h4>
+            <p>{t('residentPhotos.noPhotosHint')}</p>
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 p-4">
@@ -254,7 +256,7 @@ export default function ResidentPhotosPage() {
                 >
                   <img
                     src={photo.url}
-                    alt={photo.caption || 'Ảnh cư dân'}
+                    alt={photo.caption || t('residentPhotos.photoAlt')}
                     className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                     loading="lazy"
                   />
@@ -267,7 +269,7 @@ export default function ResidentPhotosPage() {
                 <button
                   type="button"
                   className="absolute top-2 right-2 rounded-full bg-black/60 p-1.5 text-white opacity-0 transition-opacity group-hover:opacity-100 hover:bg-red-600"
-                  title="Xóa ảnh"
+                  title={t('residentPhotos.deletePhoto')}
                   onClick={(e) => {
                     e.stopPropagation();
                     setPhotoToDelete(photo);
@@ -288,7 +290,7 @@ export default function ResidentPhotosPage() {
           onClick={() => setPreviewPhoto(null)}
         >
           <div className="max-h-full max-w-2xl overflow-hidden rounded-2xl bg-white" onClick={(e) => e.stopPropagation()}>
-            <img src={previewPhoto.url} alt={previewPhoto.caption || 'Ảnh cư dân'} className="max-h-[70vh] w-full object-contain bg-black" />
+            <img src={previewPhoto.url} alt={previewPhoto.caption || t('residentPhotos.photoAlt')} className="max-h-[70vh] w-full object-contain bg-black" />
             <div className="flex items-center justify-between gap-3 p-4">
               <div>
                 {previewPhoto.caption && <p className="font-medium text-slate-800">{previewPhoto.caption}</p>}
@@ -302,7 +304,7 @@ export default function ResidentPhotosPage() {
                 className="rounded-full border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50"
                 onClick={() => setPreviewPhoto(null)}
               >
-                Đóng
+                {t('common.close')}
               </button>
             </div>
           </div>
@@ -320,13 +322,13 @@ export default function ResidentPhotosPage() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-4 flex items-start justify-between">
-              <h4 className="text-base font-bold text-slate-800">Xóa ảnh này?</h4>
+              <h4 className="text-base font-bold text-slate-800">{t('residentPhotos.deleteConfirmTitle')}</h4>
               <button type="button" onClick={() => !deleting && setPhotoToDelete(null)}>
                 <X size={18} className="text-slate-400" />
               </button>
             </div>
             <p className="mb-5 text-sm text-slate-500">
-              Ảnh sẽ bị xóa vĩnh viễn khỏi album và không thể khôi phục.
+              {t('residentPhotos.deleteConfirmText')}
             </p>
             <div className="flex gap-3">
               <button
@@ -335,7 +337,7 @@ export default function ResidentPhotosPage() {
                 onClick={() => setPhotoToDelete(null)}
                 disabled={deleting}
               >
-                Hủy
+                {t('common.cancel')}
               </button>
               <button
                 type="button"
@@ -345,10 +347,10 @@ export default function ResidentPhotosPage() {
               >
                 {deleting ? (
                   <span className="flex items-center justify-center gap-1.5">
-                    <Loader2 size={14} className="animate-spin" /> Đang xóa...
+                    <Loader2 size={14} className="animate-spin" /> {t('residentPhotos.deleting')}
                   </span>
                 ) : (
-                  'Xóa ảnh'
+                  t('residentPhotos.deletePhoto')
                 )}
               </button>
             </div>

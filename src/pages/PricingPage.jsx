@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { Check } from 'lucide-react';
 import PublicHeader from '../components/homepage/PublicHeader';
@@ -8,54 +9,42 @@ import { getAuthToken } from '../utils/auth';
 import servicePackageService from '../services/servicePackage.service';
 import '../styles/shared/PublicPages.css';
 
-const DEFAULT_PACKAGES = [
+const getDefaultPackages = (t) => [
   {
-    _id: 'p1', name: 'Gói Chăm sóc Cơ bản', tier: 'basic', monthlyPrice: 12000000,
-    description: 'Hỗ trợ sinh hoạt hàng ngày, giám sát sức khỏe cơ bản và hướng dẫn dinh dưỡng chuyên nghiệp.',
-    services: ['Hỗ trợ ăn uống, tắm rửa, giặt giũ hàng ngày', 'Đo sinh hiệu 2 lần/ngày', 'Khám bác sĩ định kỳ 2 tuần/lần', 'Hoạt động cộng đồng hàng ngày', 'WiFi & tiện ích chung'],
+    _id: 'p1', name: t('pricing.pkg.basic.name'), tier: 'basic', monthlyPrice: 12000000,
+    description: t('pricing.pkg.basic.desc'),
+    services: [t('pricing.pkg.basic.s1'), t('pricing.pkg.basic.s2'), t('pricing.pkg.basic.s3'), t('pricing.pkg.basic.s4'), t('pricing.pkg.basic.s5')],
   },
   {
-    _id: 'p2', name: 'Gói Chăm sóc Tiêu chuẩn', tier: 'standard', monthlyPrice: 18000000,
-    description: 'Hỗ trợ lâm sàng toàn diện kết hợp phục hồi chức năng và giám sát sức khỏe liên tục.',
-    services: ['Toàn bộ dịch vụ gói Cơ bản', 'Vật lý trị liệu 3 lần/tuần', 'Khám chuyên khoa hàng tuần', 'Giám sát AI 24/7', 'Thực đơn dinh dưỡng cá nhân hoá', 'App gia đình theo dõi'],
+    _id: 'p2', name: t('pricing.pkg.standard.name'), tier: 'standard', monthlyPrice: 18000000,
+    description: t('pricing.pkg.standard.desc'),
+    services: [t('pricing.pkg.standard.s1'), t('pricing.pkg.standard.s2'), t('pricing.pkg.standard.s3'), t('pricing.pkg.standard.s4'), t('pricing.pkg.standard.s5'), t('pricing.pkg.standard.s6')],
   },
   {
-    _id: 'p3', name: 'Gói Chăm sóc Cao cấp', tier: 'premium', monthlyPrice: 28000000,
-    description: 'Liệu pháp chuyên sâu cho cư dân hồi phục sau đột quỵ, chấn thương hoặc suy giảm nhận thức.',
-    services: ['Toàn bộ dịch vụ gói Tiêu chuẩn', 'Vật lý trị liệu 1-1 hàng ngày', 'Khám bác sĩ 2 ngày/lần', 'Điều dưỡng trực 24/7', 'Hỗ trợ nhận thức chuyên biệt', 'CLB sở thích & wellness độc quyền'],
+    _id: 'p3', name: t('pricing.pkg.premium.name'), tier: 'premium', monthlyPrice: 28000000,
+    description: t('pricing.pkg.premium.desc'),
+    services: [t('pricing.pkg.premium.s1'), t('pricing.pkg.premium.s2'), t('pricing.pkg.premium.s3'), t('pricing.pkg.premium.s4'), t('pricing.pkg.premium.s5'), t('pricing.pkg.premium.s6')],
   },
   {
-    _id: 'p4', name: 'Gói VIP Toàn diện', tier: 'vip', monthlyPrice: 45000000,
-    description: 'Dịch vụ chăm sóc đẳng cấp hotel 5 sao kết hợp y tế chuyên sâu — dành cho cư dân cao cấp nhất.',
-    services: ['Toàn bộ dịch vụ gói Cao cấp', 'Suite phòng VIP riêng biệt', 'Điều dưỡng cá nhân riêng 24/7', 'Bác sĩ thăm khám hàng ngày', 'Xe đưa đón riêng', 'Dịch vụ concierge cá nhân'],
+    _id: 'p4', name: t('pricing.pkg.vip.name'), tier: 'vip', monthlyPrice: 45000000,
+    description: t('pricing.pkg.vip.desc'),
+    services: [t('pricing.pkg.vip.s1'), t('pricing.pkg.vip.s2'), t('pricing.pkg.vip.s3'), t('pricing.pkg.vip.s4'), t('pricing.pkg.vip.s5'), t('pricing.pkg.vip.s6')],
   },
 ];
 
-const FAQS = [
-  {
-    q: 'Chi phí hàng tháng bao gồm những gì?',
-    a: 'Chi phí bao gồm: chỗ ở, dinh dưỡng 3 bữa/ngày, dịch vụ chăm sóc cá nhân, các buổi thể dục/vật lý trị liệu theo gói, và sử dụng toàn bộ tiện ích chung. Thuốc điều trị và xét nghiệm bổ sung tính riêng.',
-  },
-  {
-    q: 'Có thể thay đổi gói chăm sóc sau khi nhập viện không?',
-    a: 'Có. Gia đình có thể nâng hoặc hạ gói bất kỳ lúc nào với thông báo trước 7 ngày. Đội ngũ y tế sẽ đánh giá lại và điều chỉnh kế hoạch chăm sóc phù hợp.',
-  },
-  {
-    q: 'Gia đình có thể thăm viếng tự do không?',
-    a: 'Gia đình được thăm viếng từ 7:00 đến 20:00 tất cả các ngày kể cả lễ, Tết. Không giới hạn số lượt thăm. Các gói Premium và VIP có khu vực tiếp khách riêng tư.',
-  },
-  {
-    q: 'Cách thanh toán và có hỗ trợ trả góp không?',
-    a: 'Thanh toán hàng tháng qua chuyển khoản, thẻ ngân hàng hoặc ví điện tử. Chúng tôi hỗ trợ đóng theo quý/năm với ưu đãi 5–10%. Trả góp qua ngân hàng đối tác có thể hỗ trợ theo từng trường hợp.',
-  },
-  {
-    q: 'Nếu cư dân cần xuất viện sớm thì sao?',
-    a: 'Hoàn trả phần phí chưa sử dụng trong vòng 7 ngày làm việc sau khi xuất viện, trừ phí xử lý hành chính theo quy định. Đội ngũ sẽ hỗ trợ bàn giao hồ sơ và tư vấn chuyển tiếp chăm sóc.',
-  },
+const getFaqs = (t) => [
+  { q: t('pricing.faq.q1'), a: t('pricing.faq.a1') },
+  { q: t('pricing.faq.q2'), a: t('pricing.faq.a2') },
+  { q: t('pricing.faq.q3'), a: t('pricing.faq.a3') },
+  { q: t('pricing.faq.q4'), a: t('pricing.faq.a4') },
+  { q: t('pricing.faq.q5'), a: t('pricing.faq.a5') },
 ];
 
 export default function PricingPage() {
+  const { t } = useTranslation();
   const { token, user } = useAuth();
+  const DEFAULT_PACKAGES = getDefaultPackages(t);
+  const FAQS = getFaqs(t);
   const [packages, setPackages] = useState(DEFAULT_PACKAGES);
 
   useEffect(() => {
@@ -69,7 +58,7 @@ export default function PricingPage() {
     load();
   }, [token]);
 
-  const bookPath = (token && user?.role === 'family') ? '/family/admission-requests/new' : '/login';
+  const bookPath = (token && user?.role === 'family') ? '/family/admission-requests/new' : '/contact';
 
   return (
     <div className="home-page">
@@ -78,11 +67,10 @@ export default function PricingPage() {
         {/* ── HERO ── */}
         <div className="pub-hero pub-hero--light pub-hero--centered">
           <div className="pub-hero__inner">
-            <span className="home-subtitle">Bảng giá</span>
-            <h1>Gói chăm sóc phù hợp với mọi nhu cầu</h1>
+            <span className="home-subtitle">{t('pricing.hero.badge')}</span>
+            <h1>{t('pricing.hero.title')}</h1>
             <p>
-              Bốn gói dịch vụ được thiết kế linh hoạt từ chăm sóc cơ bản đến đặc quyền VIP,
-              đảm bảo mọi gia đình đều tìm được lựa chọn phù hợp nhất.
+              {t('pricing.hero.desc')}
             </p>
           </div>
         </div>
@@ -95,16 +83,16 @@ export default function PricingPage() {
               return (
                 <div key={pkg._id} className={`pricing-card ${isStandard ? 'featured' : ''}`}>
                   <span className={`pricing-card__badge ${pkg.tier}`}>
-                    {{ basic: 'Cơ Bản', standard: 'Tiêu Chuẩn', premium: 'Cao Cấp', vip: 'VIP' }[pkg.tier] || pkg.tier}
+                    {t(`pricing.tierLabel.${pkg.tier}`, { defaultValue: pkg.tier })}
                   </span>
                   <h3 className="pricing-card__title">{pkg.name}</h3>
                   <div className="pricing-card__price-box">
                     <span className="pricing-card__price">{pkg.monthlyPrice?.toLocaleString() || 0}</span>
-                    <span className="pricing-card__period">VNĐ / tháng</span>
+                    <span className="pricing-card__period">{t('pricing.perMonth')}</span>
                   </div>
                   <p className="pricing-card__description">{pkg.description}</p>
                   <div className="pricing-card__divider" />
-                  <span className="pricing-card__list-title">Dịch vụ bao gồm:</span>
+                  <span className="pricing-card__list-title">{t('pricing.servicesIncluded')}</span>
                   <div className="pricing-card__list">
                     {pkg.services?.map((srv, idx) => (
                       <div key={idx} className="pricing-card__item">
@@ -117,7 +105,7 @@ export default function PricingPage() {
                     to={bookPath}
                     className={`pricing-card__button ${isStandard ? 'pricing-card__button--primary' : 'pricing-card__button--secondary'}`}
                   >
-                    Đăng ký gói này
+                    {t('pricing.register')}
                   </Link>
                 </div>
               );
@@ -128,9 +116,9 @@ export default function PricingPage() {
         {/* ── FAQ ── */}
         <section className="pub-section pub-section--white">
           <div className="pub-section__head">
-            <span className="home-subtitle">Câu hỏi thường gặp</span>
-            <h2>Giải đáp thắc mắc về chi phí</h2>
-            <p>Những câu hỏi phổ biến nhất từ gia đình khi tìm hiểu về gói dịch vụ tại An Nhiên.</p>
+            <span className="home-subtitle">{t('pricing.faqSection.badge')}</span>
+            <h2>{t('pricing.faqSection.title')}</h2>
+            <p>{t('pricing.faqSection.desc')}</p>
           </div>
           <div className="pricing-faq">
             {FAQS.map((f, i) => (
@@ -144,9 +132,9 @@ export default function PricingPage() {
 
         {/* ── CTA ── */}
         <section className="pricing-cta">
-          <h2>Chưa chắc gói nào phù hợp?</h2>
-          <p>Đội ngũ tư vấn sẽ đánh giá miễn phí và đề xuất gói chăm sóc tốt nhất cho người thân của bạn.</p>
-          <Link to="/contact" className="button button--primary">Tư vấn miễn phí ngay</Link>
+          <h2>{t('pricing.cta.title')}</h2>
+          <p>{t('pricing.cta.desc')}</p>
+          <Link to="/contact" className="button button--primary">{t('pricing.cta.button')}</Link>
         </section>
       </main>
       <PublicFooter />

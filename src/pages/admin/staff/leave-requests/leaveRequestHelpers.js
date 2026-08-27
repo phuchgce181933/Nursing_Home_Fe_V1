@@ -35,5 +35,5 @@ export function getLeaveDays(request) {
 }
 
 export function getLeaveListPath(role) {
-  return role === 'manager' ? '/manager/staff/leave-requests' : '/admin/staff/leave-requests';
+  return '/admin/staff/leave-requests';
 }

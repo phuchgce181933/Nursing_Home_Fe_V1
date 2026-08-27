@@ -75,7 +75,7 @@
   font-family: inherit;
 }
 .ic-btn--primary {
-  background: #3b5bdb;
+  background: var(--nh-primary);
   color: #fff;
 }
 .ic-btn--primary:hover { background: #364fc7; box-shadow: 0 4px 14px rgba(59,91,219,0.25); }
@@ -205,7 +205,7 @@
   flex-shrink: 0;
 }
 .ic-stat-card__icon--total  { background: #ede9fe; color: #7c3aed; }
-.ic-stat-card__icon--open   { background: #dbeafe; color: #3b82f6; }
+.ic-stat-card__icon--open   { background: var(--nh-primary-light); color: var(--nh-primary); }
 .ic-stat-card__icon--invest { background: #fef3c7; color: #d97706; }
 .ic-stat-card__icon--resolve{ background: #dcfce7; color: #16a34a; }
 .ic-stat-card__value {
@@ -255,7 +255,7 @@
   color: #1e293b;
 }
 .ic-search__input:focus {
-  border-color: #3b5bdb;
+  border-color: var(--nh-primary);
   box-shadow: 0 0 0 3px rgba(59,91,219,0.12);
 }
 .ic-status-pills {
@@ -276,9 +276,9 @@
 }
 .ic-pill:hover { background: #f1f5f9; }
 .ic-pill--active {
-  background: #3b5bdb;
+  background: var(--nh-primary);
   color: #fff;
-  border-color: #3b5bdb;
+  border-color: var(--nh-primary);
 }
 .ic-pill--active:hover { background: #364fc7; }
 
@@ -376,7 +376,7 @@
   font-weight: 600;
   animation: ic-badgePop 0.3s ease;
 }
-.ic-badge--open          { background: #dbeafe; color: #2563eb; }
+.ic-badge--open          { background: var(--nh-primary-light); color: var(--nh-primary); }
 .ic-badge--investigating { background: #fef3c7; color: #b45309; }
 .ic-badge--resolved      { background: #dcfce7; color: #15803d; }
 .ic-badge--closed        { background: #f1f5f9; color: #64748b; }
@@ -518,7 +518,7 @@
 .ic-field__select:focus,
 .ic-field__textarea:focus,
 .ic-multi-select-search:focus {
-  border-color: #3b5bdb;
+  border-color: var(--nh-primary);
   box-shadow: 0 0 0 3px rgba(59,91,219,0.12);
 }
 .ic-field__textarea {
@@ -561,7 +561,7 @@
   margin-top: 8px;
   padding: 10px 12px;
   background: #f0f9ff;
-  border-left: 3px solid #3b5bdb;
+  border-left: 3px solid var(--nh-primary);
   border-radius: 4px;
   font-size: 0.875rem;
   color: #1e40af;
@@ -623,7 +623,7 @@
   margin-top: 4px;
   width: 18px;
   height: 18px;
-  accent-color: #3b5bdb;
+  accent-color: var(--nh-primary);
 }
 .ic-multi-select-item__label {
   display: flex;
@@ -665,7 +665,7 @@
   gap: 6px;
   padding: 6px 10px;
   background: #e0e7ff;
-  color: #3b5bdb;
+  color: var(--nh-primary);
   border-radius: 6px;
   font-size: 0.8rem;
   font-weight: 500;

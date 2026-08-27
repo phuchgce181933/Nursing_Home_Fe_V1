@@ -93,8 +93,8 @@ export default function BuildingsPage() {
 
   const handleCreateBuilding = async (e) => {
     e.preventDefault();
-    if (!formCode.trim()) return setFormError('Mã tòa nhà là bắt buộc');
-    if (!formName.trim()) return setFormError('Tên tòa nhà là bắt buộc');
+    if (!formCode.trim()) return setFormError(t('buildings.errCodeRequired'));
+    if (!formName.trim()) return setFormError(t('buildings.errNameRequired'));
 
     try {
       setSubmitting(true);
@@ -109,7 +109,7 @@ export default function BuildingsPage() {
       refetch();
     } catch (err) {
       console.error(err);
-      setFormError(err.response?.data?.message || 'Không thể tạo tòa nhà.');
+      setFormError(err.response?.data?.message || t('buildings.errCreateFailed'));
     } finally {
       setSubmitting(false);
     }
@@ -118,8 +118,8 @@ export default function BuildingsPage() {
   const handleUpdateBuilding = async (e) => {
     e.preventDefault();
     if (!selectedBuilding?._id) return;
-    if (!formCode.trim()) return setFormError('Mã tòa nhà là bắt buộc');
-    if (!formName.trim()) return setFormError('Tên tòa nhà là bắt buộc');
+    if (!formCode.trim()) return setFormError(t('buildings.errCodeRequired'));
+    if (!formName.trim()) return setFormError(t('buildings.errNameRequired'));
 
     try {
       setSubmitting(true);
@@ -135,7 +135,7 @@ export default function BuildingsPage() {
       refetch();
     } catch (err) {
       console.error(err);
-      setFormError(err.response?.data?.message || 'Cập nhật tòa nhà thất bại.');
+      setFormError(err.response?.data?.message || t('buildings.errUpdateFailed'));
     } finally {
       setSubmitting(false);
     }
@@ -150,7 +150,7 @@ export default function BuildingsPage() {
       refetch();
     } catch (err) {
       console.error(err);
-      showToast(err.response?.data?.message || 'Vô hiệu hóa tòa nhà thất bại.', 'error');
+      showToast(err.response?.data?.message || t('buildings.errDeactivateFailed'), 'error');
     } finally {
       setSubmitting(false);
     }
@@ -445,10 +445,10 @@ export default function BuildingsPage() {
             </div>
             <div className="fac-modal-footer">
               <button type="button" onClick={() => setShowDeleteModal(false)} className="fac-btn fac-btn--secondary">
-                Hủy
+                {t('facilities.btnCancel')}
               </button>
               <button type="button" onClick={handleDeleteBuilding} disabled={submitting} className="fac-btn fac-btn--danger">
-                {submitting ? 'Đang khóa...' : 'Xác Nhận Khóa'}
+                {submitting ? t('buildings.deactivating') : t('buildings.confirmDeactivate')}
               </button>
             </div>
           </div>
@@ -706,7 +706,7 @@ export default function BuildingsPage() {
             </div>
             <div className="fac-modal-footer">
               <button type="button" onClick={() => setShowStatsModal(false)} className="fac-btn fac-btn--secondary">
-                Đóng
+                {t('common.close')}
               </button>
             </div>
           </div>

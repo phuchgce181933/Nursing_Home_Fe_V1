@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { AlertTriangle, CheckCircle, CreditCard, Package, Users, Wallet, PlusCircle, Search, ChevronDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import residentService from '../../services/resident.service';
@@ -26,7 +27,7 @@ const getPackagePrice = (resident) => {
 const getPackagePriceLabel = (resident) => {
   const monthlyPrice = getPackagePrice(resident);
   if (monthlyPrice == null) return null;
-  return `${formatMoney(monthlyPrice)} / tháng`;
+  return formatMoney(monthlyPrice);
 };
 
 const getInitials = (name) => {
@@ -35,13 +36,11 @@ const getInitials = (name) => {
   return parts[parts.length - 1]?.[0]?.toUpperCase() || '?';
 };
 
-const INVOICE_STATUS_LABELS = {
-  PAID: 'Đã thanh toán',
-  PARTIALLY_PAID: 'Thanh toán một phần',
-  CANCELLED: 'Đã hủy',
+const INVOICE_STATUS_I18N = {
+  PAID: 'familyDashboard.invoice.statusPaid',
+  PARTIALLY_PAID: 'familyDashboard.invoice.statusPartiallyPaid',
+  CANCELLED: 'familyDashboard.invoice.statusCancelled',
 };
-
-const getInvoiceStatusLabel = (status) => INVOICE_STATUS_LABELS[status] || 'Chưa thanh toán';
 
 const matchesInvoiceFilter = (invoice, filter) => {
   const status = String(invoice?.status || '').toUpperCase();
@@ -51,12 +50,13 @@ const matchesInvoiceFilter = (invoice, filter) => {
 };
 
 const INVOICE_GROUPS = [
-  { key: 'service', label: 'Hóa đơn dịch vụ', icon: '📋', theme: 'service', match: (inv) => inv.type === 'SERVICE' || !inv.type },
-  { key: 'medication', label: 'Hóa đơn thuốc', icon: '💊', theme: 'medication', match: (inv) => inv.type === 'MEDICATION' },
-  { key: 'other', label: 'Hóa đơn khác', icon: '🧾', theme: 'other', match: (inv) => inv.type && inv.type !== 'SERVICE' && inv.type !== 'MEDICATION' },
+  { key: 'service', i18nKey: 'familyDashboard.invoice.serviceInvoices', icon: '📋', theme: 'service', match: (inv) => inv.type === 'SERVICE' || !inv.type },
+  { key: 'medication', i18nKey: 'familyDashboard.invoice.medicationInvoices', icon: '💊', theme: 'medication', match: (inv) => inv.type === 'MEDICATION' },
+  { key: 'other', i18nKey: 'familyDashboard.invoice.otherInvoices', icon: '🧾', theme: 'other', match: (inv) => inv.type && inv.type !== 'SERVICE' && inv.type !== 'MEDICATION' },
 ];
 
 function FamilyDashboardPage() {
+  const { t } = useTranslation();
   const [residents, setResidents] = useState([]);
   const [invoicesList, setInvoicesList] = useState({});
   const [loading, setLoading] = useState(true);
@@ -112,7 +112,7 @@ function FamilyDashboardPage() {
         const data = await residentService.getFamilyResidentList();
         setResidents(Array.isArray(data) ? data : []);
       } catch (err) {
-        setError(err?.response?.data?.message || err.message || 'Không thể tải dữ liệu');
+        setError(err?.response?.data?.message || err.message || t('familyDashboard.resident.loadError'));
       } finally {
         setLoading(false);
       }
@@ -149,7 +149,7 @@ function FamilyDashboardPage() {
         const payload = await familyPortalService.getWalletBalance();
         setWalletInfo(payload);
       } catch (err) {
-        setWalletError(err?.response?.data?.message || err.message || 'Không thể tải số dư ví');
+        setWalletError(err?.response?.data?.message || err.message || t('familyDashboard.wallet.loading'));
       } finally {
         setWalletLoading(false);
       }
@@ -169,7 +169,7 @@ function FamilyDashboardPage() {
       }
     } catch (err) {
       console.error('Failed to get checkout URL:', err);
-      setError(err?.response?.data?.message || err.message || 'Không thể mở trang thanh toán');
+      setError(err?.response?.data?.message || err.message || t('familyDashboard.invoice.checkoutError'));
     } finally {
       setCheckoutLoadingInvoiceId(null);
     }
@@ -177,15 +177,15 @@ function FamilyDashboardPage() {
 
   const handleWalletTopup = async () => {
     if (!topupAmount || topupAmount <= 0) {
-      setWalletError('Số tiền nạp phải lớn hơn 0');
+      setWalletError(t('familyDashboard.wallet.topupPositive'));
       return;
     }
     if (topupAmount < TOPUP_MIN) {
-      setWalletError(`Số tiền nạp tối thiểu là ${formatMoney(TOPUP_MIN)}`);
+      setWalletError(t('familyDashboard.wallet.topupMin', { min: formatMoney(TOPUP_MIN) }));
       return;
     }
     if (topupAmount > TOPUP_MAX) {
-      setWalletError(`Số tiền nạp tối đa là ${formatMoney(TOPUP_MAX)}`);
+      setWalletError(t('familyDashboard.wallet.topupMax', { max: formatMoney(TOPUP_MAX) }));
       return;
     }
 
@@ -198,7 +198,7 @@ function FamilyDashboardPage() {
       }
     } catch (err) {
       console.error('Wallet topup error:', err);
-      setWalletError(err?.response?.data?.message || err.message || 'Không thể tạo yêu cầu nạp tiền');
+      setWalletError(err?.response?.data?.message || err.message || t('familyDashboard.wallet.topupError'));
     } finally {
       setIsTopupProcessing(false);
     }
@@ -206,7 +206,7 @@ function FamilyDashboardPage() {
 
   const handlePayWithWallet = async (residentId, invoiceId, amount) => {
     if (walletInfo.balance < amount) {
-      setWalletError('Số dư ví không đủ để thanh toán hóa đơn.');
+      setWalletError(t('familyDashboard.wallet.insufficientBalance'));
       return;
     }
 
@@ -227,7 +227,7 @@ function FamilyDashboardPage() {
       setShowOtpModal(true);
     } catch (err) {
       console.error('Wallet payment failed:', err);
-      setWalletError(err?.response?.data?.message || err.message || 'Không thể gửi yêu cầu OTP xác thực');
+      setWalletError(err?.response?.data?.message || err.message || t('familyDashboard.wallet.paymentOtpError'));
     } finally {
       setIsWalletPaymentProcessing(false);
     }
@@ -235,12 +235,12 @@ function FamilyDashboardPage() {
 
   const handleVerifyWalletOtp = async () => {
     if (!otpCode.trim()) {
-      setOtpError('Vui lòng nhập mã OTP.');
+      setOtpError(t('familyDashboard.otp.emptyError'));
       return;
     }
 
     if (!otpId) {
-      setOtpError('OTP không hợp lệ. Vui lòng thử lại.');
+      setOtpError(t('familyDashboard.otp.invalidError'));
       return;
     }
 
@@ -265,7 +265,7 @@ function FamilyDashboardPage() {
       setPendingWalletPayment(null);
     } catch (err) {
       console.error('OTP verification failed:', err);
-      setOtpError(err?.response?.data?.message || err.message || 'Mã OTP không hợp lệ hoặc đã hết hạn');
+      setOtpError(err?.response?.data?.message || err.message || t('familyDashboard.otp.verifyError'));
     } finally {
       setIsOtpVerifying(false);
     }
@@ -285,7 +285,7 @@ function FamilyDashboardPage() {
       setOtpCode('');
     } catch (err) {
       console.error('OTP resend failed:', err);
-      setOtpError(err?.response?.data?.message || err.message || 'Không thể gửi lại mã OTP');
+      setOtpError(err?.response?.data?.message || err.message || t('familyDashboard.otp.resendError'));
     } finally {
       setIsWalletPaymentProcessing(false);
     }
@@ -294,7 +294,7 @@ function FamilyDashboardPage() {
   const handleCreateInvoice = async (resident) => {
     const packagePrice = getPackagePrice(resident);
     if (!packagePrice) {
-      setError('Không xác định được giá gói dịch vụ. Vui lòng kiểm tra thông tin gói.');
+      setError(t('familyDashboard.invoice.packageError'));
       return;
     }
 
@@ -319,7 +319,7 @@ function FamilyDashboardPage() {
       }
     } catch (err) {
       console.error('Failed to create invoice:', err);
-      setError(err?.response?.data?.message || err.message || 'Không thể tạo hóa đơn');
+      setError(err?.response?.data?.message || err.message || t('familyDashboard.invoice.createError'));
     } finally {
       setCreatingInvoiceFor(null);
     }
@@ -331,7 +331,7 @@ function FamilyDashboardPage() {
     const medicationInvoices = invoices.filter(inv => inv.type === 'MEDICATION' && !['PAID', 'CANCELLED'].includes(String(inv.status || '').toUpperCase()));
 
     if (serviceInvoices.length === 0 && medicationInvoices.length === 0) {
-      setError('Không có hóa đơn chưa thanh toán để thanh toán.');
+      setError(t('familyDashboard.invoice.noUnpaid'));
       return;
     }
 
@@ -363,7 +363,7 @@ function FamilyDashboardPage() {
     }
 
     if (invoiceIds.length === 0) {
-      setWalletError('Vui lòng chọn ít nhất một gói để thanh toán.');
+      setWalletError(t('familyDashboard.wallet.selectPackage'));
       return;
     }
 
@@ -382,7 +382,7 @@ function FamilyDashboardPage() {
 
     if (paymentMethod === 'wallet') {
       if (walletInfo.balance < totalAmount) {
-        setWalletError(`Số dư ví không đủ. Cần ${formatMoney(totalAmount)}, hiện có ${formatMoney(walletInfo.balance)}`);
+        setWalletError(t('familyDashboard.wallet.insufficientDetail', { need: formatMoney(totalAmount), have: formatMoney(walletInfo.balance) }));
         return;
       }
     }
@@ -426,7 +426,7 @@ function FamilyDashboardPage() {
       }
     } catch (err) {
       console.error('Batch payment error:', err);
-      setWalletError(err?.response?.data?.message || err.message || 'Không thể thanh toán theo gói');
+      setWalletError(err?.response?.data?.message || err.message || t('familyDashboard.wallet.batchError'));
     } finally {
       setIsBatchPaymentProcessing(false);
     }
@@ -448,16 +448,16 @@ function FamilyDashboardPage() {
     <div className="page-family-dashboard">
       <header className="page-header">
         <div>
-          <h1>Trang Gia đình</h1>
-          <p>Xem gói dịch vụ đã đăng ký và các khoản phí cần thanh toán cho cư dân của bạn.</p>
+          <h1>{t('familyDashboard.title')}</h1>
+          <p>{t('familyDashboard.subtitle')}</p>
         </div>
       </header>
 
       <section className="wallet-summary-card">
         <div className="wallet-summary-header">
           <div>
-            <h2>Ví điện tử</h2>
-            <p>Quản lý số dư và nạp tiền nhanh bằng PayOS.</p>
+            <h2>{t('familyDashboard.wallet.title')}</h2>
+            <p>{t('familyDashboard.wallet.subtitle')}</p>
           </div>
           <div className="wallet-icon">
             <Wallet size={24} />
@@ -466,20 +466,20 @@ function FamilyDashboardPage() {
 
         <div className="wallet-summary-body">
           {walletLoading ? (
-            <div className="wallet-loading">Đang tải số dư ví...</div>
+            <div className="wallet-loading">{t('familyDashboard.wallet.loading')}</div>
           ) : (
             <>
               <div className="wallet-balance-row">
-                <span>Số dư hiện tại</span>
+                <span>{t('familyDashboard.wallet.currentBalance')}</span>
                 <strong>{formatMoney(walletInfo.balance)}</strong>
               </div>
               <div className="wallet-metrics-row">
                 <div>
-                  <span>Tổng đã nạp </span>
+                  <span>{t('familyDashboard.wallet.totalTopup')} </span>
                   <strong>{formatMoney(walletInfo.totalTopup)}</strong>
                 </div>
                 <div>
-                  <span>Tổng đã chi </span>
+                  <span>{t('familyDashboard.wallet.totalSpent')} </span>
                   <strong> {formatMoney(walletInfo.totalSpent)}</strong>
                 </div>
               </div>
@@ -493,7 +493,7 @@ function FamilyDashboardPage() {
           )}
 
           <div className="wallet-topup-form">
-            <label htmlFor="wallet-topup-amount">Số tiền nạp (VND)</label>
+            <label htmlFor="wallet-topup-amount">{t('familyDashboard.wallet.topupLabel')}</label>
             <div className="wallet-topup-input-group">
               <input
                 id="wallet-topup-amount"
@@ -510,19 +510,19 @@ function FamilyDashboardPage() {
                 onClick={handleWalletTopup}
                 disabled={isTopupProcessing || walletLoading}
               >
-                {isTopupProcessing ? 'Đang tạo yêu cầu...' : 'Nạp tiền vào ví'}
+                {isTopupProcessing ? t('familyDashboard.wallet.topupProcessing') : t('familyDashboard.wallet.topupButton')}
                 <PlusCircle size={16} />
               </button>
             </div>
             <span className="wallet-topup-hint">
-              Tối thiểu {formatMoney(TOPUP_MIN)} · Tối đa {formatMoney(TOPUP_MAX)}
+              {t('familyDashboard.wallet.topupHint', { min: formatMoney(TOPUP_MIN), max: formatMoney(TOPUP_MAX) })}
             </span>
           </div>
         </div>
       </section>
 
       {loading && (
-        <div className="loading-state">Đang tải thông tin cư dân...</div>
+        <div className="loading-state">{t('familyDashboard.resident.loading')}</div>
       )}
 
       {error && (
@@ -533,7 +533,7 @@ function FamilyDashboardPage() {
 
       {!loading && residents.length === 0 && (
         <div className="alert alert-info">
-          <Users size={18} /> Bạn chưa liên kết với cư dân nào trong hệ thống.
+          <Users size={18} /> {t('familyDashboard.resident.noResidents')}
         </div>
       )}
 
@@ -543,27 +543,27 @@ function FamilyDashboardPage() {
             <Search size={16} />
             <input
               type="text"
-              placeholder="Tìm theo tên hoặc mã cư dân..."
+              placeholder={t('familyDashboard.resident.searchPlaceholder')}
               value={residentSearch}
               onChange={(event) => setResidentSearch(event.target.value)}
             />
           </div>
           <label className="family-invoice-filter">
-            <span>Lọc hóa đơn</span>
+            <span>{t('familyDashboard.resident.filterLabel')}</span>
             <select value={invoiceFilter} onChange={(event) => setInvoiceFilter(event.target.value)}>
-              <option value="unpaid">Chưa thanh toán</option>
-              <option value="paid">Đã thanh toán</option>
-              <option value="all">Tất cả</option>
+              <option value="unpaid">{t('familyDashboard.resident.filterUnpaid')}</option>
+              <option value="paid">{t('familyDashboard.resident.filterPaid')}</option>
+              <option value="all">{t('familyDashboard.resident.filterAll')}</option>
             </select>
           </label>
-          <span className="family-resident-count">{visibleResidentCount}/{residents.length} cư dân</span>
+          <span className="family-resident-count">{t('familyDashboard.resident.count', { visible: visibleResidentCount, total: residents.length })}</span>
         </div>
       )}
 
       <div className="family-resident-list">
         {filteredResidents.length === 0 && !loading && residents.length > 0 && (
           <div className="alert alert-info">
-            <Users size={18} /> Không tìm thấy cư dân phù hợp với từ khóa tìm kiếm.
+            <Users size={18} /> {t('familyDashboard.resident.noSearchResults')}
           </div>
         )}
         {filteredResidents.map((resident) => {
@@ -604,9 +604,9 @@ function FamilyDashboardPage() {
       {showOtpModal && (
         <div className="otp-modal-backdrop" onClick={() => setShowOtpModal(false)}>
           <div className="otp-modal" onClick={(event) => event.stopPropagation()}>
-            <h3>Xác thực thanh toán bằng SMS OTP</h3>
-            <p>Chúng tôi đã gửi mã OTP đến số <strong>{otpMaskedPhone || '***'}.</strong></p>
-            <label htmlFor="wallet-otp-code">Mã OTP</label>
+            <h3>{t('familyDashboard.otp.title')}</h3>
+            <p>{t('familyDashboard.otp.sentTo')} <strong>{otpMaskedPhone || '***'}.</strong></p>
+            <label htmlFor="wallet-otp-code">{t('familyDashboard.otp.label')}</label>
             <input
               id="wallet-otp-code"
               type="text"
@@ -614,17 +614,17 @@ function FamilyDashboardPage() {
               autoComplete="one-time-code"
               value={otpCode}
               onChange={(event) => setOtpCode(event.target.value)}
-              placeholder="Nhập mã OTP"
+              placeholder={t('familyDashboard.otp.placeholder')}
               className="otp-input"
               maxLength={6}
             />
             {otpError && <div className="otp-error">{otpError}</div>}
             <div className="otp-actions">
               <button type="button" className="button button-secondary" onClick={handleResendWalletOtp} disabled={isWalletPaymentProcessing}>
-                Gửi lại mã OTP
+                {t('familyDashboard.otp.resend')}
               </button>
               <button type="button" className="button button-primary" onClick={handleVerifyWalletOtp} disabled={isOtpVerifying}>
-                {isOtpVerifying ? 'Đang xác thực...' : 'Xác nhận'}
+                {isOtpVerifying ? t('familyDashboard.otp.verifying') : t('familyDashboard.otp.confirm')}
               </button>
             </div>
           </div>
@@ -642,6 +642,7 @@ function ResidentListItem({
   onOpenCheckout, onPayWithWallet, onCreateInvoice,
   hasUnpaidServiceInvoice, creatingInvoiceFor, isWalletPaymentProcessing, walletLoading, checkoutLoadingInvoiceId,
 }) {
+  const { t } = useTranslation();
   const unpaidCount = invoices.filter((inv) => !['PAID', 'CANCELLED'].includes(String(inv.status || '').toUpperCase())).length;
 
   return (
@@ -649,14 +650,14 @@ function ResidentListItem({
       <button type="button" className="family-resident-row__header" onClick={onToggle}>
         <span className="family-resident-avatar">{getInitials(resident.fullName)}</span>
         <span className="family-resident-row__identity">
-          <span className="family-resident-row__name">{resident.fullName || resident.residentCode || 'Cư dân'}</span>
-          <span className="family-resident-row__code">Mã: {resident.residentCode || 'N/A'}</span>
+          <span className="family-resident-row__name">{resident.fullName || resident.residentCode || t('familyDashboard.resident.defaultName')}</span>
+          <span className="family-resident-row__code">{t('familyDashboard.resident.code', { code: resident.residentCode || 'N/A' })}</span>
         </span>
         <span className="family-resident-row__package">
-          {resident.servicePackage || 'Chưa đăng ký gói dịch vụ'}
+          {resident.servicePackage || t('familyDashboard.resident.noPackage')}
         </span>
         <span className="family-resident-row__invoice-count">
-          {invoices.length} hóa đơn{unpaidCount > 0 ? ` · ${unpaidCount} chưa thanh toán` : ''}
+          {unpaidCount > 0 ? t('familyDashboard.resident.unpaidCount', { count: invoices.length, unpaid: unpaidCount }) : t('familyDashboard.resident.invoiceCount', { count: invoices.length })}
         </span>
         <ChevronDown size={18} className="family-resident-row__chevron" />
       </button>
@@ -665,15 +666,15 @@ function ResidentListItem({
         <div className="family-resident-row__body">
           {resident.servicePackage && getPackagePriceLabel(resident) && (
             <div className="info-row">
-              <strong>Giá gói dịch vụ:</strong>
+              <strong>{t('familyDashboard.resident.packagePrice')}</strong>
               <span style={{ fontSize: '14px' }}>{getPackagePriceLabel(resident)}</span>
             </div>
           )}
 
           {invoices.length === 0 ? (
             <div className="info-row">
-              <strong>Trạng thái hóa đơn:</strong>
-              <span>Chưa có hóa đơn</span>
+              <strong>{t('familyDashboard.resident.invoiceStatus')}</strong>
+              <span>{t('familyDashboard.resident.noInvoices')}</span>
             </div>
           ) : (
             INVOICE_GROUPS.map((group) => {
@@ -700,15 +701,15 @@ function ResidentListItem({
           <div className="family-resident-row__actions">
             {latestInvoice && latestInvoice.status === 'PAID' ? (
               <button type="button" className="button button-secondary" disabled>
-                Đã thanh toán hết
+                {t('familyDashboard.invoice.allPaid')}
               </button>
             ) : latestInvoice && latestInvoice.status === 'CANCELLED' ? (
               <button type="button" className="button button-secondary" disabled>
-                Hóa đơn đã hủy
+                {t('familyDashboard.invoice.cancelled')}
               </button>
             ) : hasUnpaidServiceInvoice ? (
               <button type="button" className="button button-secondary" disabled>
-                Đã có hóa đơn chưa thanh toán
+                {t('familyDashboard.invoice.hasUnpaid')}
               </button>
             ) : hasServicePackage && PACKAGE_PRICES[resident.servicePackage] ? (
               <button
@@ -717,11 +718,11 @@ function ResidentListItem({
                 onClick={() => onCreateInvoice(resident)}
                 disabled={creatingInvoiceFor === resident._id}
               >
-                {creatingInvoiceFor === resident._id ? 'Đang tạo hóa đơn...' : 'Tạo hóa đơn'}
+                {creatingInvoiceFor === resident._id ? t('familyDashboard.invoice.creating') : t('familyDashboard.invoice.create')}
               </button>
             ) : (
               <button type="button" className="button button-secondary" disabled>
-                {hasServicePackage ? 'Chưa có thông tin giá gói' : 'Chưa có khoản phí'}
+                {hasServicePackage ? t('familyDashboard.invoice.noPriceInfo') : t('familyDashboard.invoice.noCharges')}
               </button>
             )}
           </div>
@@ -734,9 +735,10 @@ function ResidentListItem({
 /* ══════════════════════ Invoice group + row (nested accordion) ══════════════════════ */
 
 function InvoiceGroup({ group, invoices, resident, expandedInvoiceIds, onToggleInvoice, onOpenCheckout, onPayWithWallet, isWalletPaymentProcessing, walletLoading, checkoutLoadingInvoiceId }) {
+  const { t } = useTranslation();
   return (
     <div className={`family-invoice-group family-invoice-group--${group.theme}`}>
-      <div className="family-invoice-group__title">{group.icon} {group.label}</div>
+      <div className="family-invoice-group__title">{group.icon} {t(group.i18nKey)}</div>
       {invoices.map((invoice, idx) => (
         <InvoiceRow
           key={invoice._id || idx}
@@ -758,18 +760,19 @@ function InvoiceGroup({ group, invoices, resident, expandedInvoiceIds, onToggleI
 
 const INVOICE_COST_FIELDS_BY_THEME = {
   service: [
-    { key: 'careServiceCost', label: 'Phí dịch vụ chăm sóc', showIf: (inv) => inv.careServiceCost > 0 || inv.roomCost > 0 },
-    { key: 'roomCost', label: 'Phí xét nghiệm' },
-    { key: 'otherCost', label: 'Chi phí khác' },
+    { key: 'careServiceCost', i18nKey: 'familyDashboard.invoice.careServiceCost', showIf: (inv) => inv.careServiceCost > 0 || inv.roomCost > 0 },
+    { key: 'roomCost', i18nKey: 'familyDashboard.invoice.roomCost' },
+    { key: 'otherCost', i18nKey: 'familyDashboard.invoice.otherCost' },
   ],
   medication: [
-    { key: 'medicationCost', label: 'Phí thuốc' },
-    { key: 'otherCost', label: 'Chi phí khác' },
+    { key: 'medicationCost', i18nKey: 'familyDashboard.invoice.medicationCost' },
+    { key: 'otherCost', i18nKey: 'familyDashboard.invoice.otherCost' },
   ],
   other: [],
 };
 
 function InvoiceRow({ invoice, theme, resident, isExpanded, onToggle, onOpenCheckout, onPayWithWallet, isWalletPaymentProcessing, walletLoading, checkoutLoadingInvoiceId }) {
+  const { t } = useTranslation();
   const invoiceStatus = invoice?.status?.toString().toUpperCase?.();
   const invoiceTotalAmount = invoice?.totalAmount ?? invoice?.total ?? 0;
   const isPaid = invoiceStatus === 'PAID';
@@ -785,7 +788,7 @@ function InvoiceRow({ invoice, theme, resident, isExpanded, onToggle, onOpenChec
           {invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString('vi-VN') : '-'}
         </span>
         <span className={`family-invoice-row__status ${isPaid ? 'is-paid' : isCancelled ? 'is-cancelled' : 'is-due'}`}>
-          {getInvoiceStatusLabel(invoiceStatus)}
+          {INVOICE_STATUS_I18N[invoiceStatus] ? t(INVOICE_STATUS_I18N[invoiceStatus]) : t('familyDashboard.invoice.statusUnpaid')}
         </span>
         <span className="family-invoice-row__total">{formatMoney(invoiceTotalAmount)}</span>
         <ChevronDown size={16} className="family-invoice-row__chevron" />
@@ -796,30 +799,30 @@ function InvoiceRow({ invoice, theme, resident, isExpanded, onToggle, onOpenChec
           {costFields.map((field) => (
             (field.showIf ? field.showIf(invoice) : invoice[field.key] > 0) && (
               <div className="info-row" key={field.key} style={{ marginBottom: '6px', fontSize: '13px' }}>
-                <strong>{field.label}:</strong>
+                <strong>{t(field.i18nKey)}:</strong>
                 <span>{formatMoney(invoice[field.key])}</span>
               </div>
             )
           ))}
           {invoice.items && invoice.items.length > 0 && (
             <div style={{ marginTop: '8px', marginBottom: 6 }}>
-              <div style={{ fontSize: 12, color: '#475569', marginBottom: 6 }}>Chi tiết khoản phí:</div>
+              <div style={{ fontSize: 12, color: '#475569', marginBottom: 6 }}>{t('familyDashboard.invoice.itemsDetail')}</div>
               {invoice.items.map((it, i) => (
                 <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '4px 0' }}>
-                  <div style={{ color: '#0f172a' }}>{it.description || it.name || 'Khoản phí'}</div>
+                  <div style={{ color: '#0f172a' }}>{it.description || it.name || t('familyDashboard.invoice.defaultItem')}</div>
                   <div style={{ fontWeight: 700, color: '#0f172a' }}>{formatMoney(it.amount)}</div>
                 </div>
               ))}
             </div>
           )}
           <div className={`family-invoice-row__grand-total family-invoice-row__grand-total--${theme}`}>
-            <strong>Tổng:</strong>
+            <strong>{t('familyDashboard.invoice.grandTotal')}</strong>
             <span>{formatMoney(invoiceTotalAmount)}</span>
           </div>
           {isCancelled && (
             <div className="info-row" style={{ marginTop: '8px', color: '#64748b' }}>
-              <strong>Lý do hủy:</strong>
-              <span>{invoice.cancellationReason || 'Đã hủy do thay đổi gói dịch vụ.'}</span>
+              <strong>{t('familyDashboard.invoice.cancelReason')}</strong>
+              <span>{invoice.cancellationReason || t('familyDashboard.invoice.defaultCancelReason')}</span>
             </div>
           )}
           {!isPaid && !isCancelled && (
@@ -830,7 +833,7 @@ function InvoiceRow({ invoice, theme, resident, isExpanded, onToggle, onOpenChec
                 onClick={() => onOpenCheckout(resident._id, invoice._id)}
                 disabled={isCheckoutLoading}
               >
-                {isCheckoutLoading ? 'Đang mở...' : 'Thanh toán'}
+                {isCheckoutLoading ? t('familyDashboard.invoice.checkoutLoading') : t('familyDashboard.invoice.checkout')}
               </button>
               <button
                 type="button"
@@ -838,7 +841,7 @@ function InvoiceRow({ invoice, theme, resident, isExpanded, onToggle, onOpenChec
                 onClick={() => onPayWithWallet(resident._id, invoice._id, invoiceTotalAmount)}
                 disabled={isWalletPaymentProcessing || walletLoading}
               >
-                {isWalletPaymentProcessing ? 'Đang...' : 'Thanh toán bằng ví'}
+                {isWalletPaymentProcessing ? t('familyDashboard.invoice.walletPayProcessing') : t('familyDashboard.invoice.walletPay')}
               </button>
             </div>
           )}

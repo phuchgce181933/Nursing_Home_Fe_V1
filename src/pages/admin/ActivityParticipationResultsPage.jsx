@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { CheckCircle, Filter, RefreshCw, BarChart3, Search } from 'lucide-react';
 import activityService from '../../services/activity.service';
 import residentService from '../../services/resident.service';
@@ -6,6 +7,7 @@ import { useToast } from '../../hooks/useToast';
 import '../../styles/admin/AdminAdmissionRequestsPage.css';
 
 export default function ActivityParticipationResultsPage() {
+  const { t } = useTranslation();
   const { showToast } = useToast();
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -130,7 +132,7 @@ export default function ActivityParticipationResultsPage() {
       }
     } catch (err) {
       console.error('Fetch activities failed:', err);
-      setError(err.response?.data?.message || 'Không thể tải danh sách hoạt động.');
+      setError(err.response?.data?.message || t('activityParticipation.loadError'));
     } finally {
       setLoading(false);
     }
@@ -223,10 +225,10 @@ export default function ActivityParticipationResultsPage() {
 
       handleCancel();
       fetchActivities();
-      showToast('Đã lưu kết quả tham gia thành công!', 'success');
+      showToast(t('activityParticipation.saveSuccess'), 'success');
     } catch (err) {
       console.error('Submit failed:', err);
-      setFormError(err.response?.data?.message || 'Có lỗi khi lưu kết quả.');
+      setFormError(err.response?.data?.message || t('activityParticipation.saveError'));
     } finally {
       setSubmitting(false);
     }
@@ -238,21 +240,21 @@ export default function ActivityParticipationResultsPage() {
         <div>
           <h1>
             <CheckCircle size={26} />
-            Kết quả tham gia hoạt động
+            {t('activityParticipation.title')}
           </h1>
-          <p>Ghi nhận và quản lý kết quả tham gia hoạt động của cư dân.</p>
+          <p>{t('activityParticipation.subtitle')}</p>
         </div>
       </div>
 
       <div className="adm-filter-panel">
         <form onSubmit={handleApplyFilters} className="adm-filter-grid">
           <div>
-            <label className="text-sm font-semibold">Tìm kiếm</label>
+            <label className="text-sm font-semibold">{t('activityParticipation.filter.search')}</label>
             <div className="adm-filter-input-wrapper">
               <Search className="adm-filter-input-icon" size={14} />
               <input
                 type="text"
-                placeholder="Tìm theo tiêu đề..."
+                placeholder={t('activityParticipation.filter.searchPlaceholder')}
                 className="adm-filter-input"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -261,25 +263,25 @@ export default function ActivityParticipationResultsPage() {
           </div>
 
           <div>
-            <label className="text-sm font-semibold">Trạng thái</label>
+            <label className="text-sm font-semibold">{t('activityParticipation.filter.status')}</label>
             <select
               className="adm-filter-select"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
             >
-              <option value="">Tất cả trạng thái</option>
-              <option value="completed">Đã hoàn thành</option>
-              <option value="ongoing">Đang diễn ra</option>
-              <option value="scheduled">Đã lên lịch</option>
+              <option value="">{t('activityParticipation.filter.allStatuses')}</option>
+              <option value="completed">{t('activityParticipation.filter.completed')}</option>
+              <option value="ongoing">{t('activityParticipation.filter.ongoing')}</option>
+              <option value="scheduled">{t('activityParticipation.filter.scheduled')}</option>
             </select>
           </div>
 
           <div className="flex items-end gap-3" style={{ alignSelf: 'end' }}>
             <button type="button" className="adm-btn-refresh" onClick={handleResetFilters}>
-              <RefreshCw size={14} /> Đặt lại
+              <RefreshCw size={14} /> {t('activityParticipation.filter.reset')}
             </button>
             <button type="submit" className="adm-btn-refresh">
-              <Filter size={14} /> Áp dụng
+              <Filter size={14} /> {t('activityParticipation.filter.apply')}
             </button>
           </div>
         </form>
@@ -290,25 +292,25 @@ export default function ActivityParticipationResultsPage() {
           <table className="adm-table">
             <thead>
               <tr>
-                <th>Tiêu đề hoạt động</th>
-                <th>Ngày diễn ra</th>
-                <th>Người tham gia</th>
-                <th>Có mặt và vắng</th>
-                <th>Trạng thái</th>
-                <th>Hành động</th>
+                <th>{t('activityParticipation.table.activityTitle')}</th>
+                <th>{t('activityParticipation.table.date')}</th>
+                <th>{t('activityParticipation.table.participants')}</th>
+                <th>{t('activityParticipation.table.attendance')}</th>
+                <th>{t('activityParticipation.table.status')}</th>
+                <th>{t('activityParticipation.table.action')}</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
                   <td colSpan="6" style={{ textAlign: 'center', padding: '24px' }}>
-                    Đang tải hoạt động...
+                    {t('activityParticipation.loading')}
                   </td>
                 </tr>
               ) : activities.length === 0 ? (
                 <tr>
                   <td colSpan="6" style={{ textAlign: 'center', padding: '24px' }}>
-                    Không tìm thấy hoạt động nào.
+                    {t('activityParticipation.noActivities')}
                   </td>
                 </tr>
               ) : (
@@ -336,7 +338,7 @@ export default function ActivityParticipationResultsPage() {
                         (() => {
                           const presentCount = activity.attendanceRecords.filter((record) => record.status !== 'absent').length;
                           const absentCount = activity.attendanceRecords.filter((record) => record.status === 'absent').length;
-                          return `Có mặt: ${presentCount}, Vắng: ${absentCount}`;
+                          return t('activityParticipation.attendanceDisplay', { present: presentCount, absent: absentCount });
                         })()
                       ) : (
                         '---'
@@ -362,7 +364,7 @@ export default function ActivityParticipationResultsPage() {
                         onClick={() => handleEdit(activity)}
                         disabled={editingId === activity._id}
                       >
-                        <BarChart3 size={14} /> Ghi nhận
+                        <BarChart3 size={14} /> {t('activityParticipation.record')}
                       </button>
                     </td>
                   </tr>
@@ -377,16 +379,16 @@ export default function ActivityParticipationResultsPage() {
         <div className="adm-modal-overlay">
           <div className="adm-modal">
             <div className="adm-modal-header">
-              <h2>Ghi nhận</h2>
+              <h2>{t('activityParticipation.modal.title')}</h2>
               <button type="button" className="adm-btn-refresh" onClick={handleCancel} style={{ whiteSpace: 'nowrap' }}>
-                Đóng
+                {t('activityParticipation.modal.close')}
               </button>
             </div>
 
             <form onSubmit={handleSubmit} className="adm-modal-body">
                     {editingOccurrenceOptions.length > 0 && (
                       <div style={{ marginBottom: 12 }}>
-                        <label className="text-sm font-semibold">Chọn ngày</label>
+                        <label className="text-sm font-semibold">{t('activityParticipation.modal.selectDate')}</label>
                         <select className="adm-filter-select" value={editingOccurrenceDate || ''} onChange={(e) => {
                           const val = e.target.value || null;
                           setEditingOccurrenceDate(val);
@@ -404,15 +406,15 @@ export default function ActivityParticipationResultsPage() {
                     )}
               {form.attendanceRecords.length > 0 && (
                 <div className="adm-modal-section">
-                  <label className="text-sm font-semibold">Ghi nhận từng cư dân</label>
+                  <label className="text-sm font-semibold">{t('activityParticipation.modal.perResident')}</label>
                   <div className="adm-table-responsive">
                     <table className="adm-table adm-participation-table">
                       <thead>
                         <tr>
-                          <th>Cư dân</th>
-                          <th>Điểm danh</th>
-                          <th>Mức độ tham gia</th>
-                          <th>Nhận xét</th>
+                          <th>{t('activityParticipation.modal.residentCol')}</th>
+                          <th>{t('activityParticipation.modal.attendanceCol')}</th>
+                          <th>{t('activityParticipation.modal.participationLevelCol')}</th>
+                          <th>{t('activityParticipation.modal.commentCol')}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -429,10 +431,10 @@ export default function ActivityParticipationResultsPage() {
                                   value={record.status}
                                   onChange={(e) => updateAttendanceRecord(record.residentId, 'status', e.target.value)}
                                 >
-                                  <option value="present">Có mặt</option>
-                                  <option value="absent">Vắng mặt</option>
-                                  <option value="late">Muộn</option>
-                                  <option value="left_early">Về sớm</option>
+                                  <option value="present">{t('activityParticipation.attendance.present')}</option>
+                                  <option value="absent">{t('activityParticipation.attendance.absent')}</option>
+                                  <option value="late">{t('activityParticipation.attendance.late')}</option>
+                                  <option value="left_early">{t('activityParticipation.attendance.leftEarly')}</option>
                                 </select>
                               </td>
                               <td>
@@ -441,9 +443,9 @@ export default function ActivityParticipationResultsPage() {
                                   value={participation.participationLevel}
                                   onChange={(e) => updateParticipationRecord(record.residentId, 'participationLevel', e.target.value)}
                                 >
-                                  <option value="passive">Không tham gia</option>
-                                  <option value="partial">Tham gia TB</option>
-                                  <option value="active">Thường xuyên tham gia</option>
+                                  <option value="passive">{t('activityParticipation.participation.passive')}</option>
+                                  <option value="partial">{t('activityParticipation.participation.partial')}</option>
+                                  <option value="active">{t('activityParticipation.participation.active')}</option>
                                 </select>
                               </td>
                               <td>
@@ -452,7 +454,7 @@ export default function ActivityParticipationResultsPage() {
                                   className="adm-filter-input"
                                   value={participation.comment}
                                   onChange={(e) => updateParticipationRecord(record.residentId, 'comment', e.target.value)}
-                                  placeholder="Nhận xét..."
+                                  placeholder={t('activityParticipation.modal.commentPlaceholder')}
                                 />
                               </td>
                             </tr>
@@ -476,7 +478,7 @@ export default function ActivityParticipationResultsPage() {
 
       <div className="adm-header" style={{ marginTop: '18px', justifyContent: 'space-between' }}>
         <span>
-          Trang {page} / {totalPages} — {total} hoạt động
+          {t('activityParticipation.pagination.page', { page, totalPages, total })}
         </span>
         <div style={{ display: 'flex', gap: '10px' }}>
           <button
@@ -485,7 +487,7 @@ export default function ActivityParticipationResultsPage() {
             disabled={page <= 1}
             onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
           >
-            Trước
+            {t('activityParticipation.pagination.prev')}
           </button>
           <button
             type="button"
@@ -493,7 +495,7 @@ export default function ActivityParticipationResultsPage() {
             disabled={page >= totalPages}
             onClick={() => setPage((prev) => Math.min(prev + 1, totalPages))}
           >
-            Tiếp
+            {t('activityParticipation.pagination.next')}
           </button>
         </div>
       </div>

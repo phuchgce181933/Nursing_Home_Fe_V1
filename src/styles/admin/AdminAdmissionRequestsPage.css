@@ -9,7 +9,7 @@
   padding: 24px;
   max-width: 1600px;
   margin: 0 auto;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: inherit;
   color: #334155;
 }
 
@@ -27,7 +27,7 @@
 .arh-drawer,
 .arh-drawer textarea,
 .arh-drawer button {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+  font-family: inherit;
 }
 
 /* Header Adjustments */
@@ -751,7 +751,7 @@
 
 .status-badge-custom-adm--new {
   background-color: #eff6ff;
-  color: #2563eb;
+  color: var(--nh-primary);
   border: 1px solid #bfdbfe;
 }
 
@@ -801,7 +801,7 @@
 
 .adm-status-badge--issued {
   background-color: #eff6ff;
-  color: #2563eb;
+  color: var(--nh-primary);
   border: 1px solid #bfdbfe;
 }
 

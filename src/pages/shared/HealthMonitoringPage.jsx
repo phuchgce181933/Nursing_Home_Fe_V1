@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   HeartPulse,
@@ -34,20 +35,20 @@ import '../../styles/shared/HealthMonitoringPage.css';
 const THRESHOLDS = {
   bloodPressureSystolic:  { min: 90,   max: 140,  unit: 'mmHg' },
   bloodPressureDiastolic: { min: 60,   max: 90,   unit: 'mmHg' },
-  pulse:                  { min: 60,   max: 100,  unit: 'lần/phút' },
+  pulse:                  { min: 60,   max: 100,  unit: 'bpm' },
   temperatureCelsius:     { min: 35.0, max: 37.8, unit: '°C' },
   oxygenSaturation:       { min: 95,   max: 100,  unit: '%' },
 };
 
 // ─── Cấu hình biểu đồ ───
 const CHART_METRICS = [
-  { key: 'bloodPressureSystolic',  label: 'Huyết áp tâm thu',    color: '#ef4444', unit: 'mmHg' },
-  { key: 'bloodPressureDiastolic', label: 'Huyết áp tâm trương', color: '#f97316', unit: 'mmHg' },
-  { key: 'pulse',                  label: 'Nhịp tim',             color: '#8b5cf6', unit: 'lần/phút' },
-  { key: 'temperatureCelsius',     label: 'Nhiệt độ',             color: '#ec4899', unit: '°C' },
-  { key: 'oxygenSaturation',       label: 'SpO₂',                 color: '#06b6d4', unit: '%' },
-  { key: 'bloodSugar',             label: 'Đường huyết',          color: '#10b981', unit: 'mmol/L' },
-  { key: 'weightKg',               label: 'Cân nặng',             color: '#3b82f6', unit: 'kg' },
+  { key: 'bloodPressureSystolic',  i18nKey: 'healthMonitoring.systolicBP',  color: '#ef4444', unit: 'mmHg' },
+  { key: 'bloodPressureDiastolic', i18nKey: 'healthMonitoring.diastolicBP', color: '#f97316', unit: 'mmHg' },
+  { key: 'pulse',                  i18nKey: 'healthMonitoring.heartRate',   color: '#8b5cf6', unit: 'bpm' },
+  { key: 'temperatureCelsius',     i18nKey: 'healthMonitoring.temperature', color: '#ec4899', unit: '°C' },
+  { key: 'oxygenSaturation',       i18nKey: 'SpO₂',                        color: '#06b6d4', unit: '%' },
+  { key: 'bloodSugar',             i18nKey: 'healthMonitoring.bloodSugar',  color: '#10b981', unit: 'mmol/L' },
+  { key: 'weightKg',               i18nKey: 'healthMonitoring.weight',      color: '#0f766e', unit: 'kg' },
 ];
 
 // ─── Giới hạn hợp lệ (chặn submit, khớp backend VITAL_RANGES) — khác với THRESHOLDS chỉ để cảnh báo ───
@@ -78,122 +79,21 @@ const formatDT = (val) => {
   });
 };
 
-const formatAge = (dob) => {
+const formatAge = (dob, t) => {
   if (!dob) return null;
   const age = Math.floor((Date.now() - new Date(dob)) / (1000 * 60 * 60 * 24 * 365.25));
-  return `${age} tuổi`;
-};
-
-// ─── Chuyển field name sang label tiếng Việt ───
-const getFieldLabel = (field) => {
-  const labels = {
-    // Physical Examination
-    general: 'Tổng quát',
-    cardiovascular: 'Tim mạch',
-    respiratory: 'Hô hấp',
-    abdominal: 'Bụng',
-    neurological: 'Thần kinh',
-    musculoskeletal: 'Cơ xương',
-    skin: 'Da',
-    other: 'Khác',
-    summary: 'Tóm tắt',
-    // Urinalysis Results
-    appearance: 'Hình thái',
-    color: 'Màu sắc',
-    pH: 'pH',
-    specificGravity: 'Trọng lượng riêng',
-    protein: 'Protein',
-    glucose: 'Glucose',
-    ketones: 'Ketone',
-    blood: 'Máu',
-    leukocyteEsterase: 'Bạch cầu esterase',
-    nitrites: 'Nitrit',
-    urobilinogen: 'Urobilinogen',
-    bilirubin: 'Bilirubin',
-    microscopy: 'Kính hiển vi',
-    notes: 'Ghi chú',
-    // ECG Results
-    heartRate: 'Nhịp tim',
-    rhythm: 'Nhịp điệu',
-    prInterval: 'Khoảng PR',
-    qrsDuration: 'Thời gian QRS',
-    qtInterval: 'Khoảng QT',
-    axis: 'Trục',
-    interpretation: 'Giải thích',
-    // Cognitive Function
-    assessmentTool: 'Công cụ đánh giá',
-    score: 'Điểm số',
-    orientation: 'Định hướng',
-    memory: 'Trí nhớ',
-    attention: 'Chú ý',
-    language: 'Ngôn ngữ',
-    executiveFunction: 'Chức năng thực hành',
-    // Functional Status
-    mobility: 'Độ linh hoạt',
-    transfers: 'Chuyển vị',
-    adls: 'Hoạt động hàng ngày',
-    iadls: 'Hoạt động có công cụ',
-    assistanceRequired: 'Sự hỗ trợ cần thiết',
-    // Fall Risk
-    level: 'Mức độ',
-    historyOfFalls: 'Lịch sử té ngã',
-    gait: 'Dáng đi',
-    balance: 'Cân bằng',
-    medications: 'Thuốc',
-    vision: 'Thị lực',
-    cognition: 'Nhận thức',
-    // Nutritional Status
-    bmi: 'BMI',
-    weightChange: 'Thay đổi cân nặng',
-    appetite: 'Cảm giác thèm ăn',
-    dietType: 'Loại chế độ ăn',
-    swallowing: 'Khả năng nuốt',
-    proteinIntake: 'Lượng protein',
-    hydration: 'Tình trạng nước',
-  };
-  return labels[field] || (field.charAt(0).toUpperCase() + field.slice(1));
-};
-
-// ─── Xuất CSV (client-side) ───
-const exportToCSV = (records, resident) => {
-  if (!records.length) return;
-  const headers = [
-    'Thời gian đo', 'HA tâm thu (mmHg)', 'HA tâm trương (mmHg)', 'Nhịp tim (l/phút)',
-    'Nhiệt độ (°C)', 'SpO₂ (%)', 'Đường huyết (mmol/L)', 'Cân nặng (kg)', 'Chiều cao (cm)',
-    'Bất thường', 'Ghi chú',
-  ];
-  const rows = records.map((r) => [
-    r.measuredAt ? new Date(r.measuredAt).toLocaleString('vi-VN') : '',
-    r.bloodPressureSystolic ?? '',
-    r.bloodPressureDiastolic ?? '',
-    r.pulse ?? '',
-    r.temperatureCelsius ?? '',
-    r.oxygenSaturation ?? '',
-    r.bloodSugar ?? '',
-    r.weightKg ?? '',
-    r.heightCm ?? '',
-    r.abnormalFlag ? 'Có' : 'Không',
-    r.summary ?? '',
-  ]);
-  const csv = '\uFEFF' + [headers, ...rows].map((row) => row.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `health-report-${resident?.residentCode || 'resident'}-${new Date().toISOString().slice(0, 10)}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
+  return t('healthMonitoring.ageYears', { age });
 };
 
 // ── Xuất PDF (client-side) ──
 // onBlocked lets the calling component show its own in-app toast instead of a native
 // alert; falls back to alert() for any caller that doesn't pass one.
-const exportToPDF = (records, resident, onBlocked = (msg) => alert(msg)) => {
+const exportToPDF = (records, resident, onBlocked = (msg) => alert(msg), t = (k) => k) => {
   if (!records.length) return;
 
   const printWindow = window.open('', '_blank', 'width=1000,height=900');
   if (!printWindow) {
-    onBlocked('Vui lòng cho phép trình duyệt mở cửa sổ bật lên (pop-up) để xuất báo cáo PDF.');
+    onBlocked(t('healthMonitoring.pdfPopupBlocked'));
     return;
   }
   
@@ -204,16 +104,16 @@ const exportToPDF = (records, resident, onBlocked = (msg) => alert(msg)) => {
   const latest = records[0] || {};
   
   const getStatusText = (abnormal) => {
-    return abnormal 
-      ? '<span style="color: #ef4444; font-weight: bold; font-size: 11px;">Bất thường</span>'
-      : '<span style="color: #10b981; font-weight: bold; font-size: 11px;">Bình thường</span>';
+    return abnormal
+      ? `<span style="color: #ef4444; font-weight: bold; font-size: 11px;">${t('healthMonitoring.abnormal')}</span>`
+      : `<span style="color: #10b981; font-weight: bold; font-size: 11px;">${t('healthMonitoring.normal')}</span>`;
   };
   
   const getAbnormalTextClass = (key, val) => {
     if (val === undefined || val === null || val === '') return '';
-    const t = THRESHOLDS[key];
-    if (!t) return '';
-    const isAbn = Number(val) > t.max || Number(val) < t.min;
+    const th = THRESHOLDS[key];
+    if (!th) return '';
+    const isAbn = Number(val) > th.max || Number(val) < th.min;
     return isAbn ? 'color: #ef4444; font-weight: bold;' : 'color: #334155;';
   };
 
@@ -235,7 +135,7 @@ const exportToPDF = (records, resident, onBlocked = (msg) => alert(msg)) => {
     <!DOCTYPE html>
     <html>
     <head>
-      <title>Báo cáo Sức khỏe - ${resident.fullName}</title>
+      <title>${t('healthMonitoring.pdfTitle')} - ${resident.fullName}</title>
       <meta charset="utf-8">
       <style>
         body {
@@ -250,7 +150,7 @@ const exportToPDF = (records, resident, onBlocked = (msg) => alert(msg)) => {
         .header {
           display: flex;
           justify-content: space-between;
-          border-bottom: 2px solid #3b82f6;
+          border-bottom: 2px solid #0f766e;
           padding-bottom: 15px;
           margin-bottom: 20px;
         }
@@ -270,7 +170,7 @@ const exportToPDF = (records, resident, onBlocked = (msg) => alert(msg)) => {
         }
         .header-right h3 {
           margin: 0 0 4px 0;
-          color: #3b82f6;
+          color: #0f766e;
           font-size: 14px;
           font-weight: 700;
         }
@@ -324,7 +224,7 @@ const exportToPDF = (records, resident, onBlocked = (msg) => alert(msg)) => {
           font-size: 13px;
           font-weight: 700;
           color: #1e3a8a;
-          border-left: 4px solid #3b82f6;
+          border-left: 4px solid #0f766e;
           padding-left: 8px;
           margin: 22px 0 10px 0;
           text-transform: uppercase;
@@ -422,82 +322,82 @@ const exportToPDF = (records, resident, onBlocked = (msg) => alert(msg)) => {
     <body>
       <div class="header">
         <div class="header-left">
-          <h2>HỆ THỐNG QUẢN LÝ VIỆN DƯỠNG LÃO NURSING HOME</h2>
-          <p>Địa chỉ: Đường Đại Lộ Thăng Long, Hà Nội</p>
-          <p>Điện thoại: (024) 3789 9999 | Email: contact@nursinghome.com</p>
+          <h2>${t('healthMonitoring.pdfOrgHeader')}</h2>
+          <p>${t('healthMonitoring.pdfAddress')}</p>
+          <p>${t('healthMonitoring.pdfContactLine')}</p>
         </div>
         <div class="header-right">
-          <h3>BÁO CÁO Y TẾ CÁ NHÂN</h3>
-          <p>Ngày xuất bản: ${new Date().toLocaleDateString('vi-VN')}</p>
-          <p>Mã tài liệu: HS-${resident.residentCode || 'N/A'}</p>
+          <h3>${t('healthMonitoring.pdfIndividualReport')}</h3>
+          <p>${t('healthMonitoring.pdfPublishDate')}: ${new Date().toLocaleDateString('vi-VN')}</p>
+          <p>${t('healthMonitoring.pdfDocCode')}: HS-${resident.residentCode || 'N/A'}</p>
         </div>
       </div>
       
       <div class="title-container">
-        <h1>BÁO CÁO LỊCH SỬ CHỈ SỐ SỨC KHỎE</h1>
-        <p>Tài liệu lưu hành nội bộ - Bảo mật thông tin y khoa của cư dân</p>
+        <h1>${t('healthMonitoring.pdfHistoryReportTitle')}</h1>
+        <p>${t('healthMonitoring.pdfConfidentialNote')}</p>
       </div>
       
       <div class="info-grid">
         <div class="info-item">
-          <span class="info-label">Họ tên cư dân:</span>
+          <span class="info-label">${t('healthMonitoring.pdfResidentName')}:</span>
           <span class="info-value" style="font-weight: bold; text-transform: uppercase;">${resident.fullName}</span>
         </div>
         <div class="info-item">
-          <span class="info-label">Mã số cư dân:</span>
+          <span class="info-label">${t('healthMonitoring.pdfResidentCode')}:</span>
           <span class="info-value" style="font-weight: bold; color: #1e3a8a;">#${resident.residentCode || 'N/A'}</span>
         </div>
         <div class="info-item">
-          <span class="info-label">Ngày sinh:</span>
-          <span class="info-value">${resident.dateOfBirth ? new Date(resident.dateOfBirth).toLocaleDateString('vi-VN') : '—'} (${age} tuổi)</span>
+          <span class="info-label">${t('healthMonitoring.pdfDob')}:</span>
+          <span class="info-value">${resident.dateOfBirth ? new Date(resident.dateOfBirth).toLocaleDateString('vi-VN') : '—'} (${age} ${t('healthMonitoring.yearsOld')})</span>
         </div>
         <div class="info-item">
-          <span class="info-label">Giới tính:</span>
-          <span class="info-value">${resident.gender === 'male' ? 'Nam' : resident.gender === 'female' ? 'Nữ' : 'N/A'}</span>
+          <span class="info-label">${t('healthMonitoring.pdfGender')}:</span>
+          <span class="info-value">${resident.gender === 'male' ? t('healthMonitoring.male') : resident.gender === 'female' ? t('healthMonitoring.female') : 'N/A'}</span>
         </div>
         <div class="info-item">
-          <span class="info-label">Nhóm máu:</span>
-          <span class="info-value">${resident.bloodType && resident.bloodType !== 'unknown' ? resident.bloodType : 'Chưa xác định'}</span>
+          <span class="info-label">${t('healthMonitoring.pdfBloodType')}:</span>
+          <span class="info-value">${resident.bloodType && resident.bloodType !== 'unknown' ? resident.bloodType : t('healthMonitoring.pdfUnknownBloodType')}</span>
         </div>
         <div class="info-item">
-          <span class="info-label">Trạng thái/Phòng:</span>
-          <span class="info-value">${resident.residencyStatus === 'pending' ? 'Chờ nhập viện' : resident.room?.roomCode ? 'Phòng ' + resident.room.roomCode : 'Chưa nhận phòng'}</span>
+          <span class="info-label">${t('healthMonitoring.pdfStatusRoom')}:</span>
+          <span class="info-value">${resident.residencyStatus === 'pending' ? t('healthMonitoring.pendingAdmission') : resident.room?.roomCode ? t('healthMonitoring.pdfRoomPrefix') + resident.room.roomCode : t('healthMonitoring.pdfNoRoomAssigned')}</span>
         </div>
       </div>
       
-      <div class="section-title">Chỉ số đo gần nhất (${formatDT(latest.measuredAt)})</div>
+      <div class="section-title">${t('healthMonitoring.pdfLatestMeasurementTitle', { date: formatDT(latest.measuredAt) })}</div>
       <div class="vitals-summary-grid">
         <div class="vital-card">
-          <div class="vital-card-title">Huyết áp</div>
+          <div class="vital-card-title">${t('healthMonitoring.pdfBP')}</div>
           <div class="vital-card-value" style="${getAbnormalTextClass('bloodPressureSystolic', latest.bloodPressureSystolic)}">${latest.bloodPressureSystolic ?? '—'}/${latest.bloodPressureDiastolic ?? '—'} <span class="vital-card-unit">mmHg</span></div>
         </div>
         <div class="vital-card">
-          <div class="vital-card-title">Nhịp tim</div>
-          <div class="vital-card-value" style="${getAbnormalTextClass('pulse', latest.pulse)}">${latest.pulse ?? '—'} <span class="vital-card-unit">l/p</span></div>
+          <div class="vital-card-title">${t('healthMonitoring.pdfHR')}</div>
+          <div class="vital-card-value" style="${getAbnormalTextClass('pulse', latest.pulse)}">${latest.pulse ?? '—'} <span class="vital-card-unit">${t('healthMonitoring.pdfBpmShort')}</span></div>
         </div>
         <div class="vital-card">
-          <div class="vital-card-title">Nhiệt độ</div>
+          <div class="vital-card-title">${t('healthMonitoring.pdfTemp')}</div>
           <div class="vital-card-value" style="${getAbnormalTextClass('temperatureCelsius', latest.temperatureCelsius)}">${latest.temperatureCelsius ?? '—'} <span class="vital-card-unit">°C</span></div>
         </div>
         <div class="vital-card">
-          <div class="vital-card-title">Chỉ số SpO₂</div>
+          <div class="vital-card-title">${t('healthMonitoring.pdfSpO2')}</div>
           <div class="vital-card-value" style="${getAbnormalTextClass('oxygenSaturation', latest.oxygenSaturation)}">${latest.oxygenSaturation ?? '—'} <span class="vital-card-unit">%</span></div>
         </div>
       </div>
-      
-      <div class="section-title">Lịch sử đo chỉ số sinh tồn và cân nặng</div>
+
+      <div class="section-title">${t('healthMonitoring.pdfHistoryTableTitle')}</div>
       <table class="table">
         <thead>
           <tr>
-            <th style="text-align: left;">Thời gian đo</th>
-            <th>HA tâm thu</th>
-            <th>HA tâm trương</th>
-            <th>Nhịp tim</th>
-            <th>Nhiệt độ</th>
-            <th>SpO₂</th>
-            <th>Đường huyết</th>
-            <th>Cân nặng</th>
-            <th>Đánh giá</th>
+            <th style="text-align: left;">${t('healthMonitoring.pdfColMeasuredAt')}</th>
+            <th>${t('healthMonitoring.pdfColBpSystolic')}</th>
+            <th>${t('healthMonitoring.pdfColBpDiastolic')}</th>
+            <th>${t('healthMonitoring.pdfColHR')}</th>
+            <th>${t('healthMonitoring.pdfColTemp')}</th>
+            <th>${t('healthMonitoring.pdfColSpO2')}</th>
+            <th>${t('healthMonitoring.pdfColBloodSugar')}</th>
+            <th>${t('healthMonitoring.pdfColWeight')}</th>
+            <th>${t('healthMonitoring.pdfColEvaluation')}</th>
           </tr>
         </thead>
         <tbody>
@@ -507,15 +407,15 @@ const exportToPDF = (records, resident, onBlocked = (msg) => alert(msg)) => {
       
       <div class="footer">
         <div class="signature-box">
-          <p><b>Cư dân / Người đại diện</b></p>
-          <p style="font-size: 11px; color: #64748b;">(Ký và ghi rõ họ tên)</p>
-          <div class="signature-line">Xác nhận của gia đình</div>
+          <p><b>${t('healthMonitoring.pdfFamilyRep')}</b></p>
+          <p style="font-size: 11px; color: #64748b;">(${t('healthMonitoring.pdfSignInstruction')})</p>
+          <div class="signature-line">${t('healthMonitoring.pdfFamilyConfirm')}</div>
         </div>
         <div class="signature-box">
-          <p>Hà Nội, Ngày ${new Date().getDate()} tháng ${new Date().getMonth() + 1} năm ${new Date().getFullYear()}</p>
-          <p><b>Bác sĩ / Nhân viên điều dưỡng phụ trách</b></p>
-          <p style="font-size: 11px; color: #64748b;">(Ký tên và đóng dấu chuyên môn)</p>
-          <div class="signature-line">Xác nhận chuyên môn</div>
+          <p>${t('healthMonitoring.pdfDateLine', { date: new Date().getDate() + '/' + (new Date().getMonth() + 1) + '/' + new Date().getFullYear() })}</p>
+          <p><b>${t('healthMonitoring.pdfDoctorNurse')}</b></p>
+          <p style="font-size: 11px; color: #64748b;">(${t('healthMonitoring.pdfSignStamp')})</p>
+          <div class="signature-line">${t('healthMonitoring.pdfProfConfirm')}</div>
         </div>
       </div>
       
@@ -534,6 +434,7 @@ const exportToPDF = (records, resident, onBlocked = (msg) => alert(msg)) => {
 
 // ─── SVG Line Chart ───
 function VitalChart({ records, metricKey }) {
+  const { t } = useTranslation();
   const metric = CHART_METRICS.find((m) => m.key === metricKey);
   const threshold = THRESHOLDS[metricKey];
 
@@ -549,7 +450,7 @@ function VitalChart({ records, metricKey }) {
     return (
       <div className="hm-chart-empty">
         <BarChart2 size={32} />
-        <p>Cần ít nhất 2 bản ghi để vẽ biểu đồ</p>
+        <p>{t('healthMonitoring.chartMinRecords')}</p>
       </div>
     );
   }
@@ -635,12 +536,12 @@ function VitalChart({ records, metricKey }) {
       <div className="hm-chart-legend">
         <div className="hm-chart-legend-item">
           <div className="hm-chart-legend-dot" style={{ backgroundColor: metric.color }} />
-          <span>{metric.label} ({metric.unit})</span>
+          <span>{t(metric.i18nKey)} ({metric.unit})</span>
         </div>
         {threshold && (
           <div className="hm-chart-legend-item">
             <div className="hm-chart-legend-dot" style={{ backgroundColor: '#f87171', borderRadius: '2px' }} />
-            <span>Ngưỡng bình thường: {threshold.min}–{threshold.max} {threshold.unit}</span>
+            <span>{t('healthMonitoring.normalRange', { min: threshold.min, max: threshold.max, unit: threshold.unit })}</span>
           </div>
         )}
       </div>
@@ -650,6 +551,7 @@ function VitalChart({ records, metricKey }) {
 
 // ─── Main Component ─────────────────────────────────────────────────────────────
 export default function HealthMonitoringPage() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { showToast } = useToast();
 
@@ -840,7 +742,7 @@ export default function HealthMonitoringPage() {
       const maleMin = field.maleMin !== undefined && field.maleMin !== null && field.maleMin !== '' ? Number(field.maleMin) : null;
       const maleMax = field.maleMax !== undefined && field.maleMax !== null && field.maleMax !== '' ? Number(field.maleMax) : null;
       if (maleMin !== null || maleMax !== null) {
-        return { min: maleMin, max: maleMax, isGenderSpecific: true, genderLabel: 'Nam' };
+        return { min: maleMin, max: maleMax, isGenderSpecific: true, genderLabel: t('healthMonitoring.genderMale') };
       }
     }
 
@@ -848,7 +750,7 @@ export default function HealthMonitoringPage() {
       const femaleMin = field.femaleMin !== undefined && field.femaleMin !== null && field.femaleMin !== '' ? Number(field.femaleMin) : null;
       const femaleMax = field.femaleMax !== undefined && field.femaleMax !== null && field.femaleMax !== '' ? Number(field.femaleMax) : null;
       if (femaleMin !== null || femaleMax !== null) {
-        return { min: femaleMin, max: femaleMax, isGenderSpecific: true, genderLabel: 'Nữ' };
+        return { min: femaleMin, max: femaleMax, isGenderSpecific: true, genderLabel: t('healthMonitoring.genderFemale') };
       }
     }
 
@@ -895,17 +797,17 @@ export default function HealthMonitoringPage() {
       const { min, max, isGenderSpecific, genderLabel } = getFieldThresholds(field, selectedResident?.gender);
       if (value === '' || value === undefined || value === null) {
         return min !== null && max !== null
-          ? `${isGenderSpecific ? `${genderLabel}: ` : ''}Nhập số trong khoảng ${min} - ${max}`
-          : 'Nhập giá trị số phù hợp';
+          ? `${isGenderSpecific ? `${genderLabel}: ` : ''}${t('healthMonitoring.validationRange', { min, max })}`
+          : t('healthMonitoring.phNumber');
       }
-      if (Number.isNaN(Number(value))) return 'Giá trị phải là số hợp lệ.';
+      if (Number.isNaN(Number(value))) return t('healthMonitoring.validationInvalid');
       if (isFieldValueOutOfRange(field, value)) {
-        return `⚠ Ngoài ngưỡng ${isGenderSpecific ? `${genderLabel}: ` : ''}${min ?? '-'} đến ${max ?? '-'}.`;
+        return `⚠ ${t('healthMonitoring.validationRange', { min: min ?? '-', max: max ?? '-' })}${isGenderSpecific ? ` (${genderLabel})` : ''}`;
       }
-      return min !== null && max !== null ? `${isGenderSpecific ? `${genderLabel}: ` : ''}Bình thường: ${min}–${max}` : 'Giá trị hợp lệ.';
+      return min !== null && max !== null ? `${isGenderSpecific ? `${genderLabel}: ` : ''}${t('healthMonitoring.normalThreshold', { min, max, unit: '' })}` : t('healthMonitoring.validationInvalid');
     }
     if (field.type === 'DROPDOWN') {
-      return field.options?.length ? `Chọn một trong: ${field.options.join(', ')}` : '';
+      return field.options?.length ? `${t('healthMonitoring.phSelect')}: ${field.options.join(', ')}` : '';
     }
     return '';
   };
@@ -917,19 +819,19 @@ export default function HealthMonitoringPage() {
         const value = selectedServices[service._id]?.fieldValues?.[field.fieldCode];
         if (field.required) {
           if (value === undefined || value === null || String(value).trim() === '') {
-            return `Trường "${field.label}" của dịch vụ "${service.serviceName}" là bắt buộc.`;
+            return `${field.label} — ${service.serviceName}`;
           }
         }
         if (field.type === 'NUMBER' && value !== undefined && value !== null && String(value).trim() !== '') {
           const parsed = Number(value);
           if (Number.isNaN(parsed)) {
-            return `Trường "${field.label}" phải là số hợp lệ.`;
+            return `${field.label}: ${t('healthMonitoring.validationInvalid')}`;
           }
           // Abnormal values are allowed and only shown as warnings.
         }
         if (field.type === 'DROPDOWN' && field.required) {
           if (!field.options?.includes(String(value))) {
-            return `Vui lòng chọn giá trị hợp lệ cho trường "${field.label}" của dịch vụ "${service.serviceName}".`;
+            return `${field.label} — ${service.serviceName}`;
           }
         }
       }
@@ -1078,7 +980,7 @@ export default function HealthMonitoringPage() {
     const errors = {};
     const hasAnyVital = VITAL_FIELD_KEYS.some((key) => form[key] !== '' && form[key] !== undefined && form[key] !== null);
     if (!hasAnyVital) {
-      return { errors, general: 'Vui lòng nhập ít nhất một chỉ số sinh tồn trước khi lưu.' };
+      return { errors, general: t('healthMonitoring.validationAtLeastOne') };
     }
     VITAL_FIELD_KEYS.forEach((key) => {
       const val = form[key];
@@ -1086,17 +988,17 @@ export default function HealthMonitoringPage() {
       const num = Number(val);
       const range = VALID_RANGES[key];
       if (Number.isNaN(num)) {
-        errors[key] = 'Giá trị không hợp lệ';
+        errors[key] = t('healthMonitoring.validationInvalid');
       } else if (range && (num < range.min || num > range.max)) {
-        errors[key] = `Phải từ ${range.min} đến ${range.max}`;
+        errors[key] = t('healthMonitoring.validationRange', { min: range.min, max: range.max });
       }
     });
     if (form.bloodPressureSystolic !== '' && form.bloodPressureDiastolic !== '' && !errors.bloodPressureSystolic && !errors.bloodPressureDiastolic) {
       if (Number(form.bloodPressureDiastolic) >= Number(form.bloodPressureSystolic)) {
-        errors.bloodPressureDiastolic = 'Phải nhỏ hơn HA tâm thu';
+        errors.bloodPressureDiastolic = t('healthMonitoring.validationDiastolic');
       }
     }
-    return { errors, general: Object.keys(errors).length ? 'Vui lòng kiểm tra lại các chỉ số được đánh dấu.' : null };
+    return { errors, general: Object.keys(errors).length ? t('healthMonitoring.validationCheckMarked') : null };
   };
 
   const handleCopyLatestVitals = () => {
@@ -1233,7 +1135,7 @@ export default function HealthMonitoringPage() {
       loadResidents();
       setTimeout(() => setFormSuccess(false), 4000);
     } catch (err) {
-      const msg = err?.response?.data?.message || 'Không thể lưu chỉ số. Vui lòng thử lại.';
+      const msg = err?.response?.data?.message || t('healthMonitoring.errorSave');
       const matchedField = VITAL_FIELD_KEYS.find((key) => msg.includes(key));
       if (matchedField) setFieldErrors((prev) => ({ ...prev, [matchedField]: msg }));
       setFormError(msg);
@@ -1264,12 +1166,12 @@ export default function HealthMonitoringPage() {
     if (Array.isArray(value)) {
       const allImageUrls = value.every((item) => isImageUrl(item));
       if (allImageUrls) {
-        return <span>{`${value.length} ảnh`}</span>;
+        return <span>{t('healthMonitoring.photoCount', { count: value.length })}</span>;
       }
       return <span>{value.map((item) => String(item)).join(', ')}</span>;
     }
     if (isImageUrl(value)) {
-      return <span>Ảnh</span>;
+      return <span>{t('healthMonitoring.photo')}</span>;
     }
     return <span>{String(value)}</span>;
   };
@@ -1327,7 +1229,7 @@ export default function HealthMonitoringPage() {
               imageUrls.push(value);
             }
           }
-          const imageLabel = imageUrls.length > 0 ? `${imageUrls.length} ảnh` : null;
+          const imageLabel = imageUrls.length > 0 ? t('healthMonitoring.photoCount', { count: imageUrls.length }) : null;
           return (
             <div
               key={serviceKey}
@@ -1351,8 +1253,8 @@ export default function HealthMonitoringPage() {
               >
                 <div style={{ display: 'grid', gap: 4, alignItems: 'center', width: '100%' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontWeight: 700 }}>
-                    <span>{svc.serviceName || svc.serviceCode || 'Dịch vụ'}</span>
-                    {serviceAbnormal && <span className="hm-badge-warn" style={{ fontSize: 11, padding: '2px 6px' }}>Bất thường</span>}
+                    <span>{svc.serviceName || svc.serviceCode || t('healthMonitoring.serviceLabel')}</span>
+                    {serviceAbnormal && <span className="hm-badge-warn" style={{ fontSize: 11, padding: '2px 6px' }}>{t('healthMonitoring.serviceAbnormal')}</span>}
                   </div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, color: '#475569', fontSize: 12 }}>
                     <span>{svc.serviceCode || 'N/A'}</span>
@@ -1361,17 +1263,17 @@ export default function HealthMonitoringPage() {
                     {imageLabel ? <span>{imageLabel}</span> : null}
                   </div>
                 </div>
-                <span style={{ fontSize: 12, color: '#2563eb' }}>{expanded ? 'Ẩn' : 'Chi tiết'}</span>
+                <span style={{ fontSize: 12, color: '#0f766e' }}>{expanded ? t('healthMonitoring.hideToggle') : t('healthMonitoring.detailsToggle')}</span>
               </button>
               {expanded && (
                 <div style={{ marginTop: 10, display: 'grid', gap: 8, color: '#334155' }}>
                   {renderServiceImagePreview(svc.fieldValues, serviceKey, expanded)}
                   <div style={{ display: 'grid', gap: 6 }}>
-                    <div><strong>Đơn giá:</strong> {formatMoney(svc.unitPrice)}</div>
-                    <div><strong>Số lượng:</strong> {svc.quantity || 1}</div>
+                    <div><strong>{t('healthMonitoring.unitPrice')}</strong> {formatMoney(svc.unitPrice)}</div>
+                    <div><strong>{t('healthMonitoring.serviceQuantity')}</strong> {svc.quantity || 1}</div>
                     {svc.fieldValues && Object.keys(svc.fieldValues).length > 0 && (
                       <div style={{ marginTop: 6 }}>
-                        <div style={{ fontWeight: 700, marginBottom: 4 }}>Thông số chi tiết</div>
+                        <div style={{ fontWeight: 700, marginBottom: 4 }}>{t('healthMonitoring.detailedParams')}</div>
                         <div style={{ display: 'grid', gap: 8, paddingLeft: 8 }}>
                           {Object.entries(svc.fieldValues).map(([field, value]) => (
                             <div key={field} style={{ fontSize: 11, color: '#475569' }}>
@@ -1403,11 +1305,11 @@ export default function HealthMonitoringPage() {
 
   // ─── Hint text for form inputs ───
   const getHint = (key, val) => {
-    const t = THRESHOLDS[key];
-    if (!t) return `${t?.unit || ''}`;
+    const th = THRESHOLDS[key];
+    if (!th) return `${th?.unit || ''}`;
     const warn = val !== '' && isAbnormal(key, val);
-    if (warn) return `⚠ Ngoài ngưỡng bình thường (${t.min}–${t.max} ${t.unit}) · Hợp lệ & Được phép lưu (Tự động ghi nhận cảnh báo bất thường)`;
-    return `Bình thường: ${t.min}–${t.max} ${t.unit}`;
+    if (warn) return `⚠ ${t('healthMonitoring.abnormalThreshold', { min: th.min, max: th.max, unit: th.unit })}`;
+    return t('healthMonitoring.normalThreshold', { min: th.min, max: th.max, unit: th.unit });
   };
 
   return (
@@ -1417,13 +1319,13 @@ export default function HealthMonitoringPage() {
         <div className="hm-header-left">
           <h1>
             <HeartPulse size={26} />
-            Theo Dõi Sức Khỏe
+            {t('healthMonitoring.title')}
           </h1>
-          <p>Theo dõi, cập nhật chỉ số sinh tồn và sức khỏe của người cao tuổi đang cư trú.</p>
+          <p>{t('healthMonitoring.subtitle')}</p>
         </div>
         <button className="hm-btn hm-btn-ghost" onClick={loadResidents} disabled={resLoading}>
           <RefreshCw size={15} className={resLoading ? 'hm-spin' : ''} />
-          Làm mới
+          {t('healthMonitoring.refresh')}
         </button>
       </div>
 
@@ -1432,28 +1334,28 @@ export default function HealthMonitoringPage() {
         <div className="hm-stat-card">
           <div className="hm-stat-icon hm-stat-icon--blue"><User size={20} /></div>
           <div>
-            <span className="hm-stat-label">Cư dân đang nhập viện</span>
+            <span className="hm-stat-label">{t('healthMonitoring.statAdmitted')}</span>
             <span className="hm-stat-value">{stats.total}</span>
           </div>
         </div>
         <div className="hm-stat-card">
           <div className="hm-stat-icon hm-stat-icon--green"><CheckCircle size={20} /></div>
           <div>
-            <span className="hm-stat-label">Chỉ số bình thường</span>
+            <span className="hm-stat-label">{t('healthMonitoring.statNormal')}</span>
             <span className="hm-stat-value">{stats.normal}</span>
           </div>
         </div>
         <div className="hm-stat-card">
           <div className="hm-stat-icon hm-stat-icon--red"><AlertTriangle size={20} /></div>
           <div>
-            <span className="hm-stat-label">Có chỉ số bất thường</span>
+            <span className="hm-stat-label">{t('healthMonitoring.statAbnormal')}</span>
             <span className="hm-stat-value">{stats.abnormal}</span>
           </div>
         </div>
         <div className="hm-stat-card">
           <div className="hm-stat-icon hm-stat-icon--purple"><Activity size={20} /></div>
           <div>
-            <span className="hm-stat-label">Bản ghi đã chọn</span>
+            <span className="hm-stat-label">{t('healthMonitoring.statRecords')}</span>
             <span className="hm-stat-value">{selectedResident ? recTotal : '—'}</span>
           </div>
         </div>
@@ -1464,13 +1366,13 @@ export default function HealthMonitoringPage() {
         {/* ── LEFT: Resident List ── */}
         <div className="hm-list-panel">
           <div className="hm-list-header">
-            <h3>Danh sách cư dân</h3>
+            <h3>{t('healthMonitoring.residentList')}</h3>
             <div className="hm-search-wrap">
               <Search size={14} className="hm-search-icon" />
               <input
                 id="hm-resident-search"
                 className="hm-search-input"
-                placeholder="Tìm tên hoặc mã cư dân..."
+                placeholder={t('healthMonitoring.searchResident')}
                 value={resSearch}
                 onChange={(e) => setResSearch(e.target.value)}
               />
@@ -1480,7 +1382,7 @@ export default function HealthMonitoringPage() {
           <div className="hm-list-body">
             {resLoading && <div className="hm-list-loading"><Loader2 size={20} className="hm-spin" /></div>}
             {!resLoading && filteredResidents.length === 0 && (
-              <div className="hm-list-empty">Không tìm thấy cư dân nào</div>
+              <div className="hm-list-empty">{t('healthMonitoring.noResidentFound')}</div>
             )}
             {!resLoading && filteredResidents.map((r) => (
               <div
@@ -1494,11 +1396,11 @@ export default function HealthMonitoringPage() {
                 </div>
                 <div className="hm-resident-badges">
                   {r.residencyStatus === 'pending' && (
-                    <span className="hm-badge-room" style={{ backgroundColor: '#fffbeb', color: '#d97706', borderColor: '#fef3c7' }}>Chờ nhập viện</span>
+                    <span className="hm-badge-room" style={{ backgroundColor: '#fffbeb', color: '#d97706', borderColor: '#fef3c7' }}>{t('healthMonitoring.pendingAdmission')}</span>
                   )}
                   {r.room?.roomCode && <span className="hm-badge-room">{r.room.roomCode}</span>}
                   {r._hasAbnormal && (
-                    <span className="hm-badge-abnormal"><AlertTriangle size={10} />Bất thường</span>
+                    <span className="hm-badge-abnormal"><AlertTriangle size={10} />{t('healthMonitoring.abnormal')}</span>
                   )}
                 </div>
               </div>
@@ -1511,7 +1413,7 @@ export default function HealthMonitoringPage() {
           {!selectedResident ? (
             <div className="hm-detail-empty">
               <HeartPulse size={48} />
-              <p>Chọn một cư dân để xem và cập nhật hồ sơ sức khỏe</p>
+              <p>{t('healthMonitoring.selectResidentPrompt')}</p>
             </div>
           ) : (
             <>
@@ -1525,35 +1427,35 @@ export default function HealthMonitoringPage() {
                   <button
                     className="hm-btn hm-btn-export"
                     style={{ fontSize: '12px', padding: '6px 12px', backgroundColor: '#fee2e2', color: '#dc2626', borderColor: '#fecaca' }}
-                    onClick={() => exportToPDF(records, selectedResident, (msg) => showToast(msg, 'error'))}
+                    onClick={() => exportToPDF(records, selectedResident, (msg) => showToast(msg, 'error'), t)}
                     disabled={records.length === 0}
-                    title="Xuất báo cáo PDF"
+                    title={t('healthMonitoring.exportPdfTitle')}
                   >
-                    <Download size={14} /> Xuất PDF
+                    <Download size={14} /> {t('healthMonitoring.exportPdf')}
                   </button>
                 </div>
                 <div className="hm-profile-info">
                   {selectedResident.dateOfBirth && (
                     <div className="hm-profile-info-item">
-                      <span className="hm-profile-info-label">Tuổi</span>
-                      <span className="hm-profile-info-value">{formatAge(selectedResident.dateOfBirth)}</span>
+                      <span className="hm-profile-info-label">{t('healthMonitoring.labelAge')}</span>
+                      <span className="hm-profile-info-value">{formatAge(selectedResident.dateOfBirth, t)}</span>
                     </div>
                   )}
                   <div className="hm-profile-info-item">
-                    <span className="hm-profile-info-label">Giới tính</span>
+                    <span className="hm-profile-info-label">{t('healthMonitoring.labelGender')}</span>
                     <span className="hm-profile-info-value">
-                      {selectedResident.gender === 'male' ? 'Nam' : selectedResident.gender === 'female' ? 'Nữ' : 'N/A'}
+                      {selectedResident.gender === 'male' ? t('healthMonitoring.genderMale') : selectedResident.gender === 'female' ? t('healthMonitoring.genderFemale') : 'N/A'}
                     </span>
                   </div>
                   {selectedResident.bloodType && selectedResident.bloodType !== 'unknown' && (
                     <div className="hm-profile-info-item">
-                      <span className="hm-profile-info-label">Nhóm máu</span>
+                      <span className="hm-profile-info-label">{t('healthMonitoring.labelBloodType')}</span>
                       <span className="hm-profile-info-value">{selectedResident.bloodType}</span>
                     </div>
                   )}
                   {selectedResident.room?.roomCode && (
                     <div className="hm-profile-info-item">
-                      <span className="hm-profile-info-label">Phòng</span>
+                      <span className="hm-profile-info-label">{t('healthMonitoring.labelRoom')}</span>
                       <span className="hm-profile-info-value">{selectedResident.room.roomCode}</span>
                     </div>
                   )}
@@ -1565,10 +1467,9 @@ export default function HealthMonitoringPage() {
                 <div className="hm-alert-banner">
                   <AlertTriangle size={18} className="hm-alert-icon" />
                   <div>
-                    <span className="hm-alert-title">⚠ Cảnh báo: Chỉ số bất thường được phát hiện!</span>
+                    <span className="hm-alert-title">⚠ {t('healthMonitoring.alertTitle')}</span>
                     <span className="hm-alert-details">
-                      Bản ghi gần nhất ({formatDT(latestRecord?.measuredAt)}) có các chỉ số vượt ngưỡng bình thường.
-                      Vui lòng kiểm tra và xử lý kịp thời.
+                      {t('healthMonitoring.alertDesc', { time: formatDT(latestRecord?.measuredAt) })}
                     </span>
                   </div>
                 </div>
@@ -1581,21 +1482,21 @@ export default function HealthMonitoringPage() {
                   className={`hm-tab-btn${activeTab === 'history' ? ' is-active' : ''}`}
                   onClick={() => setActiveTab('history')}
                 >
-                  <ClipboardList size={15} /> Lịch sử
+                  <ClipboardList size={15} /> {t('healthMonitoring.tabHistory')}
                 </button>
                 <button
                   id="hm-tab-update"
                   className={`hm-tab-btn${activeTab === 'update' ? ' is-active' : ''}`}
                   onClick={() => setActiveTab('update')}
                 >
-                  <Activity size={15} /> Cập nhật chỉ số
+                  <Activity size={15} /> {t('healthMonitoring.tabUpdate')}
                 </button>
                 <button
                   id="hm-tab-chart"
                   className={`hm-tab-btn${activeTab === 'chart' ? ' is-active' : ''}`}
                   onClick={() => setActiveTab('chart')}
                 >
-                  <BarChart2 size={15} /> Biểu đồ
+                  <BarChart2 size={15} /> {t('healthMonitoring.tabChart')}
                 </button>
               </div>
 
@@ -1604,7 +1505,7 @@ export default function HealthMonitoringPage() {
                 <div className="hm-tab-content">
                   {/* Filter bar */}
                   <div className="hm-filter-bar">
-                    <span className="hm-filter-label"><Calendar size={13} style={{ verticalAlign: 'middle', marginRight: 4 }} />Thời gian:</span>
+                    <span className="hm-filter-label"><Calendar size={13} style={{ verticalAlign: 'middle', marginRight: 4 }} />{t('healthMonitoring.filterTime')}</span>
                     <input
                       id="hm-filter-from"
                       type="date"
@@ -1612,7 +1513,7 @@ export default function HealthMonitoringPage() {
                       value={fromDate}
                       onChange={(e) => setFromDate(e.target.value)}
                     />
-                    <span style={{ fontSize: '12px', color: '#64748b' }}>đến</span>
+                    <span style={{ fontSize: '12px', color: '#64748b' }}>{t('healthMonitoring.filterTo')}</span>
                     <input
                       id="hm-filter-to"
                       type="date"
@@ -1621,8 +1522,8 @@ export default function HealthMonitoringPage() {
                       onChange={(e) => setToDate(e.target.value)}
                     />
                     <div className="hm-filter-actions">
-                      <button className="hm-btn hm-btn-ghost" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={handleResetFilter}>Xóa</button>
-                      <button className="hm-btn hm-btn-primary" style={{ padding: '6px 14px', fontSize: '12px' }} onClick={handleApplyFilter}>Áp dụng</button>
+                      <button className="hm-btn hm-btn-ghost" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={handleResetFilter}>{t('healthMonitoring.filterClear')}</button>
+                      <button className="hm-btn hm-btn-primary" style={{ padding: '6px 14px', fontSize: '12px' }} onClick={handleApplyFilter}>{t('healthMonitoring.filterApply')}</button>
                     </div>
                   </div>
 
@@ -1630,23 +1531,23 @@ export default function HealthMonitoringPage() {
                   {recLoading ? (
                     <div className="hm-no-data"><Loader2 size={22} className="hm-spin" /></div>
                   ) : records.length === 0 ? (
-                    <div className="hm-no-data">Chưa có bản ghi sức khỏe nào{(appliedFrom || appliedTo) ? ' trong khoảng thời gian này' : ''}.</div>
+                    <div className="hm-no-data">{(appliedFrom || appliedTo) ? t('healthMonitoring.noRecordsInRange') : t('healthMonitoring.noRecords')}</div>
                   ) : (
                     <>
                       <div className="hm-table-wrap">
                         <table className="hm-table">
                           <thead>
                             <tr>
-                              <th>Thời gian</th>
-                              <th>HA tâm thu</th>
-                              <th>HA tâm trương</th>
-                              <th>Nhịp tim</th>
-                              <th>Nhiệt độ</th>
+                              <th>{t('healthMonitoring.colTime')}</th>
+                              <th>{t('healthMonitoring.colSystolic')}</th>
+                              <th>{t('healthMonitoring.colDiastolic')}</th>
+                              <th>{t('healthMonitoring.colPulse')}</th>
+                              <th>{t('healthMonitoring.colTemp')}</th>
                               <th>SpO₂</th>
-                              <th>Đường huyết</th>
-                              <th>Cân nặng</th>
-                              <th>Dịch vụ khám</th>
-                              <th>Trạng thái</th>
+                              <th>{t('healthMonitoring.colBloodSugar')}</th>
+                              <th>{t('healthMonitoring.colWeight')}</th>
+                              <th>{t('healthMonitoring.colServices')}</th>
+                              <th>{t('healthMonitoring.colStatus')}</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -1663,8 +1564,8 @@ export default function HealthMonitoringPage() {
                                 <td>{renderServiceSummary(rec.selectedServices, rec._id)}</td>
                                 <td>
                                   {rec.abnormalFlag
-                                    ? <span className="hm-badge-warn"><AlertTriangle size={10} /> Bất thường</span>
-                                    : <span className="hm-badge-normal"><CheckCircle size={10} /> Bình thường</span>}
+                                    ? <span className="hm-badge-warn"><AlertTriangle size={10} /> {t('healthMonitoring.abnormal')}</span>
+                                    : <span className="hm-badge-normal"><CheckCircle size={10} /> {t('healthMonitoring.normal')}</span>}
                                 </td>
                               </tr>
                             ))}
@@ -1676,13 +1577,13 @@ export default function HealthMonitoringPage() {
                       {recTotalPages > 1 && (
                         <div className="hm-pagination">
                           <span className="hm-pagination-info">
-                            Hiển thị {(recPage - 1) * 10 + 1}–{Math.min(recPage * 10, recTotal)} / {recTotal} bản ghi
+                            {t('healthMonitoring.paginationInfo', { from: (recPage - 1) * 10 + 1, to: Math.min(recPage * 10, recTotal), total: recTotal })}
                           </span>
                           <div className="hm-pagination-btns">
                             <button className="hm-btn hm-btn-ghost" style={{ padding: '5px 10px' }} disabled={recPage <= 1} onClick={() => setRecPage(p => p - 1)}>
                               <ChevronLeft size={14} />
                             </button>
-                            <span style={{ fontSize: '12.5px', color: '#475569' }}>Trang {recPage} / {recTotalPages}</span>
+                            <span style={{ fontSize: '12.5px', color: '#475569' }}>{t('healthMonitoring.paginationPage', { page: recPage, totalPages: recTotalPages })}</span>
                             <button className="hm-btn hm-btn-ghost" style={{ padding: '5px 10px' }} disabled={recPage >= recTotalPages} onClick={() => setRecPage(p => p + 1)}>
                               <ChevronRight size={14} />
                             </button>
@@ -1707,7 +1608,7 @@ export default function HealthMonitoringPage() {
                           exit={{ opacity: 0, height: 0 }}
                           transition={{ duration: 0.25 }}
                         >
-                          <CheckCircle size={16} /> Đã lưu chỉ số sức khỏe thành công!
+                          <CheckCircle size={16} /> {t('healthMonitoring.successSaved')}
                         </motion.div>
                       )}
                       {formError && (
@@ -1727,19 +1628,19 @@ export default function HealthMonitoringPage() {
                     {latestRecord && (
                       <div className="hm-form-section" style={{ background: '#f8fafc', border: '1px solid #dbeafe', marginBottom: 18 }}>
                         <div className="hm-form-section-title">
-                          <ClipboardList size={15} /> Thông số cũ từ lần khám gần nhất
+                          <ClipboardList size={15} /> {t('healthMonitoring.prevVitals')}
                         </div>
                         <div className="hm-form-grid">
                           <div className="hm-form-group">
-                            <div className="hm-form-label">HA tâm thu / tâm trương</div>
+                            <div className="hm-form-label">{t('healthMonitoring.labelSystolicDiastolic')}</div>
                             <div className="hm-form-value">{renderVal('bloodPressureSystolic', latestRecord.bloodPressureSystolic)} / {renderVal('bloodPressureDiastolic', latestRecord.bloodPressureDiastolic)}</div>
                           </div>
                           <div className="hm-form-group">
-                            <div className="hm-form-label">Nhịp tim</div>
+                            <div className="hm-form-label">{t('healthMonitoring.labelPulse')}</div>
                             <div className="hm-form-value">{renderVal('pulse', latestRecord.pulse)}</div>
                           </div>
                           <div className="hm-form-group">
-                            <div className="hm-form-label">Nhiệt độ</div>
+                            <div className="hm-form-label">{t('healthMonitoring.labelTemp')}</div>
                             <div className="hm-form-value">{renderVal('temperatureCelsius', latestRecord.temperatureCelsius)}</div>
                           </div>
                           <div className="hm-form-group">
@@ -1747,15 +1648,15 @@ export default function HealthMonitoringPage() {
                             <div className="hm-form-value">{renderVal('oxygenSaturation', latestRecord.oxygenSaturation)}</div>
                           </div>
                           <div className="hm-form-group">
-                            <div className="hm-form-label">Đường huyết</div>
+                            <div className="hm-form-label">{t('healthMonitoring.labelBloodSugarForm')}</div>
                             <div className="hm-form-value">{latestRecord.bloodSugar != null ? `${latestRecord.bloodSugar} mmol/L` : <span style={{ color: '#64748b' }}>—</span>}</div>
                           </div>
                           <div className="hm-form-group">
-                            <div className="hm-form-label">Cân nặng</div>
+                            <div className="hm-form-label">{t('healthMonitoring.labelWeightForm')}</div>
                             <div className="hm-form-value">{latestRecord.weightKg != null ? `${latestRecord.weightKg} kg` : <span style={{ color: '#64748b' }}>—</span>}</div>
                           </div>
                           <div className="hm-form-group full">
-                            <div className="hm-form-label">Dịch vụ khám gần nhất</div>
+                            <div className="hm-form-label">{t('healthMonitoring.labelLastServices')}</div>
                             <div style={{ padding: '10px 12px', background: '#ffffff', borderRadius: 8, border: '1px solid #e2e8f0' }}>
                               {renderServiceSummary(latestRecord.selectedServices, latestRecord?._id)}
                             </div>
@@ -1765,28 +1666,30 @@ export default function HealthMonitoringPage() {
                     )}
                     <div className="hm-form-section">
                       <div className="hm-form-section-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
-                        <span><Thermometer size={15} style={{ verticalAlign: 'middle', marginRight: 4 }} /> Chỉ số sinh tồn (Vital Signs)</span>
+                        <span><Thermometer size={15} style={{ verticalAlign: 'middle', marginRight: 4 }} /> {t('healthMonitoring.vitalSignsTitle')}</span>
                         {latestRecord && (
                           <button
                             type="button"
                             className="hm-btn hm-btn-ghost"
-                            style={{ padding: '4px 10px', fontSize: '12px', height: 'auto', fontWeight: 600, color: '#2563eb', border: '1px solid #bfdbfe', background: '#eff6ff' }}
+                            style={{ padding: '4px 10px', fontSize: '12px', height: 'auto', fontWeight: 600, color: '#0f766e', border: '1px solid #bfdbfe', background: '#eff6ff' }}
                             onClick={handleCopyLatestVitals}
-                            title="Điền tự động các chỉ số sinh tồn từ lần khám gần nhất"
+                            title={t('healthMonitoring.autofillTitle')}
                           >
-                            <RotateCcw size={13} style={{ marginRight: 4 }} /> Dùng lại chỉ số cũ
+                            <RotateCcw size={13} style={{ marginRight: 4 }} /> {t('healthMonitoring.autofillBtn')}
                           </button>
                         )}
                       </div>
                       <div className="hm-form-grid">
                         {[
-                          { key: 'bloodPressureSystolic',  label: 'HA tâm thu',    placeholder: 'VD: 120' },
-                          { key: 'bloodPressureDiastolic', label: 'HA tâm trương', placeholder: 'VD: 80' },
-                          { key: 'pulse',                  label: 'Nhịp tim',       placeholder: 'VD: 72' },
-                          { key: 'temperatureCelsius',     label: 'Nhiệt độ',       placeholder: 'VD: 36.8' },
-                          { key: 'oxygenSaturation',       label: 'SpO₂ (%)',       placeholder: 'VD: 98' },
-                          { key: 'bloodSugar',             label: 'Đường huyết',   placeholder: 'VD: 5.5' },
-                        ].map(({ key, label, placeholder }) => {
+                          { key: 'bloodPressureSystolic',  i18nLabel: 'healthMonitoring.formSystolic',   i18nPh: 'healthMonitoring.phSystolic' },
+                          { key: 'bloodPressureDiastolic', i18nLabel: 'healthMonitoring.formDiastolic',  i18nPh: 'healthMonitoring.phDiastolic' },
+                          { key: 'pulse',                  i18nLabel: 'healthMonitoring.formPulse',      i18nPh: 'healthMonitoring.phPulse' },
+                          { key: 'temperatureCelsius',     i18nLabel: 'healthMonitoring.formTemp',       i18nPh: 'healthMonitoring.phTemp' },
+                          { key: 'oxygenSaturation',       i18nLabel: 'SpO₂ (%)',                       i18nPh: 'healthMonitoring.phSystolic' },
+                          { key: 'bloodSugar',             i18nLabel: 'healthMonitoring.formBloodSugar', i18nPh: 'healthMonitoring.phBloodSugar' },
+                        ].map(({ key, i18nLabel, i18nPh }) => {
+                          const label = i18nLabel.startsWith('healthMonitoring.') ? t(i18nLabel) : i18nLabel;
+                          const placeholder = t(i18nPh);
                           const val = form[key];
                           const warn = val !== '' && isAbnormal(key, val);
                           const fieldErr = fieldErrors[key];
@@ -1823,29 +1726,29 @@ export default function HealthMonitoringPage() {
                     {/* Other indicators */}
                     <div className="hm-form-section" style={{ marginTop: '18px' }}>
                       <div className="hm-form-section-title">
-                        <Scale size={15} /> Chỉ số khác
+                        <Scale size={15} /> {t('healthMonitoring.otherIndicators')}
                       </div>
                       <div className="hm-form-grid">
                         <div className="hm-form-group">
-                          <label className="hm-form-label" htmlFor="hm-input-weightKg">Cân nặng <span>(kg)</span></label>
-                          <input id="hm-input-weightKg" type="number" step="0.1" min={VALID_RANGES.weightKg.min} max={VALID_RANGES.weightKg.max} className={`hm-form-input${fieldErrors.weightKg ? ' is-error' : ''}`} placeholder="VD: 65" value={form.weightKg} onChange={(e) => { setForm(prev => ({ ...prev, weightKg: e.target.value })); if (fieldErrors.weightKg) setFieldErrors((prev) => ({ ...prev, weightKg: undefined })); }} />
+                          <label className="hm-form-label" htmlFor="hm-input-weightKg">{t('healthMonitoring.labelWeightKg')}</label>
+                          <input id="hm-input-weightKg" type="number" step="0.1" min={VALID_RANGES.weightKg.min} max={VALID_RANGES.weightKg.max} className={`hm-form-input${fieldErrors.weightKg ? ' is-error' : ''}`} placeholder="65" value={form.weightKg} onChange={(e) => { setForm(prev => ({ ...prev, weightKg: e.target.value })); if (fieldErrors.weightKg) setFieldErrors((prev) => ({ ...prev, weightKg: undefined })); }} />
                           {fieldErrors.weightKg && <span className="hm-form-hint is-error">{fieldErrors.weightKg}</span>}
                         </div>
                         <div className="hm-form-group">
-                          <label className="hm-form-label" htmlFor="hm-input-heightCm">Chiều cao <span>(cm)</span></label>
-                          <input id="hm-input-heightCm" type="number" step="0.1" min={VALID_RANGES.heightCm.min} max={VALID_RANGES.heightCm.max} className={`hm-form-input${fieldErrors.heightCm ? ' is-error' : ''}`} placeholder="VD: 160" value={form.heightCm} onChange={(e) => { setForm(prev => ({ ...prev, heightCm: e.target.value })); if (fieldErrors.heightCm) setFieldErrors((prev) => ({ ...prev, heightCm: undefined })); }} />
+                          <label className="hm-form-label" htmlFor="hm-input-heightCm">{t('healthMonitoring.labelHeightCm')}</label>
+                          <input id="hm-input-heightCm" type="number" step="0.1" min={VALID_RANGES.heightCm.min} max={VALID_RANGES.heightCm.max} className={`hm-form-input${fieldErrors.heightCm ? ' is-error' : ''}`} placeholder="160" value={form.heightCm} onChange={(e) => { setForm(prev => ({ ...prev, heightCm: e.target.value })); if (fieldErrors.heightCm) setFieldErrors((prev) => ({ ...prev, heightCm: undefined })); }} />
                           {fieldErrors.heightCm && <span className="hm-form-hint is-error">{fieldErrors.heightCm}</span>}
                         </div>
                         <div className="hm-form-group">
-                          <label className="hm-form-label" htmlFor="hm-input-bloodType">Nhóm máu</label>
+                          <label className="hm-form-label" htmlFor="hm-input-bloodType">{t('healthMonitoring.labelBloodTypeForm')}</label>
                           <select id="hm-input-bloodType" className="hm-form-select" value={form.bloodType} onChange={(e) => setForm(prev => ({ ...prev, bloodType: e.target.value }))}>
-                            <option value="">— Không thay đổi —</option>
+                            <option value="">{t('healthMonitoring.noChange')}</option>
                             {['A+','A-','B+','B-','AB+','AB-','O+','O-'].map(bt => <option key={bt} value={bt}>{bt}</option>)}
                           </select>
                         </div>
                         <div className="hm-form-group full">
-                          <label className="hm-form-label" htmlFor="hm-input-summary">Ghi chú / Tóm tắt tình trạng</label>
-                          <textarea id="hm-input-summary" className="hm-form-textarea" maxLength={500} placeholder="Nhập ghi chú về tình trạng sức khỏe..." value={form.summary} onChange={(e) => setForm(prev => ({ ...prev, summary: e.target.value }))} />
+                          <label className="hm-form-label" htmlFor="hm-input-summary">{t('healthMonitoring.labelSummary')}</label>
+                          <textarea id="hm-input-summary" className="hm-form-textarea" maxLength={500} placeholder={t('healthMonitoring.phSummary')} value={form.summary} onChange={(e) => setForm(prev => ({ ...prev, summary: e.target.value }))} />
                           <span className="hm-form-hint">{form.summary.length}/500</span>
                         </div>
                       </div>
@@ -1853,12 +1756,12 @@ export default function HealthMonitoringPage() {
 
                     <div className="hm-form-section" style={{ marginTop: '18px' }}>
                       <div className="hm-form-section-title">
-                        <ClipboardList size={15} /> Dịch vụ lâm sàng & Cận lâm sàng
+                        <ClipboardList size={15} /> {t('healthMonitoring.clinicalServicesTitle')}
                       </div>
                       <div className="hm-form-grid">
                         <div className="hm-form-group full">
                           <div style={{ border: '1px solid #e6eef6', padding: 8, borderRadius: 6 }}>
-                            {clinicalServices.length === 0 && <div style={{ color: '#64748b' }}>Không có dịch vụ nào.</div>}
+                            {clinicalServices.length === 0 && <div style={{ color: '#64748b' }}>{t('healthMonitoring.noServices')}</div>}
                             {clinicalServices.map((svc) => {
                               const selected = !!selectedServices[svc._id];
                               return (
@@ -1880,7 +1783,7 @@ export default function HealthMonitoringPage() {
                                         <div style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
                                           {svc.serviceName}
                                           {selected && isSelectedServiceAbnormal(selectedServices[svc._id]) && (
-                                            <span className="hm-badge-warn" style={{ fontSize: 11, padding: '2px 6px' }}>Bất thường</span>
+                                            <span className="hm-badge-warn" style={{ fontSize: 11, padding: '2px 6px' }}>{t('healthMonitoring.serviceAbnormal')}</span>
                                           )}
                                         </div>
                                         <div style={{ fontSize: 12, color: '#64748b' }}>{svc.category} · {formatMoney(svc.unitPrice)}</div>
@@ -1889,7 +1792,7 @@ export default function HealthMonitoringPage() {
                                     {selected && (
                                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                          <span>Số lượng:</span>
+                                          <span>{t('healthMonitoring.serviceQuantity')}</span>
                                           <input type="number" min="1" value={selectedServices[svc._id]?.quantity || 1} onChange={(e) => {
                                             const q = parseInt(e.target.value || '1', 10) || 1;
                                             setSelectedServices(prev => ({ ...prev, [svc._id]: { ...prev[svc._id], quantity: q } }));
@@ -1902,7 +1805,7 @@ export default function HealthMonitoringPage() {
                                   {selected && svc.fields && svc.fields.length > 0 && (
                                     <div className="hm-service-fields-panel hm-service-fields-grid">
                                       <div className="hm-service-fields-heading" style={{ marginBottom: 6, fontWeight: 700, color: '#0f172a' }}>
-                                        Thông tin dịch vụ: {svc.serviceName}
+                                        {t('healthMonitoring.serviceInfo', { name: svc.serviceName })}
                                       </div>
                                       {svc.fields.map((field) => {
                                         const value = getSelectedServiceFieldValue(svc._id, field.fieldCode);
@@ -1938,7 +1841,7 @@ export default function HealthMonitoringPage() {
                                               <input
                                                 type="number"
                                                 className={`hm-form-input${outOfRange ? ' is-warn' : ''}`}
-                                                placeholder={field.placeholder || 'Nhập giá trị số'}
+                                                placeholder={field.placeholder || t('healthMonitoring.phNumber')}
                                                 value={value}
                                                 step="any"
                                                 onChange={(e) => setSelectedServiceFieldValue(svc._id, field.fieldCode, e.target.value)}
@@ -1949,7 +1852,7 @@ export default function HealthMonitoringPage() {
                                                 value={value}
                                                 onChange={(e) => setSelectedServiceFieldValue(svc._id, field.fieldCode, e.target.value)}
                                               >
-                                                <option value="">-- Chọn --</option>
+                                                <option value="">{t('healthMonitoring.phSelect')}</option>
                                                 {(Array.isArray(field.options) ? field.options : []).map((opt) => (
                                                   <option key={opt} value={opt}>{opt}</option>
                                                 ))}
@@ -1958,7 +1861,7 @@ export default function HealthMonitoringPage() {
                                               <input
                                                 type="text"
                                                 className={`hm-form-input${outOfRange ? ' is-warn' : ''}`}
-                                                placeholder={field.placeholder || 'Nhập giá trị'}
+                                                placeholder={field.placeholder || t('healthMonitoring.phText')}
                                                 value={value}
                                                 onChange={(e) => setSelectedServiceFieldValue(svc._id, field.fieldCode, e.target.value)}
                                               />
@@ -2002,8 +1905,8 @@ export default function HealthMonitoringPage() {
 
                         <div className="hm-form-group full" style={{ marginTop: 8 }}>
                           <div style={{ border: '1px solid #e6eef6', padding: 10, borderRadius: 6 }}>
-                            <div style={{ fontWeight: 800, marginBottom: 8 }}>Hóa đơn (chỉ tính dịch vụ đã chọn)</div>
-                            {Object.values(selectedServices).length === 0 && <div style={{ color: '#64748b' }}>Chưa chọn dịch vụ nào.</div>}
+                            <div style={{ fontWeight: 800, marginBottom: 8 }}>{t('healthMonitoring.invoiceTitle')}</div>
+                            {Object.values(selectedServices).length === 0 && <div style={{ color: '#64748b' }}>{t('healthMonitoring.noServicesSelected')}</div>}
                             {Object.values(selectedServices).map((s) => (
                               <div key={s._id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px dashed #eef2f7' }}>
                                 <div>{s.serviceName} × {s.quantity}</div>
@@ -2011,7 +1914,7 @@ export default function HealthMonitoringPage() {
                               </div>
                             ))}
                             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontWeight: 800 }}>
-                              <div>Tổng</div>
+                              <div>{t('healthMonitoring.invoiceTotal')}</div>
                               <div>{formatMoney(Object.values(selectedServices).reduce((sum, it) => sum + ((Number(it.unitPrice) || 0) * (Number(it.quantity) || 1)), 0))}</div>
                             </div>
                           </div>
@@ -2021,9 +1924,9 @@ export default function HealthMonitoringPage() {
 
                     <div style={{ display: 'flex', gap: '10px', marginTop: '18px' }}>
                       <button type="submit" className="hm-btn hm-btn-primary" disabled={formSaving} id="hm-submit-vitals">
-                        {formSaving ? <><Loader2 size={14} className="hm-spin" /> Đang lưu...</> : <><Activity size={14} /> Lưu chỉ số sức khỏe</>}
+                        {formSaving ? <><Loader2 size={14} className="hm-spin" /> {t('healthMonitoring.saving')}</> : <><Activity size={14} /> {t('healthMonitoring.saveVitals')}</>}
                       </button>
-                      <button type="button" className="hm-btn hm-btn-ghost" onClick={() => setForm(emptyForm)}>Xóa form</button>
+                      <button type="button" className="hm-btn hm-btn-ghost" onClick={() => setForm(emptyForm)}>{t('healthMonitoring.clearForm')}</button>
                     </div>
                   </form>
                 </div>
@@ -2033,7 +1936,7 @@ export default function HealthMonitoringPage() {
               {activeTab === 'chart' && (
                 <div className="hm-tab-content">
                   <div className="hm-chart-controls">
-                    <span style={{ fontSize: '13px', fontWeight: 600, color: '#475569' }}>Chỉ số:</span>
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: '#475569' }}>{t('healthMonitoring.chartMetric')}</span>
                     <select
                       id="hm-chart-metric"
                       className="hm-chart-select"
@@ -2041,10 +1944,10 @@ export default function HealthMonitoringPage() {
                       onChange={(e) => setChartMetric(e.target.value)}
                     >
                       {CHART_METRICS.map((m) => (
-                        <option key={m.key} value={m.key}>{m.label} ({m.unit})</option>
+                        <option key={m.key} value={m.key}>{t(m.i18nKey)} ({m.unit})</option>
                       ))}
                     </select>
-                    <span style={{ fontSize: '12px', color: '#94a3b8' }}>Hiển thị tối đa 20 bản ghi gần nhất</span>
+                    <span style={{ fontSize: '12px', color: '#94a3b8' }}>{t('healthMonitoring.chartMax20')}</span>
                   </div>
 
                   <div className="hm-chart-container">

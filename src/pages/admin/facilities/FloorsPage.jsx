@@ -70,9 +70,9 @@ export default function FloorsPage() {
 
   const handleCreateFloor = async (e) => {
     e.preventDefault();
-    if (!formFloorBuildingId) return setFormError('Vui lòng chọn tòa nhà');
-    if (!formFloorNumber) return setFormError('Số tầng là bắt buộc');
-    if (Number(formFloorNumber) <= 0) return setFormError('Số tầng phải lớn hơn 0');
+    if (!formFloorBuildingId) return setFormError(t('floors.errSelectBuilding'));
+    if (!formFloorNumber) return setFormError(t('floors.errFloorRequired'));
+    if (Number(formFloorNumber) <= 0) return setFormError(t('floors.errFloorPositive'));
 
     try {
       setSubmitting(true);
@@ -87,7 +87,7 @@ export default function FloorsPage() {
       refetch();
     } catch (err) {
       console.error(err);
-      setFormError(err.response?.data?.message || 'Không thể tạo tầng.');
+      setFormError(err.response?.data?.message || t('floors.errCreateFailed'));
     } finally {
       setSubmitting(false);
     }
@@ -96,8 +96,8 @@ export default function FloorsPage() {
   const handleUpdateFloor = async (e) => {
     e.preventDefault();
     if (!selectedFloor?._id) return;
-    if (!formFloorNumber) return setFormError('Số tầng là bắt buộc');
-    if (Number(formFloorNumber) <= 0) return setFormError('Số tầng phải lớn hơn 0');
+    if (!formFloorNumber) return setFormError(t('floors.errFloorRequired'));
+    if (Number(formFloorNumber) <= 0) return setFormError(t('floors.errFloorPositive'));
 
     try {
       setSubmitting(true);
@@ -112,7 +112,7 @@ export default function FloorsPage() {
       refetch();
     } catch (err) {
       console.error(err);
-      setFormError(err.response?.data?.message || 'Cập nhật tầng thất bại.');
+      setFormError(err.response?.data?.message || t('floors.errUpdateFailed'));
     } finally {
       setSubmitting(false);
     }
@@ -127,7 +127,7 @@ export default function FloorsPage() {
       refetch();
     } catch (err) {
       console.error(err);
-      showToast(err.response?.data?.message || 'Vô hiệu hóa tầng thất bại.', 'error');
+      showToast(err.response?.data?.message || t('floors.errDeactivateFailed'), 'error');
     } finally {
       setSubmitting(false);
     }
@@ -384,10 +384,10 @@ export default function FloorsPage() {
                 <AlertTriangle size={36} className="text-red-500" style={{ flexShrink: 0 }} />
                 <div>
                   <p style={{ margin: '0 0 10px 0', fontWeight: '600' }}>
-                    Bạn có chắc chắn muốn vô hiệu hóa tầng <strong>{selectedFloor?.name || `Tầng ${selectedFloor?.floorNumber}`}</strong>?
+                    {t('floors.deactivateConfirm', { name: selectedFloor?.name || `${t('facilities.floor')} ${selectedFloor?.floorNumber}` })}
                   </p>
                   <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>
-                    Hành động này sẽ tạm khóa tầng này và chuyển trạng thái toàn bộ phòng thuộc tầng này sang Đóng (Closed).
+                    {t('floors.deactivateWarning')}
                   </p>
                 </div>
               </div>

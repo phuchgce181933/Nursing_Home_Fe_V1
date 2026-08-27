@@ -1,69 +1,37 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useLocation, Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { MessageCircle, X, User, Mail, Phone, Send, AlertCircle, Bot, ChevronRight, Paperclip } from 'lucide-react';
 import conversationService from '../services/conversation.service';
 import { useToast } from '../hooks/useToast';
 import AttachmentList from './chat/AttachmentList';
 
-const AUTHENTICATED_PREFIXES = ['/admin', '/manager', '/doctor', '/nurse', '/caregiver', '/pharmacist', '/family'];
+const AUTHENTICATED_PREFIXES = ['/admin', '/doctor', '/nurse', '/caregiver', '/pharmacist', '/family'];
 // Auth pages aren't "browsing" pages either — a visitor here is either about to log in
 // (and gets real messaging once authenticated) or resetting credentials, so the guest
 // contact widget doesn't belong here any more than it does inside the dashboards.
 const AUTH_ROUTES = ['/login', '/forgot-password', '/reset-password'];
 const STORAGE_KEY = 'guest_chat_conversation';
 
-// Gợi ý dựa trên các mục chính đang có sẵn trên website (Dịch vụ, Bảng giá, Đặt lịch
-// tham quan, Không gian sống...) — trả lời tự động phía client, tin nhắn thật vẫn được
-// gửi cho admin như bình thường để nhân viên có thể rep trực tiếp ngay sau đó.
-// `reply` là mảng các đoạn: chuỗi thường, hoặc { text, to } để render thành link điều
-// hướng thẳng tới trang tương ứng trên web.
-const QUICK_SUGGESTIONS = [
-  {
-    id: 'services',
-    label: 'Dịch vụ chăm sóc',
-    reply: [
-      'An Nhiên cung cấp dịch vụ chăm sóc người cao tuổi toàn diện: theo dõi sức khỏe 24/7, phục hồi chức năng, dinh dưỡng cá nhân hóa và các hoạt động cộng đồng. Bạn có thể xem chi tiết tại mục "',
-      { text: 'Dịch vụ', to: '/services' },
-      '" trên trang chủ nhé!',
-    ],
-  },
-  {
-    id: 'pricing',
-    label: 'Bảng giá dịch vụ',
-    reply: [
-      'An Nhiên có nhiều gói dịch vụ từ Cơ bản đến VIP, phù hợp với từng nhu cầu chăm sóc. Bạn xem chi tiết tại mục "',
-      { text: 'Bảng giá', to: '/pricing' },
-      '", hoặc đội tư vấn sẽ gửi báo giá cụ thể cho bạn ngay sau đây.',
-    ],
-  },
-  {
-    id: 'tour',
-    label: 'Đặt lịch tham quan cơ sở',
-    reply: [
-      'Bạn có thể ',
-      { text: 'đặt lịch tham quan', to: '/login' },
-      ' trực tiếp để trải nghiệm không gian sống tại An Nhiên. Đội ngũ tư vấn sẽ liên hệ xác nhận thời gian phù hợp với bạn trong thời gian sớm nhất.',
-    ],
-  },
-  {
-    id: 'admission',
-    label: 'Thủ tục nhập viện',
-    reply: [
-      'Thủ tục ',
-      { text: 'đăng ký nhập viện', to: '/login' },
-      ' khá đơn giản: đăng ký thông tin → tư vấn & đánh giá sức khỏe ban đầu → ký hợp đồng → nhận phòng. Đội ngũ An Nhiên sẽ đồng hành cùng gia đình trong từng bước.',
-    ],
-  },
-  {
-    id: 'living',
-    label: 'Không gian sống & cơ sở vật chất',
-    reply: [
-      'An Nhiên được thiết kế theo tiêu chuẩn Nhật Bản với không gian xanh, phòng ở tiện nghi và khu sinh hoạt cộng đồng. Xem thêm hình ảnh thực tế tại mục "',
-      { text: 'Không gian sống', to: '/living' },
-      '".',
-    ],
-  },
+const SUGGESTION_DEFS = [
+  { id: 'services', key: 'services', linkTo: '/services' },
+  { id: 'pricing', key: 'pricing', linkTo: '/pricing' },
+  { id: 'tour', key: 'tour', linkTo: '/login' },
+  { id: 'admission', key: 'admission', linkTo: '/login' },
+  { id: 'living', key: 'living', linkTo: '/living' },
 ];
+
+function buildSuggestions(t) {
+  return SUGGESTION_DEFS.map((def) => ({
+    id: def.id,
+    label: t(`guestChat.suggestions.${def.key}.label`),
+    reply: [
+      t(`guestChat.suggestions.${def.key}.reply1`),
+      { text: t(`guestChat.suggestions.${def.key}.linkText`), to: def.linkTo },
+      t(`guestChat.suggestions.${def.key}.reply2`),
+    ],
+  }));
+}
 
 function ReplyParts({ parts }) {
   return (parts || []).map((part, i) =>
@@ -106,6 +74,7 @@ const PLAIN_INPUT_CLASS =
   'rounded-lg border border-outline-variant bg-white px-3.5 py-2.5 text-sm text-slate-700 placeholder:text-slate-400 transition-colors focus:border-navy-deep focus:outline-none focus:ring-2 focus:ring-navy-deep/10';
 
 export default function GuestChatWidget() {
+  const { t } = useTranslation();
   const location = useLocation();
   const isAuthenticatedArea =
     AUTHENTICATED_PREFIXES.some((prefix) => location.pathname.startsWith(prefix)) ||
@@ -184,19 +153,19 @@ export default function GuestChatWidget() {
 
   const validate = () => {
     const nextErrors = {};
-    if (!name.trim()) nextErrors.name = 'Vui lòng nhập họ tên';
+    if (!name.trim()) nextErrors.name = t('guestChat.errNameRequired');
 
     const trimmedEmail = email.trim();
     const trimmedPhone = phone.trim();
 
     if (!trimmedEmail && !trimmedPhone) {
-      nextErrors.contact = 'Vui lòng nhập email hoặc số điện thoại';
+      nextErrors.contact = t('guestChat.errContactRequired');
     } else {
       if (trimmedEmail && !EMAIL_REGEX.test(trimmedEmail)) {
-        nextErrors.email = 'Địa chỉ email không hợp lệ';
+        nextErrors.email = t('guestChat.errEmailInvalid');
       }
       if (trimmedPhone && !PHONE_REGEX.test(trimmedPhone)) {
-        nextErrors.phone = 'Số điện thoại không hợp lệ (VD: 0912345678)';
+        nextErrors.phone = t('guestChat.errPhoneInvalid');
       }
     }
     setErrors(nextErrors);
@@ -218,7 +187,7 @@ export default function GuestChatWidget() {
       setShowSuggestions(true);
     } catch (err) {
       console.error(err);
-      showToast(err.response?.data?.message || err.message || 'Không thể tạo liên hệ', 'error');
+      showToast(err.response?.data?.message || err.message || t('guestChat.errCreateFailed'), 'error');
     } finally {
       setSubmitting(false);
     }
@@ -242,7 +211,7 @@ export default function GuestChatWidget() {
       if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (err) {
       console.error(err);
-      showToast(err.response?.data?.message || err.message || 'Không gửi được', 'error');
+      showToast(err.response?.data?.message || err.message || t('guestChat.errSendFailed'), 'error');
     }
   };
 
@@ -284,7 +253,7 @@ export default function GuestChatWidget() {
           <button
             type="button"
             onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen(true); }}
-            aria-label="Mở khung liên hệ tư vấn"
+            aria-label={t('guestChat.openWidget')}
             className="press-effect group relative flex h-14 w-14 items-center justify-center rounded-full bg-navy-deep text-white shadow-lg shadow-navy-deep/30 transition-transform duration-200 hover:scale-105"
           >
             <span className="absolute inset-0 rounded-full bg-navy-deep opacity-40 animate-ping" />
@@ -300,12 +269,12 @@ export default function GuestChatWidget() {
             <div className="flex items-center justify-between gap-2 bg-navy-deep px-4 py-3 text-white">
               <div className="flex items-center gap-2">
                 <MessageCircle size={18} />
-                <span className="text-sm font-semibold">Liên hệ tư vấn</span>
+                <span className="text-sm font-semibold">{t('guestChat.headerTitle')}</span>
               </div>
               <button
                 type="button"
                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen(false); stopPolling(); }}
-                aria-label="Đóng"
+                aria-label={t('guestChat.closeWidget')}
                 className="rounded-full p-1.5 text-white/90 transition-colors hover:bg-white/15 hover:text-white"
               >
                 <X size={17} />
@@ -317,13 +286,13 @@ export default function GuestChatWidget() {
               {!conversation ? (
                 <div className="flex flex-col gap-2.5">
                   <p className="text-xs text-slate-500">
-                    Để lại thông tin, đội ngũ An Nhiên sẽ liên hệ tư vấn cho bạn sớm nhất.
+                    {t('guestChat.introText')}
                   </p>
 
                   <Field icon={<User size={16} />} error={errors.name}>
                     <input
                       className={errors.name ? FIELD_ERROR_CLASS : FIELD_NORMAL_CLASS}
-                      placeholder="Họ tên"
+                      placeholder={t('guestChat.namePlaceholder')}
                       value={name}
                       onChange={(e) => { setName(e.target.value); if (errors.name) setErrors((prev) => ({ ...prev, name: undefined })); }}
                     />
@@ -352,7 +321,7 @@ export default function GuestChatWidget() {
                   <Field icon={<Phone size={16} />} error={errors.phone || errors.contact}>
                     <input
                       className={errors.phone || errors.contact ? FIELD_ERROR_CLASS : FIELD_NORMAL_CLASS}
-                      placeholder="Số điện thoại"
+                      placeholder={t('guestChat.phonePlaceholder')}
                       value={phone}
                       onChange={(e) => {
                         const v = e.target.value;
@@ -387,7 +356,7 @@ export default function GuestChatWidget() {
                     return (
                       <div key={m._id || m.id} className={`animate-fade-in-up flex flex-col ${guest ? 'items-end' : 'items-start'}`}>
                         <span className="mb-1 px-1 text-[11px] font-medium text-slate-400">
-                          {m.guestName || m.senderUserId?.fullName || (guest ? 'Bạn' : 'Tư vấn viên')}
+                          {m.guestName || m.senderUserId?.fullName || (guest ? t('messagesPage.you') : t('messagesPage.consultant'))}
                         </span>
                         <div
                           className={`max-w-[85%] rounded-2xl px-3.5 py-2 text-sm leading-snug shadow-sm ${
@@ -423,11 +392,11 @@ export default function GuestChatWidget() {
                           <Bot size={15} />
                         </div>
                         <div className="rounded-2xl rounded-tl-sm bg-surface-container-low px-3.5 py-2 text-sm text-slate-700 shadow-sm">
-                          Bạn muốn tìm hiểu về nội dung nào dưới đây?
+                          {t('guestChat.suggestionPrompt')}
                         </div>
                       </div>
                       <div className="ml-9 flex flex-col gap-1.5">
-                        {QUICK_SUGGESTIONS.map((item, i) => (
+                        {buildSuggestions(t).map((item, i) => (
                           <button
                             key={item.id}
                             type="button"
@@ -455,7 +424,7 @@ export default function GuestChatWidget() {
                   className="press-effect flex w-full items-center justify-center gap-2 rounded-xl bg-sage-healing py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <Send size={16} />
-                  {submitting ? 'Đang gửi...' : 'Bắt đầu chat'}
+                  {submitting ? t('guestChat.sending') : t('guestChat.startChat')}
                 </button>
               ) : (
                 <div>
@@ -475,8 +444,8 @@ export default function GuestChatWidget() {
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
-                      title="Đính kèm tệp"
-                      data-tooltip="Đính kèm tệp"
+                      title={t('messagesPage.attachFile')}
+                      data-tooltip={t('messagesPage.attachFile')}
                       className="press-effect flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-navy-deep"
                     >
                       <Paperclip size={17} />
@@ -492,13 +461,13 @@ export default function GuestChatWidget() {
                       value={message}
                       onChange={(e) => setMessage(e.target.value)}
                       onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); sendMessage(); } }}
-                      placeholder="Nhập tin nhắn..."
+                      placeholder={t('messagesPage.messagePlaceholder')}
                       className={`${PLAIN_INPUT_CLASS} flex-1`}
                     />
                     <button
                       type="button"
                       onClick={(e) => { e.preventDefault(); e.stopPropagation(); sendMessage(); }}
-                      aria-label="Gửi"
+                      aria-label={t('guestChat.sendLabel')}
                       disabled={!message.trim() && files.length === 0}
                       className="press-effect flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-navy-deep text-white transition-colors hover:bg-[#132745] disabled:cursor-not-allowed disabled:opacity-40"
                     >

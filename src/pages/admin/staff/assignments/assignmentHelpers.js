@@ -19,7 +19,7 @@ export const CARE_LEVEL_EMOJI = { low: '🟢', medium: '🟠', high: '🔴' };
 export const ASSIGNMENT_TABS = ['area', 'residents', 'tasks'];
 
 export function getAssignmentBasePath(role) {
-  return role === 'manager' ? '/manager/staff/assignments' : '/admin/staff/assignments';
+  return '/admin/staff/assignments';
 }
 
 export function getAssignmentListUrl(basePath, { tab = 'area', date } = {}) {

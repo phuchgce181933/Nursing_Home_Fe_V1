@@ -38,7 +38,7 @@ const addDaysStr = (dateStr, days) => {
   return localDateStr(d);
 };
 
-const AVATAR_COLORS = ['#3b5bdb', '#e64980', '#0ca678', '#f76707', '#7048e8', '#1098ad', '#d6336c', '#5c7cfa'];
+const AVATAR_COLORS = ['#0f766e', '#e64980', '#0ca678', '#f76707', '#7048e8', '#1098ad', '#d6336c', '#5c7cfa'];
 const getAvatarColor = (name) => {
   let hash = 0;
   for (let i = 0; i < (name || '').length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
@@ -63,15 +63,16 @@ const getDosageError = (dosage, t) => {
 };
 
 /* statuses uppercase from BE */
-const RX_STATUS_KEYS = { ACTIVE: 'statusActive', COMPLETED: 'statusCompleted', CANCELLED: 'statusCancelled' };
-// COMPLETED is a whole-prescription outcome the system derives automatically once every
-// medication item is done (see backend maybeCompletePrescriptionItem) — a doctor editing
-// one item's tab must not be able to manually force it, since that would incorrectly mark
-// every other still-active medication on the same prescription as completed too.
+const RX_STATUS_KEYS = {
+  DRAFT: 'statusDraft', ACTIVE: 'statusActive', SUSPENDED: 'statusSuspended',
+  COMPLETED: 'statusCompleted', CANCELLED: 'statusCancelled', EXPIRED: 'statusExpired',
+};
 const MANUAL_RX_STATUS_KEYS = { ACTIVE: 'statusActive', CANCELLED: 'statusCancelled' };
 const SCHED_STATUS_KEYS = {
   PENDING: 'schedPending', TAKEN: 'schedTaken', LATE_TAKEN: 'schedLateTaken',
   MISSED: 'schedMissed', SKIPPED: 'schedSkipped', OVERDUE: 'schedOverdue',
+  REFUSED: 'schedRefused', HELD: 'schedHeld', NOT_AVAILABLE: 'schedNotAvailable',
+  DISCONTINUED: 'schedDiscontinued',
 };
 
 /* ── StatusBadge ── */
@@ -98,6 +99,15 @@ function RxStatusCell({ prescription }) {
   const { t } = useTranslation();
   const discontinuedCount = (prescription.items || []).filter((it) => it.isActive === false).length;
 
+  if (prescription.status === 'DRAFT') {
+    return <span className="med-badge med-badge--draft">{t('medication.statusDraft')}</span>;
+  }
+  if (prescription.status === 'SUSPENDED') {
+    return <span className="med-badge med-badge--suspended">{t('medication.statusSuspended')}</span>;
+  }
+  if (prescription.status === 'EXPIRED') {
+    return <span className="med-badge med-badge--expired">{t('medication.statusExpired')}</span>;
+  }
   if (prescription.status !== 'ACTIVE') {
     return <StatusBadge status={prescription.status} type="rx" />;
   }
@@ -472,6 +482,45 @@ function ItemRow({ item, idx, onChange, onRemove, t, canRemove, errors = {}, exc
             placeholder={t('medication.instructionsPlaceholder')}
           />
         </div>
+
+        {/* PRN Toggle */}
+        <div className="cpf-prn-row">
+          <label className="cpf-prn-toggle">
+            <input
+              type="checkbox"
+              checked={!!item.isPRN}
+              onChange={(e) => onChange(idx, { ...item, isPRN: e.target.checked })}
+            />
+            <span className="cpf-prn-toggle__label">{t('medication.prnLabel')}</span>
+            <span className="cpf-prn-toggle__desc">{t('medication.prnDesc')}</span>
+          </label>
+          {item.isPRN && (
+            <div className="cpf-row-2" style={{ marginTop: 8 }}>
+              <div className="cpf-field">
+                <label className="cpf-label">{t('medication.prnReason')}</label>
+                <input
+                  className="cpf-input"
+                  value={item.prnReason || ''}
+                  onChange={(e) => onChange(idx, { ...item, prnReason: e.target.value })}
+                  placeholder={t('medication.prnReasonPlaceholder')}
+                />
+                {errors[`item_${idx}_prnReason`] && <span className="cpf-error">{errors[`item_${idx}_prnReason`]}</span>}
+              </div>
+              <div className="cpf-field">
+                <label className="cpf-label">{t('medication.maxDailyDoses')}</label>
+                <input
+                  type="number"
+                  className="cpf-input"
+                  value={item.maxDailyDoses || ''}
+                  onChange={(e) => onChange(idx, { ...item, maxDailyDoses: e.target.value })}
+                  min="1"
+                  max="12"
+                  placeholder="4"
+                />
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -502,7 +551,7 @@ function CreatePrescriptionModal({ residents, onSave, onClose }) {
     residentId: '',
     diagnosisNote: '',
     validUntil: '',
-    items: [{ medicationId: '', medicationName: '', dosage: '', unit: '', frequency: 1, times: ['08:00'], route: 'oral', duration: '', startDate: todayStr() }],
+    items: [{ medicationId: '', medicationName: '', dosage: '', unit: '', frequency: 1, times: ['08:00'], route: 'oral', duration: '', startDate: todayStr(), isPRN: false, prnReason: '', maxDailyDoses: '' }],
   });
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
@@ -551,6 +600,14 @@ function CreatePrescriptionModal({ residents, onSave, onClose }) {
         else if (dosageNum === 0) errs[`item_${i}_dosage`] = t('medication.dosageZero');
       }
 
+      // PRN items don't need schedule fields
+      if (item.isPRN) {
+        if (!item.prnReason && !item.instructions) {
+          errs[`item_${i}_prnReason`] = t('medication.prnReasonRequired');
+        }
+        return;
+      }
+
       if (!item.startDate) errs[`item_${i}_startDate`] = t('medication.startDateRequired');
       else if (item.startDate < today) errs[`item_${i}_startDate`] = t('medication.startDatePast');
       else if (form.validUntil && item.startDate > form.validUntil) errs[`item_${i}_startDate`] = t('medication.startDateAfterValidUntil');
@@ -588,13 +645,13 @@ function CreatePrescriptionModal({ residents, onSave, onClose }) {
   const handleAddItem = () =>
     setForm((p) => ({
       ...p,
-      items: [...p.items, { medicationId: '', medicationName: '', dosage: '', unit: '', frequency: 1, times: ['08:00'], route: 'oral', duration: '', startDate: todayStr() }],
+      items: [...p.items, { medicationId: '', medicationName: '', dosage: '', unit: '', frequency: 1, times: ['08:00'], route: 'oral', duration: '', startDate: todayStr(), isPRN: false, prnReason: '', maxDailyDoses: '' }],
     }));
 
   const handleRemoveItem = (idx) =>
     setForm((p) => ({ ...p, items: p.items.filter((_, i) => i !== idx) }));
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (saveAsDraft = false) => {
     if (!validate()) return;
     setSaving(true);
     try {
@@ -602,19 +659,21 @@ function CreatePrescriptionModal({ residents, onSave, onClose }) {
         residentId: form.residentId,
         diagnosisNote: form.diagnosisNote.trim(),
         validUntil: form.validUntil,
+        saveAsDraft,
         items: form.items.map((item) => ({
           medicationId: item.medicationId,
           medicationName: item.medicationName.trim(),
           dosage: parseFloat(item.dosage),
           unit: item.unit.trim(),
           frequency: parseInt(item.frequency, 10),
-          times: item.times,
+          times: item.isPRN ? [] : item.times,
           route: item.route,
           duration: item.duration ? parseInt(item.duration, 10) : undefined,
-          startDate: item.startDate || undefined,
-          // Compute endDate from startDate + duration so the dosing schedule is
-          // generated right away — no separate "Đặt lịch" step needed afterwards.
-          endDate: item.duration ? addDaysStr(item.startDate, item.duration) : undefined,
+          startDate: item.isPRN ? undefined : (item.startDate || undefined),
+          endDate: item.isPRN ? undefined : (item.duration ? addDaysStr(item.startDate, item.duration) : undefined),
+          isPRN: item.isPRN || false,
+          prnReason: item.isPRN ? item.prnReason : undefined,
+          maxDailyDoses: item.isPRN && item.maxDailyDoses ? parseInt(item.maxDailyDoses, 10) : undefined,
         })),
       });
     } finally {
@@ -787,7 +846,10 @@ function CreatePrescriptionModal({ residents, onSave, onClose }) {
         {/* Drawer footer */}
         <div className="cpf-drawer__footer">
           <button className="cpf-btn cpf-btn--ghost" onClick={onClose} disabled={saving}>{t('medication.cancelBtn')}</button>
-          <button className="cpf-btn cpf-btn--primary" onClick={handleSubmit} disabled={saving}>
+          <button className="cpf-btn cpf-btn--outline" onClick={() => handleSubmit(true)} disabled={saving}>
+            {saving ? t('medication.loading') : t('medication.saveAsDraft')}
+          </button>
+          <button className="cpf-btn cpf-btn--primary" onClick={() => handleSubmit(false)} disabled={saving}>
             {saving ? t('medication.loading') : t('medication.createPrescription')}
           </button>
         </div>
@@ -925,7 +987,7 @@ function SetScheduleModal({ prescription, onSave, onClose }) {
           {/* Meal timing */}
           <div className="sched-meal-timing">
             <div className="sched-meal-timing__left">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b5bdb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0f766e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M18 8h1a4 4 0 0 1 0 8h-1" /><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z" /><line x1="6" y1="1" x2="6" y2="4" /><line x1="10" y1="1" x2="10" y2="4" /><line x1="14" y1="1" x2="14" y2="4" />
               </svg>
               <div>
@@ -1083,7 +1145,7 @@ function HistoryModal({ prescription, onClose }) {
                   </div>
                 </div>
                 <div className="mh-stat-card">
-                  <div className="mh-stat-card__icon" style={{ background: '#dbeafe', color: '#2563eb' }}>
+                  <div className="mh-stat-card__icon" style={{ background: 'rgba(15, 118, 110, 0.12)', color: '#0f766e' }}>
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
                     </svg>
@@ -1338,7 +1400,7 @@ function EditPrescriptionModal({ prescription, onSave, onClose }) {
           <div className="cpf-field">
             <label className="cpf-label">
               {t('medication.instructions')}
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#3b5bdb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: 4 }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0f766e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: 4 }}>
                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
               </svg>
             </label>
@@ -1373,7 +1435,7 @@ function EditPrescriptionModal({ prescription, onSave, onClose }) {
 
           {/* Info notice */}
           <div className="edit-notice">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3b5bdb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0f766e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
             </svg>
             <div>
@@ -1397,7 +1459,7 @@ function EditPrescriptionModal({ prescription, onSave, onClose }) {
 /* ════════════════════════════════════════
    Tab 1 — Prescriptions (2-column dashboard)
    ════════════════════════════════════════ */
-function PrescriptionsTab({ prescriptions, residents, loading, selectedResidentId, onResidentChange, onOpenCreate, onOpenSchedule, onOpenHistory, onOpenEdit }) {
+function PrescriptionsTab({ prescriptions, residents, loading, selectedResidentId, onResidentChange, onOpenCreate, onOpenSchedule, onOpenHistory, onOpenEdit, onActivate, onSuspend, onResume }) {
   const { t } = useTranslation();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ACTIVE');
@@ -1564,15 +1626,32 @@ function PrescriptionsTab({ prescriptions, residents, loading, selectedResidentI
                                     </tbody>
                                   </table>
                                   <div className="med-rx-detail-actions">
-                                    <button className="med-action-btn med-action-btn--edit" onClick={() => onOpenEdit(p)}>
-                                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                                      </svg>
-                                      {t('medication.editPrescription')}
-                                    </button>
+                                    {['ACTIVE', 'DRAFT'].includes(p.status) && (
+                                      <button className="med-action-btn med-action-btn--edit" onClick={() => onOpenEdit(p)}>
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                        </svg>
+                                        {t('medication.editPrescription')}
+                                      </button>
+                                    )}
                                     <button className="med-action-btn med-action-btn--history" onClick={() => onOpenHistory(p)}>
                                       {t('medication.viewHistory')}
                                     </button>
+                                    {p.status === 'DRAFT' && onActivate && (
+                                      <button className="med-action-btn med-action-btn--activate" onClick={() => onActivate(p._id)}>
+                                        {t('medication.activatePrescription')}
+                                      </button>
+                                    )}
+                                    {p.status === 'ACTIVE' && onSuspend && (
+                                      <button className="med-action-btn med-action-btn--suspend" onClick={() => onSuspend(p._id)}>
+                                        {t('medication.suspendPrescription')}
+                                      </button>
+                                    )}
+                                    {p.status === 'SUSPENDED' && onResume && (
+                                      <button className="med-action-btn med-action-btn--activate" onClick={() => onResume(p._id)}>
+                                        {t('medication.resumePrescription')}
+                                      </button>
+                                    )}
                                   </div>
                                 </div>
                               </td>
@@ -1910,7 +1989,7 @@ function DoctorMedicationPage() {
     if (!stockWarnings.length) return;
     const names = stockWarnings.map((w) => w.medicationName).join(', ');
     showToast(
-      t('medication.insufficientStockWarning', 'Kho có thể không đủ thuốc cho: {{names}}. Đã báo cho dược sĩ.', { names }),
+      t('medication.insufficientStockWarning', { names }),
       'info',
       8000
     );
@@ -1922,7 +2001,7 @@ function DoctorMedicationPage() {
       closeModal();
       loadPrescriptions(payload.residentId);
       if (!selectedResidentId) setSelectedResidentId(payload.residentId);
-      showToast(t('medication.createSuccess', 'Đã tạo đơn thuốc thành công'), 'success');
+      showToast(t('medication.createSuccess'), 'success');
       showStockWarnings(result?.warnings);
     } catch (err) {
       showToast(err.response?.data?.message || t('medication.createError'), 'error');
@@ -1935,11 +2014,46 @@ function DoctorMedicationPage() {
       const result = await medicationService.updatePrescription(id, payload);
       closeModal();
       loadPrescriptions(selectedResidentId);
-      showToast(t('medication.updateSuccess', 'Đã cập nhật đơn thuốc thành công'), 'success');
+      showToast(t('medication.updateSuccess'), 'success');
       showStockWarnings(result?.warnings);
     } catch (err) {
       showToast(err.response?.data?.message || t('medication.updateError'), 'error');
       throw err;
+    }
+  };
+
+  const handleActivate = async (id) => {
+    try {
+      await medicationService.activatePrescription(id);
+      loadPrescriptions(selectedResidentId);
+      showToast(t('medication.activateSuccess'), 'success');
+    } catch (err) {
+      showToast(err.response?.data?.message || t('medication.activateError'), 'error');
+    }
+  };
+
+  const handleSuspend = async (id) => {
+    const reason = window.prompt(t('medication.suspendReasonPrompt'));
+    if (!reason || reason.trim().length < 5) {
+      showToast(t('medication.suspendReasonRequired'), 'error');
+      return;
+    }
+    try {
+      await medicationService.suspendPrescription(id, { reason: reason.trim() });
+      loadPrescriptions(selectedResidentId);
+      showToast(t('medication.suspendSuccess'), 'success');
+    } catch (err) {
+      showToast(err.response?.data?.message || t('medication.suspendError'), 'error');
+    }
+  };
+
+  const handleResume = async (id) => {
+    try {
+      await medicationService.resumePrescription(id);
+      loadPrescriptions(selectedResidentId);
+      showToast(t('medication.resumeSuccess'), 'success');
+    } catch (err) {
+      showToast(err.response?.data?.message || t('medication.resumeError'), 'error');
     }
   };
 
@@ -1948,7 +2062,7 @@ function DoctorMedicationPage() {
       await medicationService.setMedicationSchedule(payload);
       closeModal();
       loadPrescriptions(selectedResidentId);
-      showToast(t('medication.scheduleSuccess', 'Đã cập nhật lịch dùng thuốc thành công'), 'success');
+      showToast(t('medication.scheduleSuccess'), 'success');
     } catch (err) {
       showToast(err.response?.data?.message || t('medication.scheduleError'), 'error');
       throw err;
@@ -2011,6 +2125,9 @@ function DoctorMedicationPage() {
           onOpenSchedule={(p) => setModal({ type: 'schedule', prescription: p })}
           onOpenHistory={(p) => setModal({ type: 'history', prescription: p })}
           onOpenEdit={(p) => setModal({ type: 'edit', prescription: p })}
+          onActivate={handleActivate}
+          onSuspend={handleSuspend}
+          onResume={handleResume}
         />
       ) : (
         <DailyTab />

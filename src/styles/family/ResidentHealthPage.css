@@ -250,7 +250,7 @@
   height: 40px;
   border-radius: 10px;
   background: #eef2ff;
-  color: #3b5bdb;
+  color: var(--nh-primary);
   display: flex;
   align-items: center;
   justify-content: center;

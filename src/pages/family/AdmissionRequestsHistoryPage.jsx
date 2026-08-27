@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { Search, Plus, Eye, Inbox, Loader2, Calendar, ChevronLeft, ChevronRight, Clock, CheckCircle } from 'lucide-react';
 import admissionService from '../../services/admission.service';
@@ -38,23 +39,13 @@ const getStatusBadgeClass = (status) => {
   }
 };
 
-const getStatusLabel = (status) => {
-  switch (status) {
-    case 'new_request':
-      return 'Chờ duyệt';
-    case 'consulting':
-      return 'Đang tư vấn';
-    case 'assessing':
-      return 'Đang đánh giá';
-    case 'contracting':
-      return 'Đang làm hợp đồng';
-    case 'checked_in':
-      return 'Đã tiếp nhận';
-    case 'cancelled':
-      return 'Đã hủy';
-    default:
-      return status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Mới';
-  }
+const STATUS_I18N = {
+  new_request: 'admissionHistory.statusNewRequest',
+  consulting: 'admissionHistory.statusConsulting',
+  assessing: 'admissionHistory.statusAssessing',
+  contracting: 'admissionHistory.statusContracting',
+  checked_in: 'admissionHistory.statusCheckedIn',
+  cancelled: 'admissionHistory.statusCancelled',
 };
 
 const getEligibilityBadgeClass = (status) => {
@@ -69,18 +60,13 @@ const getEligibilityBadgeClass = (status) => {
   }
 };
 
-const getEligibilityLabel = (status) => {
-  switch (status) {
-    case 'eligible':
-      return 'Đủ điều kiện';
-    case 'not_eligible':
-      return 'Không đủ điều kiện';
-    case 'pending':
-    default:
-      return 'Chờ đánh giá';
-  }
+const ELIGIBILITY_I18N = {
+  eligible: 'admissionHistory.eligibilityEligible',
+  not_eligible: 'admissionHistory.eligibilityNotEligible',
+  pending: 'admissionHistory.eligibilityPending',
 };
 export default function AdmissionRequestsHistoryPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
 
   // Filters & Pagination states
@@ -158,7 +144,7 @@ export default function AdmissionRequestsHistoryPage() {
       setTotalPages(res?.totalPages || 1);
     } catch (err) {
       console.error('Failed to load admission requests history:', err);
-      setLoadError(err?.response?.data?.message || err?.message || 'Không thể tải danh sách yêu cầu. Vui lòng thử lại.');
+      setLoadError(err?.response?.data?.message || err?.message || t('admissionHistory.errorLoad'));
     } finally {
       setLoading(false);
     }
@@ -193,9 +179,9 @@ export default function AdmissionRequestsHistoryPage() {
         {/* Header Section */}
         <div className="arh-header">
           <div className="arh-header__title-group">
-            <h1 className="arh-header__title">Lịch sử yêu cầu tiếp nhận</h1>
+            <h1 className="arh-header__title">{t('admissionHistory.title')}</h1>
             <p className="arh-header__subtitle">
-              Quản lý và theo dõi các yêu cầu tiếp nhận và chăm sóc cho người thân của bạn.
+              {t('admissionHistory.subtitle')}
             </p>
           </div>
           <button
@@ -203,7 +189,7 @@ export default function AdmissionRequestsHistoryPage() {
             onClick={() => navigate('/family/admission-requests/new')}
           >
             <Plus size={16} />
-            Đăng ký tiếp nhận mới
+            {t('admissionHistory.newRequest')}
           </button>
         </div>
 
@@ -215,7 +201,7 @@ export default function AdmissionRequestsHistoryPage() {
               <div className="arh-stat-card__icon-box arh-stat-card__icon-box--pending">
                 <Clock size={20} />
               </div>
-              <span className="arh-stat-card__label">Yêu cầu đang xử lý</span>
+              <span className="arh-stat-card__label">{t('admissionHistory.statsActive')}</span>
             </div>
             <div className="arh-stat-card__value">
               {String(stats.active).padStart(2, '0')}
@@ -228,7 +214,7 @@ export default function AdmissionRequestsHistoryPage() {
               <div className="arh-stat-card__icon-box arh-stat-card__icon-box--completed">
                 <CheckCircle size={20} />
               </div>
-              <span className="arh-stat-card__label">Tiếp nhận hoàn tất</span>
+              <span className="arh-stat-card__label">{t('admissionHistory.statsCompleted')}</span>
             </div>
             <div className="arh-stat-card__value">
               {String(stats.completed).padStart(2, '0')}
@@ -241,7 +227,7 @@ export default function AdmissionRequestsHistoryPage() {
               <div className="arh-stat-card__icon-box arh-stat-card__icon-box--appointment">
                 <Calendar size={20} />
               </div>
-              <span className="arh-stat-card__label">Lịch hẹn sắp tới</span>
+              <span className="arh-stat-card__label">{t('admissionHistory.statsAppointments')}</span>
             </div>
             <div className="arh-stat-card__value">
               {String(stats.appointments).padStart(2, '0')}
@@ -256,7 +242,7 @@ export default function AdmissionRequestsHistoryPage() {
             <input
               type="text"
               className="arh-filters__input"
-              placeholder="Tìm kiếm theo mã yêu cầu, tên người thân hoặc CCCD..."
+              placeholder={t('admissionHistory.searchPlaceholder')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -271,13 +257,13 @@ export default function AdmissionRequestsHistoryPage() {
                 setPage(1);
               }}
             >
-              <option value="">Tất cả trạng thái</option>
-              <option value="new_request">Chờ duyệt</option>
-              <option value="consulting">Đang tư vấn</option>
-              <option value="assessing">Đang đánh giá</option>
-              <option value="contracting">Đang làm hợp đồng</option>
-              <option value="checked_in">Đã tiếp nhận</option>
-              <option value="cancelled">Đã hủy</option>
+              <option value="">{t('admissionHistory.allStatuses')}</option>
+              <option value="new_request">{t('admissionHistory.statusNewRequest')}</option>
+              <option value="consulting">{t('admissionHistory.statusConsulting')}</option>
+              <option value="assessing">{t('admissionHistory.statusAssessing')}</option>
+              <option value="contracting">{t('admissionHistory.statusContracting')}</option>
+              <option value="checked_in">{t('admissionHistory.statusCheckedIn')}</option>
+              <option value="cancelled">{t('admissionHistory.statusCancelled')}</option>
             </select>
           </div>
 
@@ -290,7 +276,7 @@ export default function AdmissionRequestsHistoryPage() {
                 setDateStr(e.target.value);
                 setPage(1);
               }}
-              title="Lọc theo ngày gửi"
+              title={t('admissionHistory.filterByDate')}
             />
           </div>
         </div>
@@ -299,7 +285,7 @@ export default function AdmissionRequestsHistoryPage() {
           <div className="arh-error-banner">
             <span>{loadError}</span>
             <button type="button" className="arh-error-banner__retry" onClick={loadData}>
-              Thử lại
+              {t('admissionHistory.retry')}
             </button>
           </div>
         )}
@@ -309,14 +295,14 @@ export default function AdmissionRequestsHistoryPage() {
           {loading ? (
             <div className="arh-loading-box">
               <Loader2 className="arh-loading-spinner" size={32} />
-              <p className="arh-loading-text">Đang tải lịch sử yêu cầu...</p>
+              <p className="arh-loading-text">{t('admissionHistory.loading')}</p>
             </div>
           ) : admissions.length === 0 ? (
             <div className="arh-empty-box">
               <Inbox size={48} className="arh-empty-icon" />
-              <p className="arh-empty-text">Không tìm thấy yêu cầu tiếp nhận nào.</p>
+              <p className="arh-empty-text">{t('admissionHistory.emptyTitle')}</p>
               <p className="text-xs max-w-sm text-slate-400 mt-1">
-                Hãy thử thay đổi từ khóa tìm kiếm hoặc lọc theo trạng thái khác.
+                {t('admissionHistory.emptyHint')}
               </p>
             </div>
           ) : (
@@ -325,13 +311,13 @@ export default function AdmissionRequestsHistoryPage() {
                 <table className="arh-table">
                   <thead>
                     <tr>
-                      <th>Mã yêu cầu</th>
-                      <th>Người thân</th>
-                      <th>Ngày gửi</th>
-                      <th>Ngày mong muốn</th>
-                      <th>Trạng thái</th>
-                      <th>Đánh giá y tế</th>
-                      <th className="text-center">Hành động</th>
+                      <th>{t('admissionHistory.colCode')}</th>
+                      <th>{t('admissionHistory.colRelative')}</th>
+                      <th>{t('admissionHistory.colSubmitDate')}</th>
+                      <th>{t('admissionHistory.colPreferredDate')}</th>
+                      <th>{t('admissionHistory.colStatus')}</th>
+                      <th>{t('admissionHistory.colEligibility')}</th>
+                      <th className="text-center">{t('admissionHistory.colActions')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -362,19 +348,19 @@ export default function AdmissionRequestsHistoryPage() {
                         </td>
                         <td>
                           <span className={`arh-badge arh-badge--${adm.status}`}>
-                            {getStatusLabel(adm.status)}
+                            {t(STATUS_I18N[adm.status] || 'admissionHistory.statusDefault')}
                           </span>
                         </td>
                         <td>
                           <span className={`arh-elig-badge arh-elig-badge--${adm.eligibilityStatus || 'pending'}`}>
-                            {getEligibilityLabel(adm.eligibilityStatus)}
+                            {t(ELIGIBILITY_I18N[adm.eligibilityStatus] || 'admissionHistory.eligibilityPending')}
                           </span>
                         </td>
                         <td className="text-center" onClick={(e) => e.stopPropagation()}>
                           <button
                             className="arh-btn--action"
                             onClick={() => handleOpenDetail(adm._id || adm.id)}
-                            title="Xem chi tiết"
+                            title={t('admissionHistory.viewDetail')}
                           >
                             <Eye size={18} />
                           </button>
@@ -388,14 +374,14 @@ export default function AdmissionRequestsHistoryPage() {
               {/* Pagination block */}
               <div className="arh-pagination">
                 <span className="arh-pagination__info">
-                  Hiển thị {Math.min((page - 1) * limit + 1, total)} - {Math.min(page * limit, total)} trên {total} yêu cầu
+                  {t('admissionHistory.paginationInfo', { from: Math.min((page - 1) * limit + 1, total), to: Math.min(page * limit, total), total })}
                 </span>
                 <div className="arh-pagination__controls">
                   <button
                     className="arh-pagination__btn"
                     onClick={() => setPage((p) => Math.max(p - 1, 1))}
                     disabled={page === 1}
-                    title="Trang trước"
+                    title={t('admissionHistory.prevPage')}
                   >
                     <ChevronLeft size={16} />
                   </button>
@@ -416,7 +402,7 @@ export default function AdmissionRequestsHistoryPage() {
                     className="arh-pagination__btn"
                     onClick={() => setPage((p) => Math.min(p + 1, totalPages))}
                     disabled={page === totalPages}
-                    title="Trang sau"
+                    title={t('admissionHistory.nextPage')}
                   >
                     <ChevronRight size={16} />
                   </button>

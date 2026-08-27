@@ -143,7 +143,7 @@
 }
 .cn-filters__search input:focus {
   outline: none;
-  border-color: #3b5bdb;
+  border-color: var(--nh-primary);
   box-shadow: 0 0 0 3px rgba(59, 91, 219, 0.1);
   background: #fff;
 }
@@ -199,7 +199,7 @@
 .cn-category-pill--active[data-type="daily_living"]  { background: #7c3aed; }
 .cn-category-pill--active[data-type="health"]        { background: #dc2626; }
 .cn-category-pill--active[data-type="general"]       { background: #475569; }
-.cn-category-pill--active[data-type=""]              { background: #3b5bdb; }
+.cn-category-pill--active[data-type=""]              { background: var(--nh-primary); }
 
 /* Priority pills */
 .cn-priority-pills {
@@ -253,7 +253,7 @@
 .cn-filter-select:focus,
 .cn-filter-date:focus {
   outline: none;
-  border-color: #3b5bdb;
+  border-color: var(--nh-primary);
   box-shadow: 0 0 0 3px rgba(59, 91, 219, 0.1);
 }
 
@@ -263,7 +263,7 @@
   font-weight: 500;
 }
 .cn-filters__result-count strong {
-  color: #3b5bdb;
+  color: var(--nh-primary);
   font-weight: 700;
 }
 
@@ -303,8 +303,8 @@
   margin-bottom: -2px;
   transition: color 0.2s, border-color 0.2s;
 }
-.cn-tab:hover { color: #3b5bdb; }
-.cn-tab--active { color: #3b5bdb; border-bottom-color: #3b5bdb; }
+.cn-tab:hover { color: var(--nh-primary); }
+.cn-tab--active { color: var(--nh-primary); border-bottom-color: var(--nh-primary); }
 
 /* ── Note Cards List ── */
 .cn-notes-list {
@@ -351,7 +351,7 @@
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #3b5bdb 0%, #6366f1 100%);
+  background: linear-gradient(135deg, var(--nh-primary) 0%, #14b8a6 100%);
   color: #fff;
   display: flex;
   align-items: center;
@@ -406,7 +406,7 @@
 }
 
 .cn-note-card__readmore {
-  color: #3b5bdb;
+  color: var(--nh-primary);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -491,7 +491,7 @@
   background: transparent;
 }
 .cn-action-btn:hover { transform: translateY(-1px); }
-.cn-action-btn--view    { color: #3b5bdb; }
+.cn-action-btn--view    { color: var(--nh-primary); }
 .cn-action-btn--view:hover { background: #eff6ff; border-color: #bfdbfe; }
 .cn-action-btn--edit    { color: #d97706; }
 .cn-action-btn--edit:hover { background: #fffbeb; border-color: #fed7aa; }
@@ -564,9 +564,9 @@
 }
 .cn-pagination__btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .cn-pagination__btn--active {
-  background: #3b5bdb;
+  background: var(--nh-primary);
   color: #fff;
-  border-color: #3b5bdb;
+  border-color: var(--nh-primary);
 }
 .cn-pagination__btn--active:hover { background: #2b4bc7; }
 .cn-pagination__ellipsis {
@@ -604,7 +604,7 @@
   justify-content: center;
   flex-shrink: 0;
 }
-.cn-stat-card__icon--notes     { background: #eff6ff; color: #3b5bdb; }
+.cn-stat-card__icon--notes     { background: #eff6ff; color: var(--nh-primary); }
 .cn-stat-card__icon--urgent    { background: #fef2f2; color: #dc2626; }
 .cn-stat-card__icon--important { background: #fff7ed; color: #ea580c; }
 .cn-stat-card__icon--complete  { background: #ecfdf5; color: #16a34a; }
@@ -640,7 +640,7 @@
 .cn-btn:active { transform: translateY(0) scale(0.97); }
 .cn-btn:disabled { opacity: 0.55; cursor: not-allowed; transform: none; box-shadow: none; }
 
-.cn-btn--primary   { background: #3b5bdb; color: #fff; }
+.cn-btn--primary   { background: var(--nh-primary); color: #fff; }
 .cn-btn--primary:hover { background: #2b4bc7; }
 .cn-btn--secondary { background: #f1f5f9; color: #475569; }
 .cn-btn--secondary:hover { background: #e2e8f0; }
@@ -654,8 +654,8 @@
 .cn-btn--ghost:hover { background: #f8fafc; color: #334155; }
 .cn-btn--outline {
   background: #fff;
-  color: #3b5bdb;
-  border: 1.5px solid #3b5bdb;
+  color: var(--nh-primary);
+  border: 1.5px solid var(--nh-primary);
 }
 .cn-btn--outline:hover { background: #eff6ff; }
 
@@ -787,7 +787,7 @@
   width: 46px;
   height: 46px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #3b5bdb 0%, #6366f1 100%);
+  background: linear-gradient(135deg, var(--nh-primary) 0%, #14b8a6 100%);
   color: #fff;
   display: flex;
   align-items: center;
@@ -849,7 +849,7 @@
 }
 .cn-form-input:focus {
   outline: none;
-  border-color: #3b5bdb;
+  border-color: var(--nh-primary);
   box-shadow: 0 0 0 3px rgba(59, 91, 219, 0.12);
 }
 .cn-form-input--error {
@@ -1199,7 +1199,7 @@ textarea.cn-form-input {
   width: 40px;
   height: 40px;
   border: 3px solid #e2e8f0;
-  border-top-color: #3b5bdb;
+  border-top-color: var(--nh-primary);
   border-radius: 50%;
   animation: cnSpinnerRotate 0.7s linear infinite;
 }

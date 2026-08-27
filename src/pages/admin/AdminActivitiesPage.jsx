@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Search, RefreshCw, Plus, Edit3, Trash2, Filter, CalendarDays, AlertTriangle, Eye, X } from 'lucide-react';
 import activityService from '../../services/activity.service';
 import authService from '../../services/auth.service';
@@ -8,12 +9,12 @@ import { useToast } from '../../hooks/useToast';
 import '../../styles/admin/AdminAdmissionRequestsPage.css';
 
 const STATUS_OPTIONS = [
-  { value: '', label: 'Tất cả trạng thái' },
-  { value: 'draft', label: 'Nháp' },
-  { value: 'scheduled', label: 'Đã lên lịch' },
-  { value: 'ongoing', label: 'Đang diễn ra' },
-  { value: 'completed', label: 'Đã hoàn thành' },
-  { value: 'cancelled', label: 'Đã huỷ' },
+  { value: '', i18nKey: 'adminActivities.statusAll' },
+  { value: 'draft', i18nKey: 'adminActivities.statusDraft' },
+  { value: 'scheduled', i18nKey: 'adminActivities.statusScheduled' },
+  { value: 'ongoing', i18nKey: 'adminActivities.statusOngoing' },
+  { value: 'completed', i18nKey: 'adminActivities.statusCompleted' },
+  { value: 'cancelled', i18nKey: 'adminActivities.statusCancelled' },
 ];
 
 const getStatusOptionsForForm = (currentStatus) => {
@@ -64,7 +65,7 @@ const getAutoDurationMinutes = (startAt, endAt) => {
   return Math.round(diffMs / (1000 * 60));
 };
 
-const formatDurationLabel = (durationMinutes) => {
+const formatDurationLabel = (durationMinutes, t) => {
   const totalMinutes = Number(durationMinutes);
   if (!Number.isFinite(totalMinutes) || totalMinutes <= 0) return '';
 
@@ -74,7 +75,7 @@ const formatDurationLabel = (durationMinutes) => {
   const minutes = remainingMinutes % 60;
 
   const parts = [];
-  if (totalDays > 0) parts.push(`${totalDays} ngày`);
+  if (totalDays > 0) parts.push(t ? t('adminActivities.durationDays', { count: totalDays }) : `${totalDays} ngày`);
   if (hours > 0) parts.push(`${hours}h`);
   if (minutes > 0) parts.push(`${minutes}p`);
 
@@ -89,19 +90,19 @@ const getMinDateTimeLocal = () => {
 };
 
 const ACTIVITY_CATEGORY_OPTIONS = [
-  'Hoạt động chăm sóc cá nhân hằng ngày',
-  'Hoạt động chăm sóc sức khỏe',
-  'Hoạt động ăn uống - dinh dưỡng',
-  'Hoạt động thể chất - phục hồi chức năng',
-  'Hoạt động giải trí',
-  'Hoạt động kích thích nhận thức',
-  'Hoạt động xã hội - giao lưu',
-  'Hoạt động tâm lý - tinh thần',
-  'Hoạt động sự kiện đặc biệt',
-  'Hoạt động với gia đình',
-  'Hoạt động quản lý nội bộ',
-  'Hoạt động xử lý sự cố',
-  'Khác',
+  { value: 'Hoạt động chăm sóc cá nhân hằng ngày', i18nKey: 'adminActivities.categoryPersonalCare' },
+  { value: 'Hoạt động chăm sóc sức khỏe', i18nKey: 'adminActivities.categoryHealthCare' },
+  { value: 'Hoạt động ăn uống - dinh dưỡng', i18nKey: 'adminActivities.categoryNutrition' },
+  { value: 'Hoạt động thể chất - phục hồi chức năng', i18nKey: 'adminActivities.categoryPhysical' },
+  { value: 'Hoạt động giải trí', i18nKey: 'adminActivities.categoryEntertainment' },
+  { value: 'Hoạt động kích thích nhận thức', i18nKey: 'adminActivities.categoryCognitive' },
+  { value: 'Hoạt động xã hội - giao lưu', i18nKey: 'adminActivities.categorySocial' },
+  { value: 'Hoạt động tâm lý - tinh thần', i18nKey: 'adminActivities.categoryPsychological' },
+  { value: 'Hoạt động sự kiện đặc biệt', i18nKey: 'adminActivities.categorySpecialEvent' },
+  { value: 'Hoạt động với gia đình', i18nKey: 'adminActivities.categoryFamily' },
+  { value: 'Hoạt động quản lý nội bộ', i18nKey: 'adminActivities.categoryInternalManagement' },
+  { value: 'Hoạt động xử lý sự cố', i18nKey: 'adminActivities.categoryIncident' },
+  { value: 'Khác', i18nKey: 'adminActivities.categoryOther' },
 ];
 
 const isActivityStaff = (staff) => {
@@ -117,6 +118,7 @@ const isActivityStaff = (staff) => {
 };
 
 export default function AdminActivitiesPage() {
+  const { t } = useTranslation();
   const { showToast } = useToast();
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -179,11 +181,11 @@ export default function AdminActivitiesPage() {
       setTotalPages(res?.totalPages || 1);
     } catch (err) {
       console.error('Fetch activities failed:', err);
-      setError(err.response?.data?.message || 'Không thể tải danh sách hoạt động.');
+      setError(err.response?.data?.message || t('adminActivities.errLoadActivities'));
     } finally {
       setLoading(false);
     }
-  }, [page, limit, appliedFilters]);
+  }, [page, limit, appliedFilters, t]);
 
   useEffect(() => {
     fetchActivities();
@@ -224,14 +226,11 @@ export default function AdminActivitiesPage() {
     const loadAbnormalStatus = async () => {
       try {
         const statusMap = {};
-        console.log(`📋 Loading abnormal status for ${residents.length} residents...`);
-        
         const results = await Promise.allSettled(
           residents.map(async (resident) => {
             try {
               const latestRecord = await medicalRecordService.getLatestVitals(resident._id);
               const isAbnormal = latestRecord?.abnormalFlag === true;
-              console.log(`✓ Resident ${resident.fullName} (${resident._id}): abnormal=${isAbnormal}, record=`, latestRecord);
               return { id: resident._id, isAbnormal };
             } catch (err) {
               console.error(`✗ Failed to load health status for resident ${resident.fullName} (${resident._id}):`, err.message);
@@ -239,15 +238,14 @@ export default function AdminActivitiesPage() {
             }
           })
         );
-        
+
         results.forEach((result) => {
           if (result.status === 'fulfilled' && result.value) {
             statusMap[result.value.id] = result.value.isAbnormal;
           }
         });
-        
+
         if (active) {
-          console.log(`📊 Health status map updated:`, statusMap);
           setResidentsAbnormalStatus(statusMap);
         }
       } catch (err) {
@@ -270,17 +268,14 @@ export default function AdminActivitiesPage() {
     const checkActivitiesAbnormal = async () => {
       try {
         const abnormalMap = {};
-        console.log(`🏥 Checking abnormal status for ${activities.length} activities...`);
-        
         for (const activity of activities) {
           const participantIds = activity.participantResidentIds || [];
           const abnormalCount = participantIds.filter((id) => residentsAbnormalStatus[id]).length;
           abnormalMap[activity._id] = abnormalCount;
           if (abnormalCount > 0) {
-            console.log(`  ⚠️ Activity "${activity.title}" has ${abnormalCount} abnormal participants`);
           }
         }
-        
+
         if (active) {
           setActivitiesAbnormalParticipants(abnormalMap);
         }
@@ -384,7 +379,7 @@ export default function AdminActivitiesPage() {
     setIsCreating(true);
     setForm({
       title: activity.title || '',
-      category: activity.category && !ACTIVITY_CATEGORY_OPTIONS.includes(activity.category) ? 'Khác' : (activity.category || ''),
+      category: activity.category && !ACTIVITY_CATEGORY_OPTIONS.some((opt) => opt.value === activity.category) ? 'Khác' : (activity.category || ''),
       categoryOther: activity.category && !ACTIVITY_CATEGORY_OPTIONS.includes(activity.category) ? activity.category : '',
       description: activity.description || '',
       startAt: toInputDateTimeLocal(activity.startAt || activity.scheduledAt),
@@ -406,14 +401,14 @@ export default function AdminActivitiesPage() {
   };
 
   const handleDelete = async (activityId) => {
-    if (!window.confirm('Bạn có chắc muốn xóa hoạt động này không?')) return;
+    if (!window.confirm(t('adminActivities.confirmDeleteActivity'))) return;
     try {
       setLoading(true);
       await activityService.deleteActivity(activityId);
       fetchActivities();
     } catch (err) {
       console.error('Delete failed:', err);
-      showToast(err.response?.data?.message || 'Không thể xóa hoạt động.', 'error');
+      showToast(err.response?.data?.message || t('adminActivities.errDeleteActivity'), 'error');
     } finally {
       setLoading(false);
     }
@@ -424,11 +419,11 @@ export default function AdminActivitiesPage() {
       .map((residentId) => {
         const resident = residents.find((item) => item._id === residentId);
         if (!resident) return null;
-        return resident.fullName || resident.residentCode || 'Cư dân';
+        return resident.fullName || resident.residentCode || t('adminActivities.residentFallback');
       })
       .filter(Boolean);
 
-    if (names.length === 0) return '0 cư dân';
+    if (names.length === 0) return t('adminActivities.zeroResidents');
     if (names.length <= 2) return names.join(', ');
     return `${names.slice(0, 2).join(', ')} +${names.length - 2}`;
   };
@@ -440,7 +435,7 @@ export default function AdminActivitiesPage() {
       fetchActivities();
     } catch (err) {
       console.error('Status update failed:', err);
-      showToast(err.response?.data?.message || 'Không thể cập nhật trạng thái.', 'error');
+      showToast(err.response?.data?.message || t('adminActivities.errUpdateStatus'), 'error');
     } finally {
       setLoading(false);
     }
@@ -448,19 +443,19 @@ export default function AdminActivitiesPage() {
 
   const handleBulkDelete = async () => {
     const targetLabel = appliedFilters.search || appliedFilters.status || appliedFilters.from || appliedFilters.to
-      ? 'các hoạt động phù hợp với bộ lọc hiện tại'
-      : 'tất cả hoạt động';
+      ? t('adminActivities.bulkTargetFilter')
+      : t('adminActivities.bulkTargetAll');
 
-    if (!window.confirm(`Bạn có chắc muốn xóa ${targetLabel} không?`)) return;
+    if (!window.confirm(t('adminActivities.confirmBulkDelete', { target: targetLabel }))) return;
 
     try {
       setLoading(true);
       await activityService.bulkDeleteActivities(appliedFilters);
       await fetchActivities();
-      showToast('Đã xóa các hoạt động phù hợp.', 'success');
+      showToast(t('adminActivities.successBulkDelete'), 'success');
     } catch (err) {
       console.error('Bulk delete failed:', err);
-      showToast(err.response?.data?.message || 'Không thể xóa các hoạt động này.', 'error');
+      showToast(err.response?.data?.message || t('adminActivities.errBulkDelete'), 'error');
     } finally {
       setLoading(false);
     }
@@ -470,10 +465,13 @@ export default function AdminActivitiesPage() {
     if (!bulkStatus) return;
 
     const targetLabel = appliedFilters.search || appliedFilters.status || appliedFilters.from || appliedFilters.to
-      ? 'các hoạt động phù hợp với bộ lọc hiện tại'
-      : 'tất cả hoạt động';
+      ? t('adminActivities.bulkTargetFilter')
+      : t('adminActivities.bulkTargetAll');
 
-    if (!window.confirm(`Bạn có chắc muốn đổi trạng thái của ${targetLabel} thành ${STATUS_OPTIONS.find((item) => item.value === bulkStatus)?.label || bulkStatus}?`)) return;
+    const foundOption = STATUS_OPTIONS.find((item) => item.value === bulkStatus);
+    const statusLabel = foundOption ? t(foundOption.i18nKey) : bulkStatus;
+
+    if (!window.confirm(t('adminActivities.confirmBulkStatus', { target: targetLabel, status: statusLabel }))) return;
 
     try {
       setLoading(true);
@@ -483,10 +481,10 @@ export default function AdminActivitiesPage() {
       }
       await activityService.bulkUpdateActivityStatus({ ...filters, status: bulkStatus });
       await fetchActivities();
-      showToast('Đã cập nhật trạng thái cho các hoạt động phù hợp.', 'success');
+      showToast(t('adminActivities.successBulkStatus'), 'success');
     } catch (err) {
       console.error('Bulk status update failed:', err);
-      showToast(err.response?.data?.message || 'Không thể cập nhật trạng thái cho các hoạt động này.', 'error');
+      showToast(err.response?.data?.message || t('adminActivities.errBulkStatus'), 'error');
     } finally {
       setLoading(false);
     }
@@ -524,48 +522,48 @@ export default function AdminActivitiesPage() {
     if (e) e.preventDefault();
     setFormError(null);
     if (!form.title.trim()) {
-      setFormError('Tiêu đề là bắt buộc');
+      setFormError(t('adminActivities.validTitle'));
       return;
     }
     if (!form.startAt) {
-      setFormError('Ngày/giờ bắt đầu là bắt buộc');
+      setFormError(t('adminActivities.validStartAt'));
       return;
     }
     if (!form.location?.trim()) {
-      setFormError('Địa điểm là bắt buộc');
+      setFormError(t('adminActivities.validLocation'));
       return;
     }
     if (!form.category?.trim()) {
-      setFormError('Danh mục hoạt động là bắt buộc');
+      setFormError(t('adminActivities.validCategory'));
       return;
     }
     if (form.category === 'Khác' && !form.categoryOther?.trim()) {
-      setFormError('Vui lòng nhập danh mục khác');
+      setFormError(t('adminActivities.validCategoryOther'));
       return;
     }
 
     const startDate = new Date(form.startAt);
     const endDate = form.endAt ? new Date(form.endAt) : startDate;
     if (Number.isNaN(startDate.getTime())) {
-      setFormError('Ngày bắt đầu không hợp lệ');
+      setFormError(t('adminActivities.validStartDateInvalid'));
       return;
     }
     if (startDate < new Date()) {
-      setFormError('Ngày bắt đầu không được là quá khứ');
+      setFormError(t('adminActivities.validStartDatePast'));
       return;
     }
     if (form.endAt && endDate <= startDate) {
-      setFormError('Ngày kết thúc phải sau ngày bắt đầu');
+      setFormError(t('adminActivities.validEndAfterStart'));
       return;
     }
 
     const computedDurationMinutes = getAutoDurationMinutes(form.startAt, form.endAt || form.startAt);
     if (computedDurationMinutes === null) {
-      setFormError('Ngày bắt đầu và kết thúc phải hợp lệ');
+      setFormError(t('adminActivities.validDateRange'));
       return;
     }
     if (computedDurationMinutes <= 0) {
-      setFormError('Ngày kết thúc phải sau ngày bắt đầu');
+      setFormError(t('adminActivities.validEndAfterStart'));
       return;
     }
 
@@ -573,14 +571,14 @@ export default function AdminActivitiesPage() {
       ? form.organizerStaffIds.filter(Boolean)
       : [];
     if (organizerStaffIds.length === 0) {
-      setFormError('Nhân viên tổ chức là bắt buộc');
+      setFormError(t('adminActivities.validOrganizerRequired'));
       return;
     }
 
     for (const organizerId of organizerStaffIds) {
       const organizer = staffOptions.find((s) => s._id === organizerId);
       if (!organizer || !isActivityStaff(organizer)) {
-        setFormError('Nhân viên tổ chức phải là y tá, hộ lý, caregiver hoặc bác sĩ');
+        setFormError(t('adminActivities.validOrganizerRole'));
         return;
       }
     }
@@ -591,7 +589,7 @@ export default function AdminActivitiesPage() {
     for (const supportStaffId of supportStaffIds) {
       const supportStaff = staffOptions.find((s) => s._id === supportStaffId);
       if (!supportStaff || !isActivityStaff(supportStaff)) {
-        setFormError('Nhân viên hỗ trợ phải là y tá, hộ lý, caregiver hoặc bác sĩ');
+        setFormError(t('adminActivities.validSupportRole'));
         return;
       }
     }
@@ -628,7 +626,7 @@ export default function AdminActivitiesPage() {
       fetchActivities();
     } catch (err) {
       console.error('Submit activity failed:', err);
-      setFormError(err.response?.data?.message || 'Có lỗi khi lưu hoạt động.');
+      setFormError(err.response?.data?.message || t('adminActivities.errSaveActivity'));
     } finally {
       setSubmitting(false);
     }
@@ -640,9 +638,9 @@ export default function AdminActivitiesPage() {
         <div>
           <h1>
             <CalendarDays size={26} />
-            Quản lý hoạt động
+            {t('adminActivities.pageTitle')}
           </h1>
-          <p>Quản lý hoạt động cho cư dân: tạo, chỉnh sửa, xóa, và cập nhật trạng thái.</p>
+          <p>{t('adminActivities.pageSubtitle')}</p>
         </div>
         <button
           type="button"
@@ -654,19 +652,19 @@ export default function AdminActivitiesPage() {
           className="adm-btn-refresh"
         >
           <Plus size={16} />
-          {isCreating ? 'Đóng form' : 'Tạo hoạt động'}
+          {isCreating ? t('adminActivities.btnCloseForm') : t('adminActivities.btnCreate')}
         </button>
       </div>
 
       <div className="adm-filter-panel">
         <form onSubmit={handleApplyFilters} className="adm-filter-grid">
           <div>
-            <label className="text-sm font-semibold">Tìm kiếm</label>
+            <label className="text-sm font-semibold">{t('adminActivities.filterSearch')}</label>
             <div className="adm-filter-input-wrapper">
               <Search className="adm-filter-input-icon" size={14} />
               <input
                 type="text"
-                placeholder="Tìm theo tiêu đề, danh mục..."
+                placeholder={t('adminActivities.filterSearchPlaceholder')}
                 className="adm-filter-input"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -675,7 +673,7 @@ export default function AdminActivitiesPage() {
           </div>
 
           <div>
-            <label className="text-sm font-semibold">Trạng thái</label>
+            <label className="text-sm font-semibold">{t('adminActivities.filterStatus')}</label>
             <select
               className="adm-filter-select"
               value={status}
@@ -683,14 +681,14 @@ export default function AdminActivitiesPage() {
             >
               {STATUS_OPTIONS.map((item) => (
                 <option key={item.value} value={item.value}>
-                  {item.label}
+                  {t(item.i18nKey)}
                 </option>
               ))}
             </select>
           </div>
 
           <div>
-            <label className="text-sm font-semibold">Từ ngày</label>
+            <label className="text-sm font-semibold">{t('adminActivities.filterFrom')}</label>
             <input
               type="date"
               className="adm-filter-select"
@@ -700,7 +698,7 @@ export default function AdminActivitiesPage() {
           </div>
 
           <div>
-            <label className="text-sm font-semibold">Đến ngày</label>
+            <label className="text-sm font-semibold">{t('adminActivities.filterTo')}</label>
             <input
               type="date"
               className="adm-filter-select"
@@ -711,10 +709,10 @@ export default function AdminActivitiesPage() {
 
           <div className="flex items-end gap-3" style={{ alignSelf: 'end' }}>
             <button type="button" className="adm-btn-refresh" onClick={handleResetFilters}>
-              <RefreshCw size={14} /> Đặt lại
+              <RefreshCw size={14} /> {t('adminActivities.btnReset')}
             </button>
             <button type="submit" className="adm-btn-refresh">
-              <Filter size={14} /> Áp dụng
+              <Filter size={14} /> {t('adminActivities.btnApply')}
             </button>
           </div>
         </form>
@@ -728,15 +726,15 @@ export default function AdminActivitiesPage() {
           >
             {STATUS_OPTIONS.filter((item) => item.value).map((item) => (
               <option key={item.value} value={item.value}>
-                {item.label}
+                {t(item.i18nKey)}
               </option>
             ))}
           </select>
           <button type="button" className="adm-btn-refresh" onClick={handleBulkStatusChange}>
-            Chuyển trạng thái tất cả
+            {t('adminActivities.btnBulkChangeStatus')}
           </button>
           <button type="button" className="adm-btn-refresh" onClick={handleBulkDelete}>
-            <Trash2 size={14} /> Xóa tất cả
+            <Trash2 size={14} /> {t('adminActivities.btnDeleteAll')}
           </button>
         </div>
       </div>
@@ -744,11 +742,11 @@ export default function AdminActivitiesPage() {
       {isCreating && (
         <div className="adm-filter-panel" style={{ marginBottom: '28px' }}>
           <h2 style={{ marginBottom: '12px', fontSize: '18px', fontWeight: 700 }}>
-            {editingId ? 'Chỉnh sửa hoạt động' : 'Tạo hoạt động'}
+            {editingId ? t('adminActivities.formTitleEdit') : t('adminActivities.formTitleCreate')}
           </h2>
           <form onSubmit={handleSubmit} className="adm-activity-form-grid">
             <div className="adm-form-field">
-              <label className="text-sm font-semibold">Tiêu đề</label>
+              <label className="text-sm font-semibold">{t('adminActivities.fieldTitle')}</label>
               <input
                 type="text"
                 className="adm-filter-input"
@@ -757,15 +755,15 @@ export default function AdminActivitiesPage() {
               />
             </div>
             <div className="adm-form-field">
-              <label className="text-sm font-semibold">Danh mục</label>
+              <label className="text-sm font-semibold">{t('adminActivities.fieldCategory')}</label>
               <select
                 className="adm-filter-select"
                 value={form.category}
                 onChange={(e) => setForm({ ...form, category: e.target.value, categoryOther: e.target.value === 'Khác' ? form.categoryOther : '' })}
               >
-                <option value="">Chọn danh mục</option>
+                <option value="">{t('adminActivities.fieldCategoryPlaceholder')}</option>
                 {ACTIVITY_CATEGORY_OPTIONS.map((item) => (
-                  <option key={item} value={item}>{item}</option>
+                  <option key={item.value} value={item.value}>{t(item.i18nKey)}</option>
                 ))}
               </select>
               {form.category === 'Khác' && (
@@ -775,12 +773,12 @@ export default function AdminActivitiesPage() {
                   style={{ marginTop: '8px' }}
                   value={form.categoryOther}
                   onChange={(e) => setForm({ ...form, categoryOther: e.target.value })}
-                  placeholder="Nhập danh mục khác"
+                  placeholder={t('adminActivities.fieldCategoryOtherPlaceholder')}
                 />
               )}
             </div>
             <div className="adm-form-field">
-              <label className="text-sm font-semibold">Bắt đầu</label>
+              <label className="text-sm font-semibold">{t('adminActivities.fieldStartAt')}</label>
               <input
                 type="datetime-local"
                 className="adm-filter-input"
@@ -794,7 +792,7 @@ export default function AdminActivitiesPage() {
               />
             </div>
             <div className="adm-form-field">
-              <label className="text-sm font-semibold">Kết thúc</label>
+              <label className="text-sm font-semibold">{t('adminActivities.fieldEndAt')}</label>
               <input
                 type="datetime-local"
                 className="adm-filter-input"
@@ -808,17 +806,17 @@ export default function AdminActivitiesPage() {
               />
             </div>
             <div className="adm-form-field">
-              <label className="text-sm font-semibold">Thời lượng</label>
+              <label className="text-sm font-semibold">{t('adminActivities.fieldDuration')}</label>
               <input
                 type="text"
                 className="adm-filter-input"
-                value={formatDurationLabel(form.durationMinutes)}
+                value={formatDurationLabel(form.durationMinutes, t)}
                 readOnly
-                placeholder="Sẽ tự tính từ thời gian bắt đầu và kết thúc"
+                placeholder={t('adminActivities.fieldDurationPlaceholder')}
               />
             </div>
             <div className="adm-form-field">
-              <label className="text-sm font-semibold">Thời lượng mỗi ngày</label>
+              <label className="text-sm font-semibold">{t('adminActivities.fieldDailyDuration')}</label>
               <input
                 type="number"
                 min="1"
@@ -829,7 +827,7 @@ export default function AdminActivitiesPage() {
               />
             </div>
             <div className="adm-form-field">
-              <label className="text-sm font-semibold">Địa điểm</label>
+              <label className="text-sm font-semibold">{t('adminActivities.fieldLocation')}</label>
               <input
                 type="text"
                 className="adm-filter-input"
@@ -838,7 +836,7 @@ export default function AdminActivitiesPage() {
               />
             </div>
             <div className="adm-form-field adm-form-field-full">
-              <label className="text-sm font-semibold">Nhân viên tổ chức</label>
+              <label className="text-sm font-semibold">{t('adminActivities.fieldOrganizerStaff')}</label>
               <div className="adm-participant-chips" style={{ marginBottom: '8px' }}>
                 <label className="adm-participant-chip" style={{ cursor: 'pointer' }}>
                   <input
@@ -847,7 +845,7 @@ export default function AdminActivitiesPage() {
                     onChange={() => toggleRoleGroupSelection('organizerStaffIds', ['doctor', 'bác sĩ'])}
                     style={{ marginRight: '6px' }}
                   />
-                  Tất cả bác sĩ
+                  {t('adminActivities.allDoctors')}
                 </label>
                 <label className="adm-participant-chip" style={{ cursor: 'pointer' }}>
                   <input
@@ -856,7 +854,7 @@ export default function AdminActivitiesPage() {
                     onChange={() => toggleRoleGroupSelection('organizerStaffIds', ['caregiver', 'hộ lý'])}
                     style={{ marginRight: '6px' }}
                   />
-                  Tất cả hộ lý
+                  {t('adminActivities.allCaregivers')}
                 </label>
                 <label className="adm-participant-chip" style={{ cursor: 'pointer' }}>
                   <input
@@ -865,7 +863,7 @@ export default function AdminActivitiesPage() {
                     onChange={() => toggleRoleGroupSelection('organizerStaffIds', ['nurse', 'y tá', 'điều dưỡng'])}
                     style={{ marginRight: '6px' }}
                   />
-                  Tất cả y tá
+                  {t('adminActivities.allNurses')}
                 </label>
               </div>
               <div className="adm-participant-picker">
@@ -880,7 +878,7 @@ export default function AdminActivitiesPage() {
                         style={{ width: '16px', height: '16px' }}
                       />
                       <span>
-                        {staff.fullName || staff.email || 'Nhân viên'} {staff.role ? `(${staff.role})` : ''}
+                        {staff.fullName || staff.email || t('adminActivities.staffFallback')} {staff.role ? `(${staff.role})` : ''}
                       </span>
                     </label>
                   );
@@ -888,7 +886,7 @@ export default function AdminActivitiesPage() {
               </div>
             </div>
             <div className="adm-form-field adm-form-field-full">
-              <label className="text-sm font-semibold">Nhân viên hỗ trợ</label>
+              <label className="text-sm font-semibold">{t('adminActivities.fieldSupportStaff')}</label>
               <div className="adm-participant-chips" style={{ marginBottom: '8px' }}>
                 <label className="adm-participant-chip" style={{ cursor: 'pointer' }}>
                   <input
@@ -897,7 +895,7 @@ export default function AdminActivitiesPage() {
                     onChange={() => toggleRoleGroupSelection('supportStaffIds', ['doctor', 'bác sĩ'])}
                     style={{ marginRight: '6px' }}
                   />
-                  Tất cả bác sĩ
+                  {t('adminActivities.allDoctors')}
                 </label>
                 <label className="adm-participant-chip" style={{ cursor: 'pointer' }}>
                   <input
@@ -906,7 +904,7 @@ export default function AdminActivitiesPage() {
                     onChange={() => toggleRoleGroupSelection('supportStaffIds', ['caregiver', 'hộ lý'])}
                     style={{ marginRight: '6px' }}
                   />
-                  Tất cả hộ lý
+                  {t('adminActivities.allCaregivers')}
                 </label>
                 <label className="adm-participant-chip" style={{ cursor: 'pointer' }}>
                   <input
@@ -915,7 +913,7 @@ export default function AdminActivitiesPage() {
                     onChange={() => toggleRoleGroupSelection('supportStaffIds', ['nurse', 'y tá', 'điều dưỡng'])}
                     style={{ marginRight: '6px' }}
                   />
-                  Tất cả y tá
+                  {t('adminActivities.allNurses')}
                 </label>
               </div>
               <div className="adm-participant-picker">
@@ -930,7 +928,7 @@ export default function AdminActivitiesPage() {
                         style={{ width: '16px', height: '16px' }}
                       />
                       <span>
-                        {staff.fullName || staff.email || 'Nhân viên'} {staff.role ? `(${staff.role})` : ''}
+                        {staff.fullName || staff.email || t('adminActivities.staffFallback')} {staff.role ? `(${staff.role})` : ''}
                       </span>
                     </label>
                   );
@@ -938,7 +936,7 @@ export default function AdminActivitiesPage() {
               </div>
             </div>
             <div className="adm-form-field adm-form-field-full">
-              <label className="text-sm font-semibold">Người tham gia</label>
+              <label className="text-sm font-semibold">{t('adminActivities.fieldParticipants')}</label>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '8px' }}>
                 <label className="adm-participant-chip" style={{ cursor: 'pointer' }}>
                   <input
@@ -947,13 +945,13 @@ export default function AdminActivitiesPage() {
                     onChange={toggleAllResidents}
                     style={{ marginRight: '6px' }}
                   />
-                  Tất cả cư dân
+                  {t('adminActivities.allResidents')}
                 </label>
               </div>
               <input
                 type="text"
                 className="adm-filter-input"
-                placeholder="Tìm cư dân..."
+                placeholder={t('adminActivities.searchResidentPlaceholder')}
                 value={participantSearch}
                 onChange={(e) => setParticipantSearch(e.target.value)}
                 disabled={optionsLoading}
@@ -965,7 +963,7 @@ export default function AdminActivitiesPage() {
                   .slice(0, 6)
                   .map((resident) => {
                     const label =
-                      (resident.fullName || 'Cư dân') +
+                      (resident.fullName || t('adminActivities.residentFallback')) +
                       (resident.residentCode ? ' (' + resident.residentCode + ')' : '');
                     return (
                       <button
@@ -981,7 +979,7 @@ export default function AdminActivitiesPage() {
                   })}
                 {form.participantResidentIds.length > 6 && (
                   <span className="adm-participant-chip adm-participant-chip-muted">
-                    {'+' + (form.participantResidentIds.length - 6) + ' khác'}
+                    {t('adminActivities.moreOthers', { count: form.participantResidentIds.length - 6 })}
                   </span>
                 )}
               </div>
@@ -1008,12 +1006,12 @@ export default function AdminActivitiesPage() {
                         style={{ width: '16px', height: '16px' }}
                       />
                       <span>
-                        {resident.fullName || 'Cư dân chưa đặt tên'}{resident.residentCode ? ` (${resident.residentCode})` : ''}
+                        {resident.fullName || t('adminActivities.residentUnnamed')}{resident.residentCode ? ` (${resident.residentCode})` : ''}
                       </span>
                       {hasAbnormal && (
                         <span className="adm-abnormal-badge">
                           <AlertTriangle size={12} />
-                          Bất thường
+                          {t('adminActivities.badgeAbnormal')}
                         </span>
                       )}
                     </label>
@@ -1027,9 +1025,9 @@ export default function AdminActivitiesPage() {
                     resident.residentCode?.toLowerCase().includes(searchText)
                   );
                 }).length === 0 && (
-                  <div className="adm-empty-state">Không tìm thấy cư dân phù hợp.</div>
+                  <div className="adm-empty-state">{t('adminActivities.noResidentsFound')}</div>
                 )}
-                {optionsLoading && <div className="adm-empty-state">Đang tải danh sách cư dân...</div>}
+                {optionsLoading && <div className="adm-empty-state">{t('adminActivities.loadingResidents')}</div>}
               </div>
               {(() => {
                 const selectedAbnormalResidents = form.participantResidentIds
@@ -1043,11 +1041,11 @@ export default function AdminActivitiesPage() {
                   <div className="adm-warning-box">
                     <AlertTriangle size={20} />
                     <div>
-                      <strong>⚠ Cảnh báo: Cư dân có chỉ số sức khỏe bất thường</strong>
+                      <strong>{t('adminActivities.warningAbnormalResidents')}</strong>
                       <div className="adm-warning-list">
                         {selectedAbnormalResidents.map((item) => (
                           <div key={item.resident._id}>
-                            • {item.resident.fullName || 'Cư dân'} ({item.resident.residentCode}) - Xin hãy giám sát sau khi tham gia hoạt động
+                            • {item.resident.fullName || t('adminActivities.residentFallback')} ({item.resident.residentCode}) {t('adminActivities.monitorAfterActivity')}
                           </div>
                         ))}
                       </div>
@@ -1057,7 +1055,7 @@ export default function AdminActivitiesPage() {
               })()}
             </div>
             <div className="adm-form-field">
-              <label className="text-sm font-semibold">Trạng thái</label>
+              <label className="text-sm font-semibold">{t('adminActivities.fieldStatus')}</label>
               <select
                 className="adm-filter-select"
                 value={form.status}
@@ -1065,13 +1063,13 @@ export default function AdminActivitiesPage() {
               >
                 {getStatusOptionsForForm(form.status).filter((item) => item.value).map((item) => (
                   <option key={item.value} value={item.value}>
-                    {item.label}
+                    {t(item.i18nKey)}
                   </option>
                 ))}
               </select>
             </div>
             <div className="adm-form-field adm-form-field-full">
-              <label className="text-sm font-semibold">Mô tả</label>
+              <label className="text-sm font-semibold">{t('adminActivities.fieldDescription')}</label>
               <textarea
                 rows="3"
                 className="adm-filter-input"
@@ -1085,10 +1083,10 @@ export default function AdminActivitiesPage() {
             )}
             <div className="adm-form-actions adm-form-field-full">
               <button type="button" className="adm-btn-refresh" onClick={() => { resetForm(); setIsCreating(false); }}>
-                Huỷ
+                {t('adminActivities.btnCancel')}
               </button>
               <button type="submit" className="adm-btn-refresh" disabled={submitting}>
-                {editingId ? 'Lưu thay đổi' : 'Tạo hoạt động'}
+                {editingId ? t('adminActivities.btnSaveChanges') : t('adminActivities.btnCreate')}
               </button>
             </div>
           </form>
@@ -1104,7 +1102,7 @@ export default function AdminActivitiesPage() {
             const activity = activities.find((a) => a._id === activityId);
             return { activity, count };
           });
-        
+
         return totalAbnormal > 0 ? (
           <div
             style={{
@@ -1120,11 +1118,11 @@ export default function AdminActivitiesPage() {
           >
             <AlertTriangle size={20} style={{ color: '#ef4444', flexShrink: 0, marginTop: '2px' }} />
             <div style={{ fontSize: '13px', color: '#991b1b' }}>
-              <strong>⚠ Cảnh báo: {activitiesWithAbnormal.length} hoạt động có bệnh nhân ở trạng thái bất thường</strong>
+              <strong>{t('adminActivities.warningAbnormalActivities', { count: activitiesWithAbnormal.length })}</strong>
               <div style={{ marginTop: '8px', fontSize: '12px', opacity: 0.9 }}>
                 {activitiesWithAbnormal.map(({ activity, count }) => (
                   <div key={activity._id}>
-                    • <strong>{activity.title}</strong> - {count} bệnh nhân có chỉ số bất thường
+                    • <strong>{activity.title}</strong> - {t('adminActivities.abnormalPatientCount', { count })}
                   </div>
                 ))}
               </div>
@@ -1138,25 +1136,25 @@ export default function AdminActivitiesPage() {
           <table className="adm-table">
             <thead>
               <tr>
-                <th>Tiêu đề</th>
-                <th>Danh mục</th>
-                <th>Lên lịch lúc</th>
-                <th>Trạng thái</th>
-                <th>Người tham gia</th>
-                <th>Hành động</th>
+                <th>{t('adminActivities.colTitle')}</th>
+                <th>{t('adminActivities.colCategory')}</th>
+                <th>{t('adminActivities.colScheduledAt')}</th>
+                <th>{t('adminActivities.colStatus')}</th>
+                <th>{t('adminActivities.colParticipants')}</th>
+                <th>{t('adminActivities.colActions')}</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
                   <td colSpan="6" style={{ textAlign: 'center', padding: '24px' }}>
-                    Đang tải hoạt động...
+                    {t('adminActivities.loadingActivities')}
                   </td>
                 </tr>
               ) : activities.length === 0 ? (
                 <tr>
                   <td colSpan="6" style={{ textAlign: 'center', padding: '24px' }}>
-                    Không tìm thấy hoạt động nào.
+                    {t('adminActivities.noActivitiesFound')}
                   </td>
                 </tr>
               ) : (
@@ -1183,7 +1181,7 @@ export default function AdminActivitiesPage() {
                               }}
                             >
                               <AlertTriangle size={10} />
-                              {abnormalCount} bất thường
+                              {t('adminActivities.abnormalCount', { count: abnormalCount })}
                             </span>
                           )}
                         </div>
@@ -1198,7 +1196,7 @@ export default function AdminActivitiesPage() {
                         >
                           {STATUS_OPTIONS.filter((item) => item.value).map((item) => (
                             <option key={item.value} value={item.value}>
-                              {item.label}
+                              {t(item.i18nKey)}
                             </option>
                           ))}
                         </select>
@@ -1230,7 +1228,7 @@ export default function AdminActivitiesPage() {
                           className="adm-btn-refresh"
                           style={{ marginRight: '8px' }}
                           onClick={() => setSelectedActivityId(activity._id)}
-                          title="Xem chi tiết"
+                          title={t('adminActivities.btnViewDetail')}
                         >
                           <Eye size={14} />
                         </button>
@@ -1239,7 +1237,7 @@ export default function AdminActivitiesPage() {
                           className="adm-btn-refresh"
                           style={{ marginRight: '8px' }}
                           onClick={() => handleEdit(activity)}
-                          title="Chỉnh sửa"
+                          title={t('adminActivities.btnEdit')}
                         >
                           <Edit3 size={14} />
                         </button>
@@ -1247,7 +1245,7 @@ export default function AdminActivitiesPage() {
                           type="button"
                           className="adm-btn-refresh"
                           onClick={() => handleDelete(activity._id)}
-                          title="Xóa"
+                          title={t('adminActivities.btnDelete')}
                         >
                           <Trash2 size={14} />
                         </button>
@@ -1263,7 +1261,7 @@ export default function AdminActivitiesPage() {
 
       <div className="adm-header" style={{ marginTop: '18px', justifyContent: 'space-between' }}>
         <span>
-          Trang {page} / {totalPages} — {total} hoạt động
+          {t('adminActivities.paginationInfo', { page, totalPages, total })}
         </span>
         <div style={{ display: 'flex', gap: '10px' }}>
           <button
@@ -1272,7 +1270,7 @@ export default function AdminActivitiesPage() {
             disabled={page <= 1}
             onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
           >
-            Trước
+            {t('adminActivities.btnPrev')}
           </button>
           <button
             type="button"
@@ -1280,7 +1278,7 @@ export default function AdminActivitiesPage() {
             disabled={page >= totalPages}
             onClick={() => setPage((prev) => Math.min(prev + 1, totalPages))}
           >
-            Tiếp
+            {t('adminActivities.btnNext')}
           </button>
         </div>
       </div>
@@ -1314,7 +1312,7 @@ export default function AdminActivitiesPage() {
               padding: '16px 20px',
               borderBottom: '1px solid #e2e8f0',
             }}>
-              <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 700 }}>Chi tiết hoạt động</h2>
+              <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 700 }}>{t('adminActivities.modalTitle')}</h2>
               <button
                 type="button"
                 onClick={() => setSelectedActivityId(null)}
@@ -1350,14 +1348,17 @@ export default function AdminActivitiesPage() {
                         fontSize: '12px',
                         fontWeight: 600,
                       }}>
-                        {STATUS_OPTIONS.find((s) => s.value === activity.status)?.label || activity.status}
+                        {(() => {
+                          const found = STATUS_OPTIONS.find((s) => s.value === activity.status);
+                          return found ? t(found.i18nKey) : activity.status;
+                        })()}
                       </span>
                     </div>
 
                     {/* Description */}
                     {activity.description && (
                       <div style={{ marginBottom: '16px' }}>
-                        <label style={{ display: 'block', fontWeight: 600, marginBottom: '4px', fontSize: '14px' }}>Mô tả</label>
+                        <label style={{ display: 'block', fontWeight: 600, marginBottom: '4px', fontSize: '14px' }}>{t('adminActivities.detailDescription')}</label>
                         <p style={{ margin: 0, color: '#475569', fontSize: '14px', lineHeight: 1.5 }}>{activity.description}</p>
                       </div>
                     )}
@@ -1365,29 +1366,29 @@ export default function AdminActivitiesPage() {
                     {/* Category */}
                     {activity.category && (
                       <div style={{ marginBottom: '16px' }}>
-                        <label style={{ display: 'block', fontWeight: 600, marginBottom: '4px', fontSize: '14px' }}>Danh mục</label>
+                        <label style={{ display: 'block', fontWeight: 600, marginBottom: '4px', fontSize: '14px' }}>{t('adminActivities.detailCategory')}</label>
                         <p style={{ margin: 0, color: '#475569', fontSize: '14px' }}>{activity.category}</p>
                       </div>
                     )}
 
                     {/* Date Range */}
                     <div style={{ marginBottom: '16px' }}>
-                      <label style={{ display: 'block', fontWeight: 600, marginBottom: '4px', fontSize: '14px' }}>Thời gian</label>
+                      <label style={{ display: 'block', fontWeight: 600, marginBottom: '4px', fontSize: '14px' }}>{t('adminActivities.detailDateRange')}</label>
                       <p style={{ margin: 0, color: '#475569', fontSize: '14px' }}>{formatActivityDateRange(activity)}</p>
                     </div>
 
                     {/* Duration */}
                     {activity.durationMinutes && (
                       <div style={{ marginBottom: '16px' }}>
-                        <label style={{ display: 'block', fontWeight: 600, marginBottom: '4px', fontSize: '14px' }}>Thời lượng</label>
-                        <p style={{ margin: 0, color: '#475569', fontSize: '14px' }}>{formatDurationLabel(activity.durationMinutes)}</p>
+                        <label style={{ display: 'block', fontWeight: 600, marginBottom: '4px', fontSize: '14px' }}>{t('adminActivities.detailDuration')}</label>
+                        <p style={{ margin: 0, color: '#475569', fontSize: '14px' }}>{formatDurationLabel(activity.durationMinutes, t)}</p>
                       </div>
                     )}
 
                     {/* Location */}
                     {activity.location && (
                       <div style={{ marginBottom: '16px' }}>
-                        <label style={{ display: 'block', fontWeight: 600, marginBottom: '4px', fontSize: '14px' }}>Địa điểm</label>
+                        <label style={{ display: 'block', fontWeight: 600, marginBottom: '4px', fontSize: '14px' }}>{t('adminActivities.detailLocation')}</label>
                         <p style={{ margin: 0, color: '#475569', fontSize: '14px' }}>{activity.location}</p>
                       </div>
                     )}
@@ -1395,7 +1396,7 @@ export default function AdminActivitiesPage() {
                     {/* Organizer */}
                     {organizer && (
                       <div style={{ marginBottom: '16px' }}>
-                        <label style={{ display: 'block', fontWeight: 600, marginBottom: '4px', fontSize: '14px' }}>Nhân viên tổ chức</label>
+                        <label style={{ display: 'block', fontWeight: 600, marginBottom: '4px', fontSize: '14px' }}>{t('adminActivities.detailOrganizer')}</label>
                         <p style={{ margin: 0, color: '#475569', fontSize: '14px' }}>
                           {organizer.fullName || organizer.email} {organizer.role ? `(${organizer.role})` : ''}
                         </p>
@@ -1405,7 +1406,7 @@ export default function AdminActivitiesPage() {
                     {/* Participants */}
                     {participantsList.length > 0 && (
                       <div style={{ marginBottom: '16px' }}>
-                        <label style={{ display: 'block', fontWeight: 600, marginBottom: '8px', fontSize: '14px' }}>Cư dân tham gia ({participantsList.length})</label>
+                        <label style={{ display: 'block', fontWeight: 600, marginBottom: '8px', fontSize: '14px' }}>{t('adminActivities.detailParticipants', { count: participantsList.length })}</label>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                           {participantsList.map((resident) => {
                             const isAbnormal = residentsAbnormalStatus[resident._id];
@@ -1429,7 +1430,7 @@ export default function AdminActivitiesPage() {
                                     borderRadius: '4px',
                                     fontWeight: 600,
                                   }}>
-                                    ⚠️ Bất thường
+                                    ⚠️ {t('adminActivities.badgeAbnormal')}
                                   </span>
                                 )}
                               </div>

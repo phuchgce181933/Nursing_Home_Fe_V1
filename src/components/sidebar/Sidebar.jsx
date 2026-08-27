@@ -1,8 +1,8 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'motion/react';
-import { ChevronDown, LogOut } from 'lucide-react';
+import { ChevronDown, LogOut, Menu, X } from 'lucide-react';
 import { sidebarData } from './sidebarData';
 import { useAuth } from '../../hooks/useAuth';
 import useUnreadConversations from '../../hooks/useUnreadConversations';
@@ -16,6 +16,18 @@ function Sidebar({ items = sidebarData }) {
   const { logout } = useAuth();
   const hasMessagesNav = items.some((item) => isMessagesPath(item.path));
   const unreadConversations = useUnreadConversations(hasMessagesNav);
+  const [isOpen, setIsOpen] = useState(false);
+
+  // Close sidebar whenever the user navigates (mobile UX)
+  useEffect(() => {
+    setIsOpen(false);
+  }, [location.pathname]);
+
+  // Prevent body scroll while mobile sidebar is open
+  useEffect(() => {
+    document.body.style.overflow = isOpen ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [isOpen]);
 
   const handleLogout = () => {
     logout();
@@ -46,7 +58,36 @@ function Sidebar({ items = sidebarData }) {
   };
 
   return (
-    <aside className="sidebar">
+    <>
+      {/* Hamburger toggle — only rendered/visible on mobile (<1024px) */}
+      <button
+        type="button"
+        className="sidebar__hamburger"
+        onClick={() => setIsOpen((prev) => !prev)}
+        aria-label={isOpen ? 'Close menu' : 'Open menu'}
+        aria-expanded={isOpen}
+      >
+        {isOpen ? <X size={22} /> : <Menu size={22} />}
+      </button>
+
+      {/* Semi-transparent backdrop — clicks outside close the sidebar */}
+      <div
+        className={`sidebar__backdrop${isOpen ? ' sidebar__backdrop--visible' : ''}`}
+        onClick={() => setIsOpen(false)}
+        aria-hidden="true"
+      />
+
+    <aside className={`sidebar${isOpen ? ' sidebar--open' : ''}`}>
+      {/* Close button inside sidebar, mobile only */}
+      <button
+        type="button"
+        className="sidebar__close"
+        onClick={() => setIsOpen(false)}
+        aria-label="Close menu"
+      >
+        <X size={18} />
+      </button>
+
       <div className="sidebar__header">
         <div className="sidebar__logo-section">
           <img
@@ -112,6 +153,7 @@ function Sidebar({ items = sidebarData }) {
         </button>
       </div>
     </aside>
+    </>
   );
 }
 

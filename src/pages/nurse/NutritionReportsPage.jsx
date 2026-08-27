@@ -75,27 +75,15 @@ function StatusCell({ ok }) {
 
 /* ---------- KPI config ---------- */
 const KPI_CONFIG = [
-  { key: 'totalAdmittedResidents', label: 'Cu dan dang o', icon: '👤', color: '#3b5bdb' },
-  { key: 'residentsWithMealPlan', label: 'Co thuc don publish', icon: '📋', color: '#0891b2' },
-  { key: 'residentsWithSpecialDiet', label: 'Co che do an dac biet', icon: '🍽', color: '#7c3aed' },
-  { key: 'residentsWithMealTimeSchedule', label: 'Co lich gio an', icon: '⏰', color: '#0d9488' },
-  { key: 'totalMealIntakeRecords', label: 'Ghi nhan intake (CG)', icon: '📝', color: '#2563eb' },
-  { key: 'residentsWithMealIntake', label: 'Cu dan co intake', icon: '🧑‍⚕️', color: '#059669' },
-  { key: 'totalMealNotes', label: 'Ghi chu meal (text)', icon: '💬', color: '#6366f1' },
-  { key: 'residentsMissingMealPlan', label: 'Thieu thuc don publish', icon: '⚠️', color: '#dc2626' },
+  { key: 'totalAdmittedResidents', i18nKey: 'kpiAdmitted', icon: '👤', color: '#0f766e' },
+  { key: 'residentsWithMealPlan', i18nKey: 'kpiWithMealPlan', icon: '📋', color: '#0891b2' },
+  { key: 'residentsWithSpecialDiet', i18nKey: 'kpiWithSpecialDiet', icon: '🍽', color: '#7c3aed' },
+  { key: 'residentsWithMealTimeSchedule', i18nKey: 'kpiWithMealTime', icon: '⏰', color: '#0d9488' },
+  { key: 'totalMealIntakeRecords', i18nKey: 'kpiIntakeRecords', icon: '📝', color: '#0f766e' },
+  { key: 'residentsWithMealIntake', i18nKey: 'kpiWithIntake', icon: '🧑‍⚕️', color: '#059669' },
+  { key: 'totalMealNotes', i18nKey: 'kpiMealNotes', icon: '💬', color: '#6366f1' },
+  { key: 'residentsMissingMealPlan', i18nKey: 'kpiMissingMealPlan', icon: '⚠️', color: '#dc2626' },
 ];
-
-/* Vietnamese label map (avoid unicode in JSX source that could break build) */
-const KPI_LABELS = {
-  totalAdmittedResidents: 'Cư dân đang ở',
-  residentsWithMealPlan: 'Có thực đơn publish',
-  residentsWithSpecialDiet: 'Có chế độ ăn đặc biệt',
-  residentsWithMealTimeSchedule: 'Có lịch giờ ăn',
-  totalMealIntakeRecords: 'Ghi nhận intake (CG)',
-  residentsWithMealIntake: 'Cư dân có intake',
-  totalMealNotes: 'Ghi chú meal (text)',
-  residentsMissingMealPlan: 'Thiếu thực đơn publish',
-};
 
 function NutritionReportsPage() {
   const { t, i18n } = useTranslation();
@@ -176,9 +164,9 @@ function NutritionReportsPage() {
       {/* ---- Page header ---- */}
       <div className="nr-header">
         <div className="nr-header__text">
-          <h1 className="nr-header__title">Báo cáo dinh dưỡng</h1>
+          <h1 className="nr-header__title">{t('nurse.nutritionReports.title')}</h1>
           <p className="nr-header__sub">
-            Xem tổng hợp thực đơn, chế độ ăn đặc biệt, giờ ăn đã publish và ghi chú ăn uống của cư dân trong khoảng thời gian bạn chọn.
+            {t('nurse.nutritionReports.subtitle')}
           </p>
         </div>
       </div>
@@ -189,19 +177,19 @@ function NutritionReportsPage() {
       <div className="nr-filters">
         <div className="nr-filters__group">
           <label className="nr-filters__label">
-            <span>Từ ngày</span>
+            <span>{t('nurse.nutritionReports.fromDate')}</span>
             <input type="date" className="nr-input" value={from} onChange={(e) => setFrom(e.target.value)} />
           </label>
           <label className="nr-filters__label">
-            <span>Đến ngày</span>
+            <span>{t('nurse.nutritionReports.toDate')}</span>
             <input type="date" className="nr-input" value={to} onChange={(e) => setTo(e.target.value)} />
           </label>
           <label className="nr-filters__label">
-            <span>Tìm cư dân</span>
+            <span>{t('nurse.nutritionReports.searchResident')}</span>
             <input
               type="search"
               className="nr-input"
-              placeholder="Tên hoặc mã"
+              placeholder={t('nurse.nutritionReports.searchPlaceholder')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -212,18 +200,18 @@ function NutritionReportsPage() {
               checked={missingOnly}
               onChange={(e) => setMissingOnly(e.target.checked)}
             />
-            <span>Chỉ thiếu thực đơn</span>
+            <span>{t('nurse.nutritionReports.missingMealPlanOnly')}</span>
           </label>
         </div>
         <div className="nr-filters__actions">
           <button type="button" className="nr-btn nr-btn--ghost" onClick={setLast7Days}>
-            7 ngày gần nhất
+            {t('nurse.nutritionReports.last7Days')}
           </button>
           <button type="button" className="nr-btn nr-btn--ghost" onClick={setTodayOnly}>
-            Hôm nay
+            {t('nurse.nutritionReports.todayOnly')}
           </button>
           <button type="button" className="nr-btn nr-btn--primary" onClick={loadData} disabled={loading}>
-            {loading ? 'Đang tải...' : 'Tải lại'}
+            {loading ? t('nurse.nutritionReports.loading') : t('nurse.nutritionReports.reload')}
           </button>
         </div>
       </div>
@@ -236,7 +224,7 @@ function NutritionReportsPage() {
               key={cfg.key}
               icon={cfg.icon}
               value={summary[cfg.key] ?? 0}
-              label={KPI_LABELS[cfg.key]}
+              label={t(`nurse.nutritionReports.${cfg.i18nKey}`)}
               color={cfg.color}
               delay={i * 80}
             />
@@ -247,20 +235,20 @@ function NutritionReportsPage() {
       {/* ---- Residents table ---- */}
       <div className="nr-table-card">
         <div className="nr-table-card__header">
-          <h2 className="nr-table-card__title">Danh sách cư dân</h2>
-          <span className="nr-table-card__count">{residents.length} kết quả</span>
+          <h2 className="nr-table-card__title">{t('nurse.nutritionReports.residentListTitle')}</h2>
+          <span className="nr-table-card__count">{t('nurse.nutritionReports.resultCount', { count: residents.length })}</span>
         </div>
         <div className="nr-table-wrap">
           <table className="nr-table">
             <thead>
               <tr>
-                <th>Cư dân</th>
-                <th>Mã</th>
-                <th>Thực đơn</th>
-                <th>Chế độ đặc biệt</th>
-                <th>Giờ ăn</th>
-                <th>Intake (CG)</th>
-                <th>Ghi chú meal</th>
+                <th>{t('nurse.nutritionReports.colResident')}</th>
+                <th>{t('nurse.nutritionReports.colCode')}</th>
+                <th>{t('nurse.nutritionReports.colMealPlan')}</th>
+                <th>{t('nurse.nutritionReports.colSpecialDiet')}</th>
+                <th>{t('nurse.nutritionReports.colMealTime')}</th>
+                <th>{t('nurse.nutritionReports.colIntake')}</th>
+                <th>{t('nurse.nutritionReports.colMealNotes')}</th>
                 <th></th>
               </tr>
             </thead>
@@ -269,14 +257,14 @@ function NutritionReportsPage() {
                 <tr>
                   <td colSpan={8} className="nr-table__empty">
                     <div className="nr-spinner" />
-                    <span>Đang tải dữ liệu...</span>
+                    <span>{t('nurse.nutritionReports.loadingData')}</span>
                   </td>
                 </tr>
               )}
               {!loading && residents.length === 0 && (
                 <tr>
                   <td colSpan={8} className="nr-table__empty">
-                    Không có cư dân phù hợp bộ lọc
+                    {t('nurse.nutritionReports.emptyFiltered')}
                   </td>
                 </tr>
               )}
@@ -296,7 +284,7 @@ function NutritionReportsPage() {
                         className="nr-btn nr-btn--sm nr-btn--primary"
                         onClick={() => openDetail(row.residentId)}
                       >
-                        Chi tiết
+                        {t('nurse.nutritionReports.btnDetail')}
                       </button>
                     </td>
                   </tr>
@@ -320,7 +308,7 @@ function NutritionReportsPage() {
                   <h3 className="nr-modal__title">
                     {detail?.resident?.fullName || '...'}
                   </h3>
-                  <span className="nr-modal__subtitle">Chi tiết dinh dưỡng</span>
+                  <span className="nr-modal__subtitle">{t('nurse.nutritionReports.modalSubtitle')}</span>
                 </div>
               </div>
               {!detailLoading && (
@@ -337,7 +325,7 @@ function NutritionReportsPage() {
               {detailLoading && (
                 <div className="nr-modal__loading">
                   <div className="nr-spinner nr-spinner--lg" />
-                  <p>Đang tải chi tiết...</p>
+                  <p>{t('nurse.nutritionReports.detailLoading')}</p>
                 </div>
               )}
               {!detailLoading && detail && (
@@ -345,22 +333,22 @@ function NutritionReportsPage() {
                   {/* resident meta */}
                   <div className="nr-meta">
                     <div className="nr-meta__item">
-                      <span className="nr-meta__key">Mã</span>
+                      <span className="nr-meta__key">{t('nurse.nutritionReports.detailCode')}</span>
                       <span className="nr-meta__val">{detail.resident?.residentCode || '—'}</span>
                     </div>
                     <div className="nr-meta__item">
-                      <span className="nr-meta__key">Khoảng</span>
+                      <span className="nr-meta__key">{t('nurse.nutritionReports.detailPeriod')}</span>
                       <span className="nr-meta__val">{formatLocaleDate(detail.period?.from, i18n.language)} – {formatLocaleDate(detail.period?.to, i18n.language)}</span>
                     </div>
                     {detail.resident?.allergies?.length > 0 && (
                       <div className="nr-meta__item">
-                        <span className="nr-meta__key">Dị ứng</span>
+                        <span className="nr-meta__key">{t('nurse.nutritionReports.detailAllergies')}</span>
                         <span className="nr-meta__val nr-meta__val--tag">{detail.resident.allergies.join(', ')}</span>
                       </div>
                     )}
                     {detail.resident?.chronicConditions?.length > 0 && (
                       <div className="nr-meta__item">
-                        <span className="nr-meta__key">Bệnh nền</span>
+                        <span className="nr-meta__key">{t('nurse.nutritionReports.detailChronic')}</span>
                         <span className="nr-meta__val nr-meta__val--tag">{detail.resident.chronicConditions.join(', ')}</span>
                       </div>
                     )}
@@ -368,14 +356,14 @@ function NutritionReportsPage() {
 
                   {/* summary chips */}
                   <div className="nr-chips">
-                    <span className="nr-chip">{detail.summary?.mealPlanMealCount ?? 0} bữa có thực đơn</span>
-                    <span className="nr-chip">{detail.summary?.mealIntakeCount ?? 0} ghi nhận intake</span>
-                    <span className="nr-chip">{detail.summary?.mealNotesCount ?? 0} ghi chú meal</span>
-                    <span className="nr-chip">{detail.summary?.daysWithData ?? 0} ngày có dữ liệu</span>
+                    <span className="nr-chip">{t('nurse.nutritionReports.chipMealPlanMeals', { count: detail.summary?.mealPlanMealCount ?? 0 })}</span>
+                    <span className="nr-chip">{t('nurse.nutritionReports.chipIntakeRecords', { count: detail.summary?.mealIntakeCount ?? 0 })}</span>
+                    <span className="nr-chip">{t('nurse.nutritionReports.chipMealNotes', { count: detail.summary?.mealNotesCount ?? 0 })}</span>
+                    <span className="nr-chip">{t('nurse.nutritionReports.chipDaysWithData', { count: detail.summary?.daysWithData ?? 0 })}</span>
                   </div>
 
                   {(!detail.days || detail.days.length === 0) && (
-                    <p className="nr-empty">Chưa có dữ liệu dinh dưỡng publish trong khoảng này.</p>
+                    <p className="nr-empty">{t('nurse.nutritionReports.emptyDetailDays')}</p>
                   )}
 
                   {/* day blocks */}
@@ -384,9 +372,9 @@ function NutritionReportsPage() {
                       <div key={day.workDate} className="nr-day">
                         <div className="nr-day__header">
                           <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                            <rect x="1" y="3" width="16" height="14" rx="3" stroke="#3b5bdb" strokeWidth="1.5" />
-                            <path d="M1 7h16" stroke="#3b5bdb" strokeWidth="1.5" />
-                            <path d="M5 1v4M13 1v4" stroke="#3b5bdb" strokeWidth="1.5" strokeLinecap="round" />
+                            <rect x="1" y="3" width="16" height="14" rx="3" stroke="#0f766e" strokeWidth="1.5" />
+                            <path d="M1 7h16" stroke="#0f766e" strokeWidth="1.5" />
+                            <path d="M5 1v4M13 1v4" stroke="#0f766e" strokeWidth="1.5" strokeLinecap="round" />
                           </svg>
                           <span>{formatLocaleDate(day.workDate, i18n.language)}</span>
                         </div>
@@ -394,11 +382,11 @@ function NutritionReportsPage() {
                         {/* meal time schedule */}
                         {day.mealTimeSchedule && (
                           <div className="nr-sub nr-sub--time">
-                            <h4 className="nr-sub__title">Giờ ăn</h4>
+                            <h4 className="nr-sub__title">{t('nurse.nutritionReports.sectionMealTimes')}</h4>
                             <div className="nr-sub__content">
-                              <span className="nr-time-tag">Sáng {day.mealTimeSchedule.breakfastTime}</span>
-                              <span className="nr-time-tag">Trưa {day.mealTimeSchedule.lunchTime}</span>
-                              <span className="nr-time-tag">Tối {day.mealTimeSchedule.dinnerTime}</span>
+                              <span className="nr-time-tag">{t('nurse.nutritionReports.mealTimeBreakfast')} {day.mealTimeSchedule.breakfastTime}</span>
+                              <span className="nr-time-tag">{t('nurse.nutritionReports.mealTimeLunch')} {day.mealTimeSchedule.lunchTime}</span>
+                              <span className="nr-time-tag">{t('nurse.nutritionReports.mealTimeDinner')} {day.mealTimeSchedule.dinnerTime}</span>
                               {day.mealTimeSchedule.notes && (
                                 <span className="nr-time-note">{day.mealTimeSchedule.notes}</span>
                               )}
@@ -409,16 +397,16 @@ function NutritionReportsPage() {
                         {/* meal plan entries */}
                         {day.mealPlanEntries?.length > 0 && (
                           <div className="nr-sub nr-sub--plan">
-                            <h4 className="nr-sub__title">Thực đơn</h4>
+                            <h4 className="nr-sub__title">{t('nurse.nutritionReports.sectionMealPlan')}</h4>
                             <div className="nr-sub__content">
                               <table className="nr-subtable">
                                 <thead>
                                   <tr>
-                                    <th>Bữa</th>
-                                    <th>Món</th>
-                                    <th>Giờ</th>
-                                    <th>Kcal</th>
-                                    <th>Ghi chú</th>
+                                    <th>{t('nurse.nutritionReports.colMeal')}</th>
+                                    <th>{t('nurse.nutritionReports.colDish')}</th>
+                                    <th>{t('nurse.nutritionReports.colTime')}</th>
+                                    <th>{t('nurse.nutritionReports.colKcal')}</th>
+                                    <th>{t('nurse.nutritionReports.colNotes')}</th>
                                   </tr>
                                 </thead>
                                 <tbody>
@@ -440,15 +428,15 @@ function NutritionReportsPage() {
                         {/* special diet entries */}
                         {day.specialDietEntries?.length > 0 && (
                           <div className="nr-sub nr-sub--diet">
-                            <h4 className="nr-sub__title">Chế độ ăn đặc biệt</h4>
+                            <h4 className="nr-sub__title">{t('nurse.nutritionReports.sectionSpecialDiet')}</h4>
                             <div className="nr-sub__content">
                               <table className="nr-subtable">
                                 <thead>
                                   <tr>
-                                    <th>Loại</th>
-                                    <th>Hạn chế</th>
-                                    <th>Mục tiêu</th>
-                                    <th>Giờ</th>
+                                    <th>{t('nurse.nutritionReports.colType')}</th>
+                                    <th>{t('nurse.nutritionReports.colRestrictions')}</th>
+                                    <th>{t('nurse.nutritionReports.colGoal')}</th>
+                                    <th>{t('nurse.nutritionReports.colTime')}</th>
                                   </tr>
                                 </thead>
                                 <tbody>
@@ -469,17 +457,17 @@ function NutritionReportsPage() {
                         {/* meal intake notes */}
                         {day.mealIntakeNotes?.length > 0 && (
                           <div className="nr-sub nr-sub--intake">
-                            <h4 className="nr-sub__title">Ghi nhận intake (Caregiver)</h4>
+                            <h4 className="nr-sub__title">{t('nurse.nutritionReports.sectionIntake')}</h4>
                             <div className="nr-sub__content">
                               <table className="nr-subtable">
                                 <thead>
                                   <tr>
-                                    <th>Bữa</th>
-                                    <th>Món dự kiến</th>
-                                    <th>Tình trạng</th>
-                                    <th>% ăn</th>
-                                    <th>Ghi chú</th>
-                                    <th>Thời gian</th>
+                                    <th>{t('nurse.nutritionReports.colMeal')}</th>
+                                    <th>{t('nurse.nutritionReports.colPlannedDish')}</th>
+                                    <th>{t('nurse.nutritionReports.colStatus')}</th>
+                                    <th>{t('nurse.nutritionReports.colPortion')}</th>
+                                    <th>{t('nurse.nutritionReports.colNotes')}</th>
+                                    <th>{t('nurse.nutritionReports.colRecordedAt')}</th>
                                   </tr>
                                 </thead>
                                 <tbody>
@@ -506,7 +494,7 @@ function NutritionReportsPage() {
                         {/* meal notes */}
                         {day.mealNotes?.length > 0 && (
                           <div className="nr-sub nr-sub--notes">
-                            <h4 className="nr-sub__title">Ghi chú ăn uống (text)</h4>
+                            <h4 className="nr-sub__title">{t('nurse.nutritionReports.sectionMealNotes')}</h4>
                             <div className="nr-sub__content">
                               {day.mealNotes.map((n) => (
                                 <div key={n._id} className="nr-note">

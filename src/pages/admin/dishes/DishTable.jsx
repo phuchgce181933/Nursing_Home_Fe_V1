@@ -53,22 +53,24 @@ export default function DishTable({ dishes, loading, onEdit, onDelete }) {
                 <td>
                   <StatusBadge isActive={dish.isActive !== false} t={t} ns={ns} />
                 </td>
-                <td style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  <button
-                    type="button"
-                    className="resident-page__action"
-                    onClick={() => onEdit(dish)}
-                  >
-                    {t('common.edit')}
-                  </button>
-                  <button
-                    type="button"
-                    className="resident-page__action"
-                    style={{ background: 'rgba(220, 38, 38, 0.12)', color: '#b91c1c' }}
-                    onClick={() => onDelete(dish._id)}
-                  >
-                    {t('common.delete')}
-                  </button>
+                <td>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      className="resident-page__action"
+                      onClick={() => onEdit(dish)}
+                    >
+                      {t('common.edit')}
+                    </button>
+                    <button
+                      type="button"
+                      className="resident-page__action"
+                      style={{ background: 'rgba(220, 38, 38, 0.12)', color: '#b91c1c' }}
+                      onClick={() => onDelete(dish._id)}
+                    >
+                      {t('common.delete')}
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}

@@ -64,24 +64,26 @@ export default function StaffTable({ staff, loading, onView, onEdit, onBan, canM
               <td>
                 <StatusBadge s={s} t={t} />
               </td>
-              <td style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                <button
-                  type="button"
-                  className="resident-page__action"
-                  onClick={() => onView(s)}
-                >
-                  {t('common.view')}
-                </button>
+              <td>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                   <button
-                  type="button"
-                  className="resident-page__action"
-                  style={s.isBanned ? undefined : { background: 'rgba(220, 38, 38, 0.12)', color: '#b91c1c' }}
-                  onClick={() => onBan(s)}
-                  disabled={!manageable}
-                  title={!manageable ? t('admin.staff.profiles.banNoPermission') : undefined}
-                >
-                  {s.isBanned ? t('admin.staff.profiles.unban') : t('admin.staff.profiles.ban')}
-                </button>
+                    type="button"
+                    className="resident-page__action"
+                    onClick={() => onView(s)}
+                  >
+                    {t('common.view')}
+                  </button>
+                  <button
+                    type="button"
+                    className="resident-page__action"
+                    style={s.isBanned ? undefined : { background: 'rgba(220, 38, 38, 0.12)', color: '#b91c1c' }}
+                    onClick={() => onBan(s)}
+                    disabled={!manageable}
+                    title={!manageable ? t('admin.staff.profiles.banNoPermission') : undefined}
+                  >
+                    {s.isBanned ? t('admin.staff.profiles.unban') : t('admin.staff.profiles.ban')}
+                  </button>
+                </div>
               </td>
             </tr>
           );

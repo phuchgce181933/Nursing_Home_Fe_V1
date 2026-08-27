@@ -54,14 +54,20 @@ const getSeverityDisplay = (t) => ({
   critical: t('incidents.severity.critical'),
 });
 
-const getResolutionStatusLabel = (status) => {
+const getResolutionStatusLabel = (status, t) => {
   const normalized = String(status || '').trim().toLowerCase().replace(/[-\s]+/g, '_');
-  const labels = {
-    in_progress: 'Đang tiến hành',
-    pending: 'Đang chờ xử lý',
-    resolved: 'Đã giải quyết',
-    completed: 'Đã hoàn tất',
-    closed: 'Đã đóng',
+  const labels = t ? {
+    in_progress: t('incidentManagement.resolutionStatus.inProgress'),
+    pending: t('incidentManagement.resolutionStatus.pending'),
+    resolved: t('incidentManagement.resolutionStatus.resolved'),
+    completed: t('incidentManagement.resolutionStatus.completed'),
+    closed: t('incidentManagement.resolutionStatus.closed'),
+  } : {
+    in_progress: 'In Progress',
+    pending: 'Pending',
+    resolved: 'Resolved',
+    completed: 'Completed',
+    closed: 'Closed',
   };
   return labels[normalized] || status || '—';
 };
@@ -134,7 +140,14 @@ function IncidentManagementPage() {
   const [selectedClinicalServices, setSelectedClinicalServices] = useState({});
   const [medSuggestions] = useState(["Paracetamol", "Amoxicillin", "Ibuprofen", "Metformin", "Aspirin", "Omeprazole"]);
   const [medSuggestionOpenIndex, setMedSuggestionOpenIndex] = useState(-1);
-  const immediateActionOptions = ['Lau sàn', 'Hỗ trợ cư dân', 'Gọi bác sĩ', 'Liên hệ gia đình', 'Chuyển viện', 'Khác'];
+  const immediateActionOptions = [
+    { value: 'Lau sàn', i18nKey: 'incidents.immediateAction.cleanFloor' },
+    { value: 'Hỗ trợ cư dân', i18nKey: 'incidents.immediateAction.assistResident' },
+    { value: 'Gọi bác sĩ', i18nKey: 'incidents.immediateAction.callDoctor' },
+    { value: 'Liên hệ gia đình', i18nKey: 'incidents.immediateAction.contactFamily' },
+    { value: 'Chuyển viện', i18nKey: 'incidents.immediateAction.transferHospital' },
+    { value: 'Khác', i18nKey: 'incidents.immediateAction.other' },
+  ];
   const [staffAvailabilityMap, setStaffAvailabilityMap] = useState({});
   const [assignmentConflicts, setAssignmentConflicts] = useState({});
 
@@ -378,6 +391,12 @@ function IncidentManagementPage() {
     return key ? staffAvailabilityMap[key] : null;
   };
 
+  const getStaffIsOnDuty = (staff) => {
+    const availability = getStaffAvailability(staff);
+    if (!availability) return false;
+    return availability.isOnShift || availability.onShift || availability.availabilityStatus === 'On Duty';
+  };
+
   const getStaffAvailabilityLabel = (staff) => {
     const availability = getStaffAvailability(staff);
     const staffId = getStaffSelectionId(staff);
@@ -391,18 +410,16 @@ function IncidentManagementPage() {
     }
 
     const status = availability.availabilityStatus || availability.readinessLabelVi || '—';
-    const isOnDuty = availability.isOnShift || availability.onShift || availability.availabilityStatus === 'On Duty';
-    const baseLabel = isOnDuty ? `Đang đi làm · ${status}` : `Không trực · ${status}`;
+    const isOnDuty = getStaffIsOnDuty(staff);
+    const baseLabel = isOnDuty ? `${t('incidents.availability.onDuty')} · ${status}` : `${t('incidents.availability.offDuty')} · ${status}`;
 
     const formatConflictDetails = (conf) => {
       if (!conf) return '';
       const parts = [];
-      // Prefer full lists if available
-      // Show only tasks/appointments on the incident day when available
       if (Array.isArray(conf.careTasksForDayTimes) && conf.careTasksForDayTimes.length) {
-        parts.push(`Nhiệm vụ trong ngày: ${conf.careTasksForDayTimes.join(', ')}`);
+        parts.push(t('incidents.availability.tasksForDay', { tasks: conf.careTasksForDayTimes.join(', ') }));
       } else if (Array.isArray(conf.allCareTaskTimes) && conf.allCareTaskTimes.length) {
-        parts.push(`Nhiệm vụ: ${conf.allCareTaskTimes.join(', ')}`);
+        parts.push(t('incidents.availability.tasks', { tasks: conf.allCareTaskTimes.join(', ') }));
       }
 
       if (Array.isArray(conf.appointmentTimesForDay) && conf.appointmentTimesForDay.length) {
@@ -414,9 +431,8 @@ function IncidentManagementPage() {
             return String(a);
           }
         });
-        parts.push(`Lịch khám trong ngày: ${formattedAppts.join(', ')}`);
+        parts.push(t('incidents.availability.appointmentsForDay', { appts: formattedAppts.join(', ') }));
       }
-      // Fallback to human reasons if arrays missing
       if (parts.length === 0 && Array.isArray(conf.reasons) && conf.reasons.length) {
         parts.push(conf.reasons.join(', '));
       }
@@ -434,7 +450,7 @@ function IncidentManagementPage() {
     const conflict = assignmentConflicts[staffId];
     if (!conflict) return null;
     if (!conflict.canAssign) {
-      return <span className="ic-availability ic-availability--conflict">Không thể chỉ định · {conflict.reasons.join(' · ')}</span>;
+      return <span className="ic-availability ic-availability--conflict">{t('incidents.availability.cannotAssign')} · {conflict.reasons.join(' · ')}</span>;
     }
     return null;
   };
@@ -533,25 +549,20 @@ function IncidentManagementPage() {
   useEffect(() => {
     // Auto-select current user as assigned staff when drawer opens and staff accounts are loaded
     if (drawerJustOpened && staffAccounts.length > 0 && !optionsLoading) {
-      console.log('[DEBUG] Auto-selecting current user. User:', user?._id, 'StaffAccounts:', staffAccounts.length);
-      
       // Find current user's staff profile - try multiple match strategies
       let currentUserStaff = staffAccounts.find((staff) => {
         const staffUserId = staff.userId?._id || staff.userId;
         const match = staffUserId === user?._id;
-        console.log(`[DEBUG] Checking staff ${staff._id}: staffUserId=${staffUserId}, user._id=${user?._id}, match=${match}`);
         return match;
       });
 
       // If not found, try matching by email
       if (!currentUserStaff && user?.email) {
         currentUserStaff = staffAccounts.find((staff) => staff.email === user.email || staff.userId?.email === user.email);
-        console.log('[DEBUG] Found by email:', currentUserStaff?._id);
       }
 
       if (currentUserStaff) {
         const staffId = getStaffSelectionId(currentUserStaff);
-        console.log('[DEBUG] Setting assigned staff to:', staffId);
         setForm((prev) => ({
           ...prev,
           assignedStaffIds: [staffId],
@@ -712,7 +723,7 @@ function IncidentManagementPage() {
       const incidentAtVal = form.incidentAt;
       if (!incidentAtVal) {
         setMessageType('error');
-        setMessage(t('incidents.error.invalidIncidentAt') || 'Thời gian xảy ra không hợp lệ.');
+        setMessage(t('incidents.error.invalidIncidentAt'));
         setIsSaving(false);
         return;
       }
@@ -720,13 +731,13 @@ function IncidentManagementPage() {
       const today = new Date().toISOString().slice(0, 10);
       if (datePart !== today) {
         setMessageType('error');
-        setMessage(t('incidents.error.incidentDateMustBeToday') || 'Thời gian xảy ra phải là ngày hôm nay.');
+        setMessage(t('incidents.error.incidentDateMustBeToday'));
         setIsSaving(false);
         return;
       }
     } catch (err) {
       setMessageType('error');
-      setMessage(t('incidents.error.invalidIncidentAt') || 'Thời gian xảy ra không hợp lệ.');
+      setMessage(t('incidents.error.invalidIncidentAt'));
       setIsSaving(false);
       return;
     }
@@ -761,13 +772,13 @@ function IncidentManagementPage() {
       };
       await incidentService.reopenIncident(detailIncident._id, payload);
       setMessageType('success');
-      setMessage('Đã mở lại sự cố');
+      setMessage(t('incidents.reopen.success'));
       setReopenForm(null);
       await loadIncidents();
       await handleViewDetail(detailIncident._id);
     } catch (error) {
       setMessageType('error');
-      setMessage(error?.response?.data?.message || 'Mở lại sự cố thất bại');
+      setMessage(error?.response?.data?.message || t('incidents.reopen.failed'));
     } finally {
       setDetailLoading(false);
     }
@@ -1037,13 +1048,13 @@ function IncidentManagementPage() {
             <table className="ic-table">
               <thead>
                 <tr>
-                  <th>Loại sự cố</th>
-                  <th>Cư dân</th>
-                  <th>Độ nghiêm trọng</th>
-                  <th>Trạng thái</th>
-                  <th>Nhân viên được giao</th>
-                  <th>Thời gian</th>
-                  <th>Hành động</th>
+                  <th>{t('incidents.table.incidentType')}</th>
+                  <th>{t('incidents.table.resident')}</th>
+                  <th>{t('incidents.table.severity')}</th>
+                  <th>{t('incidents.table.status')}</th>
+                  <th>{t('incidents.table.assignedStaff')}</th>
+                  <th>{t('incidents.table.time')}</th>
+                  <th>{t('incidents.table.actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -1055,7 +1066,7 @@ function IncidentManagementPage() {
                         <div className="ic-table-title">
                           {incident.incidentType}
                           {incident.resolution?.escalationRequested && (
-                            <span style={{ marginLeft: 8, display: 'inline-block', background: '#fee2e2', color: '#dc2626', padding: '2px 8px', borderRadius: 4, fontSize: '0.7rem', fontWeight: 600 }}>🔴 CHUYỂN CẤP</span>
+                            <span style={{ marginLeft: 8, display: 'inline-block', background: '#fee2e2', color: '#dc2626', padding: '2px 8px', borderRadius: 4, fontSize: '0.7rem', fontWeight: 600 }}>🔴 {t('incidents.resolution.escalationBadge')}</span>
                           )}
                         </div>
                         <div className="ic-table-subtext">{incident.location || '—'}</div>
@@ -1097,13 +1108,13 @@ function IncidentManagementPage() {
                               return (
                                 <div key={staff?._id || staff?.id || staff?.userId?._id || staff?.userId} className="ic-assigned-item">
                                   <span>{staff?.userId?.fullName || staff?.fullName || staff?.userId?.email || staff?.email || '—'}</span>
-                                  <small className={availabilityLabel.includes('Đang đi làm') ? 'ic-availability ic-availability--on' : 'ic-availability ic-availability--off'}>{availabilityLabel}</small>
+                                  <small className={getStaffIsOnDuty(staff) ? 'ic-availability ic-availability--on' : 'ic-availability ic-availability--off'}>{availabilityLabel}</small>
                                 </div>
                               );
                             })}
                           </div>
                         ) : (
-                          <span className="ic-muted">Chưa phân công</span>
+                          <span className="ic-muted">{t('incidents.notAssigned')}</span>
                         )}
                       </td>
                       <td>
@@ -1147,14 +1158,14 @@ function IncidentManagementPage() {
           </div>
 
           <div className="ic-pagination">
-            <span className="ic-pagination__summary">Hiển thị {incidents.length} / {totalItems} sự cố</span>
+            <span className="ic-pagination__summary">{t('incidents.pagination.showing', { count: incidents.length, total: totalItems })}</span>
             <div className="ic-pagination__controls">
               <button type="button" className="ic-btn ic-btn--secondary" disabled={page <= 1 || loading} onClick={() => setPage((prev) => Math.max(prev - 1, 1))}>
-                Trước
+                {t('incidents.pagination.prev')}
               </button>
-              <span className="ic-pagination__page">Trang {page} / {totalPages}</span>
+              <span className="ic-pagination__page">{t('incidents.pagination.page', { page, totalPages })}</span>
               <button type="button" className="ic-btn ic-btn--secondary" disabled={page >= totalPages || loading} onClick={() => setPage((prev) => Math.min(prev + 1, totalPages))}>
-                Tiếp
+                {t('incidents.pagination.next')}
               </button>
             </div>
           </div>
@@ -1177,19 +1188,19 @@ function IncidentManagementPage() {
                 <LoadingSpinner label={t('incidents.loading')} />
               ) : detailError ? (
                 <div style={{ padding: 12, border: '1px solid #ffdddd', background: '#fff6f6', color: '#b00020', borderRadius: 6 }}>
-                  <strong>Lỗi:</strong> {detailError}
+                  <strong>{t('incidents.errorLabel')}:</strong> {detailError}
                 </div>
               ) : reopenForm ? (
                 <div>
-                  <h3 style={{ marginBottom: 16 }}>Mở lại sự cố - Chỉ định nhân viên</h3>
+                  <h3 style={{ marginBottom: 16 }}>{t('incidents.reopen.title')}</h3>
                   <div className="ic-field ic-form-full" style={{ marginBottom: 16 }}>
-                    <label className="ic-field__label">Nhân viên xử lý *</label>
+                    <label className="ic-field__label">{t('incidents.reopen.staffLabel')}</label>
                     <div className="ic-field--multi-select">
                       <div className="ic-multi-select-filters" style={{ marginBottom: 10 }}>
                         <input
                           type="text"
                           className="ic-multi-select-search"
-                          placeholder="Tìm nhân viên..."
+                          placeholder={t('incidents.reopen.searchPlaceholder')}
                           onChange={(e) => {
                             const query = e.target.value.toLowerCase();
                             const filtered = staffAccounts.filter(
@@ -1218,7 +1229,7 @@ function IncidentManagementPage() {
                               />
                               <div className="ic-multi-select-item__label">
                                 <span className="ic-multi-select-item__name">{formatStaffLabel(staff)}</span>
-                                <span className={availabilityLabel.includes('Đang đi làm') ? 'ic-availability ic-availability--on' : 'ic-availability ic-availability--off'}>{availabilityLabel}</span>
+                                <span className={getStaffIsOnDuty(staff) ? 'ic-availability ic-availability--on' : 'ic-availability ic-availability--off'}>{availabilityLabel}</span>
                               </div>
                             </label>
                           );
@@ -1227,9 +1238,9 @@ function IncidentManagementPage() {
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
-                    <button type="button" className="ic-btn ic-btn--secondary" onClick={() => setReopenForm(null)}>Hủy</button>
+                    <button type="button" className="ic-btn ic-btn--secondary" onClick={() => setReopenForm(null)}>{t('incidents.reopen.cancel')}</button>
                     <button type="button" className="ic-btn ic-btn--primary" onClick={() => handleReopen(reopenForm.selectedStaffIds)}>
-                      Xác nhận mở lại
+                      {t('incidents.reopen.confirm')}
                     </button>
                   </div>
                 </div>
@@ -1272,7 +1283,7 @@ function IncidentManagementPage() {
                                   </div>
                                 ))}
                                 {detailIncident.residentIds.length > 3 && (
-                                  <div style={{ color: '#64748b', fontStyle: 'italic' }}>... +{detailIncident.residentIds.length - 3} cư dân khác</div>
+                                  <div style={{ color: '#64748b', fontStyle: 'italic' }}>{t('incidents.moreResidents', { count: detailIncident.residentIds.length - 3 })}</div>
                                 )}
                               </>
                             )
@@ -1291,7 +1302,7 @@ function IncidentManagementPage() {
                                   </div>
                                 ))}
                                 {detailIncident.assignedStaffIds.length > 3 && (
-                                  <div style={{ color: '#64748b', fontStyle: 'italic' }}>... +{detailIncident.assignedStaffIds.length - 3} nhân viên khác</div>
+                                  <div style={{ color: '#64748b', fontStyle: 'italic' }}>{t('incidents.moreStaff', { count: detailIncident.assignedStaffIds.length - 3 })}</div>
                                 )}
                               </>
                             )
@@ -1328,92 +1339,92 @@ function IncidentManagementPage() {
                   )}
                   {/* Thông tin giải quyết (chỉ nhập khi đang xác minh) */}
                   <div style={{ marginTop: 20, paddingTop: 20, borderTop: '1px solid #e0e0e0' }}>
-                    <h3 style={{ marginBottom: 8 }}>Thông tin giải quyết</h3>
+                    <h3 style={{ marginBottom: 8 }}>{t('incidents.resolution.title')}</h3>
                     {detailIncident.status === 'investigating' ? (
                       resolutionForm ? (
                         <div>
                           <div className="ic-field">
-                            <label className="ic-field__label">Phương pháp giải quyết *</label>
+                            <label className="ic-field__label">{t('incidents.resolution.method')} *</label>
                             <input className="ic-field__input" value={resolutionForm.method} onChange={(e) => setResolutionForm((s) => ({ ...s, method: e.target.value }))} />
                           </div>
 
                           <div className="ic-field">
-                            <label className="ic-field__label">Tình trạng cư dân</label>
+                            <label className="ic-field__label">{t('incidents.resolution.residentCondition')}</label>
                             <select className="ic-field__select" value={resolutionForm.medical?.residentCondition || ''} onChange={(e) => {
                               const val = e.target.value;
                               setResolutionForm((s) => ({ ...s, medical: { ...s.medical, residentCondition: val, procedures: val === 'NoResident' ? [] : (s.medical?.procedures || []), medications: val === 'NoResident' ? [] : (s.medical?.medications || []) } }));
                             }}>
-                              <option value="">Chọn</option>
-                              <option value="Stable">Ổn định</option>
-                              <option value="Improving">Đang cải thiện</option>
-                              <option value="Critical">Nguy kịch</option>
-                              <option value="Hospitalized">Nhập viện</option>
-                              <option value="NoResident">Không có cư dân liên quan</option>
-                              <option value="UnknownResident">Không rõ cư dân liên quan</option>
+                              <option value="">{t('incidents.resolution.conditionSelect')}</option>
+                              <option value="Stable">{t('incidents.resolution.conditionStable')}</option>
+                              <option value="Improving">{t('incidents.resolution.conditionImproving')}</option>
+                              <option value="Critical">{t('incidents.resolution.conditionCritical')}</option>
+                              <option value="Hospitalized">{t('incidents.resolution.conditionHospitalized')}</option>
+                              <option value="NoResident">{t('incidents.resolution.conditionNoResident')}</option>
+                              <option value="UnknownResident">{t('incidents.resolution.conditionUnknownResident')}</option>
                             </select>
                           </div>
 
                           <div className="ic-field">
-                            <label className="ic-field__label">Nguyên nhân chính *</label>
+                            <label className="ic-field__label">{t('incidents.resolution.rootCause')} *</label>
                             <select className="ic-field__select" value={resolutionForm.rootCause} onChange={(e) => setResolutionForm((s) => ({ ...s, rootCause: e.target.value }))}>
-                              <option value="Wet Floor">Sàn ướt</option>
-                              <option value="Resident Lost Balance">Cư dân mất thăng bằng</option>
-                              <option value="Equipment Failure">Hỏng thiết bị</option>
-                              <option value="Staff Error">Lỗi nhân viên</option>
-                              <option value="Unknown">Không rõ</option>
-                              <option value="Other">Khác</option>
+                              <option value="Wet Floor">{t('incidents.resolution.causeWetFloor')}</option>
+                              <option value="Resident Lost Balance">{t('incidents.resolution.causeResidentBalance')}</option>
+                              <option value="Equipment Failure">{t('incidents.resolution.causeEquipmentFailure')}</option>
+                              <option value="Staff Error">{t('incidents.resolution.causeStaffError')}</option>
+                              <option value="Unknown">{t('incidents.resolution.causeUnknown')}</option>
+                              <option value="Other">{t('incidents.resolution.causeOther')}</option>
                             </select>
                             {resolutionForm.rootCause === 'Other' && (
-                              <input className="ic-field__input" placeholder="Mô tả nguyên nhân khác" value={resolutionForm.rootCauseOther || ''} onChange={(e) => setResolutionForm((s) => ({ ...s, rootCauseOther: e.target.value }))} style={{ marginTop: 8 }} />
+                              <input className="ic-field__input" placeholder={t('incidents.resolution.causeOtherPlaceholder')} value={resolutionForm.rootCauseOther || ''} onChange={(e) => setResolutionForm((s) => ({ ...s, rootCauseOther: e.target.value }))} style={{ marginTop: 8 }} />
                             )}
                           </div>
 
                           <div className="ic-field ic-form-full">
-                            <label className="ic-field__label">Nguyên nhân chi tiết</label>
+                            <label className="ic-field__label">{t('incidents.resolution.rootCauseDetail')}</label>
                             <textarea className="ic-field__textarea" rows={3} value={resolutionForm.detailedCause} onChange={(e) => setResolutionForm((s) => ({ ...s, detailedCause: e.target.value }))} />
                           </div>
 
                           <div className="ic-field ic-form-full">
-                            <label className="ic-field__label">Hành động ngay lập tức</label>
+                            <label className="ic-field__label">{t('incidents.resolution.immediateActions')}</label>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                               {immediateActionOptions
                                 .filter((act) => {
                                   const noResident = resolutionForm.medical?.residentCondition === 'NoResident';
                                   if (!noResident) return true;
-                                  const lower = String(act).toLowerCase();
+                                  const lower = String(act.value).toLowerCase();
                                   return !(lower.includes('cư dân') || lower.includes('hỗ trợ') || lower.includes('khám') || lower.includes('resident'));
                                 })
                                 .map((act) => (
-                                  <label key={act} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                    <input type="checkbox" checked={(resolutionForm.immediateActions || []).includes(act)} onChange={(e) => {
+                                  <label key={act.value} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <input type="checkbox" checked={(resolutionForm.immediateActions || []).includes(act.value)} onChange={(e) => {
                                       const prev = resolutionForm.immediateActions || [];
-                                      if (e.target.checked) setResolutionForm((s) => ({ ...s, immediateActions: [...prev, act] }));
-                                      else setResolutionForm((s) => ({ ...s, immediateActions: prev.filter((i) => i !== act) }));
+                                      if (e.target.checked) setResolutionForm((s) => ({ ...s, immediateActions: [...prev, act.value] }));
+                                      else setResolutionForm((s) => ({ ...s, immediateActions: prev.filter((i) => i !== act.value) }));
                                     }} />
-                                    <span>{act}</span>
+                                    <span>{t(act.i18nKey)}</span>
                                   </label>
                                 ))}
                               {(resolutionForm.immediateActions || []).includes('Khác') && (
-                                <input className="ic-field__input" placeholder="Mô tả hành động khác" value={resolutionForm.immediateOther || ''} onChange={(e) => setResolutionForm((s) => ({ ...s, immediateOther: e.target.value }))} />
+                                <input className="ic-field__input" placeholder={t('incidents.resolution.actionOtherPlaceholder')} value={resolutionForm.immediateOther || ''} onChange={(e) => setResolutionForm((s) => ({ ...s, immediateOther: e.target.value }))} />
                               )}
                             </div>
                           </div>
 
                           <div className="ic-field ic-form-full">
-                            <label className="ic-field__label">Đánh giá mức độ nghiêm trọng *</label>
+                            <label className="ic-field__label">{t('incidents.resolution.severityAssessment')} *</label>
                             <select className="ic-field__select" value={resolutionForm.severityAssessment} onChange={(e) => setResolutionForm((s) => ({ ...s, severityAssessment: e.target.value }))}>
-                              <option value="">-- Chọn mức độ --</option>
-                              <option value="Thấp">Thấp</option>
-                              <option value="Trung bình">Trung bình</option>
-                              <option value="Cao">Cao</option>
-                              <option value="Khẩn cấp">Khẩn cấp</option>
+                              <option value="">{t('incidents.resolution.severitySelectPlaceholder')}</option>
+                              <option value="Thấp">{t('incidents.resolution.severityLow')}</option>
+                              <option value="Trung bình">{t('incidents.resolution.severityMedium')}</option>
+                              <option value="Cao">{t('incidents.resolution.severityHigh')}</option>
+                              <option value="Khẩn cấp">{t('incidents.resolution.severityUrgent')}</option>
                             </select>
                             {resolutionForm.severityAssessment && (
                               <div className="ic-severity-description">
-                                {resolutionForm.severityAssessment === 'Thấp' && 'Không ảnh hưởng nhiều, xử lý thông thường'}
-                                {resolutionForm.severityAssessment === 'Trung bình' && 'Ảnh hưởng đến cư dân hoặc hoạt động'}
-                                {resolutionForm.severityAssessment === 'Cao' && 'Cần xử lý ưu tiên'}
-                                {resolutionForm.severityAssessment === 'Khẩn cấp' && 'Đe dọa tính mạng hoặc an toàn'}
+                                {resolutionForm.severityAssessment === 'Thấp' && t('incidents.resolution.severityDescLow')}
+                                {resolutionForm.severityAssessment === 'Trung bình' && t('incidents.resolution.severityDescMedium')}
+                                {resolutionForm.severityAssessment === 'Cao' && t('incidents.resolution.severityDescHigh')}
+                                {resolutionForm.severityAssessment === 'Khẩn cấp' && t('incidents.resolution.severityDescUrgent')}
                               </div>
                             )}
                           </div>
@@ -1421,16 +1432,16 @@ function IncidentManagementPage() {
                           <div className="ic-field">
                             <label style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer' }}>
                               <input type="checkbox" checked={resolutionForm.escalationRequested || false} onChange={(e) => setResolutionForm((s) => ({ ...s, escalationRequested: e.target.checked }))} />
-                              <span>Yêu cầu chuyển cấp</span>
+                              <span>{t('incidents.resolution.escalationRequest')}</span>
                             </label>
                           </div>
 
                           <div className="ic-field">
-                            <label className="ic-field__label">Đính kèm</label>
+                            <label className="ic-field__label">{t('incidents.resolution.attachments')}</label>
                             <div className="ic-attachment-picker">
                               <button type="button" className="ic-btn ic-btn--secondary ic-btn--upload" onClick={handleAttachmentButtonClick}>
                                 <Paperclip size={16} />
-                                {resolutionFiles.length > 0 ? `Đã chọn ${resolutionFiles.length} tệp` : 'Chọn tệp đính kèm'}
+                                {resolutionFiles.length > 0 ? t('incidents.resolution.filesSelected', { count: resolutionFiles.length }) : t('incidents.resolution.selectFiles')}
                               </button>
                               <input
                                 ref={attachmentInputRef}
@@ -1450,7 +1461,7 @@ function IncidentManagementPage() {
                                       ) : (
                                         <div className="ic-attachment__placeholder">{p.file?.name || '—'}</div>
                                       )}
-                                      <button type="button" className="ic-attachment__remove" onClick={() => removeResolutionFile(idx)} title="Xóa tệp">✕</button>
+                                      <button type="button" className="ic-attachment__remove" onClick={() => removeResolutionFile(idx)} title={t('incidents.resolution.removeFile')}>✕</button>
                                     </div>
                                     <div className="ic-attachment__name" title={p.file?.name}>{p.file?.name}</div>
                                   </div>
@@ -1460,12 +1471,12 @@ function IncidentManagementPage() {
                           </div>
 
                           <div className="ic-field ic-form-full">
-                            <label className="ic-field__label">Ghi chú</label>
+                            <label className="ic-field__label">{t('incidents.resolution.notes')}</label>
                             <textarea className="ic-field__textarea" rows={2} value={resolutionForm.notes} onChange={(e) => setResolutionForm((s) => ({ ...s, notes: e.target.value }))} />
                           </div>
 
                           <div className="ic-resolution-actions">
-                            <button type="button" className="ic-btn ic-btn--secondary" onClick={() => { setResolutionForm(null); setResolutionFiles([]); setSelectedClinicalServices({}); }}>{t('incidents.form.cancel') || 'Hủy'}</button>
+                            <button type="button" className="ic-btn ic-btn--secondary" onClick={() => { setResolutionForm(null); setResolutionFiles([]); setSelectedClinicalServices({}); }}>{t('incidents.form.cancel')}</button>
                             <button type="button" className="ic-btn ic-btn--secondary ic-btn--action" disabled={savingResolution} onClick={async () => {
                               // Save draft
                               setSavingResolution(true);
@@ -1480,17 +1491,17 @@ function IncidentManagementPage() {
                                   if (payload.medical && payload.medical.medications) delete payload.medical.medications;
                                 }
                                 await incidentService.updateIncidentResolution(detailIncident._id, payload, resolutionFiles);
-                                setMessageType('success'); setMessage('Lưu nháp thành công');
+                                setMessageType('success'); setMessage(t('incidents.resolution.saveDraftSuccess'));
                                 await loadIncidents();
                                 await handleViewDetail(detailIncident._id);
                               } catch (err) {
-                                setMessageType('error'); setMessage(err?.response?.data?.message || 'Lưu nháp thất bại');
+                                setMessageType('error'); setMessage(err?.response?.data?.message || t('incidents.resolution.saveDraftFailed'));
                               } finally { setSavingResolution(false); }
-                            }}>{t('incidents.form.saveDraft') || 'Lưu nháp'}</button>
+                            }}>{t('incidents.form.saveDraft')}</button>
                             <button type="button" className="ic-btn ic-btn--primary ic-btn--action" disabled={savingResolution} onClick={async () => {
                               // Mark as resolved
                               if (!resolutionForm.severityAssessment || !resolutionForm.method || !resolutionForm.rootCause) {
-                                setMessageType('error'); setMessage('Vui lòng điền đầy đủ: Phương pháp, Nguyên nhân chính và Đánh giá mức độ');
+                                setMessageType('error'); setMessage(t('incidents.resolution.validationRequired'));
                                 return;
                               }
                               setSavingResolution(true);
@@ -1503,17 +1514,17 @@ function IncidentManagementPage() {
                                   if (payload.medical && payload.medical.medications) delete payload.medical.medications;
                                 }
                                 await incidentService.updateIncidentResolution(detailIncident._id, payload, resolutionFiles);
-                                setMessageType('success'); setMessage('Đã đánh dấu là đã giải quyết');
+                                setMessageType('success'); setMessage(t('incidents.resolution.markResolvedSuccess'));
                                 await loadIncidents();
                                 setDetailOpen(false); setDetailIncident(null);
                               } catch (err) {
-                                setMessageType('error'); setMessage(err?.response?.data?.message || 'Đánh dấu giải quyết thất bại');
+                                setMessageType('error'); setMessage(err?.response?.data?.message || t('incidents.resolution.markResolvedFailed'));
                               } finally { setSavingResolution(false); }
-                            }}>{t('incidents.form.markResolved') || 'Đánh dấu đã giải quyết'}</button>
+                            }}>{t('incidents.form.markResolved')}</button>
                           </div>
                         </div>
                       ) : (
-                        <div style={{ color: '#666' }}>Đang tải thông tin giải quyết...</div>
+                        <div style={{ color: '#666' }}>{t('incidents.resolution.loadingResolution')}</div>
                       )
                     ) : (
                       <div>
@@ -1521,25 +1532,25 @@ function IncidentManagementPage() {
                           <div>
                             {detailIncident.resolution.escalationRequested && (
                               <div style={{ marginBottom: 16, padding: 12, background: '#fee2e2', border: '2px solid #dc2626', borderRadius: 6, color: '#7f1d1d' }}>
-                                <div style={{ fontWeight: 600, marginBottom: 4 }}>🔴 Nhân viên yêu cầu chuyển cấp</div>
-                                <div style={{ fontSize: '0.9rem' }}>Vui lòng đánh giá lại tình huống và quyết định xử lý tiếp theo</div>
+                                <div style={{ fontWeight: 600, marginBottom: 4 }}>🔴 {t('incidents.resolution.escalationTitle')}</div>
+                                <div style={{ fontSize: '0.9rem' }}>{t('incidents.resolution.escalationSubtitle')}</div>
                               </div>
                             )}
                             <div style={{ marginBottom: 12, padding: 12, background: '#f3f4f6', borderRadius: 6 }}>
                               <div style={{ marginBottom: 8 }}>
-                                <strong>Phương pháp:</strong> 
+                                <strong>{t('incidents.resolution.method')}:</strong>
                                 <span style={{ marginLeft: 8, color: detailIncident.resolution.method ? '#333' : '#ef4444', fontWeight: detailIncident.resolution.method ? '400' : '600' }}>
-                                  {detailIncident.resolution.method || 'chưa rõ'}
+                                  {detailIncident.resolution.method || t('incidents.resolution.methodUnknown')}
                                 </span>
                               </div>
                               <div style={{ marginBottom: 8 }}>
-                                <strong>Nguyên nhân chính:</strong>
+                                <strong>{t('incidents.resolution.rootCause')}:</strong>
                                 <span style={{ marginLeft: 8, color: detailIncident.resolution.rootCause ? '#333' : '#ef4444', fontWeight: detailIncident.resolution.rootCause ? '400' : '600' }}>
                                   {detailIncident.resolution.rootCause || 'Unknown'}
                                 </span>
                               </div>
                               <div style={{ marginBottom: 8 }}>
-                                <strong>Hành động ngay lập tức:</strong>
+                                <strong>{t('incidents.resolution.immediateActions')}:</strong>
                                 <span style={{ marginLeft: 8, color: (detailIncident.resolution.immediateActions || []).length > 0 ? '#333' : '#9ca3af' }}>
                                   {(detailIncident.resolution.immediateActions || []).length > 0 
                                     ? (detailIncident.resolution.immediateActions || []).map((action, idx) => (
@@ -1552,7 +1563,7 @@ function IncidentManagementPage() {
                                 </span>
                               </div>
                               <div>
-                                <strong>Mức độ nghiêm trọng:</strong>
+                                <strong>{t('incidents.resolution.severityAssessment')}:</strong>
                                 <span style={{ marginLeft: 8 }}>
                                   {detailIncident.resolution.severityAssessment ? (
                                     <span style={{ 
@@ -1576,13 +1587,13 @@ function IncidentManagementPage() {
                                       fontWeight: 600
                                     }}>
                                       {detailIncident.resolution.severityAssessment}
-                                      {detailIncident.resolution.severityAssessment === 'Thấp' 
-                                        ? ' - Không ảnh hưởng nhiều, xử lý thông thường' 
+                                      {detailIncident.resolution.severityAssessment === 'Thấp'
+                                        ? ` - ${t('incidents.resolution.severityDescLow')}`
                                         : detailIncident.resolution.severityAssessment === 'Trung bình'
-                                        ? ' - Ảnh hưởng đến cư dân hoặc hoạt động'
+                                        ? ` - ${t('incidents.resolution.severityDescMedium')}`
                                         : detailIncident.resolution.severityAssessment === 'Cao'
-                                        ? ' - Cần xử lý ưu tiên'
-                                        : ' - Đe dọa tính mạng hoặc an toàn'}
+                                        ? ` - ${t('incidents.resolution.severityDescHigh')}`
+                                        : ` - ${t('incidents.resolution.severityDescUrgent')}`}
                                     </span>
                                   ) : '—'}
                                 </span>
@@ -1591,14 +1602,14 @@ function IncidentManagementPage() {
                             {detailIncident.resolution.escalationRequested && detailIncident.status === 'resolved' && (
                               <div style={{ marginBottom: 16 }}>
                                 <button type="button" className="ic-btn ic-btn--primary" onClick={() => setReopenForm({ selectedStaffIds: [], filteredStaff: staffAccounts })}>
-                                  ↻ Mở lại sự cố và chỉ định người xử lý
+                                  ↻ {t('incidents.resolution.reopenAndAssign')}
                                 </button>
                               </div>
                             )}
-                            <div><strong>Ghi chú:</strong> {detailIncident.resolution.notes || '—'}</div>
-                            <div><strong>Thời gian hoàn thành:</strong> {detailIncident.resolution.completedAt ? new Date(detailIncident.resolution.completedAt).toLocaleString('vi-VN') : '—'}</div>
+                            <div><strong>{t('incidents.resolution.notes')}:</strong> {detailIncident.resolution.notes || '—'}</div>
+                            <div><strong>{t('incidents.resolution.completedAt')}:</strong> {detailIncident.resolution.completedAt ? new Date(detailIncident.resolution.completedAt).toLocaleString('vi-VN') : '—'}</div>
                             <div style={{ marginTop: 8 }}>
-                              <strong>File đính kèm:</strong>
+                              <strong>{t('incidents.resolution.fileAttachments')}:</strong>
                               <div className="ic-detail-attachments">
                                 {(detailIncident.resolution.attachments || []).map((att) => {
                                   const isImage = att.mimeType ? String(att.mimeType).startsWith('image/') : String(att.fileUrl || '').match(/\.(jpg|jpeg|png|webp|gif)(\?|$)/i);
@@ -1619,7 +1630,7 @@ function IncidentManagementPage() {
                             </div>
                           </div>
                         ) : (
-                          <div>Chưa có thông tin giải quyết.</div>
+                          <div>{t('incidents.resolution.noResolution')}</div>
                         )}
                       </div>
                     )}
@@ -1716,7 +1727,7 @@ function IncidentManagementPage() {
                               type="button"
                               className="ic-tag__remove"
                               onClick={() => toggleResident(residentId)}
-                              title={t('incidents.form.removeResident') || 'Xóa'}
+                              title={t('incidents.form.removeResident')}
                             >
                               ✕
                             </button>
@@ -1790,7 +1801,7 @@ function IncidentManagementPage() {
                                 type="button"
                                 className="ic-tag__remove"
                                 onClick={() => toggleAssignedStaff(staff)}
-                                title={t('incidents.form.removeStaff') || 'Xóa'}
+                                title={t('incidents.form.removeStaff')}
                               >
                                 ✕
                               </button>
@@ -1842,7 +1853,7 @@ function IncidentManagementPage() {
                               />
                               <div className="ic-multi-select-item__label">
                                 <span className="ic-multi-select-item__name">{formatStaffLabel(staff)}</span>
-                                <span className={availabilityLabel.includes('Đang đi làm') ? 'ic-availability ic-availability--on' : 'ic-availability ic-availability--off'}>{availabilityLabel}</span>
+                                <span className={getStaffIsOnDuty(staff) ? 'ic-availability ic-availability--on' : 'ic-availability ic-availability--off'}>{availabilityLabel}</span>
                                 {conflictBadge}
                               </div>
                             </label>
@@ -1920,7 +1931,7 @@ function IncidentManagementPage() {
                             />
                             <div className="ic-multi-select-item__label">
                               <span className="ic-multi-select-item__name">{formatStaffLabel(staff)}</span>
-                              <span className={availabilityLabel.includes('Đang đi làm') ? 'ic-availability ic-availability--on' : 'ic-availability ic-availability--off'}>{availabilityLabel}</span>
+                              <span className={getStaffIsOnDuty(staff) ? 'ic-availability ic-availability--on' : 'ic-availability ic-availability--off'}>{availabilityLabel}</span>
                             </div>
                           </label>
                         );

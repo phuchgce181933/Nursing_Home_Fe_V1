@@ -268,11 +268,7 @@ export default function StaffManagementPage() {
   return (
     <AdminPageShell
       title={t('admin.staff.profiles.title')}
-      subtitle={
-        actorRole === 'manager'
-          ? t('admin.staff.profiles.subtitleManager')
-          : t('admin.staff.profiles.subtitle')
-      }
+      subtitle={t('admin.staff.profiles.subtitle')}
       actions={
         <>
           <button

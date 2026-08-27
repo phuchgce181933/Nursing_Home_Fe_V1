@@ -1,5 +1,5 @@
 /** Matches backend NON_ASSIGNABLE_ROLES */
-export const NON_ASSIGNABLE_ROLES = ['admin', 'manager'];
+export const NON_ASSIGNABLE_ROLES = ['admin'];
 
 /** Matches backend CARE_TASK_ASSIGNEE_ROLES */
 export const CARE_TASK_ASSIGNEE_ROLES = ['nurse', 'doctor', 'caregiver'];

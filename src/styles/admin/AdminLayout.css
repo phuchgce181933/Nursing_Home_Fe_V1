@@ -33,3 +33,34 @@
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+
+/* ═══ Responsive — tablets & mobile (< 1024px) ═══ */
+@media (max-width: 1023px) {
+  .admin-layout {
+    /* Sidebar is a fixed overlay on mobile — main fills the whole width */
+    flex-direction: column;
+  }
+
+  .admin-layout__main {
+    /* Extra top padding reserves space for the fixed hamburger button (40px + 14px*2 ≈ 68px) */
+    padding: 72px 16px 16px;
+    width: 100%;
+  }
+
+  .admin-layout__panel {
+    padding: 20px 16px;
+    min-height: calc(100dvh - 104px);
+    border-radius: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .admin-layout__main {
+    padding: 68px 12px 12px;
+  }
+
+  .admin-layout__panel {
+    padding: 16px 12px;
+    border-radius: 10px;
+  }
+}
