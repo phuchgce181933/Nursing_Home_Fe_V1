@@ -254,6 +254,7 @@ function ScheduleTab() {
   const [saving, setSaving] = useState(false);
 
   const dateStr = localDateStr(date);
+  const isToday = dateStr === localDateStr(new Date());
 
   const load = useCallback(() => {
     setLoading(true);
@@ -522,7 +523,7 @@ function ScheduleTab() {
                       {s.notes ? <span className="med-dosage">{s.notes}</span> : <span className="med-no-data">—</span>}
                     </td>
                     <td>
-                      {(s.status === 'PENDING' || s.status === 'OVERDUE') && (
+                      {isToday && (s.status === 'PENDING' || s.status === 'OVERDUE') && (
                         <div className="med-action-group med-action-group--wrap">
                           <button
                             className="med-action-btn med-action-btn--taken"
@@ -638,9 +639,9 @@ function PrescriptionsTab() {
     try {
       await medicationService.administerPRN({
         prescriptionId,
-        medicationName: item.medicationName,
-        dosage: item.dosage,
+        prescriptionItemId: item._id,
         notes: item.prnReason || '',
+        reason: item.prnReason || '',
       });
       showToast(t('medication.prnAdministerSuccess'), 'success');
       load();

@@ -23,11 +23,6 @@ const localDateStr = (d) => {
 };
 
 const todayStr = () => localDateStr(new Date());
-const maxValidUntil = () => {
-  const d = new Date();
-  d.setDate(d.getDate() + 30);
-  return localDateStr(d);
-};
 
 // startDate ("YYYY-MM-DD") + duration (days) -> endDate ("YYYY-MM-DD").
 // Matches the backend's own endDate = startDate + duration validation exactly.
@@ -37,6 +32,24 @@ const addDaysStr = (dateStr, days) => {
   d.setDate(d.getDate() + Number(days));
   return localDateStr(d);
 };
+
+const syncPrescriptionDates = (items) => {
+  const startDate = todayStr();
+  const durations = items
+    .map((item) => Number(item.duration))
+    .filter((duration) => Number.isInteger(duration) && duration > 0);
+  const maxDuration = durations.length ? Math.max(...durations) : null;
+
+  return {
+    items: items.map((item) => ({ ...item, startDate })),
+    validUntil: maxDuration ? addDaysStr(startDate, maxDuration) : '',
+  };
+};
+
+const getPrescriptionErrorMessage = (err, fallback) =>
+  err?.response?.data?.message ||
+  err?.response?.data?.errors?.map((error) => error.message).filter(Boolean).join(' ') ||
+  fallback;
 
 const AVATAR_COLORS = ['#0f766e', '#e64980', '#0ca678', '#f76707', '#7048e8', '#1098ad', '#d6336c', '#5c7cfa'];
 const getAvatarColor = (name) => {
@@ -414,7 +427,6 @@ function ItemRow({ item, idx, onChange, onRemove, t, canRemove, errors = {}, exc
                 const updates = { ...item, medicationName: name };
                 if (med) {
                   updates.medicationId = med._id;
-                  // Unit always tracks the selected medication — never user-editable.
                   updates.unit = med.unit || '';
                 } else {
                   updates.medicationId = '';
@@ -473,6 +485,56 @@ function ItemRow({ item, idx, onChange, onRemove, t, canRemove, errors = {}, exc
           </div>
         </div>
 
+        {/* Schedule Times */}
+        {!item.isPRN && item.times && item.times.length > 0 && (
+          <div className="cpf-field">
+            <label className="cpf-label">{t('medication.times')}</label>
+            <div className="sched-times">
+              {item.times.map((tm, tIdx) => (
+                <div key={tIdx} className="sched-time-slot">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
+                  </svg>
+                  <input
+                    type="time"
+                    className="sched-time-input"
+                    value={tm}
+                    onChange={(e) => handleTimeChange(tIdx, e.target.value)}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Meal Timing */}
+        {!item.isPRN && (
+          <div className="sched-meal-timing">
+            <div className="sched-meal-timing__left">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0f766e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 8h1a4 4 0 0 1 0 8h-1" /><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z" /><line x1="6" y1="1" x2="6" y2="4" /><line x1="10" y1="1" x2="10" y2="4" /><line x1="14" y1="1" x2="14" y2="4" />
+              </svg>
+              <div>
+                <span className="sched-meal-timing__label">{t('medication.mealTiming')}</span>
+                <span className="sched-meal-timing__desc">{t('medication.mealTimingDesc')}</span>
+              </div>
+            </div>
+            <div className="sched-meal-btns">
+              {['before_meal', 'after_meal', 'with_meal', 'empty_stomach'].map((opt) => (
+                <button
+                  key={opt}
+                  type="button"
+                  className={`sched-meal-btn ${item.mealTiming === opt ? 'sched-meal-btn--active' : ''}`}
+                  onClick={() => onChange(idx, { ...item, mealTiming: item.mealTiming === opt ? '' : opt })}
+                >
+                  {t(`medication.meal_${opt}`)}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Instructions */}
         <div className="cpf-field">
           <label className="cpf-label">{t('medication.instructions')}</label>
           <input
@@ -551,10 +613,11 @@ function CreatePrescriptionModal({ residents, onSave, onClose }) {
     residentId: '',
     diagnosisNote: '',
     validUntil: '',
-    items: [{ medicationId: '', medicationName: '', dosage: '', unit: '', frequency: 1, times: ['08:00'], route: 'oral', duration: '', startDate: todayStr(), isPRN: false, prnReason: '', maxDailyDoses: '' }],
+    items: [{ medicationId: '', medicationName: '', dosage: '', unit: '', frequency: 1, times: ['08:00'], route: 'oral', duration: '', startDate: todayStr(), isPRN: false, prnReason: '', maxDailyDoses: '', mealTiming: '', instructions: '' }],
   });
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   const selectedResident = residents.find((r) => r._id === form.residentId);
 
@@ -573,11 +636,6 @@ function CreatePrescriptionModal({ residents, onSave, onClose }) {
     if (!form.residentId) errs.residentId = t('medication.resident');
     if (!form.diagnosisNote || form.diagnosisNote.trim().length < 10)
       errs.diagnosisNote = t('medication.diagnosisNoteHint');
-    const today = todayStr();
-    if (!form.validUntil) errs.validUntil = t('medication.validUntil');
-    else if (form.validUntil < today) errs.validUntil = t('medication.validUntilPast');
-    else if (form.validUntil > maxValidUntil()) errs.validUntil = t('medication.validUntilTooFar');
-
     const seenMedicationIds = new Set();
 
     form.items.forEach((item, i) => {
@@ -605,12 +663,7 @@ function CreatePrescriptionModal({ residents, onSave, onClose }) {
         if (!item.prnReason && !item.instructions) {
           errs[`item_${i}_prnReason`] = t('medication.prnReasonRequired');
         }
-        return;
       }
-
-      if (!item.startDate) errs[`item_${i}_startDate`] = t('medication.startDateRequired');
-      else if (item.startDate < today) errs[`item_${i}_startDate`] = t('medication.startDatePast');
-      else if (form.validUntil && item.startDate > form.validUntil) errs[`item_${i}_startDate`] = t('medication.startDateAfterValidUntil');
 
       if (item.duration === '' || item.duration === null || item.duration === undefined) {
         errs[`item_${i}_duration`] = t('medication.durationRequired');
@@ -620,13 +673,8 @@ function CreatePrescriptionModal({ residents, onSave, onClose }) {
           errs[`item_${i}_duration`] = t('medication.durationNotNumber');
         } else if (!Number.isInteger(durationValue) || durationValue < 1) {
           errs[`item_${i}_duration`] = t('medication.durationPositive');
-        } else if (form.validUntil && item.startDate) {
-          const endDateStr = addDaysStr(item.startDate, durationValue);
-          const effectiveEnd = new Date(`${endDateStr}T00:00:00`);
-          const validUntilDate = new Date(`${form.validUntil}T00:00:00`);
-          if (effectiveEnd > validUntilDate) {
-            errs[`item_${i}_duration`] = t('medication.durationExceedsValidUntil');
-          }
+        } else if (durationValue > 30) {
+          errs[`item_${i}_duration`] = t('medication.validUntilTooFar');
         }
       }
     });
@@ -635,30 +683,32 @@ function CreatePrescriptionModal({ residents, onSave, onClose }) {
   };
 
   const handleItemChange = (idx, updated) => {
+    setSubmitError('');
     setForm((p) => {
       const items = [...p.items];
       items[idx] = updated;
-      return { ...p, items };
+      return { ...p, ...syncPrescriptionDates(items) };
     });
   };
 
   const handleAddItem = () =>
     setForm((p) => ({
       ...p,
-      items: [...p.items, { medicationId: '', medicationName: '', dosage: '', unit: '', frequency: 1, times: ['08:00'], route: 'oral', duration: '', startDate: todayStr(), isPRN: false, prnReason: '', maxDailyDoses: '' }],
+      ...syncPrescriptionDates([...p.items, { medicationId: '', medicationName: '', dosage: '', unit: '', frequency: 1, times: ['08:00'], route: 'oral', duration: '', startDate: todayStr(), isPRN: false, prnReason: '', maxDailyDoses: '', mealTiming: '', instructions: '' }]),
     }));
 
   const handleRemoveItem = (idx) =>
-    setForm((p) => ({ ...p, items: p.items.filter((_, i) => i !== idx) }));
+    setForm((p) => ({ ...p, ...syncPrescriptionDates(p.items.filter((_, i) => i !== idx)) }));
 
   const handleSubmit = async (saveAsDraft = false) => {
+    setSubmitError('');
     if (!validate()) return;
     setSaving(true);
     try {
-      await onSave({
+      const result = await onSave({
         residentId: form.residentId,
         diagnosisNote: form.diagnosisNote.trim(),
-        validUntil: form.validUntil,
+        validUntil: syncPrescriptionDates(form.items).validUntil,
         saveAsDraft,
         items: form.items.map((item) => ({
           medicationId: item.medicationId,
@@ -674,8 +724,13 @@ function CreatePrescriptionModal({ residents, onSave, onClose }) {
           isPRN: item.isPRN || false,
           prnReason: item.isPRN ? item.prnReason : undefined,
           maxDailyDoses: item.isPRN && item.maxDailyDoses ? parseInt(item.maxDailyDoses, 10) : undefined,
+          mealTiming: item.isPRN ? undefined : (item.mealTiming || undefined),
+          instructions: item.instructions ? item.instructions.trim() : undefined,
         })),
       });
+      if (result?.error) setSubmitError(result.error);
+    } catch (err) {
+      setSubmitError(getPrescriptionErrorMessage(err, t('medication.createError')));
     } finally {
       setSaving(false);
     }
@@ -706,6 +761,7 @@ function CreatePrescriptionModal({ residents, onSave, onClose }) {
 
         {/* Body — 2-column layout */}
         <div className="cpf-drawer__body">
+          {submitError && <div className="cpf-submit-error" role="alert">{submitError}</div>}
           <div className="cpf-grid">
             {/* Left column: Resident + Diagnosis */}
             <div className="cpf-grid__left">
@@ -753,52 +809,23 @@ function CreatePrescriptionModal({ residents, onSave, onClose }) {
                 </div>
                 <div className="cpf-row-2">
                   <div className="cpf-field">
-                    <label className="cpf-label">{t('medication.validUntil')} <span className="cpf-req">*</span></label>
+                    <label className="cpf-label">{t('medication.validUntil')}</label>
                     <input
                       type="date"
                       className={`cpf-input${errors.validUntil ? ' cpf-input--err' : ''}`}
                       value={form.validUntil}
-                      min={todayStr()}
-                      max={maxValidUntil()}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        setForm((p) => ({ ...p, validUntil: v }));
-                        let err;
-                        if (!v) err = t('medication.validUntil');
-                        else if (v < todayStr()) err = t('medication.validUntilPast');
-                        else if (v > maxValidUntil()) err = t('medication.validUntilTooFar');
-                        setErrors((p) => {
-                          const sd = form.items[0]?.startDate;
-                          let startDateErr = p.item_0_startDate;
-                          if (sd) {
-                            if (sd < todayStr()) startDateErr = t('medication.startDatePast');
-                            else if (v && sd > v) startDateErr = t('medication.startDateAfterValidUntil');
-                            else startDateErr = undefined;
-                          }
-                          return { ...p, validUntil: err, item_0_startDate: startDateErr };
-                        });
-                      }}
+                      readOnly
                     />
-                    <small className="cpf-hint">{t('medication.validUntilHint')}</small>
+                    <small className="cpf-hint">{t('medication.autoDateHint')}</small>
                     {errors.validUntil && <span className="cpf-error">{errors.validUntil}</span>}
                   </div>
                   <div className="cpf-field">
-                    <label className="cpf-label">{t('medication.startDate')} <span className="cpf-req">*</span></label>
+                    <label className="cpf-label">{t('medication.startDate')}</label>
                     <input
                       type="date"
                       className={`cpf-input${errors.item_0_startDate ? ' cpf-input--err' : ''}`}
                       value={form.items[0]?.startDate || ''}
-                      min={todayStr()}
-                      max={form.validUntil || undefined}
-                      onChange={(e) => {
-                        const sd = e.target.value;
-                        setForm((p) => ({ ...p, items: p.items.map((it) => ({ ...it, startDate: sd })) }));
-                        let err;
-                        if (!sd) err = t('medication.startDateRequired');
-                        else if (sd < todayStr()) err = t('medication.startDatePast');
-                        else if (form.validUntil && sd > form.validUntil) err = t('medication.startDateAfterValidUntil');
-                        setErrors((p) => ({ ...p, item_0_startDate: err }));
-                      }}
+                      readOnly
                     />
                     {errors.item_0_startDate && <span className="cpf-error">{errors.item_0_startDate}</span>}
                   </div>
@@ -851,197 +878,6 @@ function CreatePrescriptionModal({ residents, onSave, onClose }) {
           </button>
           <button className="cpf-btn cpf-btn--primary" onClick={() => handleSubmit(false)} disabled={saving}>
             {saving ? t('medication.loading') : t('medication.createPrescription')}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ── Set Schedule Modal (per prescription items) ── */
-function SetScheduleModal({ prescription, onSave, onClose }) {
-  const { t } = useTranslation();
-  const [activeIdx, setActiveIdx] = useState(0);
-  const [itemStates, setItemStates] = useState(
-    (prescription.items || []).map((it) => ({
-      prescriptionItemId: it._id,
-      medicationName: it.medicationName,
-      dosage: it.dosage,
-      unit: it.unit,
-      route: it.route,
-      frequency: it.frequency || 1,
-      startDate: it.startDate ? new Date(it.startDate).toISOString().slice(0, 10) : todayStr(),
-      endDate: it.endDate ? new Date(it.endDate).toISOString().slice(0, 10) : '',
-      times: it.times?.length ? [...it.times] : buildTimesForFrequency(it.frequency || 1),
-      mealTiming: it.mealTiming || '',
-      notes: '',
-    }))
-  );
-  const [saving, setSaving] = useState(false);
-
-  const current = itemStates[activeIdx];
-
-  const handleTimeChange = (tIdx, val) => {
-    setItemStates((prev) => prev.map((s, i) => {
-      if (i !== activeIdx) return s;
-      const times = [...s.times];
-      times[tIdx] = val;
-      return { ...s, times };
-    }));
-  };
-
-  const handleFieldChange = (field, val) => {
-    setItemStates((prev) => prev.map((s, i) => (i === activeIdx ? { ...s, [field]: val } : s)));
-  };
-
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      await onSave({
-        prescriptionId: prescription._id,
-        items: itemStates.map((s) => ({
-          prescriptionItemId: s.prescriptionItemId,
-          startDate: s.startDate || undefined,
-          endDate: s.endDate || undefined,
-          times: s.times,
-        })),
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const resident = prescription.residentId;
-
-  return (
-    <div className="med-modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="med-modal med-modal--lg sched-modal">
-        {/* Header */}
-        <div className="med-modal__header">
-          <div className="sched-header">
-            <div className="cpf-drawer__icon">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
-              </svg>
-            </div>
-            <div>
-              <h2 className="med-modal__title">{t('medication.scheduleModalTitle')}</h2>
-              <p className="sched-header__sub">{resident?.fullName} — {resident?.residentCode}</p>
-            </div>
-          </div>
-          <button className="med-modal__close" onClick={onClose}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
-        </div>
-
-        {/* Body */}
-        <div className="med-modal__body">
-          {/* Medication tabs if multiple items */}
-          {itemStates.length > 1 && (
-            <div className="sched-med-tabs">
-              {itemStates.map((s, idx) => (
-                <button
-                  key={s.prescriptionItemId}
-                  className={`sched-med-tab ${activeIdx === idx ? 'sched-med-tab--active' : ''}`}
-                  onClick={() => setActiveIdx(idx)}
-                >
-                  <span className="sched-med-tab__dot" />
-                  {s.medicationName}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* Current medication info */}
-          <div className="sched-drug-info">
-            <div className="sched-drug-info__name">{current.medicationName}</div>
-            <div className="sched-drug-info__meta">
-              {current.dosage && <span>{current.dosage}{current.unit ? ` ${current.unit}` : ''}</span>}
-              {current.route && <span className="med-route-badge">{t(`medication.route${current.route.charAt(0).toUpperCase() + current.route.slice(1)}`)}</span>}
-              <span>{current.frequency}×/{t('medication.day')}</span>
-            </div>
-          </div>
-
-          {/* Schedule Times */}
-          <div className="cpf-field">
-            <label className="cpf-label">{t('medication.times')}</label>
-            <div className="sched-times">
-              {current.times.map((tm, tIdx) => (
-                <div key={tIdx} className="sched-time-slot">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
-                  </svg>
-                  <input
-                    type="time"
-                    className="sched-time-input"
-                    value={tm}
-                    onChange={(e) => handleTimeChange(tIdx, e.target.value)}
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Meal timing */}
-          <div className="sched-meal-timing">
-            <div className="sched-meal-timing__left">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0f766e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M18 8h1a4 4 0 0 1 0 8h-1" /><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z" /><line x1="6" y1="1" x2="6" y2="4" /><line x1="10" y1="1" x2="10" y2="4" /><line x1="14" y1="1" x2="14" y2="4" />
-              </svg>
-              <div>
-                <span className="sched-meal-timing__label">{t('medication.mealTiming')}</span>
-                <span className="sched-meal-timing__desc">{t('medication.mealTimingDesc')}</span>
-              </div>
-            </div>
-            <div className="sched-meal-btns">
-              {['before_meal', 'after_meal', 'with_meal', 'empty_stomach'].map((opt) => (
-                <button
-                  key={opt}
-                  type="button"
-                  className={`sched-meal-btn ${current.mealTiming === opt ? 'sched-meal-btn--active' : ''}`}
-                  onClick={() => handleFieldChange('mealTiming', current.mealTiming === opt ? '' : opt)}
-                >
-                  {t(`medication.meal_${opt}`)}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Start / End Date */}
-          <div className="cpf-row-2">
-            <div className="cpf-field">
-              <label className="cpf-label">{t('medication.startDate')}</label>
-              <input type="date" className="cpf-input" value={current.startDate}
-                onChange={(e) => handleFieldChange('startDate', e.target.value)} />
-            </div>
-            <div className="cpf-field">
-              <label className="cpf-label">{t('medication.endDate')}</label>
-              <input type="date" className="cpf-input" value={current.endDate}
-                onChange={(e) => handleFieldChange('endDate', e.target.value)} />
-            </div>
-          </div>
-
-          {/* Notes */}
-          <div className="cpf-field">
-            <label className="cpf-label">{t('medication.clinicalNotes')}</label>
-            <textarea
-              className="cpf-input"
-              rows={3}
-              value={current.notes}
-              onChange={(e) => handleFieldChange('notes', e.target.value)}
-              placeholder={t('medication.clinicalNotesPlaceholder')}
-              style={{ resize: 'vertical' }}
-            />
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="med-modal__footer">
-          <button className="cpf-btn cpf-btn--ghost" onClick={onClose} disabled={saving}>{t('medication.cancelBtn')}</button>
-          <button className="cpf-btn cpf-btn--primary" onClick={handleSave} disabled={saving}>
-            {saving ? t('medication.loading') : t('medication.scheduleModalTitle')}
           </button>
         </div>
       </div>
@@ -1241,225 +1077,10 @@ function HistoryModal({ prescription, onClose }) {
   );
 }
 
-/* ── Edit Prescription Modal ── */
-function EditPrescriptionModal({ prescription, onSave, onClose }) {
-  const { t } = useTranslation();
-  const { user } = useAuth();
-  const isDoctor = user?.role === 'doctor';
-  const [items, setItems] = useState(
-    (prescription.items || []).map((it) => ({
-      _id: it._id,
-      medicationId: it.medicationId?._id || it.medicationId,
-      medicationName: it.medicationName || '',
-      dosage: it.dosage || '',
-      unit: it.unit || '',
-      frequency: it.frequency || 1,
-      route: it.route || 'oral',
-      duration: it.duration,
-      startDate: it.startDate ? it.startDate.slice(0, 10) : '',
-      endDate: it.endDate ? it.endDate.slice(0, 10) : '',
-      times: it.times?.length ? [...it.times] : [],
-      instructions: it.instructions || '',
-      isActive: it.isActive !== false,
-    }))
-  );
-  const [saving, setSaving] = useState(false);
-
-  const [activeIdx, setActiveIdx] = useState(0);
-  const current = items[activeIdx];
-
-  const handleChange = (field, val) => {
-    setItems((prev) => prev.map((it, i) => (i === activeIdx ? { ...it, [field]: val } : it)));
-  };
-
-  const handleTimeChange = (tIdx, val) => {
-    setItems((prev) => prev.map((it, i) => {
-      if (i !== activeIdx) return it;
-      const times = [...it.times];
-      times[tIdx] = val;
-      return { ...it, times };
-    }));
-  };
-
-  const handleDiscontinue = () => {
-    if (!isDoctor) return;
-    if (!window.confirm(t('medication.discontinueConfirm', { name: current.medicationName }))) return;
-    setItems((prev) => prev.map((it, i) => (i === activeIdx ? { ...it, isActive: false } : it)));
-  };
-
-  const resident = prescription.residentId;
-
-  const handleSubmit = async () => {
-    setSaving(true);
-    try {
-      // This modal only ever touches instructions (+ discontinue for doctors).
-      // Dosage, frequency, route, and dates aren't editable here, so we must not
-      // echo them back. Re-sending an item's original (often past) startDate trips
-      // the backend's "startDate cannot be in the past" check on every edit.
-      const payload = {
-        items: items.map((it) => (
-          it.isActive === false
-            ? { _id: it._id, isActive: false }
-            : { _id: it._id, times: it.times, instructions: it.instructions }
-        )),
-      };
-      await onSave(prescription._id, payload);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="med-modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="med-modal med-modal--lg sched-modal">
-        <div className="med-modal__header">
-          <div className="sched-header">
-            <div className="cpf-drawer__icon" style={{ background: '#fef3c7', color: '#d97706' }}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-              </svg>
-            </div>
-            <div>
-              <h2 className="med-modal__title">{t('medication.editPrescription')}</h2>
-              <p className="sched-header__sub">#{prescription._id?.slice(-8).toUpperCase()}</p>
-            </div>
-          </div>
-          <button className="med-modal__close" onClick={onClose}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
-        </div>
-
-        <div className="med-modal__body">
-          {/* Resident info */}
-          <div className="cpf-resident-card">
-            <div className="cpf-resident-card__avatar" style={{ background: getAvatarColor(resident?.fullName) }}>
-              {getInitials(resident?.fullName)}
-            </div>
-            <div className="cpf-resident-card__info">
-              <div className="cpf-resident-card__name">{resident?.fullName}</div>
-              <div className="cpf-resident-card__meta">{resident?.residentCode}</div>
-            </div>
-          </div>
-
-          {/* Medication tabs */}
-          {items.length > 1 && (
-            <div className="sched-med-tabs">
-              {items.map((it, idx) => (
-                <button
-                  key={it._id}
-                  className={`sched-med-tab ${activeIdx === idx ? 'sched-med-tab--active' : ''}`}
-                  onClick={() => setActiveIdx(idx)}
-                  style={it.isActive === false ? { opacity: 0.55, textDecoration: 'line-through' } : undefined}
-                >
-                  <span className="sched-med-tab__dot" />
-                  {it.medicationName}
-                  {it.isActive === false && <em style={{ marginLeft: 4, fontStyle: 'normal', fontSize: 11 }}>({t('medication.discontinuedLabel')})</em>}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* Read-only fields */}
-          <div className="cpf-row-2">
-            <div className="cpf-field">
-              <label className="cpf-label">{t('medication.medicationName')} <span className="edit-readonly">{t('medication.readOnly')}</span></label>
-              <input className="cpf-input edit-input--readonly" value={current.medicationName} readOnly />
-            </div>
-            <div className="cpf-field">
-              <label className="cpf-label">{t('medication.dosage')} <span className="edit-readonly">{t('medication.readOnly')}</span></label>
-              <input className="cpf-input edit-input--readonly" value={`${current.dosage} ${current.unit}`} readOnly />
-            </div>
-          </div>
-
-          {current.isActive === false ? (
-            <div className="edit-notice">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
-              </svg>
-              <div>
-                <strong>{t('medication.discontinuedLabel')}</strong>
-                <p>{t('medication.discontinuedNotice')}</p>
-              </div>
-            </div>
-          ) : (
-            isDoctor && (
-              <button
-                type="button"
-                className="cpf-btn cpf-btn--ghost"
-                style={{ color: '#b91c1c', borderColor: '#fca5a5', marginBottom: 12 }}
-                onClick={handleDiscontinue}
-              >
-                {t('medication.discontinueMedication')}
-              </button>
-            )
-          )}
-
-          {/* Editable: instructions */}
-          <div className="cpf-field">
-            <label className="cpf-label">
-              {t('medication.instructions')}
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0f766e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: 4 }}>
-                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-              </svg>
-            </label>
-            <textarea
-              className="cpf-input"
-              rows={3}
-              value={current.instructions}
-              onChange={(e) => handleChange('instructions', e.target.value)}
-              placeholder={t('medication.instructionsPlaceholder')}
-              style={{ resize: 'vertical' }}
-              disabled={current.isActive === false}
-            />
-            <small className="cpf-hint">{t('medication.editInstructionsHint')}</small>
-          </div>
-
-          {/* Editable: times */}
-          {current.isActive !== false && current.times.length > 0 && (
-            <div className="cpf-field">
-              <label className="cpf-label">{t('medication.times')}</label>
-              <div className="sched-times">
-                {current.times.map((tm, tIdx) => (
-                  <div key={tIdx} className="sched-time-slot">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
-                    </svg>
-                    <input type="time" className="sched-time-input" value={tm} onChange={(e) => handleTimeChange(tIdx, e.target.value)} />
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Info notice */}
-          <div className="edit-notice">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0f766e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
-            </svg>
-            <div>
-              <strong>{t('medication.editNoticeTitle')}</strong>
-              <p>{isDoctor ? t('medication.editNoticeDescDoctor') : t('medication.editNoticeDescNurse')}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="med-modal__footer">
-          <button className="cpf-btn cpf-btn--ghost" onClick={onClose} disabled={saving}>{t('medication.cancelBtn')}</button>
-          <button className="cpf-btn cpf-btn--primary" onClick={handleSubmit} disabled={saving}>
-            {saving ? t('medication.loading') : t('medication.saveChanges')}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 /* ════════════════════════════════════════
    Tab 1 — Prescriptions (2-column dashboard)
    ════════════════════════════════════════ */
-function PrescriptionsTab({ prescriptions, residents, loading, selectedResidentId, onResidentChange, onOpenCreate, onOpenSchedule, onOpenHistory, onOpenEdit, onActivate, onSuspend, onResume }) {
+function PrescriptionsTab({ prescriptions, residents, loading, selectedResidentId, onResidentChange, onOpenCreate, onOpenHistory, onActivate, onSuspend, onResume }) {
   const { t } = useTranslation();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ACTIVE');
@@ -1626,14 +1247,6 @@ function PrescriptionsTab({ prescriptions, residents, loading, selectedResidentI
                                     </tbody>
                                   </table>
                                   <div className="med-rx-detail-actions">
-                                    {['ACTIVE', 'DRAFT'].includes(p.status) && (
-                                      <button className="med-action-btn med-action-btn--edit" onClick={() => onOpenEdit(p)}>
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                                        </svg>
-                                        {t('medication.editPrescription')}
-                                      </button>
-                                    )}
                                     <button className="med-action-btn med-action-btn--history" onClick={() => onOpenHistory(p)}>
                                       {t('medication.viewHistory')}
                                     </button>
@@ -2003,22 +1616,21 @@ function DoctorMedicationPage() {
       if (!selectedResidentId) setSelectedResidentId(payload.residentId);
       showToast(t('medication.createSuccess'), 'success');
       showStockWarnings(result?.warnings);
+      return result;
     } catch (err) {
-      showToast(err.response?.data?.message || t('medication.createError'), 'error');
-      throw err;
-    }
-  };
-
-  const handleEditPrescription = async (id, payload) => {
-    try {
-      const result = await medicationService.updatePrescription(id, payload);
-      closeModal();
-      loadPrescriptions(selectedResidentId);
-      showToast(t('medication.updateSuccess'), 'success');
-      showStockWarnings(result?.warnings);
-    } catch (err) {
-      showToast(err.response?.data?.message || t('medication.updateError'), 'error');
-      throw err;
+      const responseData = err.response?.data;
+      if (responseData?.errorCode === 'DUPLICATE_WARNING' && responseData.duplicates?.length) {
+        const duplicateNames = responseData.duplicates.map((item) => item.medicationName).join(', ');
+        const shouldContinue = window.confirm(
+          t('medication.duplicatePrescriptionConfirm', { names: duplicateNames })
+        );
+        if (shouldContinue) {
+          return handleCreate({ ...payload, acknowledgeDuplicates: true });
+        }
+      }
+      const message = getPrescriptionErrorMessage(err, t('medication.createError'));
+      showToast(message, 'error');
+      return { error: message };
     }
   };
 
@@ -2054,18 +1666,6 @@ function DoctorMedicationPage() {
       showToast(t('medication.resumeSuccess'), 'success');
     } catch (err) {
       showToast(err.response?.data?.message || t('medication.resumeError'), 'error');
-    }
-  };
-
-  const handleSaveSchedule = async (payload) => {
-    try {
-      await medicationService.setMedicationSchedule(payload);
-      closeModal();
-      loadPrescriptions(selectedResidentId);
-      showToast(t('medication.scheduleSuccess'), 'success');
-    } catch (err) {
-      showToast(err.response?.data?.message || t('medication.scheduleError'), 'error');
-      throw err;
     }
   };
 
@@ -2122,9 +1722,7 @@ function DoctorMedicationPage() {
           selectedResidentId={selectedResidentId}
           onResidentChange={handleResidentChange}
           onOpenCreate={() => setModal({ type: 'create', prescription: null })}
-          onOpenSchedule={(p) => setModal({ type: 'schedule', prescription: p })}
           onOpenHistory={(p) => setModal({ type: 'history', prescription: p })}
-          onOpenEdit={(p) => setModal({ type: 'edit', prescription: p })}
           onActivate={handleActivate}
           onSuspend={handleSuspend}
           onResume={handleResume}
@@ -2140,22 +1738,8 @@ function DoctorMedicationPage() {
           onClose={closeModal}
         />
       )}
-      {modal.type === 'schedule' && (
-        <SetScheduleModal
-          prescription={modal.prescription}
-          onSave={handleSaveSchedule}
-          onClose={closeModal}
-        />
-      )}
       {modal.type === 'history' && (
         <HistoryModal prescription={modal.prescription} onClose={closeModal} />
-      )}
-      {modal.type === 'edit' && (
-        <EditPrescriptionModal
-          prescription={modal.prescription}
-          onSave={handleEditPrescription}
-          onClose={closeModal}
-        />
       )}
     </div>
   );

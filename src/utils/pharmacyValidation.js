@@ -131,7 +131,7 @@ const isValidDate = (value) => {
   return !Number.isNaN(date.getTime());
 };
 
-export const validateStockForm = (form, medications = [], suppliers = []) => {
+export const validateStockForm = (form, medications = [], suppliers = [], isEditing = false) => {
   if (!trim(form.medicationId)) {
     return { valid: false, message: 'Thuốc là bắt buộc.' };
   }
@@ -160,7 +160,7 @@ export const validateStockForm = (form, medications = [], suppliers = []) => {
     return { valid: false, message: 'Ngày nhập thuốc không hợp lệ.' };
   }
   const receivedTime = new Date(form.receivedDate).getTime();
-  if (receivedTime + 60000 < Date.now()) {
+  if (!isEditing && receivedTime + 60000 < Date.now()) {
     return { valid: false, message: 'Ngày nhập thuốc không được là ngày trong quá khứ.' };
   }
 
@@ -171,7 +171,7 @@ export const validateStockForm = (form, medications = [], suppliers = []) => {
     return { valid: false, message: 'Ngày hết hạn không hợp lệ.' };
   }
   const expiryTime = new Date(form.expiryDate).getTime();
-  if (expiryTime <= Date.now()) {
+  if (!isEditing && expiryTime <= Date.now()) {
     return { valid: false, message: 'Ngày hết hạn phải là ngày trong tương lai.' };
   }
   if (receivedTime && expiryTime <= receivedTime + 365 * 24 * 60 * 60 * 1000) {

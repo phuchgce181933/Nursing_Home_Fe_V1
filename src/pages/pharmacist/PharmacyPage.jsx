@@ -828,7 +828,7 @@ function PharmacyPage({ defaultTab = 'overview' }) {
 
   const saveStock = async (event) => {
     if (event) event.preventDefault();
-    const validation = validateStockForm(stockForm, medicationOptions, supplierOptions);
+    const validation = validateStockForm(stockForm, medicationOptions, supplierOptions, !!editingStock);
     if (!validation.valid) {
       setStockError(validation.message);
       setStockMessage(null);
@@ -1900,7 +1900,7 @@ function PharmacyPage({ defaultTab = 'overview' }) {
                   {t('pharmacyPage.expiryDateLabel')}
                   <input
                     type="datetime-local"
-                    min={localDateTimeNow()}
+                    min={editingStock ? undefined : localDateTimeNow()}
                     value={stockForm.expiryDate}
                     onChange={(event) =>
                       setStockForm((prev) => ({ ...prev, expiryDate: event.target.value }))
@@ -1912,7 +1912,7 @@ function PharmacyPage({ defaultTab = 'overview' }) {
                   {t('pharmacyPage.receivedDateLabel')}
                   <input
                     type="datetime-local"
-                    min={localDateTimeNow()}
+                    min={editingStock ? undefined : localDateTimeNow()}
                     value={stockForm.receivedDate}
                     onChange={(event) =>
                       setStockForm((prev) => ({ ...prev, receivedDate: event.target.value }))
