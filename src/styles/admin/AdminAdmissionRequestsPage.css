@@ -1108,3 +1108,474 @@
     display: none; /* Ẩn bớt cột trên Mobile */
   }
 }
+
+/* =====================================================
+   Create Contract Modal (NEW FLOW - Doctor → HĐ → Invoice)
+   ===================================================== */
+
+.adm-modal-overlay--contract {
+  z-index: 1100;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  padding: 24px;
+  animation: admFadeIn 0.22s ease-out;
+}
+
+.adm-modal-content--contract {
+  width: min(100%, 720px);
+  max-height: calc(100vh - 48px);
+  background: var(--nh-surface);
+  border-radius: 20px;
+  box-shadow: 0 32px 80px rgba(15, 23, 42, 0.28);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: admModalUp 0.3s cubic-bezier(0.34, 1.4, 0.64, 1);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+.adm-modal-header--contract {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 20px 24px;
+  background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%);
+  color: #ffffff;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.adm-modal-header--contract h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  letter-spacing: 0.01em;
+}
+
+.adm-modal-header__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 10px;
+  backdrop-filter: blur(4px);
+}
+
+.adm-modal-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: rgba(255, 255, 255, 0.16);
+  border: none;
+  color: #ffffff;
+  cursor: pointer;
+  border-radius: 10px;
+  font-size: 22px;
+  font-weight: 400;
+  line-height: 1;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.adm-modal-close:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.3);
+  transform: rotate(90deg);
+}
+
+.adm-modal-close:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Body */
+.adm-modal-content--contract .adm-modal-body {
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  flex: 1;
+  /* Quan trọng: cho phép body co lại đúng kích thước modal để overflow-y: auto
+     hoạt động được bên trong flex column (mặc định min-height: auto ngăn co lại
+     dưới content-height, khiến phần 🏠 Phân bổ phòng & giường bị ẩn khi body
+     quá cao so với modal max-height). */
+  min-height: 0;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+}
+
+/* Mặc định flex-shrink: 1 khiến các section (đặc biệt 🏠 Phân bổ phòng & giường)
+   bị nén xuống 0 chiều cao khi tổng content > chiều cao body khả dụng.
+   Đặt flex-shrink: 0 để giữ nguyên chiều cao tự nhiên — body sẽ tự scroll. */
+.adm-modal-content--contract .adm-modal-body > * {
+  flex-shrink: 0;
+}
+
+.adm-modal-content--contract .adm-modal-body::-webkit-scrollbar { width: 8px; }
+.adm-modal-content--contract .adm-modal-body::-webkit-scrollbar-track { background: transparent; }
+.adm-modal-content--contract .adm-modal-body::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+.adm-modal-content--contract .adm-modal-body::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Info card: Resident + Service Package */
+.adm-contract-info {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding: 14px 16px;
+  background: linear-gradient(135deg, #f0fdfa 0%, #ecfeff 100%);
+  border: 1px solid #99f6e4;
+  border-radius: 14px;
+}
+
+.adm-contract-info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.adm-contract-info-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #0f766e;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.adm-contract-info-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+  word-break: break-word;
+  line-height: 1.4;
+}
+
+/* Form row */
+.adm-form-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+/* Form group */
+.adm-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.adm-form-group label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--nh-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.adm-form-input,
+.adm-form-textarea {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--nh-text);
+  background: var(--nh-surface-subtle);
+  border: 1px solid var(--nh-border);
+  border-radius: 10px;
+  outline: none;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.adm-form-input:focus,
+.adm-form-textarea:focus {
+  border-color: var(--nh-primary);
+  background: var(--nh-surface);
+  box-shadow: 0 0 0 3px var(--nh-primary-light);
+}
+
+.adm-form-input::placeholder,
+.adm-form-textarea::placeholder {
+  color: var(--nh-text-placeholder);
+}
+
+.adm-form-textarea {
+  resize: vertical;
+  min-height: 72px;
+  line-height: 1.5;
+}
+
+/* Hint text under form fields (small grey description) */
+.adm-form-hint {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--nh-text-muted, #64748b);
+}
+
+/* Payment plan radio-card options (Hình thức thanh toán) */
+.adm-payment-plan-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.adm-payment-plan-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1.5px solid var(--nh-border);
+  border-radius: 10px;
+  background: var(--nh-surface);
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  color: var(--nh-text-primary, #0f172a);
+}
+
+.adm-payment-plan-option:hover {
+  border-color: var(--nh-primary-light, #5eead4);
+  background: var(--nh-surface-subtle, #f8fafc);
+}
+
+.adm-payment-plan-option--active {
+  border-color: var(--nh-primary, #0f766e);
+  background: var(--nh-primary-light, rgba(15, 118, 110, 0.08));
+  box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.15);
+}
+
+.adm-payment-plan-icon {
+  color: var(--nh-primary, #0f766e);
+  margin-bottom: 2px;
+}
+
+.adm-payment-plan-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: inherit;
+}
+
+.adm-payment-plan-desc {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--nh-text-muted, #64748b);
+}
+
+@media (max-width: 720px) {
+  .adm-payment-plan-options {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Footer */
+.adm-modal-footer--contract {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 24px;
+  border-top: 1px solid var(--nh-border);
+  background: var(--nh-surface-subtle);
+}
+
+.adm-btn-cancel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 18px;
+  border: 1px solid var(--nh-border-dark);
+  background: var(--nh-surface);
+  color: var(--nh-text);
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.adm-btn-cancel:hover:not(:disabled) {
+  background: var(--nh-surface-hover);
+  border-color: var(--nh-text-muted);
+}
+
+.adm-btn-cancel:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.adm-btn-submit-contract {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%);
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 6px 14px rgba(15, 118, 110, 0.28);
+}
+
+.adm-btn-submit-contract:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px rgba(15, 118, 110, 0.35);
+}
+
+.adm-btn-submit-contract:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.adm-btn-submit-contract:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+/* Spin animation for loader icon */
+.adm-spin {
+  animation: admSpin 0.85s linear infinite;
+}
+
+@keyframes admSpin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@keyframes admFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes admModalUp {
+  from { opacity: 0; transform: translateY(24px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .adm-modal-overlay--contract { padding: 12px; }
+  .adm-modal-header--contract { padding: 16px 18px; }
+  .adm-modal-content--contract .adm-modal-body { padding: 18px; }
+  .adm-modal-footer--contract { padding: 14px 18px; flex-direction: column-reverse; }
+  .adm-modal-footer--contract button { width: 100%; }
+  .adm-form-row,
+  .adm-contract-info {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Label row with actions (for terms field) */
+.adm-form-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.adm-form-label-row label {
+  margin-bottom: 0;
+}
+
+.adm-form-label-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.adm-form-charcount {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--nh-text-muted);
+  background: var(--nh-surface-subtle);
+  border: 1px solid var(--nh-border);
+  padding: 2px 8px;
+  border-radius: 999px;
+  letter-spacing: 0.02em;
+}
+
+.adm-link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: transparent;
+  border: 1px solid var(--nh-border);
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--nh-primary);
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.adm-link-btn:hover:not(:disabled) {
+  background: var(--nh-primary-light);
+  border-color: var(--nh-primary);
+}
+
+.adm-link-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Tall textarea for long contract terms */
+.adm-form-textarea--tall {
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, Menlo, monospace;
+  font-size: 12.5px;
+  line-height: 1.55;
+  letter-spacing: 0.01em;
+}
+
+/* Preview mode for contract terms (read-only nicely formatted) */
+.adm-contract-preview {
+  margin: 0;
+  padding: 14px 16px;
+  background: var(--nh-surface-subtle);
+  border: 1px solid var(--nh-border);
+  border-radius: 10px;
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, Menlo, monospace;
+  font-size: 12.5px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--nh-text);
+  max-height: 360px;
+  overflow-y: auto;
+  letter-spacing: 0.01em;
+}
+
+.adm-contract-preview::-webkit-scrollbar { width: 8px; }
+.adm-contract-preview::-webkit-scrollbar-track { background: transparent; }
+.adm-contract-preview::-webkit-scrollbar-thumb {
+  background: var(--nh-border-dark);
+  border-radius: 4px;
+}
+.adm-contract-preview::-webkit-scrollbar-thumb:hover { background: var(--nh-text-muted); }

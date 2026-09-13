@@ -101,6 +101,7 @@ export default function AdminInvoiceManagementPage() {
   const translateStatus = (status) => {
     const normalized = String(status || '').toLowerCase();
     const map = {
+      draft: t('adminInvoices.statusDraft', 'Chưa xuất'),
       issued: t('adminInvoices.statusIssued'),
       partially_paid: t('adminInvoices.statusPartiallyPaid'),
       paid: t('adminInvoices.statusPaid'),
@@ -282,6 +283,7 @@ export default function AdminInvoiceManagementPage() {
             <label>{t('common.status')}</label>
             <select value={status} onChange={(e) => setStatus(e.target.value)}>
               <option value="">{t('common.all')}</option>
+              <option value="draft">{t('adminInvoices.statusDraft', 'Chưa xuất')}</option>
               <option value="issued">{t('adminInvoices.statusIssued')}</option>
               <option value="partially_paid">{t('adminInvoices.statusPartiallyPaid')}</option>
               <option value="paid">{t('adminInvoices.statusPaid')}</option>

@@ -307,9 +307,8 @@ export default function AdmissionDetailDrawer({
   const [eligibilityGenNotes, setEligibilityGenNotes] = useState('');
   const [evaluating, setEvaluating] = useState(false);
 
-  const [showAssignPackageModal, setShowAssignPackageModal] = useState(false);
+  // (Gói dịch vụ hiện gộp vào modal Tạo hợp đồng — selectedPackageId được dùng chung)
   const [selectedPackageId, setSelectedPackageId] = useState('');
-  const [assigningPackage, setAssigningPackage] = useState(false);
 
   const [showContractModal, setShowContractModal] = useState(false);
   const [contractNum, setContractNum] = useState('');
@@ -383,7 +382,6 @@ export default function AdmissionDetailDrawer({
     showConsultationModal,
     showScheduleModal,
     showEligibilityModal,
-    showAssignPackageModal,
     showContractModal,
     showCheckInModal
   ]);
@@ -509,7 +507,7 @@ export default function AdmissionDetailDrawer({
   }, [isOpen, admissionId, isAdmin, isDoctorOrNurseRole, isAdminRole]);
 
   useEffect(() => {
-    if (showApproveModal || showAssignPackageModal) {
+    if (showApproveModal || showContractModal) {
       const fetchPackages = async () => {
         try {
           setLoadingPackages(true);
@@ -523,7 +521,7 @@ export default function AdmissionDetailDrawer({
       };
       fetchPackages();
     }
-  }, [showApproveModal, showAssignPackageModal]);
+  }, [showApproveModal, showContractModal]);
 
   useEffect(() => {
     if (showAssignModal) {
@@ -834,25 +832,7 @@ export default function AdmissionDetailDrawer({
     }
   };
 
-  const handleAssignPackage = async (e) => {
-    if (e) e.preventDefault();
-    if (!admissionId || !selectedPackageId) return;
-
-    try {
-      setAssigningPackage(true);
-      await admissionService.adminAssignServicePackage(admissionId, { servicePackageId: selectedPackageId });
-      setShowAssignPackageModal(false);
-      setSelectedPackageId('');
-      if (onCancelSuccess) onCancelSuccess();
-      const res = await admissionService.adminGetAdmissionDetail(admissionId);
-      setAdmission(res?.admission || null);
-    } catch (err) {
-      console.error('Failed to assign package:', err);
-      setModalError(err.response?.data?.message || 'Đã xảy ra lỗi khi gán gói dịch vụ.');
-    } finally {
-      setAssigningPackage(false);
-    }
-  };
+  // (handleAssignPackage đã được gộp vào handleCreateContract — không cần tách riêng nữa)
 
   const handleCreateContract = async (e) => {
     if (e) e.preventDefault();
@@ -876,6 +856,8 @@ export default function AdmissionDetailDrawer({
         contractDiscountPercent: contractDiscountPercent !== '' ? Number(contractDiscountPercent) : undefined,
         contractTerms: contractTerms.trim() || undefined,
         notes: contractGenNotes.trim() || undefined,
+        // Gộp gói dịch vụ cùng bước tạo hợp đồng
+        servicePackageId: selectedPackageId || undefined,
       });
       setShowContractModal(false);
       setContractNum('');
@@ -885,6 +867,7 @@ export default function AdmissionDetailDrawer({
       setContractDiscountPercent('');
       setContractTerms('');
       setContractGenNotes('');
+      setSelectedPackageId('');
       if (onCancelSuccess) onCancelSuccess();
       const res = await admissionService.adminGetAdmissionDetail(admissionId);
       setAdmission(res?.admission || null);
@@ -1752,44 +1735,28 @@ const getStepIcon = (key) => {
                       </button>
                     )}
 
-                    {/* 5. Assign Service Package (Admin/Manager role) - Only when doctor confirmed (contracting status) and package is not assigned yet */}
-                    {isAdminRole && admission.status === 'contracting' && (!admission.servicePackageId && !admission.assignedServicePackage) && (
+                    {/* 5. Create Admission Contract (Admin/Manager role) - Combine service package + contract in one step */}
+                    {isAdminRole && admission.status === 'contracting' && !admission.contractNumber && (
                       <button
                         type="button"
                         onClick={() => {
-                          setSelectedPackageId(admission.servicePackageId?._id || admission.servicePackageId || '');
-                          setShowAssignPackageModal(true);
-                        }}
-                        className="adm-btn-apply"
-                        style={{ padding: '8px 16px', fontSize: '12px', borderRadius: '10px', boxShadow: 'none', background: '#1B365D' }}
-                      >
-                        Giao gói dịch vụ
-                      </button>
-                    )}
-
-                    {/* 6. Create Admission Contract (Admin/Manager role) - Only after package is assigned and contract is not created yet */}
-                    {isAdminRole && admission.status === 'contracting' && (admission.servicePackageId || admission.assignedServicePackage) && !admission.contractNumber && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (admission.contractNumber) {
-                            setContractNum(admission.contractNumber);
-                          } else {
-                            const year = new Date().getFullYear();
-                            const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-                            setContractNum(`HĐ-${year}-${randomSuffix}`);
-                          }
+                          // Pre-fill contract number
+                          const year = new Date().getFullYear();
+                          const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+                          setContractNum(`HĐ-${year}-${randomSuffix}`);
                           setContractStart(admission.contractStartDate ? admission.contractStartDate.split('T')[0] : '');
                           setContractEnd(admission.contractEndDate ? admission.contractEndDate.split('T')[0] : '');
                           setContractDurationMonths(admission.contractDurationMonths != null ? String(admission.contractDurationMonths) : '');
                           setContractDiscountPercent(admission.contractDiscountPercent != null ? String(admission.contractDiscountPercent) : '');
                           setContractTerms(admission.contractTerms || '');
+                          // Pre-fill selectedPackageId (nếu đã có package từ bước trước)
+                          setSelectedPackageId(admission.servicePackageId?._id || admission.servicePackageId || '');
                           setShowContractModal(true);
                         }}
                         className="adm-btn-apply"
                         style={{ padding: '8px 16px', fontSize: '12px', borderRadius: '10px', boxShadow: 'none', background: '#1B365D' }}
                       >
-                        {admission.contractNumber ? 'Sửa hợp đồng' : 'Tạo hợp đồng'}
+                        Tạo hợp đồng
                       </button>
                     )}
 
@@ -2396,82 +2363,15 @@ const getStepIcon = (key) => {
         </div>
       )}
 
-      {/* 5. Assign Service Package Modal */}
-      {showAssignPackageModal && (
-        <div className="arh-modal-backdrop" onClick={() => setShowAssignPackageModal(false)}>
-          <div className="arh-modal" onClick={(e) => e.stopPropagation()}>
-            <h4 className="arh-modal__title">Giao gói dịch vụ chăm sóc</h4>
-            <p className="arh-modal__text">
-              Giao hoặc cập nhật gói dịch vụ chăm sóc cho <strong className="text-slate-800">{admission?.applicant?.fullName}</strong>.
-            </p>
-            {modalError && (
-              <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-lg text-xs mb-4 font-sans">
-                {modalError}
-              </div>
-            )}
-
-            <form onSubmit={handleAssignPackage}>
-              <div className="mb-4 relative">
-                <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
-                  Gói dịch vụ đang hoạt động *
-                </label>
-                {loadingPackages ? (
-                  <div className="flex items-center gap-2 py-2 text-xs text-slate-400">
-                    <Loader2 size={14} className="animate-spin" />
-                    <span>Đang tải danh sách gói dịch vụ...</span>
-                  </div>
-                ) : (
-                  <select
-                    className="adm-filter-select"
-                    value={selectedPackageId}
-                    onChange={(e) => setSelectedPackageId(e.target.value)}
-                    required
-                  >
-                    <option value="">-- Chọn gói dịch vụ --</option>
-                    {packages.map((pkg) => (
-                      <option key={pkg._id} value={pkg._id}>
-                        {pkg.name} ({pkg.tier.toUpperCase()} - {pkg.monthlyPrice?.toLocaleString()} VND/tháng)
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
-
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  className="adm-btn-clear flex-1"
-                  style={{ borderRadius: '20px', padding: '10px 24px' }}
-                  onClick={() => {
-                    setShowAssignPackageModal(false);
-                    setSelectedPackageId('');
-                  }}
-                  disabled={assigningPackage}
-                >
-                  Hủy bỏ
-                </button>
-                <button
-                  type="submit"
-                  className="adm-btn-apply flex-1 justify-center"
-                  style={{ borderRadius: '20px', padding: '10px 24px', backgroundColor: '#1B365D' }}
-                  disabled={assigningPackage || !selectedPackageId}
-                >
-                  {assigningPackage && <Loader2 className="animate-spin mr-1" size={13} />}
-                  Xác nhận giao gói
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* 5. Assign Service Package Modal — đã gộp vào modal "Tạo hợp đồng" */}
 
       {/* 6. Create Admission Contract Modal */}
       {showContractModal && (
         <div className="arh-modal-backdrop" onClick={() => setShowContractModal(false)}>
           <div className="arh-modal" onClick={(e) => e.stopPropagation()}>
-            <h4 className="arh-modal__title">Tạo / Chỉnh sửa hợp đồng nhập viện</h4>
+            <h4 className="arh-modal__title">Tạo hợp đồng nhập viện</h4>
             <p className="arh-modal__text">
-              Lập điều khoản dịch vụ và ký kết hợp đồng chăm sóc cho <strong className="text-slate-800">{admission?.applicant?.fullName}</strong>.
+              Gán gói dịch vụ và ký kết hợp đồng chăm sóc cho <strong className="text-slate-800">{admission?.applicant?.fullName}</strong>.
             </p>
             {modalError && (
               <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-lg text-xs mb-4 font-sans">
@@ -2480,6 +2380,50 @@ const getStepIcon = (key) => {
             )}
 
             <form onSubmit={handleCreateContract}>
+              {/* ── Package selector (gộp cùng bước tạo hợp đồng) ── */}
+              {!admission.servicePackageId && !admission.assignedServicePackage ? (
+                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-xl">
+                  <label className="block text-xs font-bold text-blue-700 mb-2 uppercase tracking-wider">
+                    Gói dịch vụ chăm sóc *
+                  </label>
+                  {loadingPackages ? (
+                    <div className="flex items-center gap-2 py-2 text-xs text-slate-500">
+                      <Loader2 size={14} className="animate-spin" />
+                      <span>Đang tải danh sách gói dịch vụ...</span>
+                    </div>
+                  ) : (
+                    <select
+                      className="adm-filter-select w-full"
+                      value={selectedPackageId}
+                      onChange={(e) => setSelectedPackageId(e.target.value)}
+                      required
+                    >
+                      <option value="">-- Chọn gói dịch vụ --</option>
+                      {packages.map((pkg) => (
+                        <option key={pkg._id} value={pkg._id}>
+                          {pkg.name} ({pkg.tier?.toUpperCase()} - {pkg.monthlyPrice?.toLocaleString()} VND/tháng)
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  <p className="text-[11px] text-blue-600 mt-1.5">
+                    Chọn gói dịch vụ phù hợp với tình trạng của người cao tuổi.
+                  </p>
+                </div>
+              ) : (
+                <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-xl">
+                  <div className="text-xs font-bold text-emerald-700 uppercase tracking-wider mb-1">Gói dịch vụ đã chọn</div>
+                  <div className="font-bold text-slate-800">
+                    {admission.servicePackageId?.name || admission.assignedServicePackage}
+                    {admission.servicePackageId?.monthlyPrice && (
+                      <span className="text-xs font-normal text-slate-500 ml-2">
+                        – {admission.servicePackageId.monthlyPrice?.toLocaleString()} VND/tháng
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+
               <div className="mb-3">
                 <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
                   Số hợp đồng *
@@ -2613,6 +2557,7 @@ const getStepIcon = (key) => {
                     setContractDiscountPercent('');
                     setContractTerms('');
                     setContractGenNotes('');
+                    setSelectedPackageId('');
                   }}
                   disabled={creatingContract}
                 >
@@ -2622,7 +2567,7 @@ const getStepIcon = (key) => {
                   type="submit"
                   className="adm-btn-apply flex-1 justify-center"
                   style={{ borderRadius: '20px', padding: '10px 24px', backgroundColor: '#1B365D' }}
-                  disabled={creatingContract || !contractNum.trim()}
+                  disabled={creatingContract || !contractNum.trim() || (!admission.servicePackageId && !admission.assignedServicePackage && !selectedPackageId)}
                 >
                   {creatingContract && <Loader2 className="animate-spin mr-1" size={13} />}
                   Ký kết hợp đồng

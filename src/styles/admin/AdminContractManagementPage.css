@@ -610,6 +610,68 @@ table td {
   border: 1px solid #e2e8f0;
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   Resident Cell — bảng Quản lý Hợp đồng
+   Mục tiêu: hiển thị rõ hợp đồng thuộc về cư dân nào (avatar + tên + mã)
+   ═══════════════════════════════════════════════════════════════════════════ */
+.contract-resident-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 200px;
+  max-width: 260px;
+  white-space: normal;
+}
+
+.contract-resident-cell__avatar {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);
+}
+
+.contract-resident-cell__info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.3;
+}
+
+.contract-resident-cell__name {
+  font-weight: 600;
+  color: #0f172a;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+}
+
+.contract-resident-cell__subtitle {
+  font-size: 11px;
+  color: #64748b;
+  margin-top: 2px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Override các thuộc tính nowrap của table td để resident cell hiển thị đủ */
+table td > .contract-resident-cell {
+  white-space: normal;
+}
+
 .form-group-total label {
   display: block;
   font-size: 12px;
