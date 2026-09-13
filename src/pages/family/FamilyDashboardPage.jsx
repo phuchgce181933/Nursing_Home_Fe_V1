@@ -76,7 +76,7 @@ function FamilyDashboardPage() {
   const [isOtpVerifying, setIsOtpVerifying] = useState(false);
   const [pendingWalletPayment, setPendingWalletPayment] = useState(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [selectedPackages, setSelectedPackages] = useState({});
+  const [selectedInvoiceIds, setSelectedInvoiceIds] = useState(new Set()); // Set<string> invoice _ids
   const [currentResidentPayment, setCurrentResidentPayment] = useState(null);
   const [isBatchPaymentProcessing, setIsBatchPaymentProcessing] = useState(false);
   const [residentSearch, setResidentSearch] = useState('');
@@ -327,58 +327,74 @@ function FamilyDashboardPage() {
 
   const handleOpenPaymentModal = (resident) => {
     const invoices = invoicesList[resident._id] || [];
-    const serviceInvoices = invoices.filter(inv => (inv.type === 'SERVICE' || !inv.type) && !['PAID', 'CANCELLED'].includes(String(inv.status || '').toUpperCase()));
-    const medicationInvoices = invoices.filter(inv => inv.type === 'MEDICATION' && !['PAID', 'CANCELLED'].includes(String(inv.status || '').toUpperCase()));
+    const unpaid = invoices.filter(
+      (inv) => !['PAID', 'CANCELLED'].includes(String(inv.status || '').toUpperCase())
+    );
 
-    if (serviceInvoices.length === 0 && medicationInvoices.length === 0) {
+    if (unpaid.length === 0) {
       setError(t('familyDashboard.invoice.noUnpaid'));
       return;
     }
 
     setCurrentResidentPayment({
       resident,
-      serviceInvoices,
-      medicationInvoices,
+      unpaidInvoices: unpaid,
     });
-    
-    // Default: select both if both exist
-    const defaultSelection = {};
-    if (serviceInvoices.length > 0) defaultSelection.service = true;
-    if (medicationInvoices.length > 0) defaultSelection.medication = true;
-    setSelectedPackages(defaultSelection);
+
+    // Mặc định: chọn tất cả hóa đơn chưa thanh toán
+    setSelectedInvoiceIds(new Set(unpaid.map((inv) => inv._id)));
+    setWalletError(null);
     setShowPaymentModal(true);
+  };
+
+  const toggleInvoiceSelection = (invoiceId) => {
+    setSelectedInvoiceIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(invoiceId)) next.delete(invoiceId);
+      else next.add(invoiceId);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (!currentResidentPayment) return;
+    const { unpaidInvoices } = currentResidentPayment;
+    const allIds = unpaidInvoices.map((inv) => inv._id);
+    const allSelected = allIds.every((id) => selectedInvoiceIds.has(id));
+    if (allSelected) {
+      setSelectedInvoiceIds(new Set());
+    } else {
+      setSelectedInvoiceIds(new Set(allIds));
+    }
+  };
+
+  const closePaymentModal = () => {
+    if (isBatchPaymentProcessing) return;
+    setShowPaymentModal(false);
+    setCurrentResidentPayment(null);
+    setSelectedInvoiceIds(new Set());
   };
 
   const handleBatchPayment = async (paymentMethod) => {
     if (!currentResidentPayment) return;
 
-    const { resident, serviceInvoices, medicationInvoices } = currentResidentPayment;
-    const invoiceIds = [];
-
-    if (selectedPackages.service && serviceInvoices.length > 0) {
-      invoiceIds.push(...serviceInvoices.map(inv => inv._id));
-    }
-    if (selectedPackages.medication && medicationInvoices.length > 0) {
-      invoiceIds.push(...medicationInvoices.map(inv => inv._id));
-    }
+    const { resident, unpaidInvoices } = currentResidentPayment;
+    const invoiceIds = unpaidInvoices
+      .filter((inv) => selectedInvoiceIds.has(inv._id))
+      .map((inv) => inv._id);
 
     if (invoiceIds.length === 0) {
       setWalletError(t('familyDashboard.wallet.selectPackage'));
       return;
     }
 
-    // Calculate total amount
+    // Tính tổng tiền các hóa đơn được chọn
     let totalAmount = 0;
-    if (selectedPackages.service) {
-      serviceInvoices.forEach(inv => {
-        totalAmount += inv.totalAmount || 0;
-      });
-    }
-    if (selectedPackages.medication) {
-      medicationInvoices.forEach(inv => {
-        totalAmount += inv.totalAmount || 0;
-      });
-    }
+    unpaidInvoices.forEach((inv) => {
+      if (selectedInvoiceIds.has(inv._id)) {
+        totalAmount += Number(inv.totalAmount || 0);
+      }
+    });
 
     if (paymentMethod === 'wallet') {
       if (walletInfo.balance < totalAmount) {
@@ -401,7 +417,7 @@ function FamilyDashboardPage() {
         if (response.checkoutUrl) {
           // Redirect to PayOS checkout
           window.open(response.checkoutUrl, '_blank');
-          setShowPaymentModal(false);
+          closePaymentModal();
         }
       } else {
         // For wallet payment
@@ -421,7 +437,7 @@ function FamilyDashboardPage() {
           // Reload wallet
           const updatedWallet = await familyPortalService.getWalletBalance();
           setWalletInfo(updatedWallet);
-          setShowPaymentModal(false);
+          closePaymentModal();
         }
       }
     } catch (err) {
@@ -575,6 +591,9 @@ function FamilyDashboardPage() {
             (invoice.type === 'SERVICE' || !invoice.type) && matchesInvoiceFilter(invoice, 'unpaid')
           );
           const latestInvoice = invoices[0] || null;
+          const totalUnpaid = allInvoices.filter(
+            (inv) => !['PAID', 'CANCELLED'].includes(String(inv.status || '').toUpperCase())
+          ).length;
 
           return (
             <ResidentListItem
@@ -590,7 +609,9 @@ function FamilyDashboardPage() {
               onOpenCheckout={handleOpenCheckout}
               onPayWithWallet={handlePayWithWallet}
               onCreateInvoice={handleCreateInvoice}
+              onOpenPaymentModal={handleOpenPaymentModal}
               hasUnpaidServiceInvoice={hasUnpaidServiceInvoice}
+              totalUnpaidCount={totalUnpaid}
               creatingInvoiceFor={creatingInvoiceFor}
               isWalletPaymentProcessing={isWalletPaymentProcessing}
               walletLoading={walletLoading}
@@ -630,6 +651,286 @@ function FamilyDashboardPage() {
           </div>
         </div>
       )}
+
+      {/* Modal: Thanh toán nhiều hóa đơn (chọn từng hóa đơn + thanh toán toàn bộ) */}
+      {showPaymentModal && currentResidentPayment && (
+        <BatchPaymentModal
+          resident={currentResidentPayment.resident}
+          invoices={currentResidentPayment.unpaidInvoices}
+          selectedInvoiceIds={selectedInvoiceIds}
+          onToggleInvoice={toggleInvoiceSelection}
+          onToggleSelectAll={toggleSelectAll}
+          onClose={closePaymentModal}
+          onPay={handleBatchPayment}
+          isProcessing={isBatchPaymentProcessing}
+          walletBalance={walletInfo.balance}
+          walletError={walletError}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ══════════════════════ Batch payment modal ══════════════════════ */
+
+function BatchPaymentModal({
+  resident, invoices, selectedInvoiceIds,
+  onToggleInvoice, onToggleSelectAll,
+  onClose, onPay, isProcessing, walletBalance, walletError,
+}) {
+  const { t } = useTranslation();
+  const totalSelected = invoices
+    .filter((inv) => selectedInvoiceIds.has(inv._id))
+    .reduce((sum, inv) => sum + Number(inv.totalAmount || 0), 0);
+  const selectedCount = invoices.filter((inv) => selectedInvoiceIds.has(inv._id)).length;
+  const allSelected = invoices.length > 0 && selectedCount === invoices.length;
+  const insufficientWallet = walletBalance < totalSelected;
+
+  return (
+    <div className="otp-modal-backdrop" onClick={onClose}>
+      <div
+        className="otp-modal batch-payment-modal"
+        onClick={(e) => e.stopPropagation()}
+        style={{ maxWidth: 560, width: '95%' }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <h3 style={{ margin: 0 }}>💳 {t('familyDashboard.batchPayment.title') || 'Thanh toán hóa đơn'}</h3>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isProcessing}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              fontSize: 22,
+              cursor: isProcessing ? 'not-allowed' : 'pointer',
+              color: '#64748b',
+              padding: 0,
+              lineHeight: 1,
+            }}
+            aria-label="Close"
+          >
+            ×
+          </button>
+        </div>
+
+        <p style={{ margin: '0 0 12px', color: '#475569', fontSize: '0.9rem' }}>
+          {t('familyDashboard.batchPayment.subtitle', { name: resident?.fullName || resident?.residentCode || '' }) ||
+            `Chọn hóa đơn cần thanh toán cho ${resident?.fullName || ''}.`}
+        </p>
+
+        {/* Chọn tất cả */}
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: '10px 12px',
+            background: '#f1f5f9',
+            borderRadius: 8,
+            marginBottom: 10,
+          }}
+        >
+          <div
+            role="button"
+            tabIndex={isProcessing ? -1 : 0}
+            onClick={() => !isProcessing && onToggleSelectAll()}
+            onKeyDown={(e) => {
+              if (e.key === ' ' || e.key === 'Enter') {
+                e.preventDefault();
+                if (!isProcessing) onToggleSelectAll();
+              }
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              cursor: isProcessing ? 'not-allowed' : 'pointer',
+              fontWeight: 600,
+              fontSize: '0.9rem',
+              userSelect: 'none',
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={allSelected}
+              onChange={onToggleSelectAll}
+              disabled={isProcessing}
+              onClick={(e) => e.stopPropagation()}
+              style={{ width: 16, height: 16, cursor: 'pointer' }}
+            />
+            {allSelected
+              ? (t('familyDashboard.batchPayment.deselectAll') || 'Bỏ chọn tất cả')
+              : (t('familyDashboard.batchPayment.selectAll') || 'Chọn tất cả')}
+          </div>
+          <span style={{ fontSize: '0.82rem', color: '#64748b' }}>
+            {t('familyDashboard.batchPayment.selectedCount', { selected: selectedCount, total: invoices.length }) ||
+              `${selectedCount}/${invoices.length} đã chọn`}
+          </span>
+        </div>
+
+        {/* Danh sách hóa đơn */}
+        <div
+          style={{
+            maxHeight: 320,
+            overflowY: 'auto',
+            border: '1px solid #e2e8f0',
+            borderRadius: 8,
+            marginBottom: 12,
+          }}
+        >
+          {invoices.map((inv) => {
+            const checked = selectedInvoiceIds.has(inv._id);
+            const status = String(inv.status || '').toUpperCase();
+            const remaining = Number(inv.remainingAmount ?? inv.totalAmount ?? 0);
+            const isPartial = status === 'PARTIALLY_PAID';
+            const rowClickable = !isProcessing;
+            const handleRowClick = (e) => {
+              // Tránh trigger 2 lần khi click thẳng vào checkbox
+              if (e.target.tagName === 'INPUT') return;
+              if (!rowClickable) return;
+              onToggleInvoice(inv._id);
+            };
+            return (
+              <div
+                key={inv._id}
+                role="button"
+                tabIndex={rowClickable ? 0 : -1}
+                onClick={handleRowClick}
+                onKeyDown={(e) => {
+                  if (e.key === ' ' || e.key === 'Enter') {
+                    e.preventDefault();
+                    if (rowClickable) onToggleInvoice(inv._id);
+                  }
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: '10px 12px',
+                  borderBottom: '1px solid #f1f5f9',
+                  cursor: rowClickable ? 'pointer' : 'not-allowed',
+                  background: checked ? '#eff6ff' : '#fff',
+                  transition: 'background 0.15s ease',
+                  userSelect: 'none',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => onToggleInvoice(inv._id)}
+                  disabled={isProcessing}
+                  onClick={(e) => e.stopPropagation()}
+                  style={{ width: 16, height: 16, cursor: 'pointer', flexShrink: 0 }}
+                />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, fontSize: '0.88rem', color: '#0f172a' }}>
+                    {inv.invoiceNumber || inv._id}
+                  </div>
+                  <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: 2 }}>
+                    {inv.type === 'MEDICATION' ? '💊' : inv.type === 'SERVICE' || !inv.type ? '📋' : '🧾'}
+                    {' '}
+                    {inv.type === 'MEDICATION'
+                      ? (t('familyDashboard.invoice.medicationInvoices') || 'Hóa đơn thuốc')
+                      : (t('familyDashboard.invoice.serviceInvoices') || 'Hóa đơn dịch vụ')}
+                    {isPartial && (
+                      <span style={{ marginLeft: 6, color: '#d97706', fontWeight: 600 }}>
+                        (còn {formatMoney(remaining)})
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.92rem' }}>
+                    {formatMoney(Number(inv.totalAmount || 0))}
+                  </div>
+                  {isPartial && (
+                    <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                      đã trả {formatMoney(Number(inv.totalAmount || 0) - remaining)}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Tổng tiền */}
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: '12px 14px',
+            background: '#ecfdf5',
+            border: '1px solid #a7f3d0',
+            borderRadius: 8,
+            marginBottom: 10,
+          }}
+        >
+          <span style={{ fontWeight: 600, color: '#065f46' }}>
+            {t('familyDashboard.batchPayment.totalLabel') || 'Tổng tiền thanh toán'}
+          </span>
+          <strong style={{ fontSize: '1.15rem', color: '#047857' }}>
+            {formatMoney(totalSelected)}
+          </strong>
+        </div>
+
+        {walletError && (
+          <div
+            style={{
+              padding: '8px 12px',
+              background: '#fef2f2',
+              border: '1px solid #fecaca',
+              borderRadius: 6,
+              color: '#b91c1c',
+              fontSize: '0.85rem',
+              marginBottom: 10,
+            }}
+          >
+            {walletError}
+          </div>
+        )}
+
+        {/* Nút thanh toán */}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className="button button-secondary"
+            onClick={() => onPay('payos')}
+            disabled={isProcessing || selectedCount === 0}
+            style={{ flex: 1, minWidth: 140 }}
+          >
+            {isProcessing ? (t('familyDashboard.batchPayment.batchProcessing') || 'Đang xử lý…') : (t('familyDashboard.batchPayment.payWithPayOS') || 'Thanh toán PayOS')}
+          </button>
+          <button
+            type="button"
+            className="button button-primary"
+            onClick={() => onPay('wallet')}
+            disabled={isProcessing || selectedCount === 0 || insufficientWallet}
+            title={insufficientWallet ? (t('familyDashboard.wallet.insufficientBalance') || 'Số dư ví không đủ') : ''}
+            style={{
+              flex: 1,
+              minWidth: 160,
+              opacity: insufficientWallet ? 0.5 : 1,
+            }}
+          >
+            💰 {t('familyDashboard.batchPayment.payAllWithWallet') || 'Thanh toán toàn bộ (Ví)'}
+            <span style={{ fontSize: '0.75rem', opacity: 0.85, marginLeft: 6 }}>
+              ({formatMoney(walletBalance)})
+            </span>
+          </button>
+        </div>
+
+        {insufficientWallet && selectedCount > 0 && (
+          <p style={{ margin: '8px 0 0', fontSize: '0.78rem', color: '#b91c1c' }}>
+            {t('familyDashboard.wallet.insufficientDetail', {
+              need: formatMoney(totalSelected),
+              have: formatMoney(walletBalance),
+            }) || `Số dư ví không đủ (cần ${formatMoney(totalSelected)}, có ${formatMoney(walletBalance)}).`}
+          </p>
+        )}
+      </div>
     </div>
   );
 }
@@ -639,11 +940,11 @@ function FamilyDashboardPage() {
 function ResidentListItem({
   resident, invoices, latestInvoice, hasServicePackage,
   isExpanded, onToggle, expandedInvoiceIds, onToggleInvoice,
-  onOpenCheckout, onPayWithWallet, onCreateInvoice,
-  hasUnpaidServiceInvoice, creatingInvoiceFor, isWalletPaymentProcessing, walletLoading, checkoutLoadingInvoiceId,
+  onOpenCheckout, onPayWithWallet, onCreateInvoice, onOpenPaymentModal,
+  hasUnpaidServiceInvoice, totalUnpaidCount, creatingInvoiceFor, isWalletPaymentProcessing, walletLoading, checkoutLoadingInvoiceId,
 }) {
   const { t } = useTranslation();
-  const unpaidCount = invoices.filter((inv) => !['PAID', 'CANCELLED'].includes(String(inv.status || '').toUpperCase())).length;
+  const unpaidCount = totalUnpaidCount ?? invoices.filter((inv) => !['PAID', 'CANCELLED'].includes(String(inv.status || '').toUpperCase())).length;
 
   return (
     <article className={`family-resident-row ${isExpanded ? 'family-resident-row--open' : ''}`}>
@@ -699,6 +1000,15 @@ function ResidentListItem({
           )}
 
           <div className="family-resident-row__actions">
+            {unpaidCount >= 2 && (
+              <button
+                type="button"
+                className="button button-primary"
+                onClick={() => onOpenPaymentModal(resident)}
+              >
+                💳 {t('familyDashboard.invoice.payMultiple') || 'Thanh toán nhiều hóa đơn'} ({unpaidCount})
+              </button>
+            )}
             {latestInvoice && latestInvoice.status === 'PAID' ? (
               <button type="button" className="button button-secondary" disabled>
                 {t('familyDashboard.invoice.allPaid')}
