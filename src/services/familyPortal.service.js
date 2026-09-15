@@ -42,6 +42,12 @@ const getInvoicePaymentUrl = async (residentId, invoiceId) => {
   return response.data.data || response.data;
 };
 
+// Get invoice detail for preview
+const getInvoiceDetail = async (residentId, invoiceId) => {
+  const response = await axiosClient.get(`/family/residents/${residentId}/invoices/${invoiceId}`);
+  return response.data.data || response.data;
+};
+
 const initiateWalletPayment = async (payload) => {
   const response = await axiosClient.post('/family/wallet/payments/initiate', payload);
   return response.data.data || response.data;
@@ -108,6 +114,7 @@ export default {
   createInvoice,
   payInvoice,
   getInvoicePaymentUrl,
+  getInvoiceDetail,
   initiateWalletPayment,
   verifyWalletPayment,
   batchPayment,

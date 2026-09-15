@@ -32,8 +32,8 @@ export const validateMedicationForm = (form) => {
     return { valid: false, message: 'Nhà cung cấp là bắt buộc.' };
   }
   const minStockLevel = Number(form.minStockLevel);
-  if (Number.isNaN(minStockLevel) || minStockLevel <= 1000) {
-    return { valid: false, message: 'Mức tối thiểu phải lớn hơn 1000.' };
+  if (Number.isNaN(minStockLevel) || minStockLevel <= 1) {
+    return { valid: false, message: 'Mức tối thiểu phải lớn hơn 1.' };
   }
   return { valid: true };
 };
@@ -47,6 +47,7 @@ export const buildMedicationPayload = (form) => ({
   manufacturer: trim(form.manufacturer) || undefined,
   description: trim(form.description) || undefined,
   minStockLevel: Number(form.minStockLevel) || 0,
+  price: form.price != null && form.price !== '' ? Number(form.price) : undefined,
   isActive: Boolean(form.isActive),
 });
 

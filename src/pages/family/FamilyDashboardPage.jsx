@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AlertTriangle, CheckCircle, CreditCard, Package, Users, Wallet, PlusCircle, Search, ChevronDown } from 'lucide-react';
+import { AlertTriangle, CheckCircle, CreditCard, Package, Users, Wallet, PlusCircle, Search, ChevronDown, Eye, Printer, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import residentService from '../../services/resident.service';
 import familyPortalService from '../../services/familyPortal.service';
@@ -49,10 +49,39 @@ const matchesInvoiceFilter = (invoice, filter) => {
   return !['PAID', 'CANCELLED'].includes(status);
 };
 
+// Generate a user-friendly invoice label like "Dịch vụ tháng 6/2026" instead of raw invoice number
+const getInvoiceLabel = (invoice) => {
+  // Try to get the period date from billingPeriodStart or issuedAt
+  const periodDate = invoice.billingPeriodStart
+    ? new Date(invoice.billingPeriodStart)
+    : (invoice.issuedAt ? new Date(invoice.issuedAt) : null);
+
+  const invoiceType = String(invoice.type || '').toUpperCase();
+  let prefix = '';
+
+  if (invoiceType === 'MEDICATION') {
+    prefix = 'Thuốc';
+  } else if (invoiceType === 'SERVICE') {
+    prefix = 'Dịch vụ';
+  } else if (invoiceType === 'OTHER') {
+    prefix = 'Chi phí khác';
+  } else {
+    prefix = 'Hóa đơn';
+  }
+
+  if (periodDate && !isNaN(periodDate.getTime())) {
+    const month = periodDate.getMonth() + 1;
+    const year = periodDate.getFullYear();
+    return `${prefix} tháng ${month}/${year}`;
+  }
+
+  return prefix;
+};
+
 const INVOICE_GROUPS = [
-  { key: 'service', i18nKey: 'familyDashboard.invoice.serviceInvoices', icon: '📋', theme: 'service', match: (inv) => inv.type === 'SERVICE' || !inv.type },
-  { key: 'medication', i18nKey: 'familyDashboard.invoice.medicationInvoices', icon: '💊', theme: 'medication', match: (inv) => inv.type === 'MEDICATION' },
-  { key: 'other', i18nKey: 'familyDashboard.invoice.otherInvoices', icon: '🧾', theme: 'other', match: (inv) => inv.type && inv.type !== 'SERVICE' && inv.type !== 'MEDICATION' },
+  { key: 'service', i18nKey: 'familyDashboard.invoice.serviceInvoices', icon: '', theme: 'service', match: (inv) => inv.type === 'SERVICE' || !inv.type },
+  { key: 'medication', i18nKey: 'familyDashboard.invoice.medicationInvoices', icon: '', theme: 'medication', match: (inv) => inv.type === 'MEDICATION' },
+  { key: 'other', i18nKey: 'familyDashboard.invoice.otherInvoices', icon: '', theme: 'other', match: (inv) => inv.type && inv.type !== 'SERVICE' && inv.type !== 'MEDICATION' },
 ];
 
 function FamilyDashboardPage() {
@@ -84,6 +113,10 @@ function FamilyDashboardPage() {
   const [expandedResidentIds, setExpandedResidentIds] = useState(new Set());
   const [expandedInvoiceIds, setExpandedInvoiceIds] = useState(new Set());
   const [checkoutLoadingInvoiceId, setCheckoutLoadingInvoiceId] = useState(null);
+  const [previewInvoice, setPreviewInvoice] = useState(null); // { invoice, resident }
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [totalPreviewData, setTotalPreviewData] = useState(null); // { resident, invoices }
+  const [totalPreviewLoading, setTotalPreviewLoading] = useState(false);
   const navigate = useNavigate();
 
   const toggleResident = (residentId) => {
@@ -173,6 +206,61 @@ function FamilyDashboardPage() {
     } finally {
       setCheckoutLoadingInvoiceId(null);
     }
+  };
+
+  // Handle preview invoice details
+  const handleOpenInvoicePreview = async (residentId, invoiceId) => {
+    if (!invoiceId) return;
+    try {
+      setPreviewLoading(true);
+      setError(null);
+      const invoiceDetail = await familyPortalService.getInvoiceDetail(residentId, invoiceId);
+      console.log('[DEBUG invoicePreview] invoiceDetail:', JSON.stringify(invoiceDetail?.prescriptionId?.items, null, 2));
+      // Find the resident
+      const resident = residents.find(r => r._id === residentId) || {};
+      setPreviewInvoice({ invoice: invoiceDetail, resident });
+    } catch (err) {
+      console.error('Failed to load invoice preview:', err);
+      setError(err?.response?.data?.message || err.message || t('familyDashboard.invoice.previewError'));
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  const closeInvoicePreview = () => {
+    setPreviewInvoice(null);
+  };
+
+  // Handle preview of all invoices for a resident (total bill)
+  const handleOpenTotalPreview = async (residentId) => {
+    try {
+      setTotalPreviewLoading(true);
+      setError(null);
+      // Load all invoice details for this resident
+      const resident = residents.find(r => r._id === residentId) || {};
+      const invoiceIds = (invoicesList[residentId] || []).map(inv => inv._id);
+      // Fetch full details for each invoice
+      const enrichedInvoices = await Promise.all(
+        invoiceIds.map(async (invId) => {
+          try {
+            const detail = await familyPortalService.getInvoiceDetail(residentId, invId);
+            return detail;
+          } catch {
+            return (invoicesList[residentId] || []).find(inv => inv._id === invId) || null;
+          }
+        })
+      );
+      setTotalPreviewData({ resident, invoices: enrichedInvoices.filter(Boolean) });
+    } catch (err) {
+      console.error('Failed to load total preview:', err);
+      setError(err?.response?.data?.message || err.message || 'Không thể tải hóa đơn tổng');
+    } finally {
+      setTotalPreviewLoading(false);
+    }
+  };
+
+  const closeTotalPreview = () => {
+    setTotalPreviewData(null);
   };
 
   const handleWalletTopup = async () => {
@@ -595,6 +683,12 @@ function FamilyDashboardPage() {
             (inv) => !['PAID', 'CANCELLED'].includes(String(inv.status || '').toUpperCase())
           ).length;
 
+          // Compute grand totals for all invoices of this resident
+          const grandTotalAll = allInvoices.reduce((sum, inv) => sum + Number(inv.totalAmount || 0), 0);
+          const grandTotalUnpaid = allInvoices
+            .filter((inv) => !['PAID', 'CANCELLED'].includes(String(inv.status || '').toUpperCase()))
+            .reduce((sum, inv) => sum + Number(inv.totalAmount || 0), 0);
+
           return (
             <ResidentListItem
               key={resident._id}
@@ -607,6 +701,7 @@ function FamilyDashboardPage() {
               expandedInvoiceIds={expandedInvoiceIds}
               onToggleInvoice={toggleInvoice}
               onOpenCheckout={handleOpenCheckout}
+              onOpenInvoicePreview={handleOpenInvoicePreview}
               onPayWithWallet={handlePayWithWallet}
               onCreateInvoice={handleCreateInvoice}
               onOpenPaymentModal={handleOpenPaymentModal}
@@ -616,6 +711,9 @@ function FamilyDashboardPage() {
               isWalletPaymentProcessing={isWalletPaymentProcessing}
               walletLoading={walletLoading}
               checkoutLoadingInvoiceId={checkoutLoadingInvoiceId}
+              grandTotalAll={grandTotalAll}
+              grandTotalUnpaid={grandTotalUnpaid}
+              onOpenTotalPreview={() => handleOpenTotalPreview(resident._id)}
             />
           );
         })}
@@ -667,6 +765,32 @@ function FamilyDashboardPage() {
           walletError={walletError}
         />
       )}
+
+      {/* Modal: Xem trước hóa đơn */}
+      {previewInvoice && (
+        <InvoicePreviewModal
+          invoice={previewInvoice.invoice}
+          resident={previewInvoice.resident}
+          onClose={closeInvoicePreview}
+          onCheckout={() => {
+            closeInvoicePreview();
+            handleOpenCheckout(previewInvoice.resident._id, previewInvoice.invoice._id);
+          }}
+          onPayWithWallet={() => {
+            closeInvoicePreview();
+            handlePayWithWallet(previewInvoice.resident._id, previewInvoice.invoice._id, previewInvoice.invoice.totalAmount || 0);
+          }}
+        />
+      )}
+
+      {/* Modal: Xem trước hóa đơn tổng */}
+      {totalPreviewData && (
+        <TotalInvoicePreviewModal
+          resident={totalPreviewData.resident}
+          invoices={totalPreviewData.invoices}
+          onClose={closeTotalPreview}
+        />
+      )}
     </div>
   );
 }
@@ -694,7 +818,7 @@ function BatchPaymentModal({
         style={{ maxWidth: 560, width: '95%' }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <h3 style={{ margin: 0 }}>💳 {t('familyDashboard.batchPayment.title') || 'Thanh toán hóa đơn'}</h3>
+          <h3 style={{ margin: 0 }}>{t('familyDashboard.batchPayment.title') || 'Thanh toán hóa đơn'}</h3>
           <button
             type="button"
             onClick={onClose}
@@ -828,8 +952,6 @@ function BatchPaymentModal({
                     {inv.invoiceNumber || inv._id}
                   </div>
                   <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: 2 }}>
-                    {inv.type === 'MEDICATION' ? '💊' : inv.type === 'SERVICE' || !inv.type ? '📋' : '🧾'}
-                    {' '}
                     {inv.type === 'MEDICATION'
                       ? (t('familyDashboard.invoice.medicationInvoices') || 'Hóa đơn thuốc')
                       : (t('familyDashboard.invoice.serviceInvoices') || 'Hóa đơn dịch vụ')}
@@ -915,7 +1037,7 @@ function BatchPaymentModal({
               opacity: insufficientWallet ? 0.5 : 1,
             }}
           >
-            💰 {t('familyDashboard.batchPayment.payAllWithWallet') || 'Thanh toán toàn bộ (Ví)'}
+            {t('familyDashboard.batchPayment.payAllWithWallet') || 'Thanh toán toàn bộ (Ví)'}
             <span style={{ fontSize: '0.75rem', opacity: 0.85, marginLeft: 6 }}>
               ({formatMoney(walletBalance)})
             </span>
@@ -940,8 +1062,9 @@ function BatchPaymentModal({
 function ResidentListItem({
   resident, invoices, latestInvoice, hasServicePackage,
   isExpanded, onToggle, expandedInvoiceIds, onToggleInvoice,
-  onOpenCheckout, onPayWithWallet, onCreateInvoice, onOpenPaymentModal,
+  onOpenCheckout, onOpenInvoicePreview, onPayWithWallet, onCreateInvoice, onOpenPaymentModal,
   hasUnpaidServiceInvoice, totalUnpaidCount, creatingInvoiceFor, isWalletPaymentProcessing, walletLoading, checkoutLoadingInvoiceId,
+  grandTotalAll, grandTotalUnpaid, onOpenTotalPreview,
 }) {
   const { t } = useTranslation();
   const unpaidCount = totalUnpaidCount ?? invoices.filter((inv) => !['PAID', 'CANCELLED'].includes(String(inv.status || '').toUpperCase())).length;
@@ -972,6 +1095,40 @@ function ResidentListItem({
             </div>
           )}
 
+          {/* Tổng hóa đơn tất cả dịch vụ */}
+          {invoices.length > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: '#f8fafc', borderRadius: 8, marginTop: 8, border: '1px solid #e2e8f0' }}>
+              <div>
+                <div style={{ fontSize: 12, color: '#64748b', marginBottom: 2 }}>Hóa đơn tổng</div>
+                <div style={{ fontSize: 13, color: '#94a3b8' }}>{invoices.length} hóa đơn</div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ textAlign: 'right' }}>
+                  {grandTotalUnpaid > 0 && (
+                    <>
+                      <div style={{ fontSize: 12, color: '#dc2626', marginBottom: 2 }}>Còn nợ</div>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: '#dc2626' }}>{formatMoney(grandTotalUnpaid)}</div>
+                    </>
+                  )}
+                  {grandTotalUnpaid === 0 && invoices.length > 0 && (
+                    <>
+                      <div style={{ fontSize: 12, color: '#16a34a', marginBottom: 2 }}>Đã thanh toán</div>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: '#16a34a' }}>{formatMoney(grandTotalAll)}</div>
+                    </>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onOpenTotalPreview && onOpenTotalPreview()}
+                  style={{ padding: '5px 10px', fontSize: 12, background: '#3b82f6', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                  title="Xem trước hóa đơn tổng"
+                >
+                  <Eye size={13} /> Xem trước
+                </button>
+              </div>
+            </div>
+          )}
+
           {invoices.length === 0 ? (
             <div className="info-row">
               <strong>{t('familyDashboard.resident.invoiceStatus')}</strong>
@@ -990,6 +1147,7 @@ function ResidentListItem({
                   expandedInvoiceIds={expandedInvoiceIds}
                   onToggleInvoice={onToggleInvoice}
                   onOpenCheckout={onOpenCheckout}
+                  onOpenInvoicePreview={onOpenInvoicePreview}
                   onPayWithWallet={onPayWithWallet}
                   isWalletPaymentProcessing={isWalletPaymentProcessing}
                   walletLoading={walletLoading}
@@ -1006,7 +1164,7 @@ function ResidentListItem({
                 className="button button-primary"
                 onClick={() => onOpenPaymentModal(resident)}
               >
-                💳 {t('familyDashboard.invoice.payMultiple') || 'Thanh toán nhiều hóa đơn'} ({unpaidCount})
+                {t('familyDashboard.invoice.payMultiple') || 'Thanh toán nhiều hóa đơn'} ({unpaidCount})
               </button>
             )}
             {latestInvoice && latestInvoice.status === 'PAID' ? (
@@ -1044,11 +1202,11 @@ function ResidentListItem({
 
 /* ══════════════════════ Invoice group + row (nested accordion) ══════════════════════ */
 
-function InvoiceGroup({ group, invoices, resident, expandedInvoiceIds, onToggleInvoice, onOpenCheckout, onPayWithWallet, isWalletPaymentProcessing, walletLoading, checkoutLoadingInvoiceId }) {
+function InvoiceGroup({ group, invoices, resident, expandedInvoiceIds, onToggleInvoice, onOpenCheckout, onOpenInvoicePreview, onPayWithWallet, isWalletPaymentProcessing, walletLoading, checkoutLoadingInvoiceId }) {
   const { t } = useTranslation();
   return (
     <div className={`family-invoice-group family-invoice-group--${group.theme}`}>
-      <div className="family-invoice-group__title">{group.icon} {t(group.i18nKey)}</div>
+      <div className="family-invoice-group__title">{t(group.i18nKey)}</div>
       {invoices.map((invoice, idx) => (
         <InvoiceRow
           key={invoice._id || idx}
@@ -1058,6 +1216,7 @@ function InvoiceGroup({ group, invoices, resident, expandedInvoiceIds, onToggleI
           isExpanded={expandedInvoiceIds.has(invoice._id)}
           onToggle={() => onToggleInvoice(invoice._id)}
           onOpenCheckout={onOpenCheckout}
+          onOpenInvoicePreview={onOpenInvoicePreview}
           onPayWithWallet={onPayWithWallet}
           isWalletPaymentProcessing={isWalletPaymentProcessing}
           walletLoading={walletLoading}
@@ -1081,7 +1240,7 @@ const INVOICE_COST_FIELDS_BY_THEME = {
   other: [],
 };
 
-function InvoiceRow({ invoice, theme, resident, isExpanded, onToggle, onOpenCheckout, onPayWithWallet, isWalletPaymentProcessing, walletLoading, checkoutLoadingInvoiceId }) {
+function InvoiceRow({ invoice, theme, resident, isExpanded, onToggle, onOpenCheckout, onOpenInvoicePreview, onPayWithWallet, isWalletPaymentProcessing, walletLoading, checkoutLoadingInvoiceId }) {
   const { t } = useTranslation();
   const invoiceStatus = invoice?.status?.toString().toUpperCase?.();
   const invoiceTotalAmount = invoice?.totalAmount ?? invoice?.total ?? 0;
@@ -1093,7 +1252,7 @@ function InvoiceRow({ invoice, theme, resident, isExpanded, onToggle, onOpenChec
   return (
     <div className={`family-invoice-row ${isExpanded ? 'family-invoice-row--open' : ''}`}>
       <button type="button" className="family-invoice-row__summary" onClick={onToggle}>
-        <span className="family-invoice-row__number">{invoice.invoiceNumber}</span>
+        <span className="family-invoice-row__number">{getInvoiceLabel(invoice)}</span>
         <span className="family-invoice-row__due">
           {invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString('vi-VN') : '-'}
         </span>
@@ -1106,6 +1265,10 @@ function InvoiceRow({ invoice, theme, resident, isExpanded, onToggle, onOpenChec
 
       {isExpanded && (
         <div className="family-invoice-row__detail">
+          {/* Invoice number for reference */}
+          <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 8 }}>
+            Mã: {invoice.invoiceNumber}
+          </div>
           {costFields.map((field) => (
             (field.showIf ? field.showIf(invoice) : invoice[field.key] > 0) && (
               <div className="info-row" key={field.key} style={{ marginBottom: '6px', fontSize: '13px' }}>
@@ -1116,14 +1279,115 @@ function InvoiceRow({ invoice, theme, resident, isExpanded, onToggle, onOpenChec
           ))}
           {invoice.items && invoice.items.length > 0 && (
             <div style={{ marginTop: '8px', marginBottom: 6 }}>
-              <div style={{ fontSize: 12, color: '#475569', marginBottom: 6 }}>{t('familyDashboard.invoice.itemsDetail')}</div>
-              {invoice.items.map((it, i) => (
-                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '4px 0' }}>
-                  <div style={{ color: '#0f172a' }}>{it.description || it.name || t('familyDashboard.invoice.defaultItem')}</div>
-                  <div style={{ fontWeight: 700, color: '#0f172a' }}>{formatMoney(it.amount)}</div>
+              <div style={{ fontSize: 12, color: '#475569', marginBottom: 6, fontWeight: 600 }}>{t('familyDashboard.invoice.itemsDetail')}</div>
+              {/* Table container with horizontal scroll */}
+              <div style={{ overflowX: 'auto' }}>
+                {/* Header row */}
+                <div style={{ display: 'grid', gridTemplateColumns: '40px 2fr 50px 50px 1fr 1fr 55px 1fr 1fr', gap: 4, fontSize: 11, fontWeight: 600, color: '#64748b', paddingBottom: 6, borderBottom: '1px solid #e2e8f0', alignItems: 'center', minWidth: 700 }}>
+                  <span style={{ textAlign: 'center' }}>STT</span>
+                  <span>Tên thuốc</span>
+                  <span style={{ textAlign: 'center' }}>ĐVT</span>
+                  <span style={{ textAlign: 'center' }}>SL</span>
+                  <span style={{ textAlign: 'right' }}>Đơn giá</span>
+                  <span style={{ textAlign: 'right' }}>TT chưa thuế</span>
+                  <span style={{ textAlign: 'center' }}>Thuế</span>
+                  <span style={{ textAlign: 'right' }}>Tiền thuế</span>
+                  <span style={{ textAlign: 'right' }}>Thành tiền</span>
                 </div>
-              ))}
+                {invoice.items.map((it, i) => {
+                  const price = Number(it.price) || Number(it.unitPrice) || Number(it.amount) || 0;
+                  const quantity = Number(it.quantity) || 1;
+                  const taxRate = Number(it.taxRate) || 0.05;
+                  const beforeTax = price * quantity;
+                  const taxAmt = Math.round(beforeTax * taxRate * 100) / 100;
+                  const subtotal = beforeTax + taxAmt;
+
+                  return (
+                    <div key={i} style={{ display: 'grid', gridTemplateColumns: '40px 2fr 50px 50px 1fr 1fr 55px 1fr 1fr', gap: 4, fontSize: 13, padding: '8px 0', borderBottom: '1px solid #f1f5f9', alignItems: 'center', minWidth: 700 }}>
+                      <div style={{ textAlign: 'center', color: '#64748b' }}>{i + 1}</div>
+                      <div style={{ color: '#0f172a' }}>
+                        <div>{it.description || it.name || t('familyDashboard.invoice.defaultItem')}</div>
+                        {it.dosage && <div style={{ fontSize: 11, color: '#64748b' }}>{it.dosage} {it.unit || ''} • {it.frequency || 1}×/ngày</div>}
+                      </div>
+                      <div style={{ textAlign: 'center', color: '#64748b' }}>{it.unit || 'lần'}</div>
+                      <div style={{ textAlign: 'center', color: '#0f172a', fontWeight: 600 }}>{quantity}</div>
+                      <div style={{ textAlign: 'right', color: '#64748b' }}>{formatMoney(price)}</div>
+                      <div style={{ textAlign: 'right', color: '#64748b' }}>{formatMoney(beforeTax)}</div>
+                      <div style={{ textAlign: 'center', color: '#64748b' }}>{(taxRate * 100).toFixed(0)}%</div>
+                      <div style={{ textAlign: 'right', color: '#64748b' }}>{formatMoney(taxAmt)}</div>
+                      <div style={{ textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>{formatMoney(subtotal)}</div>
+                    </div>
+                  );
+                })}
+                {/* Total */}
+                <div style={{ marginTop: 8, paddingTop: 8, borderTop: '2px solid #e2e8f0' }}>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 16, fontSize: 14, fontWeight: 700, color: '#047857' }}>
+                    <span>Tổng cộng (đã bao gồm VAT):</span>
+                    <span style={{ width: 120, textAlign: 'right' }}>{formatMoney(invoiceTotalAmount)}</span>
+                  </div>
+                </div>
+              </div>
             </div>
+          )}
+          {/* Display prescription items for medication invoices that don't have items populated yet */}
+          {!invoice.items || invoice.items.length === 0 && invoice.prescriptionId && (
+            (() => {
+              const presItems = invoice.prescriptionId?.items || [];
+              if (presItems.length === 0) return null;
+              return (
+                <div style={{ marginTop: '8px', marginBottom: 6 }}>
+                  <div style={{ fontSize: 12, color: '#475569', marginBottom: 6, fontWeight: 600 }}>{t('familyDashboard.invoice.itemsDetail')}</div>
+                  {/* Table container with horizontal scroll */}
+                  <div style={{ overflowX: 'auto' }}>
+                    {/* Header row */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '40px 2fr 50px 50px 1fr 1fr 55px 1fr 1fr', gap: 4, fontSize: 11, fontWeight: 600, color: '#64748b', paddingBottom: 6, borderBottom: '1px solid #e2e8f0', alignItems: 'center', minWidth: 700 }}>
+                      <span style={{ textAlign: 'center' }}>STT</span>
+                      <span>Tên thuốc</span>
+                      <span style={{ textAlign: 'center' }}>ĐVT</span>
+                      <span style={{ textAlign: 'center' }}>SL</span>
+                      <span style={{ textAlign: 'right' }}>Đơn giá</span>
+                      <span style={{ textAlign: 'right' }}>TT chưa thuế</span>
+                      <span style={{ textAlign: 'center' }}>Thuế</span>
+                      <span style={{ textAlign: 'right' }}>Tiền thuế</span>
+                      <span style={{ textAlign: 'right' }}>Thành tiền</span>
+                    </div>
+                    {presItems.filter(item => item.isActive !== false).map((it, i) => {
+                      const medName = it.medicationId?.name || it.medicationName || it.name || `Thuốc ${i + 1}`;
+                      const price = Number(it.price) || Number(it.unitPrice) || 0;
+                      const quantity = Number(it.quantity) || 1;
+                      const taxRate = Number(it.taxRate) || 0.05;
+                      const beforeTax = price * quantity;
+                      const taxAmt = Math.round(beforeTax * taxRate * 100) / 100;
+                      const subtotal = beforeTax + taxAmt;
+
+                      return (
+                        <div key={i} style={{ display: 'grid', gridTemplateColumns: '40px 2fr 50px 50px 1fr 1fr 55px 1fr 1fr', gap: 4, fontSize: 13, padding: '8px 0', borderBottom: '1px solid #f1f5f9', alignItems: 'center', minWidth: 700 }}>
+                          <div style={{ textAlign: 'center', color: '#64748b' }}>{i + 1}</div>
+                          <div style={{ color: '#0f172a' }}>
+                            <div>{medName}</div>
+                            {it.dosage && <div style={{ fontSize: 11, color: '#64748b' }}>{it.dosage} {it.unit || ''} • {it.frequency || 1}×/ngày</div>}
+                          </div>
+                          <div style={{ textAlign: 'center', color: '#64748b' }}>{it.unit || 'viên'}</div>
+                          <div style={{ textAlign: 'center', color: '#0f172a', fontWeight: 600 }}>{quantity}</div>
+                          <div style={{ textAlign: 'right', color: '#64748b' }}>{price > 0 ? formatMoney(price) : '—'}</div>
+                          <div style={{ textAlign: 'right', color: '#64748b' }}>{beforeTax > 0 ? formatMoney(beforeTax) : '—'}</div>
+                          <div style={{ textAlign: 'center', color: '#64748b' }}>{(taxRate * 100).toFixed(0)}%</div>
+                          <div style={{ textAlign: 'right', color: '#64748b' }}>{taxAmt > 0 ? formatMoney(taxAmt) : '—'}</div>
+                          <div style={{ textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>{subtotal > 0 ? formatMoney(subtotal) : '—'}</div>
+                        </div>
+                      );
+                    })}
+                    {/* Total */}
+                    <div style={{ marginTop: 8, paddingTop: 8, borderTop: '2px solid #e2e8f0' }}>
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 16, fontSize: 14, fontWeight: 700, color: '#047857' }}>
+                        <span>Tổng cộng (đã bao gồm VAT):</span>
+                        <span style={{ width: 120, textAlign: 'right' }}>{formatMoney(invoiceTotalAmount)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()
           )}
           <div className={`family-invoice-row__grand-total family-invoice-row__grand-total--${theme}`}>
             <strong>{t('familyDashboard.invoice.grandTotal')}</strong>
@@ -1136,7 +1400,16 @@ function InvoiceRow({ invoice, theme, resident, isExpanded, onToggle, onOpenChec
             </div>
           )}
           {!isPaid && !isCancelled && (
-            <div style={{ marginTop: '8px', display: 'flex', gap: '8px' }}>
+            <div style={{ marginTop: '8px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="button button-secondary"
+                onClick={() => onOpenInvoicePreview(resident._id, invoice._id)}
+                title={t('familyDashboard.invoice.preview') || 'Xem trước hóa đơn'}
+              >
+                <Eye size={14} style={{ marginRight: 4 }} />
+                {t('familyDashboard.invoice.preview') || 'Xem trước'}
+              </button>
               <button
                 type="button"
                 className="button button-primary"
@@ -1155,8 +1428,1133 @@ function InvoiceRow({ invoice, theme, resident, isExpanded, onToggle, onOpenChec
               </button>
             </div>
           )}
+          {isPaid && (
+            <div style={{ marginTop: '8px', display: 'flex', gap: '8px' }}>
+              <button
+                type="button"
+                className="button button-secondary"
+                onClick={() => onOpenInvoicePreview(resident._id, invoice._id)}
+                title={t('familyDashboard.invoice.preview') || 'Xem trước hóa đơn'}
+              >
+                <Eye size={14} style={{ marginRight: 4 }} />
+                {t('familyDashboard.invoice.preview') || 'Xem trước'}
+              </button>
+            </div>
+          )}
         </div>
       )}
+    </div>
+  );
+}
+
+/* ══════════════════════ Invoice Preview Modal ══════════════════════ */
+
+function InvoicePreviewModal({ invoice, resident, onClose, onCheckout, onPayWithWallet }) {
+  const { t } = useTranslation();
+  const invoiceStatus = invoice?.status?.toString().toUpperCase?.();
+  const invoiceTotalAmount = invoice?.totalAmount ?? invoice?.total ?? 0;
+  const isPaid = invoiceStatus === 'PAID';
+  const isCancelled = invoiceStatus === 'CANCELLED';
+
+  const handlePrint = () => {
+    const printWindow = window.open('', '_blank', 'width=800,height=900');
+    if (!printWindow) return;
+
+    const invoiceType = String(invoice.type || '').toUpperCase();
+    const isMedication = invoiceType === 'MEDICATION';
+
+    // Build items HTML
+    let itemsHtml = '';
+    const presItems = invoice.prescriptionId?.items || [];
+    
+    if (presItems.length > 0) {
+      // Calculate totals
+      let totalPills = 0;
+      let totalDays = 0;
+      let totalBeforeTax = 0;
+      let totalTax = 0;
+      presItems.forEach(it => {
+        const qty = Number(it.quantity) || 0;
+        const freq = Number(it.frequency) || 0;
+        const dur = Number(it.duration) || 0;
+        if (qty > 0) {
+          totalPills += qty;
+        } else if (freq > 0 && dur > 0) {
+          totalPills += freq * dur;
+        }
+        if (dur > 0) totalDays = Math.max(totalDays, dur);
+        
+        // Calculate price and tax
+        const medPrice = Number(it.price) || Number(it.medicationId?.price) || 0;
+        const taxRate = Number(it.taxRate) || 0.05;
+        const beforeTax = medPrice * qty;
+        const taxAmt = beforeTax * taxRate;
+        totalBeforeTax += beforeTax;
+        totalTax += taxAmt;
+      });
+      
+      itemsHtml = presItems.map((it, i) => {
+        const medName = it.medicationId?.name || it.medicationName || `Thuốc ${i + 1}`;
+        const qty = Number(it.quantity) || 0;
+        const medPrice = Number(it.price) || Number(it.medicationId?.price) || 0;
+        const taxRate = Number(it.taxRate) || 0.05;
+        const beforeTax = medPrice * qty;
+        const taxAmt = Math.round(beforeTax * taxRate * 100) / 100;
+        const subtotal = beforeTax + taxAmt;
+
+        return `
+          <tr>
+            <td style="text-align:center;">${i + 1}</td>
+            <td><strong>${medName}</strong><br/><span style="font-size:11px;color:#555;">${it.dosage || ''} ${it.unit || ''} • ${it.frequency || 1}×/ngày</span></td>
+            <td style="text-align:center;">${it.unit || 'viên'}</td>
+            <td style="text-align:center;">${qty}</td>
+            <td style="text-align:right;">${medPrice > 0 ? formatMoney(medPrice) : '-'}</td>
+            <td style="text-align:right;">${beforeTax > 0 ? formatMoney(beforeTax) : '-'}</td>
+            <td style="text-align:center;">${(taxRate * 100).toFixed(0)}%</td>
+            <td style="text-align:right;">${taxAmt > 0 ? formatMoney(taxAmt) : '-'}</td>
+            <td style="text-align:right; font-weight:700;">${subtotal > 0 ? formatMoney(subtotal) : '-'}</td>
+          </tr>
+        `;
+      }).join('');
+      
+      // Add summary row for medications
+      if (totalPills > 0 || totalDays > 0) {
+        itemsHtml += `
+          <tr style="background: #f0fdf4; font-weight: bold;">
+            <td colspan="8">Tổng cộng: ${totalPills} viên ${totalDays > 0 ? `/ ${totalDays} ngày` : ''}</td>
+            <td>${formatMoney(invoiceTotalAmount)}</td>
+          </tr>
+        `;
+      }
+    } else {
+      // Show cost breakdown instead - for service invoices
+      const costRows = [];
+      
+      // Show individual items if available (from medical charges)
+      if (invoice.items && invoice.items.length > 0) {
+        invoice.items.forEach((it, i) => {
+          const price = Number(it.amount) || Number(it.price) || 0;
+          const quantity = Number(it.quantity) || 1;
+          const taxRate = 0.05;
+          const beforeTax = price * quantity;
+          const taxAmt = Math.round(beforeTax * taxRate * 100) / 100;
+          const subtotal = beforeTax + taxAmt;
+          const itemName = it.description || it.name || `Dịch vụ ${i + 1}`;
+          const unit = it.unit || 'lần';
+          costRows.push(`<tr><td style="text-align:center;">${i + 1}</td><td>${itemName}</td><td style="text-align:center;">${unit}</td><td style="text-align:center;">${quantity}</td><td style="text-align:right;">${formatMoney(price)}</td><td style="text-align:right;">${formatMoney(beforeTax)}</td><td style="text-align:center;">5%</td><td style="text-align:right;">${formatMoney(taxAmt)}</td><td style="text-align:right; font-weight:700;">${formatMoney(subtotal)}</td></tr>`);
+        });
+      } else {
+        // Fallback to summary costs
+        if (invoice.careServiceCost > 0) {
+          costRows.push(`<tr><td style="text-align:center;">1</td><td>Chi phí chăm sóc</td><td style="text-align:center;">tháng</td><td style="text-align:center;">1</td><td style="text-align:right;">${formatMoney(invoice.careServiceCost)}</td><td style="text-align:right;">${formatMoney(invoice.careServiceCost)}</td><td style="text-align:center;">0%</td><td style="text-align:right;">0 đ</td><td style="text-align:right;">${formatMoney(invoice.careServiceCost)}</td></tr>`);
+        }
+        if (invoice.roomCost > 0) {
+          costRows.push(`<tr><td style="text-align:center;">2</td><td>Chi phí phòng</td><td style="text-align:center;">tháng</td><td style="text-align:center;">1</td><td style="text-align:right;">${formatMoney(invoice.roomCost)}</td><td style="text-align:right;">${formatMoney(invoice.roomCost)}</td><td style="text-align:center;">0%</td><td style="text-align:right;">0 đ</td><td style="text-align:right;">${formatMoney(invoice.roomCost)}</td></tr>`);
+        }
+        if (invoice.medicationCost > 0) {
+          costRows.push(`<tr><td style="text-align:center;">3</td><td>Chi phí thuốc</td><td style="text-align:center;">tháng</td><td style="text-align:center;">1</td><td style="text-align:right;">${formatMoney(invoice.medicationCost)}</td><td style="text-align:right;">${formatMoney(invoice.medicationCost)}</td><td style="text-align:center;">0%</td><td style="text-align:right;">0 đ</td><td style="text-align:right;">${formatMoney(invoice.medicationCost)}</td></tr>`);
+        }
+        if (invoice.otherCost > 0) {
+          costRows.push(`<tr><td style="text-align:center;">4</td><td>Chi phí khác</td><td style="text-align:center;">tháng</td><td style="text-align:center;">1</td><td style="text-align:right;">${formatMoney(invoice.otherCost)}</td><td style="text-align:right;">${formatMoney(invoice.otherCost)}</td><td style="text-align:center;">0%</td><td style="text-align:right;">0 đ</td><td style="text-align:right;">${formatMoney(invoice.otherCost)}</td></tr>`);
+        }
+      }
+      itemsHtml = costRows.join('') || '<tr><td colspan="9">Không có chi tiết</td></tr>';
+    }
+
+    const periodDate = invoice.billingPeriodStart
+      ? new Date(invoice.billingPeriodStart)
+      : (invoice.issuedAt ? new Date(invoice.issuedAt) : null);
+    const periodStr = periodDate
+      ? `tháng ${periodDate.getMonth() + 1}/${periodDate.getFullYear()}`
+      : '';
+
+    const LOGO_URL = 'https://res.cloudinary.com/dhcrddnss/image/upload/c_crop,x_385,y_150,w_1250,h_1250,q_auto,f_auto/v1780035528/Logo_vi%E1%BB%87n_d%C6%B0%E1%BB%A1ng_l%C3%A3o_An_Nhi%C3%AAn_lrmocn.png';
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>${isMedication ? 'Đơn thuốc' : 'Hóa đơn'} - ${invoice.invoiceNumber || invoice._id}</title>
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: Arial, Helvetica, sans-serif; font-size: 14px; padding: 20px; color: #000; }
+          .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 15px; }
+          .header-logo { width: 70px; height: 70px; object-fit: contain; margin-bottom: 8px; }
+          .header h1 { font-size: 22px; text-transform: uppercase; margin-bottom: 5px; font-weight: 700; }
+          .header p { font-size: 12px; color: #555; }
+          .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+          .info-box { border: 1px solid #ccc; padding: 10px; }
+          .info-box h3 { font-size: 13px; color: #555; margin-bottom: 5px; }
+          .info-box p { font-size: 14px; font-weight: bold; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+          th, td { border: 1px solid #000; padding: 8px; text-align: left; }
+          th { background: #1e40af; color: white; font-weight: 700; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          td { font-weight: 500; }
+          .total-row { font-weight: bold; font-size: 16px; }
+          .total-row td { border-top: 2px solid #000; }
+          .status { display: inline-block; padding: 4px 12px; border-radius: 4px; font-weight: bold; }
+          .status-paid { background: #d4edda; color: #155724; }
+          .status-unpaid { background: #fff3cd; color: #856404; }
+          .status-cancelled { background: #f8d7da; color: #721c24; }
+          .footer { margin-top: 30px; text-align: center; font-size: 12px; color: #666; }
+          @media print {
+            body { padding: 0; }
+            th { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <img src="${LOGO_URL}" alt="Logo" class="header-logo" />
+          <h1>${isMedication ? 'ĐƠN THUỐC' : 'HÓA ĐƠN'}</h1>
+          <p>Nursing Home Management System</p>
+        </div>
+
+        <div class="info-grid">
+          <div class="info-box">
+            <h3>Người bệnh</h3>
+            <p>${resident?.fullName || 'N/A'}</p>
+            <p style="font-size: 12px; color: #555;">Mã: ${resident?.residentCode || 'N/A'}</p>
+          </div>
+          <div class="info-box">
+            <h3>${isMedication ? 'Đơn thuốc' : 'Hóa đơn'}</h3>
+            <p>Mã: ${invoice.invoiceNumber || invoice._id}</p>
+            <p style="font-size: 12px; color: #555;">${periodStr}</p>
+          </div>
+          <div class="info-box">
+            <h3>Ngày lập</h3>
+            <p>${invoice.issuedAt ? new Date(invoice.issuedAt).toLocaleDateString('vi-VN') : '-'}</p>
+          </div>
+          <div class="info-box">
+            <h3>Trạng thái</h3>
+            <p>
+              <span class="status ${isPaid ? 'status-paid' : isCancelled ? 'status-cancelled' : 'status-unpaid'}">
+                ${isPaid ? 'Đã thanh toán' : isCancelled ? 'Đã hủy' : 'Chưa thanh toán'}
+              </span>
+            </p>
+          </div>
+        </div>
+
+        ${invoice.diagnosisNote || invoice.prescriptionId?.diagnosisNote ? `
+        <div style="background: #eff6ff; border: 1px solid #93c5fd; padding: 10px; margin-bottom: 20px; border-radius: 4px;">
+          <strong style="color: #1e40af;">Chẩn đoán / Ghi chú:</strong>
+          <p style="margin-top: 5px; color: #1e293b;">${invoice.diagnosisNote || invoice.prescriptionId?.diagnosisNote}</p>
+        </div>
+        ` : ''}
+
+        <h3 style="margin-bottom: 10px;">Chi tiết ${isMedication ? 'đơn thuốc' : 'hóa đơn'}</h3>
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 35px; text-align:center;">STT</th>
+              <th>Tên thuốc</th>
+              <th style="width: 50px; text-align:center;">ĐVT</th>
+              <th style="width: 45px; text-align:center;">SL</th>
+              <th style="width: 95px; text-align:right;">Đơn giá</th>
+              <th style="width: 110px; text-align:right;">Thành tiền chưa thuế</th>
+              <th style="width: 60px; text-align:center;">Thuế suất</th>
+              <th style="width: 90px; text-align:right;">Tiền thuế</th>
+              <th style="width: 110px; text-align:right;">Thành tiền</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itemsHtml}
+            <tr class="total-row">
+              <td colspan="8" style="text-align: right;">TỔNG CỘNG (đã bao gồm VAT):</td>
+              <td>${formatMoney(invoiceTotalAmount)}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        ${isCancelled && invoice.cancellationReason ? `
+          <div style="background: #f8d7da; padding: 10px; border-radius: 4px; margin-bottom: 20px;">
+            <strong>Lý do hủy:</strong> ${invoice.cancellationReason}
+          </div>
+        ` : ''}
+
+        <div class="footer">
+          <p>Generated by Nursing Home Management System</p>
+          <p>${new Date().toLocaleString('vi-VN')}</p>
+        </div>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.write(html);
+    printWindow.document.close();
+    setTimeout(() => printWindow.print(), 250);
+  };
+
+  return (
+    <div className="otp-modal-backdrop" onClick={onClose}>
+      <div
+        className="otp-modal"
+        onClick={(e) => e.stopPropagation()}
+        style={{ maxWidth: 900, width: '95%', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}
+      >
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, borderBottom: '1px solid #e2e8f0', paddingBottom: 12 }}>
+          <h3 style={{ margin: 0 }}>
+            {String(invoice.type || '').toUpperCase() === 'MEDICATION'
+              ? (t('familyDashboard.invoice.medicationPreview') || 'Xem đơn thuốc')
+              : (t('familyDashboard.invoice.invoicePreview') || 'Xem hóa đơn')}
+          </h3>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              type="button"
+              onClick={handlePrint}
+              className="button button-secondary"
+              title="In hóa đơn"
+              style={{ padding: '6px 12px' }}
+            >
+              <Printer size={16} />
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                fontSize: 24,
+                cursor: 'pointer',
+                color: '#64748b',
+                padding: 0,
+                lineHeight: 1,
+              }}
+              aria-label="Close"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+
+        {/* Invoice Info Summary */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+          <div style={{ background: '#f8fafc', padding: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}>
+            <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>Người bệnh</div>
+            <div style={{ fontWeight: 600, fontSize: 14 }}>{resident?.fullName || 'N/A'}</div>
+          </div>
+          <div style={{ background: '#f8fafc', padding: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}>
+            <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>{String(invoice.type || '').toUpperCase() === 'MEDICATION' ? 'Đơn thuốc' : 'Hóa đơn'}</div>
+            <div style={{ fontWeight: 600, fontSize: 14 }}>{getInvoiceLabel(invoice)}</div>
+          </div>
+          <div style={{ background: '#f8fafc', padding: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}>
+            <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>Ngày lập</div>
+            <div style={{ fontWeight: 600, fontSize: 14 }}>
+              {invoice.issuedAt ? new Date(invoice.issuedAt).toLocaleDateString('vi-VN') : '-'}
+            </div>
+            {invoice.dueDate && (
+              <div style={{ fontSize: 12, color: '#d97706' }}>
+                Hạn: {new Date(invoice.dueDate).toLocaleDateString('vi-VN')}
+              </div>
+            )}
+          </div>
+          <div style={{ background: '#f8fafc', padding: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}>
+            <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>Trạng thái</div>
+            <span
+              className={`family-invoice-row__status ${isPaid ? 'is-paid' : isCancelled ? 'is-cancelled' : 'is-due'}`}
+              style={{ fontSize: 13, padding: '4px 10px' }}
+            >
+              {isPaid ? (t('familyDashboard.invoice.statusPaid') || 'Đã thanh toán')
+                : isCancelled ? (t('familyDashboard.invoice.statusCancelled') || 'Đã hủy')
+                : (t('familyDashboard.invoice.statusUnpaid') || 'Chưa thanh toán')}
+            </span>
+          </div>
+        </div>
+
+        {/* Diagnosis Note - for medication invoices */}
+        {(invoice.diagnosisNote || invoice.prescriptionId?.diagnosisNote) && (
+          <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 8, padding: 12, marginBottom: 16 }}>
+            <div style={{ fontSize: 11, color: '#1e40af', marginBottom: 4, fontWeight: 600 }}>
+               Chẩn đoán / Ghi chú
+            </div>
+            <div style={{ fontSize: 13, color: '#1e293b' }}>
+              {invoice.diagnosisNote || invoice.prescriptionId?.diagnosisNote}
+            </div>
+          </div>
+        )}
+
+        {/* Items List - Scrollable */}
+        <div style={{ flex: 1, overflowY: 'auto', overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: 8, marginBottom: 16 }}>
+          <table style={{ width: '100%', minWidth: 800, borderCollapse: 'collapse' }}>
+            <thead style={{ position: 'sticky', top: 0, background: '#1e40af', color: 'white' }}>
+              <tr>
+                <th style={{ padding: '10px 8px', textAlign: 'center', fontSize: 11, fontWeight: 600 }}>STT</th>
+                <th style={{ padding: '10px 8px', textAlign: 'left', fontSize: 11, fontWeight: 600 }}>Tên thuốc</th>
+                <th style={{ padding: '10px 8px', textAlign: 'center', fontSize: 11, fontWeight: 600 }}>ĐVT</th>
+                <th style={{ padding: '10px 8px', textAlign: 'center', fontSize: 11, fontWeight: 600 }}>SL</th>
+                <th style={{ padding: '10px 8px', textAlign: 'right', fontSize: 11, fontWeight: 600 }}>Đơn giá</th>
+                <th style={{ padding: '10px 8px', textAlign: 'right', fontSize: 11, fontWeight: 600 }}>TT chưa thuế</th>
+                <th style={{ padding: '10px 8px', textAlign: 'center', fontSize: 11, fontWeight: 600 }}>Thuế</th>
+                <th style={{ padding: '10px 8px', textAlign: 'right', fontSize: 11, fontWeight: 600 }}>Tiền thuế</th>
+                <th style={{ padding: '10px 8px', textAlign: 'right', fontSize: 11, fontWeight: 600 }}>Thành tiền</th>
+              </tr>
+            </thead>
+            <tbody>
+              {/* Show items from invoice or prescription */}
+              {(invoice.prescriptionId?.items?.length > 0) ? (
+                (() => {
+                  const items = invoice.prescriptionId.items;
+                  let totalPills = 0;
+                  let totalDays = 0;
+                  
+                  // Calculate totals
+                  items.forEach(it => {
+                    const qty = Number(it.quantity) || 0;
+                    const freq = Number(it.frequency) || 0;
+                    const dur = Number(it.duration) || 0;
+                    
+                    if (qty > 0) {
+                      totalPills += qty;
+                    } else if (freq > 0 && dur > 0) {
+                      totalPills += freq * dur;
+                    }
+                    if (dur > 0) totalDays = Math.max(totalDays, dur);
+                  });
+                  
+                  return (
+                    <>
+                      {items.map((it, i) => {
+                        const medName = it.medicationId?.name || it.medicationName || `Thuốc ${i + 1}`;
+                        const qty = Number(it.quantity) || 0;
+                        const medPrice = Number(it.price) || Number(it.medicationId?.price) || 0;
+                        const taxRate = Number(it.taxRate) || 0.05;
+                        const beforeTax = medPrice * qty;
+                        const taxAmt = Math.round(beforeTax * taxRate * 100) / 100;
+                        const subtotal = beforeTax + taxAmt;
+
+                        return (
+                          <tr key={i} style={{ borderBottom: '1px solid #e2e8f0', background: i % 2 === 0 ? '#fff' : '#f8fafc' }}>
+                            <td style={{ padding: '8px', textAlign: 'center', fontSize: 12, fontWeight: 600, color: '#475569' }}>{i + 1}</td>
+                            <td style={{ padding: '8px', fontSize: 12, verticalAlign: 'top' }}>
+                              <div style={{ fontWeight: 600, color: '#1e293b' }}>{medName}</div>
+                              <div style={{ fontSize: 10, color: '#64748b' }}>{it.dosage || ''} {it.unit || ''} • {it.frequency || 1}×/ngày</div>
+                            </td>
+                            <td style={{ padding: '8px', textAlign: 'center', fontSize: 12, color: '#64748b' }}>{it.unit || 'viên'}</td>
+                            <td style={{ padding: '8px', textAlign: 'center', fontSize: 12, fontWeight: 600, color: '#475569' }}>{qty}</td>
+                            <td style={{ padding: '8px', textAlign: 'right', fontSize: 12, color: '#64748b' }}>{medPrice > 0 ? formatMoney(medPrice) : '-'}</td>
+                            <td style={{ padding: '8px', textAlign: 'right', fontSize: 12, color: '#64748b' }}>{beforeTax > 0 ? formatMoney(beforeTax) : '-'}</td>
+                            <td style={{ padding: '8px', textAlign: 'center', fontSize: 12, color: '#64748b' }}>{(taxRate * 100).toFixed(0)}%</td>
+                            <td style={{ padding: '8px', textAlign: 'right', fontSize: 12, color: '#64748b' }}>{taxAmt > 0 ? formatMoney(taxAmt) : '-'}</td>
+                            <td style={{ padding: '8px', textAlign: 'right', fontWeight: 700, fontSize: 12, color: '#1e293b' }}>{subtotal > 0 ? formatMoney(subtotal) : '-'}</td>
+                          </tr>
+                        );
+                      })}
+                      {/* Summary row for medications */}
+                      {String(invoice.type || '').toUpperCase() === 'MEDICATION' && (totalPills > 0 || totalDays > 0) && (
+                        <tr style={{ background: '#f0fdf4', borderTop: '2px solid #22c55e' }}>
+                          <td colSpan="8" style={{ padding: '10px 8px', fontWeight: 600, color: '#166534', fontSize: 12 }}>
+                            Tổng cộng: {totalPills} viên {totalDays > 0 ? `/ ${totalDays} ngày` : ''}
+                          </td>
+                          <td style={{ padding: '10px 8px', textAlign: 'right', fontWeight: 700, color: '#166534', fontSize: 12 }}>
+                            {formatMoney(invoiceTotalAmount)}
+                          </td>
+                        </tr>
+                      )}
+                    </>
+                  );
+                })()
+              ) : (
+                <>
+                  {/* Show items from medical charges if available */}
+                  {invoice.items && invoice.items.length > 0 ? (
+                    <>
+                      {/* Individual items */}
+                      {invoice.items.map((it, i) => {
+                        const price = Number(it.amount) || 0;
+                        const quantity = Number(it.quantity) || 1;
+                        const itemName = it.description || it.name || `Dịch vụ ${i + 1}`;
+                        const unit = it.unit || 'lần';
+                        const taxAmt = Math.round(price * quantity * 0.05 * 100) / 100;
+                        const subtotal = price * quantity + taxAmt;
+                        return (
+                          <tr key={`mc-${i}`} style={{ borderBottom: '1px solid #e2e8f0', background: i % 2 === 0 ? '#fff' : '#f8fafc' }}>
+                            <td style={{ padding: '8px', textAlign: 'center', fontSize: 12 }}>{i + 1}</td>
+                            <td style={{ padding: '8px', fontSize: 12 }}>{itemName}</td>
+                            <td style={{ padding: '8px', textAlign: 'center', fontSize: 12 }}>{unit}</td>
+                            <td style={{ padding: '8px', textAlign: 'center', fontSize: 12 }}>{quantity}</td>
+                            <td style={{ padding: '8px', textAlign: 'right', fontSize: 12 }}>{formatMoney(price)}</td>
+                            <td style={{ padding: '8px', textAlign: 'right', fontSize: 12 }}>{formatMoney(price * quantity)}</td>
+                            <td style={{ padding: '8px', textAlign: 'center', fontSize: 12 }}>5%</td>
+                            <td style={{ padding: '8px', textAlign: 'right', fontSize: 12 }}>{formatMoney(taxAmt)}</td>
+                            <td style={{ padding: '8px', textAlign: 'right', fontWeight: 600 }}>{formatMoney(subtotal)}</td>
+                          </tr>
+                        );
+                      })}
+                    </>
+                  ) : (
+                    <>
+                      {/* Show cost breakdown for service invoices */}
+                      {invoice.careServiceCost > 0 && (
+                        <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                          <td style={{ padding: '8px', textAlign: 'center', fontSize: 12 }}>1</td>
+                          <td style={{ padding: '8px', fontSize: 12 }}>{t('familyDashboard.invoice.careServiceCost')}</td>
+                          <td style={{ padding: '8px', textAlign: 'center', fontSize: 12 }}>tháng</td>
+                          <td style={{ padding: '8px', textAlign: 'center', fontSize: 12 }}>1</td>
+                          <td style={{ padding: '8px', textAlign: 'right', fontSize: 12 }}>{formatMoney(invoice.careServiceCost)}</td>
+                          <td style={{ padding: '8px', textAlign: 'right', fontSize: 12 }}>{formatMoney(invoice.careServiceCost)}</td>
+                          <td style={{ padding: '8px', textAlign: 'center', fontSize: 12 }}>0%</td>
+                          <td style={{ padding: '8px', textAlign: 'right', fontSize: 12 }}>0 đ</td>
+                          <td style={{ padding: '8px', textAlign: 'right', fontSize: 12, fontWeight: 600 }}>{formatMoney(invoice.careServiceCost)}</td>
+                        </tr>
+                      )}
+                      {invoice.roomCost > 0 && (
+                        <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                          <td style={{ padding: '8px', textAlign: 'center', fontSize: 12 }}>2</td>
+                          <td style={{ padding: '8px', fontSize: 12 }}>{t('familyDashboard.invoice.roomCost')}</td>
+                          <td style={{ padding: '8px', textAlign: 'center', fontSize: 12 }}>tháng</td>
+                          <td style={{ padding: '8px', textAlign: 'center', fontSize: 12 }}>1</td>
+                          <td style={{ padding: '8px', textAlign: 'right', fontSize: 12 }}>{formatMoney(invoice.roomCost)}</td>
+                          <td style={{ padding: '8px', textAlign: 'right', fontSize: 12 }}>{formatMoney(invoice.roomCost)}</td>
+                          <td style={{ padding: '8px', textAlign: 'center', fontSize: 12 }}>0%</td>
+                          <td style={{ padding: '8px', textAlign: 'right', fontSize: 12 }}>0 đ</td>
+                          <td style={{ padding: '8px', textAlign: 'right', fontSize: 12, fontWeight: 600 }}>{formatMoney(invoice.roomCost)}</td>
+                        </tr>
+                      )}
+                      {invoice.medicationCost > 0 && (
+                        <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                          <td style={{ padding: '8px', textAlign: 'center', fontSize: 12 }}>3</td>
+                          <td style={{ padding: '8px', fontSize: 12 }}>{t('familyDashboard.invoice.medicationCost')}</td>
+                          <td style={{ padding: '8px', textAlign: 'center', fontSize: 12 }}>tháng</td>
+                          <td style={{ padding: '8px', textAlign: 'center', fontSize: 12 }}>1</td>
+                          <td style={{ padding: '8px', textAlign: 'right', fontSize: 12 }}>{formatMoney(invoice.medicationCost)}</td>
+                          <td style={{ padding: '8px', textAlign: 'right', fontSize: 12 }}>{formatMoney(invoice.medicationCost)}</td>
+                          <td style={{ padding: '8px', textAlign: 'center', fontSize: 12 }}>0%</td>
+                          <td style={{ padding: '8px', textAlign: 'right', fontSize: 12 }}>0 đ</td>
+                          <td style={{ padding: '8px', textAlign: 'right', fontSize: 12, fontWeight: 600 }}>{formatMoney(invoice.medicationCost)}</td>
+                        </tr>
+                      )}
+                      {invoice.otherCost > 0 && (
+                        <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                          <td style={{ padding: '8px', textAlign: 'center', fontSize: 12 }}>4</td>
+                          <td style={{ padding: '8px', fontSize: 12 }}>{t('familyDashboard.invoice.otherCost')}</td>
+                          <td style={{ padding: '8px', textAlign: 'center', fontSize: 12 }}>tháng</td>
+                          <td style={{ padding: '8px', textAlign: 'center', fontSize: 12 }}>1</td>
+                          <td style={{ padding: '8px', textAlign: 'right', fontSize: 12 }}>{formatMoney(invoice.otherCost)}</td>
+                          <td style={{ padding: '8px', textAlign: 'right', fontSize: 12 }}>{formatMoney(invoice.otherCost)}</td>
+                          <td style={{ padding: '8px', textAlign: 'center', fontSize: 12 }}>0%</td>
+                          <td style={{ padding: '8px', textAlign: 'right', fontSize: 12 }}>0 đ</td>
+                          <td style={{ padding: '8px', textAlign: 'right', fontSize: 12, fontWeight: 600 }}>{formatMoney(invoice.otherCost)}</td>
+                        </tr>
+                      )}
+                    </>
+                  )}
+                </>
+              )}
+            </tbody>
+            {/* Tổng cộng - chỉ hiện khi là hóa đơn dịch vụ (không phải đơn thuốc) */}
+            {!invoice.prescriptionId?.items?.length && (
+              <tfoot style={{ background: '#ecfdf5' }}>
+                <tr>
+                  <td colSpan="8" style={{ padding: '12px', textAlign: 'right', fontWeight: 700, fontSize: 14, color: '#166534' }}>
+                    TỔNG CỘNG:
+                  </td>
+                  <td style={{ padding: '12px', textAlign: 'right', fontWeight: 700, fontSize: 15, color: '#166534' }}>
+                    {formatMoney(invoiceTotalAmount)}
+                  </td>
+                </tr>
+              </tfoot>
+            )}
+          </table>
+        </div>
+
+        {/* Action Buttons */}
+        {!isPaid && !isCancelled && (
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+            <button type="button" className="button button-secondary" onClick={onClose}>
+              {t('common.cancel') || 'Đóng'}
+            </button>
+            <button type="button" className="button button-secondary" onClick={onPayWithWallet}>
+               {t('familyDashboard.invoice.walletPay') || 'Thanh toán ví'}
+            </button>
+            <button type="button" className="button button-primary" onClick={onCheckout}>
+              {t('familyDashboard.invoice.checkout') || 'Thanh toán PayOS'}
+            </button>
+          </div>
+        )}
+        {(isPaid || isCancelled) && (
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+            <button type="button" className="button button-secondary" onClick={onClose}>
+              {t('common.close') || 'Đóng'}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════ Total Invoice Preview Modal ══════════════════════ */
+
+function TotalInvoicePreviewModal({ resident, invoices, onClose }) {
+  const { t } = useTranslation();
+
+  // Separate SERVICE and MEDICATION invoices
+  const allServiceInvoices = invoices.filter(
+    (inv) => String(inv.type || '').toUpperCase() !== 'MEDICATION'
+  );
+  const medicationInvoices = invoices.filter(
+    (inv) => String(inv.type || '').toUpperCase() === 'MEDICATION'
+  );
+
+  // Separate clinical/paraclinical invoices (has items) from basic service invoices
+  const clinicalInvoices = allServiceInvoices.filter(inv => inv.items && inv.items.length > 0);
+  const basicServiceInvoices = allServiceInvoices.filter(inv => !inv.items || inv.items.length === 0);
+
+  // Compute combined service invoice: earliest start date → latest end date
+  const getDateValue = (v) => (v ? new Date(v).getTime() : null);
+
+  const serviceStartDates = allServiceInvoices
+    .map((inv) => getDateValue(inv.billingPeriodStart || inv.issuedAt))
+    .filter(Boolean);
+  const serviceEndDates = allServiceInvoices
+    .map((inv) => getDateValue(inv.billingPeriodEnd || inv.dueDate || inv.issuedAt))
+    .filter(Boolean);
+
+  const combinedServiceStart = serviceStartDates.length
+    ? new Date(Math.min(...serviceStartDates))
+    : null;
+  const combinedServiceEnd = serviceEndDates.length
+    ? new Date(Math.max(...serviceEndDates))
+    : null;
+
+  // Sum basic service invoice fields (invoices WITHOUT items)
+  const combinedCareServiceCost = basicServiceInvoices.reduce(
+    (s, inv) => s + Number(inv.careServiceCost || 0), 0
+  );
+  const combinedRoomCost = basicServiceInvoices.reduce(
+    (s, inv) => s + Number(inv.roomCost || 0), 0
+  );
+  const combinedMedicationCost = basicServiceInvoices.reduce(
+    (s, inv) => s + Number(inv.medicationCost || 0), 0
+  );
+  const combinedOtherCost = basicServiceInvoices.reduce(
+    (s, inv) => s + Number(inv.otherCost || 0), 0
+  );
+  const combinedServiceTotal = basicServiceInvoices.reduce(
+    (s, inv) => s + Number(inv.totalAmount || 0), 0
+  );
+  const combinedServiceUnpaid = basicServiceInvoices
+    .filter((inv) => !['PAID', 'CANCELLED'].includes(String(inv.status || '').toUpperCase()))
+    .reduce((s, inv) => s + Number(inv.totalAmount || 0), 0);
+
+  // Clinical invoices total
+  const clinicalTotal = clinicalInvoices.reduce((s, inv) => s + Number(inv.totalAmount || 0), 0);
+  const clinicalUnpaid = clinicalInvoices
+    .filter((inv) => !['PAID', 'CANCELLED'].includes(String(inv.status || '').toUpperCase()))
+    .reduce((s, inv) => s + Number(inv.totalAmount || 0), 0);
+
+  // Overall grand total
+  const grandTotalAll = invoices.reduce((sum, inv) => sum + Number(inv.totalAmount || 0), 0);
+  const grandTotalUnpaid = invoices
+    .filter((inv) => !['PAID', 'CANCELLED'].includes(String(inv.status || '').toUpperCase()))
+    .reduce((sum, inv) => sum + Number(inv.totalAmount || 0), 0);
+
+  // ── Print ───────────────────────────────────────────────────────────────
+  const handlePrint = () => {
+    const printWindow = window.open('', '_blank', 'width=900,height=1000');
+    if (!printWindow) return;
+
+    const formatVnd = (n) =>
+      new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(n || 0);
+
+    // ── Build unified 9-column table rows ─────────────────────────────────
+    // Helper: build a section-header row spanning all 9 columns
+    const sectionHeader = (label, bgColor, textColor) =>
+      `<tr><td colspan="9" style="font-weight:700; padding:7px 10px; background:${bgColor}; color:${textColor}; font-size:12px;">${label}</td></tr>`;
+
+    // Helper: build a line-item row
+    const itemRow = (stt, name, unit, qty, unitPrice, subtotal, taxRate, taxAmt, total, bg) =>
+      `<tr style="background:${bg || '#fff'};">
+        <td style="padding:5px 8px; text-align:center; font-size:12px;">${stt}</td>
+        <td style="padding:5px 8px; font-size:12px;">${name}</td>
+        <td style="padding:5px 8px; text-align:center; font-size:12px;">${unit}</td>
+        <td style="padding:5px 8px; text-align:center; font-size:12px;">${qty}</td>
+        <td style="padding:5px 8px; text-align:right; font-size:12px;">${unitPrice > 0 ? formatVnd(unitPrice) : '-'}</td>
+        <td style="padding:5px 8px; text-align:right; font-size:12px;">${subtotal > 0 ? formatVnd(subtotal) : '-'}</td>
+        <td style="padding:5px 8px; text-align:center; font-size:12px;">${taxRate > 0 ? `${(taxRate * 100).toFixed(0)}%` : '0%'}</td>
+        <td style="padding:5px 8px; text-align:right; font-size:12px;">${taxAmt > 0 ? formatVnd(taxAmt) : '0 đ'}</td>
+        <td style="padding:5px 8px; text-align:right; font-size:12px; font-weight:600;">${total > 0 ? formatVnd(total) : '-'}</td>
+      </tr>`;
+
+    // Helper: build a section-total row spanning last 2 columns
+    const sectionTotal = (label, total, bg) =>
+      `<tr style="background:${bg};">
+        <td colspan="8" style="text-align:right; font-weight:700; padding:6px 10px; font-size:12px;">${label}</td>
+        <td style="text-align:right; font-weight:700; padding:6px 10px; font-size:12px;">${formatVnd(total)}</td>
+      </tr>`;
+
+    const tableHeader = `<tr>
+      <th style="padding:5px 8px; background:#1e293b; color:#fff; font-size:11px; text-align:center; width:40px;">STT</th>
+      <th style="padding:5px 8px; background:#1e293b; color:#fff; font-size:11px;">Tên thuốc / Dịch vụ</th>
+      <th style="padding:5px 8px; background:#1e293b; color:#fff; font-size:11px; text-align:center; width:55px;">ĐVT</th>
+      <th style="padding:5px 8px; background:#1e293b; color:#fff; font-size:11px; text-align:center; width:45px;">SL</th>
+      <th style="padding:5px 8px; background:#1e293b; color:#fff; font-size:11px; text-align:right; width:90px;">Đơn giá</th>
+      <th style="padding:5px 8px; background:#1e293b; color:#fff; font-size:11px; text-align:right; width:105px;">TT chưa thuế</th>
+      <th style="padding:5px 8px; background:#1e293b; color:#fff; font-size:11px; text-align:center; width:50px;">Thuế</th>
+      <th style="padding:5px 8px; background:#1e293b; color:#fff; font-size:11px; text-align:right; width:90px;">Tiền thuế</th>
+      <th style="padding:5px 8px; background:#1e293b; color:#fff; font-size:11px; text-align:right; width:105px;">Thành tiền</th>
+    </tr>`;
+
+    let tableBody = '';
+    let globalStt = 1;
+
+    // ── 1. Dịch vụ Lâm sàng & Cận lâm sàng ──────────────────────────────
+    if (clinicalInvoices.length > 0) {
+      tableBody += sectionHeader(
+        `Hóa đơn Dịch vụ Lâm sàng & Cận lâm sàng (${clinicalInvoices.length} hóa đơn)`,
+        '#fef3c7', '#92400e'
+      );
+      clinicalInvoices.forEach((inv) => {
+        const invItems = inv.items || [];
+        invItems.forEach((it, i) => {
+          const price = Number(it.amount) || 0;
+          const quantity = Number(it.quantity) || 1;
+          const itemName = it.description || it.name || `Dịch vụ ${i + 1}`;
+          const unit = it.unit || 'lần';
+          const taxRate = 0.05;
+          const beforeTax = price;
+          const taxAmt = Math.round(beforeTax * taxRate * 100) / 100;
+          const subtotal = beforeTax + taxAmt;
+          tableBody += itemRow(globalStt++, itemName, unit, quantity, beforeTax, beforeTax, taxRate, taxAmt, subtotal, '#fffbeb');
+        });
+        // If no items, show as a single summary row
+        if (invItems.length === 0) {
+          const total = Number(inv.totalAmount) || 0;
+          const taxAmt = Math.round(total * 0.05 * 100) / 100;
+          tableBody += itemRow(globalStt++, `${inv.invoiceNumber || inv._id}`, '-', 1, total - taxAmt, total - taxAmt, 0.05, taxAmt, total, '#fffbeb');
+        }
+      });
+      tableBody += sectionTotal('Tổng dịch vụ lâm sàng & cận lâm sàng', clinicalTotal, '#fef9c3');
+    }
+
+    // ── 2. Dịch vụ cơ bản ────────────────────────────────────────────────
+    if (basicServiceInvoices.length > 0) {
+      tableBody += sectionHeader(
+        `Hóa đơn Dịch vụ Cơ bản (${basicServiceInvoices.length} hóa đơn)`,
+        '#dcfce7', '#166534'
+      );
+      // Care service cost
+      if (combinedCareServiceCost > 0) {
+        tableBody += itemRow(globalStt++, 'Chi phí dịch vụ chăm sóc', 'tháng', 1, combinedCareServiceCost, combinedCareServiceCost, 0, 0, combinedCareServiceCost, '#f0fdf4');
+      }
+      if (combinedRoomCost > 0) {
+        tableBody += itemRow(globalStt++, 'Chi phí phòng', 'tháng', 1, combinedRoomCost, combinedRoomCost, 0, 0, combinedRoomCost, '#f0fdf4');
+      }
+      if (combinedOtherCost > 0) {
+        tableBody += itemRow(globalStt++, 'Chi phí khác', '-', 1, combinedOtherCost, combinedOtherCost, 0, 0, combinedOtherCost, '#f0fdf4');
+      }
+      tableBody += sectionTotal('Tổng dịch vụ cơ bản', combinedServiceTotal, '#dcfce7');
+    }
+
+    // ── 3. Thuốc ──────────────────────────────────────────────────────────
+    if (medicationInvoices.length > 0) {
+      tableBody += sectionHeader(
+        `Hóa đơn Thuốc (${medicationInvoices.length} hóa đơn)`,
+        '#dbeafe', '#1d4ed8'
+      );
+      medicationInvoices.forEach((inv) => {
+        const presItems = inv.prescriptionId?.items || [];
+        const activeItems = presItems.filter(it => it.isActive !== false);
+        if (activeItems.length > 0) {
+          activeItems.forEach((it) => {
+            const medName = it.medicationId?.name || it.medicationName || `Thuốc`;
+            const qty = Number(it.quantity) || 1;
+            const medPrice = Number(it.price) || Number(it.medicationId?.price) || 0;
+            const taxRate = Number(it.taxRate) || 0.05;
+            const beforeTax = medPrice * qty;
+            const taxAmt = Math.round(beforeTax * taxRate * 100) / 100;
+            const subtotal = beforeTax + taxAmt;
+            tableBody += itemRow(
+              globalStt++,
+              `${medName}${it.dosage ? `<br/><span style="font-size:10px;color:#555;">${it.dosage} ${it.unit || ''} · ${it.frequency || 1}×/ngày</span>` : ''}`,
+              it.unit || 'viên',
+              qty,
+              medPrice,
+              beforeTax,
+              taxRate,
+              taxAmt,
+              subtotal,
+              '#eff6ff'
+            );
+          });
+        }
+        // If no items, show total
+        if (activeItems.length === 0) {
+          const total = Number(inv.totalAmount) || 0;
+          const taxAmt = Math.round(total * 0.05 * 100) / 100;
+          tableBody += itemRow(globalStt++, `${inv.invoiceNumber || inv._id}`, '-', 1, total - taxAmt, total - taxAmt, 0.05, taxAmt, total, '#eff6ff');
+        }
+      });
+    }
+
+    const LOGO_URL = 'https://res.cloudinary.com/dhcrddnss/image/upload/c_crop,x_385,y_150,w_1250,h_1250,q_auto,f_auto/v1780035528/Logo_vi%E1%BB%87n_d%C6%B0%E1%BB%A1ng_l%C3%A3o_An_Nhi%C3%AAn_lrmocn.png';
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Hóa đơn tổng hợp - ${resident?.fullName || ''}</title>
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: Arial, Helvetica, sans-serif; font-size: 13px; padding: 20px; color: #000; }
+          .header { text-align: center; margin-bottom: 16px; border-bottom: 2px solid #000; padding-bottom: 12px; }
+          .header-logo { width: 70px; height: 70px; object-fit: contain; margin-bottom: 8px; }
+          .header h1 { font-size: 18px; text-transform: uppercase; margin-bottom: 4px; font-weight: 700; }
+          .header p { font-size: 11px; color: #555; }
+          .info-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+          .info-box { border: 1px solid #ccc; padding: 8px 10px; }
+          .info-box h3 { font-size: 10px; color: #777; margin-bottom: 2px; text-transform: uppercase; }
+          .info-box p { font-size: 13px; font-weight: bold; }
+          .info-box .sub { font-size: 10px; color: #777; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+          th, td { border: 1px solid #000; }
+          .grand-total-row td { border-top: 2px solid #000; }
+          .footer { margin-top: 20px; text-align: center; font-size: 11px; color: #666; }
+          @media print {
+            body { padding: 0; }
+            @page { size: A4; margin: 10mm; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <img src="${LOGO_URL}" alt="Logo" class="header-logo" />
+          <h1>HÓA ĐƠN TỔNG HỢP</h1>
+          <p>Nursing Home Management System</p>
+          <p style="font-size:11px; margin-top:6px; color:#333;">
+            <strong>Địa chỉ:</strong> Số 47, Đường D17, Khu dân cư Hồng Loan, Phường Hưng Phú, TP Cần Thơ
+            &nbsp;|&nbsp;
+            <strong>SDT:</strong> 0833040158
+            &nbsp;|&nbsp;
+            <strong>Mã số thuế:</strong> 0311770883
+          </p>
+          <p style="font-size:11px; margin-top:2px; color:#333;">
+            <strong>Số tài khoản:</strong> 10142609159617789 KienLongBank - Ngân hàng TMCP Kiên Long
+          </p>
+        </div>
+
+        <div class="info-grid">
+          <div class="info-box">
+            <h3>Người bệnh</h3>
+            <p>${resident?.fullName || 'N/A'}</p>
+            <p class="sub">Mã: ${resident?.residentCode || 'N/A'}</p>
+          </div>
+          <div class="info-box">
+            <h3>Ngày lập</h3>
+            <p>${new Date().toLocaleDateString('vi-VN')}</p>
+            <p class="sub">${new Date().toLocaleTimeString('vi-VN')}</p>
+          </div>
+          <div class="info-box">
+            <h3>Tổng hóa đơn</h3>
+            <p>${invoices.length} hóa đơn</p>
+            <p class="sub">${invoices.filter(i => !['PAID','CANCELLED'].includes(String(i.status||'').toUpperCase())).length} chưa thanh toán</p>
+          </div>
+        </div>
+
+        <table>
+          <thead>${tableHeader}</thead>
+          <tbody>
+            ${tableBody}
+            <tr class="grand-total-row" style="background:#ecfdf5;">
+              <td colspan="8" style="font-weight:700; font-size:15px; text-align:right; padding:10px; color:#065f46;">TỔNG CỘNG:</td>
+              <td style="font-weight:700; font-size:15px; text-align:right; padding:10px; color:#065f46;">${formatVnd(grandTotalAll)}</td>
+            </tr>
+            ${grandTotalUnpaid > 0 ? `
+            <tr style="background:#fef2f2;">
+              <td colspan="8" style="font-weight:700; font-size:13px; text-align:right; padding:8px; color:#dc2626;">CÒN NỢ:</td>
+              <td style="font-weight:700; font-size:13px; text-align:right; padding:8px; color:#dc2626;">${formatVnd(grandTotalUnpaid)}</td>
+            </tr>
+            ` : ''}
+          </tbody>
+        </table>
+
+        <div class="footer">
+          <p>Hóa đơn được tạo tự động bởi Nursing Home Management System</p>
+          <p>${new Date().toLocaleString('vi-VN')}</p>
+        </div>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.write(html);
+    printWindow.document.close();
+    setTimeout(() => printWindow.print(), 250);
+  };
+
+  // ── Render ─────────────────────────────────────────────────────────────
+  return (
+    <div className="otp-modal-backdrop" onClick={onClose}>
+      <div
+        className="otp-modal"
+        onClick={(e) => e.stopPropagation()}
+        style={{ maxWidth: 900, width: '95%', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}
+      >
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, borderBottom: '1px solid #e2e8f0', paddingBottom: 12 }}>
+          <h3 style={{ margin: 0 }}>Hóa đơn tổng hợp</h3>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button type="button" onClick={handlePrint} className="button button-secondary" title="In hóa đơn" style={{ padding: '6px 12px' }}>
+              <Printer size={16} />
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              style={{ background: 'transparent', border: 'none', fontSize: 24, cursor: 'pointer', color: '#64748b', padding: 0, lineHeight: 1 }}
+              aria-label="Close"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+
+        {/* Patient Info */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+          <div style={{ background: '#f8fafc', padding: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}>
+            <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>Người bệnh</div>
+            <div style={{ fontWeight: 600, fontSize: 14 }}>{resident?.fullName || 'N/A'}</div>
+            <div style={{ fontSize: 12, color: '#64748b' }}>Mã: {resident?.residentCode || 'N/A'}</div>
+          </div>
+          <div style={{ background: '#f8fafc', padding: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}>
+            <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>Tổng hóa đơn</div>
+            <div style={{ fontWeight: 600, fontSize: 14 }}>{invoices.length} hóa đơn</div>
+            <div style={{ fontSize: 12, color: '#64748b' }}>{new Date().toLocaleDateString('vi-VN')}</div>
+          </div>
+        </div>
+
+        {/* Invoice List */}
+        <div style={{ flex: 1, overflowY: 'auto', marginBottom: 16 }}>
+
+          {/* ── Clinical/Paraclinical invoices ── */}
+          {clinicalInvoices.length > 0 && (
+            <div style={{ marginBottom: 16, border: '1px solid #d97706', borderRadius: 8, overflow: 'hidden' }}>
+              {/* Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: '#fef3c7', borderBottom: '1px solid #fde68a' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 13, color: '#92400e' }}>Hóa đơn Dịch vụ Lâm sàng & Cận lâm sàng</div>
+                    <div style={{ fontSize: 11, color: '#a16207' }}>{clinicalInvoices.length} hóa đơn</div>
+                  </div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: '#0f172a' }}>{formatMoney(clinicalTotal)}</div>
+                  {clinicalUnpaid > 0 && (
+                    <span style={{ fontSize: 11, padding: '2px 6px', borderRadius: 4, fontWeight: 600, background: '#fff3cd', color: '#856404' }}>
+                      Còn nợ {formatMoney(clinicalUnpaid)}
+                    </span>
+                  )}
+                  {clinicalUnpaid === 0 && (
+                    <span style={{ fontSize: 11, padding: '2px 6px', borderRadius: 4, fontWeight: 600, background: '#d4edda', color: '#155724' }}>
+                      Đã thanh toán
+                    </span>
+                  )}
+                </div>
+              </div>
+              {/* Invoice details */}
+              <div style={{ padding: '8px 12px' }}>
+                {clinicalInvoices.map((inv) => {
+                  const invItems = inv.items || [];
+                  const invStatus = String(inv.status || '').toUpperCase();
+                  const isPaid = invStatus === 'PAID';
+                  const isCancelled = invStatus === 'CANCELLED';
+                  
+                  return (
+                    <div key={inv._id} style={{ marginBottom: 10, padding: '8px', background: '#fffbeb', borderRadius: 6, border: '1px solid #fcd34d' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: '#92400e' }}>
+                          {inv.invoiceNumber || inv._id} — {inv.issuedAt ? new Date(inv.issuedAt).toLocaleDateString('vi-VN') : ''}
+                        </div>
+                        <span style={{ fontSize: 10, padding: '1px 4px', borderRadius: 3, fontWeight: 600, background: isPaid ? '#d4edda' : isCancelled ? '#f8d7da' : '#fff3cd', color: isPaid ? '#155724' : isCancelled ? '#721c24' : '#856404' }}>
+                          {isPaid ? 'Đã Thanh Toán' : isCancelled ? 'Đã hủy' : 'Chưa Thanh Toán'}
+                        </span>
+                      </div>
+                      {invItems.map((it, i) => {
+                        const price = Number(it.amount) || 0;
+                        const quantity = Number(it.quantity) || 1;
+                        const itemName = it.description || it.name || `Dịch vụ ${i + 1}`;
+                        const unit = it.unit || 'lần';
+                        const taxAmt = Math.round(price * quantity * 0.05 * 100) / 100;
+                        const subtotal = price * quantity + taxAmt;
+                        return (
+                          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '2px 0' }}>
+                            <span>{itemName} ({quantity} {unit})</span>
+                            <span style={{ fontWeight: 600 }}>{formatMoney(subtotal)}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* ── Basic SERVICE invoices ── */}
+          {basicServiceInvoices.length > 0 && (
+            <div style={{ marginBottom: 16, border: '1px solid #16a34a', borderRadius: 8, overflow: 'hidden' }}>
+              {/* Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: '#dcfce7', borderBottom: '1px solid #bbf7d0' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 13, color: '#166534' }}>Hóa đơn dịch vụ cơ bản</div>
+                    <div style={{ fontSize: 11, color: '#64748b' }}>
+                      {combinedServiceStart && combinedServiceEnd
+                        ? `Từ ngày ${combinedServiceStart.toLocaleDateString('vi-VN')} đến ngày ${combinedServiceEnd.toLocaleDateString('vi-VN')}`
+                        : `${basicServiceInvoices.length} hóa đơn`}
+                    </div>
+                  </div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: '#0f172a' }}>{formatMoney(combinedServiceTotal)}</div>
+                  {combinedServiceUnpaid > 0 && (
+                    <span style={{ fontSize: 11, padding: '2px 6px', borderRadius: 4, fontWeight: 600, background: '#fff3cd', color: '#856404' }}>
+                      Còn nợ {formatMoney(combinedServiceUnpaid)}
+                    </span>
+                  )}
+                  {combinedServiceUnpaid === 0 && (
+                    <span style={{ fontSize: 11, padding: '2px 6px', borderRadius: 4, fontWeight: 600, background: '#d4edda', color: '#155724' }}>
+                      Đã thanh toán
+                    </span>
+                  )}
+                </div>
+              </div>
+              {/* Cost breakdown */}
+              <div style={{ padding: '8px 12px' }}>
+                {combinedCareServiceCost > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '3px 0', borderBottom: '1px solid #f1f5f9' }}>
+                    <span>Chi phí chăm sóc</span>
+                    <span style={{ fontWeight: 600 }}>{formatMoney(combinedCareServiceCost)}</span>
+                  </div>
+                )}
+                {combinedRoomCost > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '3px 0', borderBottom: '1px solid #f1f5f9' }}>
+                    <span>Chi phí phòng</span>
+                    <span style={{ fontWeight: 600 }}>{formatMoney(combinedRoomCost)}</span>
+                  </div>
+                )}
+                {combinedMedicationCost > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '3px 0', borderBottom: '1px solid #f1f5f9' }}>
+                    <span>Chi phí thuốc</span>
+                    <span style={{ fontWeight: 600 }}>{formatMoney(combinedMedicationCost)}</span>
+                  </div>
+                )}
+                {combinedOtherCost > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '3px 0', borderBottom: '1px solid #f1f5f9' }}>
+                    <span>Chi phí khác</span>
+                    <span style={{ fontWeight: 600 }}>{formatMoney(combinedOtherCost)}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── Individual MEDICATION invoices ── */}
+          {medicationInvoices.map((inv) => {
+            const presItems = inv.prescriptionId?.items || [];
+            const invStatus = String(inv.status || '').toUpperCase();
+            const isPaid = invStatus === 'PAID';
+            const isCancelled = invStatus === 'CANCELLED';
+
+            return (
+              <div key={inv._id} style={{ marginBottom: 16, border: '1px solid #2563eb', borderRadius: 8, overflow: 'hidden' }}>
+                {/* Invoice header */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: '#dbeafe', borderBottom: '1px solid #bfdbfe' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: 13, color: '#1d4ed8' }}>Hóa đơn thuốc</div>
+                      <div style={{ fontSize: 11, color: '#64748b' }}>
+                        {inv.invoiceNumber || inv._id} — {inv.issuedAt ? new Date(inv.issuedAt).toLocaleDateString('vi-VN') : '-'}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontWeight: 700, fontSize: 14, color: '#0f172a' }}>{formatMoney(inv.totalAmount)}</div>
+                    <span style={{ fontSize: 11, padding: '2px 6px', borderRadius: 4, fontWeight: 600, background: isPaid ? '#d4edda' : isCancelled ? '#f8d7da' : '#fff3cd', color: isPaid ? '#155724' : isCancelled ? '#721c24' : '#856404' }}>
+                      {isPaid ? 'Đã thanh toán' : isCancelled ? 'Đã hủy' : 'Chưa thanh toán'}
+                    </span>
+                  </div>
+                </div>
+                {/* Medication items */}
+                {presItems.length > 0 ? (
+                  <div style={{ overflowX: 'auto', padding: '8px 12px' }}>
+                    {/* 9-column table header */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '40px 2fr 55px 50px 1fr 1fr 50px 1fr 1fr', gap: 4, padding: '3px 0', borderBottom: '2px solid #bfdbfe', fontSize: 11, fontWeight: 700, color: '#1d4ed8', marginBottom: 4, minWidth: 700 }}>
+                      <div style={{ textAlign: 'center' }}>STT</div>
+                      <div>Tên thuốc</div>
+                      <div style={{ textAlign: 'center' }}>ĐVT</div>
+                      <div style={{ textAlign: 'center' }}>SL</div>
+                      <div style={{ textAlign: 'right' }}>Đơn giá</div>
+                      <div style={{ textAlign: 'right' }}>TT chưa thuế</div>
+                      <div style={{ textAlign: 'center' }}>Thuế</div>
+                      <div style={{ textAlign: 'right' }}>Tiền thuế</div>
+                      <div style={{ textAlign: 'right' }}>Thành tiền</div>
+                    </div>
+                    {presItems.filter(it => it.isActive !== false).map((it, i) => {
+                      const medName = it.medicationId?.name || it.medicationName || `Thuốc ${i + 1}`;
+                      const qty = Number(it.quantity) || 1;
+                      const medPrice = Number(it.price) || Number(it.medicationId?.price) || 0;
+                      const taxRate = Number(it.taxRate) || 0.05;
+                      const beforeTax = medPrice * qty;
+                      const taxAmt = Math.round(beforeTax * taxRate * 100) / 100;
+                      const subtotal = beforeTax + taxAmt;
+                      return (
+                        <div key={i} style={{ display: 'grid', gridTemplateColumns: '40px 2fr 55px 50px 1fr 1fr 50px 1fr 1fr', gap: 4, padding: '5px 0', borderBottom: '1px solid #f1f5f9', fontSize: 13, alignItems: 'center', minWidth: 700 }}>
+                          <div style={{ textAlign: 'center', color: '#64748b' }}>{i + 1}</div>
+                          <div style={{ fontWeight: 600, color: '#0f172a' }}>
+                            <div>{medName}</div>
+                            {it.dosage && <div style={{ fontSize: 11, color: '#94a3b8' }}>{it.dosage} {it.unit || ''} · {it.frequency || 1}×/ngày</div>}
+                          </div>
+                          <div style={{ textAlign: 'center', color: '#64748b' }}>{it.unit || 'viên'}</div>
+                          <div style={{ textAlign: 'center', fontWeight: 600, color: '#0f172a' }}>{qty}</div>
+                          <div style={{ textAlign: 'right', color: medPrice > 0 ? '#475569' : '#94a3b8' }}>{medPrice > 0 ? formatMoney(medPrice) : '-'}</div>
+                          <div style={{ textAlign: 'right', color: '#475569' }}>{beforeTax > 0 ? formatMoney(beforeTax) : '-'}</div>
+                          <div style={{ textAlign: 'center', color: '#64748b' }}>{(taxRate * 100).toFixed(0)}%</div>
+                          <div style={{ textAlign: 'right', color: '#475569' }}>{taxAmt > 0 ? formatMoney(taxAmt) : '-'}</div>
+                          <div style={{ textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>{subtotal > 0 ? formatMoney(subtotal) : '-'}</div>
+                        </div>
+                      );
+                    })}
+                    {/* Subtotal row */}
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 6, paddingTop: 6, borderTop: '1px solid #bfdbfe' }}>
+                      <div style={{ display: 'flex', gap: 16, fontSize: 13, fontWeight: 700, color: '#1d4ed8' }}>
+                        <span>Tổng thuốc (đã VAT):</span>
+                        <span style={{ minWidth: 120, textAlign: 'right' }}>{formatMoney(inv.totalAmount)}</span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ padding: '8px 12px', fontSize: 13, color: '#94a3b8' }}>
+                    Không có chi tiết thuốc
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Grand Total */}
+        <div style={{ padding: '14px 16px', background: '#ecfdf5', borderRadius: 8, border: '1px solid #a7f3d0', marginBottom: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontWeight: 600, fontSize: 16, color: '#065f46' }}>TỔNG CỘNG:</span>
+            <span style={{ fontWeight: 700, fontSize: 20, color: '#047857' }}>{formatMoney(grandTotalAll)}</span>
+          </div>
+          {grandTotalUnpaid > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
+              <span style={{ fontSize: 13, color: '#dc2626' }}>Còn nợ:</span>
+              <span style={{ fontWeight: 700, fontSize: 16, color: '#dc2626' }}>{formatMoney(grandTotalUnpaid)}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Action Buttons */}
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+          <button type="button" className="button button-secondary" onClick={onClose}>
+            {t('common.close') || 'Đóng'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

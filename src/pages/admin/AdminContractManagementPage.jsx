@@ -117,6 +117,20 @@ const getContractStatusIcon = (startDate, endDate, contractStatus) => {
   return <Calendar className="w-5 h-5 text-blue-600" />;
 };
 
+// Helper format tiền VND
+const formatVnd = (n) => {
+  const num = Number(n || 0);
+  return num.toLocaleString('vi-VN') + ' đ';
+};
+
+// Helper format ngày
+const formatDateShort = (d) => {
+  if (!d) return '—';
+  const date = new Date(d);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleDateString('vi-VN');
+};
+
 export default function AdminContractManagementPage() {
   const { t, i18n } = useTranslation();
   const { showToast } = useToast();
@@ -1320,7 +1334,7 @@ export default function AdminContractManagementPage() {
       {/* Medication Invoice Modal */}
       {showMedicationModal && (
         <div className="modal-overlay">
-          <div className="modal-content">
+          <div className="modal-content" style={{ maxWidth: '850px', width: '95vw' }}>
             <div className="modal-header">
               <h2>{t('admin.contractManagement.createMedInvoiceTitle')}</h2>
               <div className="flex gap-2">
@@ -1428,7 +1442,7 @@ export default function AdminContractManagementPage() {
                           <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '6px', fontSize: '14px' }}>
                             {selectedPrx.items?.length ? (
                               <>
-                                <div style={{ marginBottom: '8px' }}>
+                                <div style={{ marginBottom: '12px' }}>
                                   <strong>{t('admin.contractManagement.fromDateLabel')}</strong>{' '}
                                   {selectedPrx.items
                                     .filter((it) => it.startDate)
@@ -1452,19 +1466,80 @@ export default function AdminContractManagementPage() {
                                     return latestDate ? formatDate(latestDate) : '—';
                                   })()}
                                 </div>
-                                <div style={{ marginBottom: '8px' }}>
-                                  <strong>{t('admin.contractManagement.medicationsLabel')}</strong>{' '}
-                                  {selectedPrx.items.map((item) => item.medicationName).filter(Boolean).join(', ') || '—'}
+
+                                {/* Bảng chi tiết thuốc */}
+                                <div style={{ marginBottom: 8 }}>
+                                  <strong style={{ fontSize: '0.88rem', color: '#475569' }}>
+                                     Chi tiết từng thuốc:
+                                  </strong>
                                 </div>
-                                <div>
-                                  <strong>{t('admin.contractManagement.medicationItemsLabel')}</strong>
-                                  <ul style={{ marginTop: 8, paddingLeft: '18px' }}>
-                                    {selectedPrx.items.map((item) => (
-                                      <li key={item._id || item.medicationId || item.medicationName} style={{ marginBottom: 4 }}>
-                                        {item.medicationName || 'N/A'} — {item.dosage || '—'} {item.unit || ''} — {item.frequency ? t('admin.contractManagement.timesPerDay', { count: item.frequency }) : '—'}{item.startDate ? ` — ${formatDate(item.startDate)}` : ''}{item.endDate ? ` ${t('admin.contractManagement.toDate', { date: formatDate(item.endDate) })}` : ''}
-                                      </li>
-                                    ))}
-                                  </ul>
+                                <div style={{ overflowX: 'auto' }}>
+                                  <table style={{
+                                    width: '100%',
+                                    borderCollapse: 'collapse',
+                                    fontSize: '13px',
+                                    marginBottom: 12,
+                                  }}>
+                                    <thead>
+                                      <tr style={{ background: '#e2e8f0' }}>
+                                        <th style={{ padding: '8px 6px', textAlign: 'center', fontWeight: 600, color: '#475569', width: 40 }}>STT</th>
+                                        <th style={{ padding: '8px 6px', textAlign: 'left', fontWeight: 600, color: '#475569' }}>Tên thuốc</th>
+                                        <th style={{ padding: '8px 6px', textAlign: 'center', fontWeight: 600, color: '#475569', width: 50 }}>ĐVT</th>
+                                        <th style={{ padding: '8px 6px', textAlign: 'center', fontWeight: 600, color: '#475569', width: 50 }}>SL</th>
+                                        <th style={{ padding: '8px 6px', textAlign: 'right', fontWeight: 600, color: '#475569' }}>Đơn giá</th>
+                                        <th style={{ padding: '8px 6px', textAlign: 'right', fontWeight: 600, color: '#475569' }}>Thành tiền chưa thuế</th>
+                                        <th style={{ padding: '8px 6px', textAlign: 'center', fontWeight: 600, color: '#475569' }}>Thuế suất</th>
+                                        <th style={{ padding: '8px 6px', textAlign: 'right', fontWeight: 600, color: '#475569' }}>Tiền thuế</th>
+                                        <th style={{ padding: '8px 6px', textAlign: 'right', fontWeight: 600, color: '#475569' }}>Thành tiền</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {selectedPrx.items.map((item, idx) => {
+                                        const price = Number(item.price) || 0;
+                                        const quantity = Number(item.quantity) || 0;
+                                        const taxRate = Number(item.taxRate) || 0.05;
+                                        const beforeTax = price * quantity;
+                                        const taxAmt = Math.round(beforeTax * taxRate * 100) / 100;
+                                        const subtotal = beforeTax + taxAmt;
+                                        return (
+                                          <tr key={item._id || item.medicationId || item.medicationName} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                                            <td style={{ padding: '8px 6px', textAlign: 'center', color: '#64748b' }}>{idx + 1}</td>
+                                            <td style={{ padding: '8px 6px' }}>
+                                              <div style={{ fontWeight: 600, color: '#0f172a' }}>{item.medicationName || 'N/A'}</div>
+                                              <div style={{ fontSize: 11, color: '#64748b' }}>{item.dosage || ''} {item.unit || ''} • {item.frequency ? `${item.frequency}×/ngày` : ''}</div>
+                                            </td>
+                                            <td style={{ padding: '8px 6px', textAlign: 'center', color: '#64748b' }}>{item.unit || 'viên'}</td>
+                                            <td style={{ padding: '8px 6px', textAlign: 'center', fontWeight: 600 }}>{quantity}</td>
+                                            <td style={{ padding: '8px 6px', textAlign: 'right', color: '#1e40af' }}>
+                                              {price > 0 ? formatVnd(price) : '—'}
+                                            </td>
+                                            <td style={{ padding: '8px 6px', textAlign: 'right', color: '#64748b' }}>
+                                              {beforeTax > 0 ? formatVnd(beforeTax) : '—'}
+                                            </td>
+                                            <td style={{ padding: '8px 6px', textAlign: 'center', color: '#64748b' }}>
+                                              {(taxRate * 100).toFixed(0)}%
+                                            </td>
+                                            <td style={{ padding: '8px 6px', textAlign: 'right', color: '#64748b' }}>
+                                              {taxAmt > 0 ? formatVnd(taxAmt) : '—'}
+                                            </td>
+                                            <td style={{ padding: '8px 6px', textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>
+                                              {subtotal > 0 ? formatVnd(subtotal) : '—'}
+                                            </td>
+                                          </tr>
+                                        );
+                                      })}
+                                    </tbody>
+                                    <tfoot>
+                                      <tr style={{ background: '#f1f5f9' }}>
+                                        <td colSpan={8} style={{ padding: '10px 10px', textAlign: 'right', fontWeight: 700, fontSize: '0.95rem', color: '#0f172a' }}>
+                                          Tổng cộng:
+                                        </td>
+                                        <td style={{ padding: '10px 10px', textAlign: 'right', fontWeight: 700, fontSize: '1.05rem', color: '#2563eb' }}>
+                                          {medEstimatedCost != null ? formatVnd(medEstimatedCost) : '—'}
+                                        </td>
+                                      </tr>
+                                    </tfoot>
+                                  </table>
                                 </div>
                               </>
                             ) : (
@@ -1476,10 +1551,6 @@ export default function AdminContractManagementPage() {
                     );
                   })()}
 
-                  <div className="form-group">
-                    <label>{t('admin.contractManagement.estimatedMedCostLabel')}</label>
-                    <div className="form-input readonly">{medEstimatedCost != null ? `${medEstimatedCost.toLocaleString('vi-VN')} VND` : '—'}</div>
-                  </div>
                   {medConflictMessage && (
                     <div className="alert alert-error" style={{ marginTop: 12 }}>
                       {medConflictMessage}

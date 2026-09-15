@@ -359,9 +359,9 @@ function MedicationAutocomplete({ value, onSelect, placeholder, excludeIds = [] 
               onMouseDown={(e) => { e.preventDefault(); handlePick(med); }}
             >
               <span className="med-autocomplete__name">{med.name}</span>
-              {(med.medicationCode || med.form || med.strength) && (
+              {(med.medicationCode || med.form || med.strength || med.price != null) && (
                 <span className="med-autocomplete__meta">
-                  {[med.medicationCode, med.form, med.strength].filter(Boolean).join(' · ')}
+                  {[med.medicationCode, med.form, med.strength].filter(Boolean).join(' · ')}{med.price != null ? (med.medicationCode || med.form || med.strength ? ' · ' : '') + `${Number(med.price).toLocaleString('vi-VN')}đ` : ''}
                 </span>
               )}
             </li>
@@ -382,10 +382,38 @@ function buildTimesForFrequency(freq) {
 function ItemRow({ item, idx, onChange, onRemove, t, canRemove, errors = {}, excludeIds = [], isDuplicate = false }) {
   const dosageError = getDosageError(item.dosage, t);
 
+  // Tự động tính số lượng = liều lượng × lần/ngày × số ngày
+  const computedQuantity = (() => {
+    const d = parseFloat(item.dosage) || 0;
+    const f = parseInt(item.frequency) || 0;
+    const dur = parseInt(item.duration) || 0;
+    return Math.max(1, Math.round(d * f * dur));
+  })();
+
+  // Sync computed quantity vào form state khi có thay đổi
+  const syncQuantity = (updatedItem) => {
+    const d = parseFloat(updatedItem.dosage) || 0;
+    const f = parseInt(updatedItem.frequency) || 0;
+    const dur = parseInt(updatedItem.duration) || 0;
+    const newQty = Math.max(1, Math.round(d * f * dur));
+    return { ...updatedItem, quantity: newQty };
+  };
+
   const handleFrequencyChange = (e) => {
     const f = parseInt(e.target.value, 10);
     const times = buildTimesForFrequency(f);
-    onChange(idx, { ...item, frequency: f, times });
+    const updated = syncQuantity({ ...item, frequency: f, times });
+    onChange(idx, updated);
+  };
+
+  const handleDosageChange = (e) => {
+    const updated = syncQuantity({ ...item, dosage: e.target.value });
+    onChange(idx, updated);
+  };
+
+  const handleDurationChange = (e) => {
+    const updated = syncQuantity({ ...item, duration: e.target.value });
+    onChange(idx, updated);
   };
 
   const handleTimeChange = (tIdx, val) => {
@@ -428,9 +456,11 @@ function ItemRow({ item, idx, onChange, onRemove, t, canRemove, errors = {}, exc
                 if (med) {
                   updates.medicationId = med._id;
                   updates.unit = med.unit || '';
+                  updates.price = med.price ?? '';
                 } else {
                   updates.medicationId = '';
                   updates.unit = '';
+                  updates.price = '';
                 }
                 onChange(idx, updates);
               }}
@@ -445,7 +475,7 @@ function ItemRow({ item, idx, onChange, onRemove, t, canRemove, errors = {}, exc
               type="number"
               className={`cpf-input${dosageError ? ' cpf-input--err' : ''}`}
               value={item.dosage}
-              onChange={(e) => onChange(idx, { ...item, dosage: e.target.value })}
+              onChange={handleDosageChange}
               placeholder={t('medication.dosagePlaceholder')}
               min="0"
             />
@@ -465,6 +495,17 @@ function ItemRow({ item, idx, onChange, onRemove, t, canRemove, errors = {}, exc
             <small className="cpf-hint">{t('medication.unitAutoHint')}</small>
           </div>
           <div className="cpf-field">
+            <label className="cpf-label">{t('medication.quantity')}</label>
+            <input
+              type="number"
+              className="cpf-input edit-input--readonly"
+              value={item.quantity || computedQuantity}
+              readOnly
+              title={t('medication.quantityAutoHint') || 'Tự động tính: Liều lượng × Lần/ngày × Số ngày'}
+            />
+            <small className="cpf-hint">{t('medication.quantityAutoHint') || '= Liều × Lần/ngày × Ngày'}</small>
+          </div>
+          <div className="cpf-field">
             <label className="cpf-label">{t('medication.frequencyLabel')}</label>
             <select className="cpf-input" value={item.frequency} onChange={handleFrequencyChange}>
               {[1, 2, 3, 4].map((n) => <option key={n} value={n}>{FREQ_LABELS[n] || `${n}×`}</option>)}
@@ -476,7 +517,7 @@ function ItemRow({ item, idx, onChange, onRemove, t, canRemove, errors = {}, exc
               type="number"
               className={`cpf-input${errors[`item_${idx}_duration`] ? ' cpf-input--err' : ''}`}
               value={item.duration}
-              onChange={(e) => onChange(idx, { ...item, duration: e.target.value })}
+              onChange={handleDurationChange}
               min="1"
               placeholder="7"
             />
@@ -613,7 +654,7 @@ function CreatePrescriptionModal({ residents, onSave, onClose }) {
     residentId: '',
     diagnosisNote: '',
     validUntil: '',
-    items: [{ medicationId: '', medicationName: '', dosage: '', unit: '', frequency: 1, times: ['08:00'], route: 'oral', duration: '', startDate: todayStr(), isPRN: false, prnReason: '', maxDailyDoses: '', mealTiming: '', instructions: '' }],
+    items: [{ medicationId: '', medicationName: '', dosage: '', unit: '', quantity: 1, frequency: 1, times: ['08:00'], route: 'oral', duration: '', startDate: todayStr(), isPRN: false, prnReason: '', maxDailyDoses: '', mealTiming: '', instructions: '', price: '' }],
   });
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
@@ -692,10 +733,10 @@ function CreatePrescriptionModal({ residents, onSave, onClose }) {
   };
 
   const handleAddItem = () =>
-    setForm((p) => ({
-      ...p,
-      ...syncPrescriptionDates([...p.items, { medicationId: '', medicationName: '', dosage: '', unit: '', frequency: 1, times: ['08:00'], route: 'oral', duration: '', startDate: todayStr(), isPRN: false, prnReason: '', maxDailyDoses: '', mealTiming: '', instructions: '' }]),
-    }));
+    setForm((p) => {
+      const newItems = [...p.items, { medicationId: '', medicationName: '', dosage: '', unit: '', quantity: 1, frequency: 1, times: ['08:00'], route: 'oral', duration: '', startDate: todayStr(), isPRN: false, prnReason: '', maxDailyDoses: '', mealTiming: '', instructions: '', price: '' }];
+      return { ...p, ...syncPrescriptionDates(newItems) };
+    });
 
   const handleRemoveItem = (idx) =>
     setForm((p) => ({ ...p, ...syncPrescriptionDates(p.items.filter((_, i) => i !== idx)) }));
@@ -705,28 +746,43 @@ function CreatePrescriptionModal({ residents, onSave, onClose }) {
     if (!validate()) return;
     setSaving(true);
     try {
+      const TAX_RATE = 0.05; // 5%
       const result = await onSave({
         residentId: form.residentId,
         diagnosisNote: form.diagnosisNote.trim(),
         validUntil: syncPrescriptionDates(form.items).validUntil,
         saveAsDraft,
-        items: form.items.map((item) => ({
-          medicationId: item.medicationId,
-          medicationName: item.medicationName.trim(),
-          dosage: parseFloat(item.dosage),
-          unit: item.unit.trim(),
-          frequency: parseInt(item.frequency, 10),
-          times: item.isPRN ? [] : item.times,
-          route: item.route,
-          duration: item.duration ? parseInt(item.duration, 10) : undefined,
-          startDate: item.isPRN ? undefined : (item.startDate || undefined),
-          endDate: item.isPRN ? undefined : (item.duration ? addDaysStr(item.startDate, item.duration) : undefined),
-          isPRN: item.isPRN || false,
-          prnReason: item.isPRN ? item.prnReason : undefined,
-          maxDailyDoses: item.isPRN && item.maxDailyDoses ? parseInt(item.maxDailyDoses, 10) : undefined,
-          mealTiming: item.isPRN ? undefined : (item.mealTiming || undefined),
-          instructions: item.instructions ? item.instructions.trim() : undefined,
-        })),
+        items: form.items.map((item) => {
+          const price = Number(item.price) || 0;
+          const quantity = Number(item.quantity) || 1;
+          const subtotalExclTax = price * quantity;
+          const taxAmount = Math.round(subtotalExclTax * TAX_RATE * 100) / 100;
+          const subtotalInclTax = subtotalExclTax + taxAmount;
+
+          return {
+            medicationId: item.medicationId,
+            medicationName: item.medicationName.trim(),
+            dosage: parseFloat(item.dosage),
+            unit: item.unit.trim(),
+            quantity,
+            price,
+            taxRate: TAX_RATE,
+            subtotalExclTax: Math.round(subtotalExclTax * 100) / 100,
+            taxAmount,
+            subtotalInclTax: Math.round(subtotalInclTax * 100) / 100,
+            frequency: parseInt(item.frequency, 10),
+            times: item.isPRN ? [] : item.times,
+            route: item.route,
+            duration: item.duration ? parseInt(item.duration, 10) : undefined,
+            startDate: item.isPRN ? undefined : (item.startDate || undefined),
+            endDate: item.isPRN ? undefined : (item.duration ? addDaysStr(item.startDate, item.duration) : undefined),
+            isPRN: item.isPRN || false,
+            prnReason: item.isPRN ? item.prnReason : undefined,
+            maxDailyDoses: item.isPRN && item.maxDailyDoses ? parseInt(item.maxDailyDoses, 10) : undefined,
+            mealTiming: item.isPRN ? undefined : (item.mealTiming || undefined),
+            instructions: item.instructions ? item.instructions.trim() : undefined,
+          };
+        }),
       });
       if (result?.error) setSubmitError(result.error);
     } catch (err) {

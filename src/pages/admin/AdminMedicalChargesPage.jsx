@@ -155,6 +155,11 @@ export default function AdminMedicalChargesPage() {
       const residentId = Object.keys(groupedByResident)[0];
       const chargesForResident = groupedByResident[residentId];
 
+      // Calculate subtotal and tax (5% VAT) for the invoice
+      const subtotal = chargesForResident.reduce((sum, c) => sum + (c.totalPrice || 0), 0);
+      const taxRate = 0.05; // 5% VAT
+      const tax = Math.round(subtotal * taxRate);
+
       // Create invoice
       const invoiceData = {
         items: chargesForResident.map((c) => ({
@@ -163,6 +168,8 @@ export default function AdminMedicalChargesPage() {
           amount: c.totalPrice,
           category: c.category,
         })),
+        subtotal, // Pass subtotal explicitly
+        tax,     // Pass calculated VAT
         periodStart: new Date(),
         periodEnd: new Date(),
       };
