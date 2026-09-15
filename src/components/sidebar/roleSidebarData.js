@@ -23,6 +23,7 @@ import {
   Image,
   LifeBuoy,
   CalendarDays,
+  TrendingUp,
 } from 'lucide-react';
 
 export const roleSidebarData = {
@@ -175,6 +176,7 @@ export const roleSidebarData = {
     { title: 'sidebar.medication', icon: Pill, path: '/pharmacist/medications' },
     { title: 'sidebar.pharmacySuppliers', icon: Truck, path: '/pharmacist/suppliers' },
     { title: 'sidebar.pharmacyStocks', icon: PackageOpen, path: '/pharmacist/stocks' },
+    { title: 'sidebar.priceList', icon: TrendingUp, path: '/pharmacist/priceList' },
     { title: 'sidebar.notifications', icon: Bell, path: '/pharmacist/notifications' },
     { title: 'sidebar.incidents', icon: FileText, path: '/pharmacist/incidents' },
     { title: 'sidebar.pharmacyReports', icon: FileText, path: '/pharmacist/reports' },

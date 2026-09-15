@@ -1244,3 +1244,187 @@
   color: #94a3b8 !important;
 }
 
+/* Price Compare Cell */
+.pharmacy-price-compare {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 140px;
+}
+
+.pharmacy-price-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pharmacy-price-label {
+  font-size: 12px;
+  color: var(--pharmacy-muted);
+  white-space: nowrap;
+}
+
+.pharmacy-price-value {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.pharmacy-price-selling {
+  color: var(--pharmacy-accent-strong);
+}
+
+.pharmacy-price-cost {
+  color: var(--pharmacy-ink);
+}
+
+/* Price List Edit Styles */
+.pharmacy-price-edit {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pharmacy-price-display {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pharmacy-input-small {
+  width: 100px;
+  padding: 6px 10px;
+  border: 1px solid var(--pharmacy-line);
+  border-radius: 8px;
+  font-size: 13px;
+  background: #fff;
+}
+
+.pharmacy-input-small:focus {
+  outline: none;
+  border-color: var(--pharmacy-accent);
+  box-shadow: 0 0 0 3px var(--pharmacy-focus);
+}
+
+.pharmacy-btn-small {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.pharmacy-btn-save {
+  background: var(--pharmacy-accent);
+  color: #fff;
+}
+
+.pharmacy-btn-save:hover {
+  background: var(--pharmacy-accent-strong);
+}
+
+.pharmacy-btn-save:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.pharmacy-btn-cancel {
+  background: rgba(249, 115, 22, 0.15);
+  color: #9a3412;
+}
+
+.pharmacy-btn-cancel:hover {
+  background: rgba(249, 115, 22, 0.25);
+}
+
+.pharmacy-btn-edit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--pharmacy-line);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--pharmacy-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  padding: 0;
+}
+
+.pharmacy-btn-edit:hover {
+  border-color: var(--pharmacy-accent);
+  color: var(--pharmacy-accent);
+  background: var(--pharmacy-accent-ghost);
+}
+
+/* Price Warning Banner */
+.pharmacy-price-warning {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
+  border: 1px solid #fb923c;
+  border-radius: 12px;
+  margin-bottom: 20px;
+  color: #9a3412;
+  font-size: 14px;
+  flex-wrap: wrap;
+}
+
+.pharmacy-price-warning svg {
+  flex-shrink: 0;
+  color: #ea580c;
+}
+
+.pharmacy-price-warning span {
+  flex: 1;
+  min-width: 200px;
+}
+
+.pharmacy-warning-confirm {
+  background: #ea580c;
+  color: #fff;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: background 0.15s ease;
+}
+
+.pharmacy-warning-confirm:hover:not(:disabled) {
+  background: #c2410c;
+}
+
+.pharmacy-warning-confirm:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.pharmacy-warning-cancel {
+  background: transparent;
+  color: #9a3412;
+  border: 1px solid #fb923c;
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: background 0.15s ease;
+}
+
+.pharmacy-warning-cancel:hover {
+  background: rgba(234, 88, 12, 0.1);
+}
+
+.price-loss {
+  color: #dc2626 !important;
+  font-size: 13px;
+}
+

@@ -15,6 +15,7 @@ import {
   RefreshCw,
   ChevronLeft,
   ChevronRight,
+  Edit2,
   Edit3,
   FileText,
   Save,
@@ -45,6 +46,7 @@ const TABS = [
   { id: 'medications', i18nKey: 'pharmacyPage.tabMedications', icon: Pill },
   { id: 'suppliers', i18nKey: 'pharmacyPage.tabSuppliers', icon: Truck },
   { id: 'stocks', i18nKey: 'pharmacyPage.tabStocks', icon: PackageOpen },
+  { id: 'priceList', i18nKey: 'pharmacyPage.tabPriceList', icon: TrendingUp },
   { id: 'reports', i18nKey: 'pharmacyPage.tabReports', icon: Activity },
 ];
 
@@ -251,8 +253,10 @@ function PharmacyPage({ defaultTab = 'overview' }) {
 
   const [lowStock, setLowStock] = useState([]);
   const [expiryList, setExpiryList] = useState([]);
+  const [priceBelowCost, setPriceBelowCost] = useState([]);
   const [overviewLowStockPage, setOverviewLowStockPage] = useState(1);
   const [overviewExpiryPage, setOverviewExpiryPage] = useState(1);
+  const [overviewPriceBelowCostPage, setOverviewPriceBelowCostPage] = useState(1);
 
   const [medications, setMedications] = useState([]);
   const [medLoading, setMedLoading] = useState(false);
@@ -279,6 +283,16 @@ function PharmacyPage({ defaultTab = 'overview' }) {
   });
   const [stockPage, setStockPage] = useState(1);
   const [stockTotalPages, setStockTotalPages] = useState(1);
+
+  // Price List state
+  const [priceList, setPriceList] = useState([]);
+  const [priceListLoading, setPriceListLoading] = useState(false);
+  const [priceListPage, setPriceListPage] = useState(1);
+  const [priceListTotalPages, setPriceListTotalPages] = useState(1);
+  const [editingPriceId, setEditingPriceId] = useState(null);
+  const [editingPriceValue, setEditingPriceValue] = useState('');
+  const [priceSaving, setPriceSaving] = useState(false);
+  const [priceWarning, setPriceWarning] = useState(null); // { medicationId, newPrice, maxCost }
 
   const PAGE_SIZE = 9;
   const OVERVIEW_PAGE_SIZE = 4;
@@ -335,6 +349,23 @@ function PharmacyPage({ defaultTab = 'overview' }) {
     ];
     return Array.from(new Set(items)).sort((a, b) => String(a).localeCompare(String(b)));
   }, [medicationFormOptions]);
+
+  // Computed: medications where selling price < max batch cost
+  const priceBelowCostList = useMemo(() => {
+    if (!priceList || priceList.length === 0) return [];
+    return priceList
+      .map((item) => {
+        const batchCosts = (item.batches || [])
+          .map((b) => b.costPerUnit)
+          .filter((c) => c != null && c > 0);
+        const maxCost = batchCosts.length > 0 ? Math.max(...batchCosts) : 0;
+        if (maxCost > 0 && item.sellingPrice < maxCost) {
+          return { ...item, maxCost };
+        }
+        return null;
+      })
+      .filter(Boolean);
+  }, [priceList]);
 
 
   const [showMedicationModal, setShowMedicationModal] = useState(false);
@@ -481,6 +512,131 @@ function PharmacyPage({ defaultTab = 'overview' }) {
     }
   }, [medicationOptions, stockFilters, stockPage, supplierOptions]);
 
+  // Price List - load from stocks with medication's selling price
+  const loadPriceList = useCallback(async () => {
+    try {
+      setPriceListLoading(true);
+      // Get all stocks and medications to build price list
+      const page = normalizePage(priceListPage);
+      
+      // First get medications with their prices
+      const medRes = await pharmacyService.listMedications({
+        isActive: true,
+        page: 1,
+        limit: 500, // Get all for price list
+      });
+      
+      const medications = medRes?.data || [];
+      
+      // Then get stocks for each medication to get batch info and cost
+      const priceListData = [];
+      for (const med of medications) {
+        const stockRes = await pharmacyService.listStocks({
+          medicationId: med._id,
+          limit: 10,
+        });
+        const stocks = stockRes?.data || [];
+        
+        // Get latest stock with cost info
+        const latestStock = stocks.length > 0 ? stocks[0] : null;
+        
+        // Get all unique batches
+        const uniqueBatches = stocks.reduce((acc, stock) => {
+          if (stock.lotNumber) {
+            const existing = acc.find(b => b.lotNumber === stock.lotNumber);
+            if (!existing) {
+              acc.push({
+                lotNumber: stock.lotNumber,
+                supplierId: stock.supplierId,
+                supplierName: stock.supplierId?.name || '',
+                costPerUnit: stock.costPerUnit,
+                expiryDate: stock.expiryDate,
+              });
+            }
+          }
+          return acc;
+        }, []);
+        
+        priceListData.push({
+          medicationId: med._id,
+          medicationName: med.name,
+          sellingPrice: med.price || 0,
+          supplierName: latestStock?.supplierId?.name || med.supplierId?.name || '',
+          batches: uniqueBatches.length > 0 ? uniqueBatches : [{ lotNumber: 'N/A' }],
+        });
+      }
+      
+      // Sort by medication name
+      priceListData.sort((a, b) => a.medicationName.localeCompare(b.medicationName));
+      
+      // Paginate
+      const startIndex = (page - 1) * PAGE_SIZE;
+      const paginatedData = priceListData.slice(startIndex, startIndex + PAGE_SIZE);
+      
+      setPriceList(paginatedData);
+      setPriceListPage(page);
+      setPriceListTotalPages(calculateTotalPages(priceListData.length, PAGE_SIZE));
+    } catch (err) {
+      console.error('Error loading price list:', err);
+    } finally {
+      setPriceListLoading(false);
+    }
+  }, [priceListPage]);
+
+  const handleEditPrice = (medicationId, currentPrice) => {
+    setEditingPriceId(medicationId);
+    setEditingPriceValue(currentPrice || '');
+  };
+
+  const handleSavePrice = async () => {
+    if (!editingPriceId) return;
+    const newPrice = Number(editingPriceValue);
+    // Find the medication in priceList to check all batch costs
+    const item = priceList.find((i) => i.medicationId === editingPriceId);
+    if (item && item.batches) {
+      const batchCosts = item.batches
+        .map((b) => b.costPerUnit)
+        .filter((c) => c != null && c > 0);
+      const maxCost = Math.max(...batchCosts);
+      if (batchCosts.length > 0 && newPrice < maxCost) {
+        setPriceWarning({ medicationId: editingPriceId, newPrice, maxCost });
+        return;
+      }
+    }
+    await doSavePrice(editingPriceId, newPrice);
+  };
+
+  const doSavePrice = async (medicationId, newPrice) => {
+    try {
+      setPriceSaving(true);
+      setPriceWarning(null);
+      await pharmacyService.updateSellingPrice(medicationId, newPrice);
+      showToast(t('pharmacyPage.updatePriceSuccess'), 'success');
+      setEditingPriceId(null);
+      setEditingPriceValue('');
+      loadPriceList();
+    } catch (err) {
+      showToast(err?.response?.data?.message || t('pharmacyPage.updatePriceError'), 'error');
+    } finally {
+      setPriceSaving(false);
+    }
+  };
+
+  const handlePriceWarningConfirm = () => {
+    if (priceWarning) {
+      doSavePrice(priceWarning.medicationId, priceWarning.newPrice);
+    }
+  };
+
+  const handlePriceWarningCancel = () => {
+    setPriceWarning(null);
+  };
+
+  const handleCancelEditPrice = () => {
+    setEditingPriceId(null);
+    setEditingPriceValue('');
+  };
+
   const loadUsageStats = useCallback(async () => {
     try {
       setUsageLoading(true);
@@ -606,8 +762,9 @@ function PharmacyPage({ defaultTab = 'overview' }) {
   useEffect(() => {
     if (activeTab === 'overview') {
       loadExpiry();
+      loadPriceList();
     }
-  }, [activeTab, loadExpiry]);
+  }, [activeTab, loadExpiry, loadPriceList]);
 
   useEffect(() => {
     if (activeTab === 'medications') {
@@ -626,6 +783,12 @@ function PharmacyPage({ defaultTab = 'overview' }) {
       loadStocks();
     }
   }, [activeTab, stockPage, stockFilters, medicationOptions, supplierOptions]);
+
+  useEffect(() => {
+    if (activeTab === 'priceList') {
+      loadPriceList();
+    }
+  }, [activeTab, priceListPage]);
 
   useEffect(() => {
     setMedPage(1);
@@ -663,6 +826,7 @@ function PharmacyPage({ defaultTab = 'overview' }) {
         manufacturer: medication.manufacturer || '',
         description: medication.description || '',
         minStockLevel: medication.minStockLevel || 0,
+        price: medication.price ?? '',
         isActive: medication.isActive !== false,
       });
     } else {
@@ -983,6 +1147,21 @@ function PharmacyPage({ defaultTab = 'overview' }) {
         })}
       </nav>
 
+      {priceWarning && (
+        <div className="pharmacy-price-warning">
+          <AlertTriangle size={20} />
+          <span>
+            Đơn giá bán (<strong>{formatCurrency(priceWarning.newPrice)}</strong>) thấp hơn giá nhập của một số lô (cao nhất: <strong>{formatCurrency(priceWarning.maxCost)}</strong>). Bạn có chắc muốn tiếp tục?
+          </span>
+          <button type="button" className="pharmacy-warning-confirm" onClick={handlePriceWarningConfirm} disabled={priceSaving}>
+            {priceSaving ? '...' : t('pharmacyPage.confirmPriceWarning')}
+          </button>
+          <button type="button" className="pharmacy-warning-cancel" onClick={handlePriceWarningCancel}>
+            {t('pharmacyPage.cancel')}
+          </button>
+        </div>
+      )}
+
       {activeTab === 'overview' && (
         <section className="pharmacy-section">
           <div className="pharmacy-summary">
@@ -1153,6 +1332,56 @@ function PharmacyPage({ defaultTab = 'overview' }) {
                 )}
               </div>
             </div>
+
+            {priceBelowCostList.length > 0 && (
+              <div className="pharmacy-card">
+                <div className="pharmacy-card__header">
+                  <div>
+                    <strong>{t('pharmacyPage.priceBelowCostTitle')}</strong>
+                    <strong className="pharmacy-card__meta">{t('pharmacyPage.priceBelowCostCount', { count: priceBelowCostList.length })}</strong>
+                  </div>
+                  <AlertTriangle size={18} />
+                </div>
+                <div className="pharmacy-card__body">
+                  <ul className="pharmacy-list pharmacy-list--compact">
+                    {priceBelowCostList
+                      .slice((overviewPriceBelowCostPage - 1) * OVERVIEW_PAGE_SIZE, overviewPriceBelowCostPage * OVERVIEW_PAGE_SIZE)
+                      .map((item) => (
+                        <li key={item.medicationId}>
+                          <div className="pharmacy-alert-item">
+                            <span className="pharmacy-alert-item__name">{item.medicationName}</span>
+                            <span className="pharmacy-alert-item__meta">
+                              Giá bán: {formatCurrency(item.sellingPrice)} | Nhập cao nhất: {formatCurrency(item.maxCost)}
+                            </span>
+                          </div>
+                          <strong className="price-loss">{formatCurrency(item.sellingPrice)}</strong>
+                        </li>
+                      ))}
+                  </ul>
+                  {Math.ceil(priceBelowCostList.length / OVERVIEW_PAGE_SIZE) > 1 && (
+                    <div className="pharmacy-pagination">
+                      <button
+                        type="button"
+                        onClick={() => setOverviewPriceBelowCostPage((prev) => Math.max(1, prev - 1))}
+                        disabled={overviewPriceBelowCostPage <= 1}
+                      >
+                        <ChevronLeft size={14} />
+                        {t('pharmacyPage.prev')}
+                      </button>
+                      <span>{t('pharmacyPage.page', { current: overviewPriceBelowCostPage, total: Math.max(1, Math.ceil(priceBelowCostList.length / OVERVIEW_PAGE_SIZE)) })}</span>
+                      <button
+                        type="button"
+                        onClick={() => setOverviewPriceBelowCostPage((prev) => Math.min(Math.max(1, Math.ceil(priceBelowCostList.length / OVERVIEW_PAGE_SIZE)), prev + 1))}
+                        disabled={overviewPriceBelowCostPage >= Math.max(1, Math.ceil(priceBelowCostList.length / OVERVIEW_PAGE_SIZE))}
+                      >
+                        {t('pharmacyPage.next')}
+                        <ChevronRight size={14} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </section>
       )}
@@ -1471,6 +1700,170 @@ function PharmacyPage({ defaultTab = 'overview' }) {
               type="button"
               onClick={() => setStockPage((prev) => Math.min(stockTotalPages, prev + 1))}
               disabled={stockPage >= stockTotalPages}
+            >
+              {t('pharmacyPage.next')}
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        </section>
+      )}
+
+      {activeTab === 'priceList' && (
+        <section className="pharmacy-section">
+          <div className="pharmacy-toolbar wide">
+            <div className="price-list-title">
+              <TrendingUp size={20} />
+              <h2>{t('pharmacyPage.tabPriceList')}</h2>
+            </div>
+          </div>
+
+          <div className="pharmacy-card">
+            <table className="pharmacy-table">
+              <thead>
+                <tr>
+                  <th>{t('pharmacyPage.colMedicationName')}</th>
+                  <th>{t('pharmacyPage.colLotNumber')}</th>
+                  <th>{t('pharmacyPage.colManufacturer')}</th>
+                  <th>{t('pharmacyPage.colPrice')}</th>
+                  <th>{t('pharmacyPage.priceLabel')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {priceListLoading && (
+                  <tr>
+                    <td colSpan="5" className="pharmacy-empty">{t('pharmacyPage.loadingStocks')}</td>
+                  </tr>
+                )}
+                {!priceListLoading && priceList.length === 0 && (
+                  <tr>
+                    <td colSpan="5" className="pharmacy-empty">{t('pharmacyPage.noStocks')}</td>
+                  </tr>
+                )}
+                {!priceListLoading &&
+                  priceList.map((item, idx) => (
+                    item.batches && item.batches.length > 0 ? (
+                      item.batches.map((batch, batchIdx) => (
+                        <tr key={`${item.medicationId}-${batchIdx}`}>
+                          {batchIdx === 0 ? (
+                            <>
+                              <td rowSpan={item.batches.length}>{item.medicationName}</td>
+                              <td>{batch.lotNumber}</td>
+                              <td rowSpan={item.batches.length}>{item.supplierName || 'N/A'}</td>
+                              <td>{batch.costPerUnit ? formatCurrency(batch.costPerUnit) : 'N/A'}</td>
+                              <td rowSpan={item.batches.length}>
+                                {editingPriceId === item.medicationId ? (
+                                  <div className="pharmacy-price-edit">
+                                    <input
+                                      type="number"
+                                      value={editingPriceValue}
+                                      onChange={(e) => setEditingPriceValue(e.target.value)}
+                                      className="pharmacy-input-small"
+                                      min="0"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={handleSavePrice}
+                                      className="pharmacy-btn-small pharmacy-btn-save"
+                                      disabled={priceSaving}
+                                    >
+                                      {priceSaving ? '...' : <Save size={12} />}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={handleCancelEditPrice}
+                                      className="pharmacy-btn-small pharmacy-btn-cancel"
+                                    >
+                                      <X size={12} />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="pharmacy-price-display">
+                                    <span>{formatCurrency(item.sellingPrice)}</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleEditPrice(item.medicationId, item.sellingPrice)}
+                                      className="pharmacy-btn-edit"
+                                    >
+                                      <Edit2 size={12} />
+                                    </button>
+                                  </div>
+                                )}
+                              </td>
+                            </>
+                          ) : (
+                            <>
+                              <td>{batch.lotNumber}</td>
+                              <td>{batch.costPerUnit ? formatCurrency(batch.costPerUnit) : 'N/A'}</td>
+                            </>
+                          )}
+                        </tr>
+                      ))
+                    ) : (
+                      <tr key={idx}>
+                        <td>{item.medicationName}</td>
+                        <td>N/A</td>
+                        <td>{item.supplierName || 'N/A'}</td>
+                        <td>N/A</td>
+                        <td>
+                          {editingPriceId === item.medicationId ? (
+                            <div className="pharmacy-price-edit">
+                              <input
+                                type="number"
+                                value={editingPriceValue}
+                                onChange={(e) => setEditingPriceValue(e.target.value)}
+                                className="pharmacy-input-small"
+                                min="0"
+                              />
+                              <button
+                                type="button"
+                                onClick={handleSavePrice}
+                                className="pharmacy-btn-small pharmacy-btn-save"
+                                disabled={priceSaving}
+                              >
+                                {priceSaving ? '...' : <Save size={12} />}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={handleCancelEditPrice}
+                                className="pharmacy-btn-small pharmacy-btn-cancel"
+                              >
+                                <X size={12} />
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="pharmacy-price-display">
+                              <span>{formatCurrency(item.sellingPrice)}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleEditPrice(item.medicationId, item.sellingPrice)}
+                                className="pharmacy-btn-edit"
+                              >
+                                <Edit2 size={12} />
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="pharmacy-pagination">
+            <button
+              type="button"
+              onClick={() => setPriceListPage((prev) => Math.max(1, prev - 1))}
+              disabled={priceListPage <= 1}
+            >
+              <ChevronLeft size={16} />
+              {t('pharmacyPage.prev')}
+            </button>
+            <span>{t('pharmacyPage.page', { current: priceListPage, total: priceListTotalPages })}</span>
+            <button
+              type="button"
+              onClick={() => setPriceListPage((prev) => Math.min(priceListTotalPages, prev + 1))}
+              disabled={priceListPage >= priceListTotalPages}
             >
               {t('pharmacyPage.next')}
               <ChevronRight size={16} />

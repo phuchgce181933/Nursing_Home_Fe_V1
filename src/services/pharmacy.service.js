@@ -10,6 +10,11 @@ const updateMedication = async (medicationId, body) => {
   return response.data;
 };
 
+const updateSellingPrice = async (medicationId, sellingPrice) => {
+  const response = await axiosClient.patch(`/pharmacy/medications/${medicationId}/selling-price`, { sellingPrice });
+  return response.data;
+};
+
 const listMedications = async (params = {}) => {
   const response = await axiosClient.get('/pharmacy/medications', { params });
   return response.data;
@@ -103,6 +108,7 @@ const getReportSummary = async (params = {}) => {
 export default {
   createMedication,
   updateMedication,
+  updateSellingPrice,
   listMedications,
   getMedication,
   addMedicationNote,

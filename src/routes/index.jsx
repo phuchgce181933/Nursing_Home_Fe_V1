@@ -295,6 +295,7 @@ function AppRoutes() {
         <Route path="medications" element={<PharmacyPage defaultTab="medications" />} />
         <Route path="suppliers" element={<PharmacyPage defaultTab="suppliers" />} />
         <Route path="stocks" element={<PharmacyPage defaultTab="stocks" />} />
+        <Route path="priceList" element={<PharmacyPage defaultTab="priceList" />} />
         <Route path="notifications" element={<NotificationsPage role="pharmacist" />} />
         <Route path="incidents" element={<IncidentManagementPage />} />
         <Route path="dispense" element={<PharmacyPage defaultTab="dispense" />} />
