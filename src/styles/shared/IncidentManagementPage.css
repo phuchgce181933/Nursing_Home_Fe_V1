@@ -749,6 +749,23 @@
 .ic-table tbody tr:hover {
   background: #f8fbff;
 }
+
+.ic-table th:last-child,
+.ic-table td:last-child {
+  position: sticky;
+  right: 0;
+  z-index: 2;
+}
+.ic-table th:last-child {
+  background: #f8fafc;
+}
+.ic-table td:last-child {
+  background: #fff;
+}
+.ic-table tbody tr:hover td:last-child {
+  background: #f8fbff;
+}
+
 .ic-table-title {
   font-weight: 600;
   color: #0f172a;
