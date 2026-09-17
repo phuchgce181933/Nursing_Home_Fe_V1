@@ -220,6 +220,7 @@
   border-radius: 16px;
   padding: 18px;
   margin-bottom: 16px;
+  overflow-x: auto;
   box-shadow: 0 12px 24px rgba(15, 23, 42, 0.04);
   overflow-x: auto;
 }
@@ -514,6 +515,23 @@
 }
 
 .pharmacy-table tbody tr:hover {
+  background: rgba(15, 118, 110, 0.06);
+}
+
+.pharmacy-table th:last-child,
+.pharmacy-table td:last-child {
+  position: sticky;
+  right: 0;
+  z-index: 2;
+}
+.pharmacy-table th:last-child {
+  background: #0f172a;
+  color: #f8fafc;
+}
+.pharmacy-table td:last-child {
+  background: #fff;
+}
+.pharmacy-table tbody tr:hover td:last-child {
   background: rgba(15, 118, 110, 0.06);
 }
 

@@ -378,7 +378,8 @@
   background: #fff;
   border: 1px solid #e2e8f0;
   border-radius: 14px;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
   animation: as-fadeIn 0.5s ease-out backwards;
   animation-delay: 0.1s;
 }

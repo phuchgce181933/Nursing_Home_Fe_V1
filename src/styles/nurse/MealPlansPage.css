@@ -359,7 +359,8 @@
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
-  overflow: hidden;
+  display: block;
+  overflow-x: auto;
 }
 
 .mp-table thead tr {
@@ -390,6 +391,22 @@
 }
 
 .mp-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+.mp-table th:last-child,
+.mp-table td:last-child {
+  position: sticky;
+  right: 0;
+  z-index: 2;
+}
+.mp-table th:last-child {
+  background: var(--nh-table-header-bg);
+}
+.mp-table td:last-child {
+  background: #fff;
+}
+.mp-table tbody tr:hover td:last-child {
   background: #f8fafc;
 }
 
@@ -713,11 +730,6 @@
 
   .mp-resident-grid {
     grid-template-columns: 1fr;
-  }
-
-  .mp-table {
-    display: block;
-    overflow-x: auto;
   }
 
   .mp-date-switch {

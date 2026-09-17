@@ -123,13 +123,21 @@ const resources = {
         trustProDesc: "An experienced, caring team"
       },
       forgotPassword: {
-        title: "Forgot password",
-        subtitle: "Enter your account email to receive a reset link.",
+        title: "Forgot password?",
+        subtitle: "Don't worry, we'll help you regain access.",
+        description: "Enter your registered email to receive a password reset link.",
+        emailLabel: "Email",
+        emailPlaceholder: "Enter your email address",
         submit: "Send reset link",
         sending: "Sending...",
         back: "Back to login",
+        successTitle: "Check your email",
+        successMessage: "We've sent a password reset link to",
+        successHint: "Please check your inbox and spam folder.",
+        resend: "Resend link",
         success: "If the email exists, we have sent password reset instructions. Please check your inbox.",
-        error: "Unable to send password reset request."
+        error: "Unable to send password reset request.",
+        invalidEmail: "Please enter a valid email address."
       },
       profile: {
         title: "User profile",
@@ -1536,6 +1544,9 @@ const resources = {
         emptyRooms: "No rooms found for this floor. Click \"Add Room\" to create one.",
         emptyBeds: "No beds found in this room. Click \"Add Bed\" to create one.",
         emptyEquipment: "No equipment found matching the filters. Click \"Add Equipment\" to create one.",
+        emptyEquipmentFiltered: "No equipment matches your search or filter.",
+        pageSize: "Items per page",
+        pageSizeSuffix: "page",
         viewGrid: "Grid View",
         viewTable: "Table View",
         modalCreateBuilding: "Add New Building",
@@ -7004,13 +7015,21 @@ const resources = {
         trustProDesc: "Đội ngũ giàu kinh nghiệm và tận tâm"
       },
       forgotPassword: {
-        title: "Quên mật khẩu",
-        subtitle: "Nhập email tài khoản để nhận liên kết đặt lại mật khẩu.",
+        title: "Quên mật khẩu?",
+        subtitle: "Đừng lo, chúng tôi sẽ giúp bạn lấy lại quyền truy cập.",
+        description: "Nhập email đã đăng ký để nhận liên kết đặt lại mật khẩu.",
+        emailLabel: "Email",
+        emailPlaceholder: "Nhập địa chỉ email của bạn",
         submit: "Gửi liên kết đặt lại",
         sending: "Đang gửi...",
         back: "Quay lại đăng nhập",
+        successTitle: "Kiểm tra email của bạn",
+        successMessage: "Chúng tôi đã gửi liên kết đặt lại mật khẩu đến",
+        successHint: "Vui lòng kiểm tra hộp thư đến và thư rác.",
+        resend: "Gửi lại liên kết",
         success: "Nếu email tồn tại, chúng tôi đã gửi hướng dẫn đặt lại mật khẩu. Vui lòng kiểm tra hộp thư của bạn.",
-        error: "Không thể gửi yêu cầu đặt lại mật khẩu."
+        error: "Không thể gửi yêu cầu đặt lại mật khẩu.",
+        invalidEmail: "Vui lòng nhập địa chỉ email hợp lệ."
       },
       profile: {
         title: "Hồ sơ người dùng",
@@ -8415,6 +8434,9 @@ const resources = {
         emptyRooms: "Không tìm thấy phòng nào trong tầng này. Bạn có thể nhấn nút \"Thêm Phòng\" để tạo mới.",
         emptyBeds: "Không tìm thấy giường nào trong phòng này. Bạn có thể nhấn nút \"Thêm Giường\" để tạo mới.",
         emptyEquipment: "Không tìm thấy thiết bị nào phù hợp. Bạn có thể bấm nút \"Thêm Thiết Bị\" để tạo mới.",
+        emptyEquipmentFiltered: "Không tìm thấy thiết bị phù hợp với tìm kiếm hoặc bộ lọc.",
+        pageSize: "Số mục mỗi trang",
+        pageSizeSuffix: "trang",
         viewGrid: "Dạng lưới",
         viewTable: "Dạng bảng",
         modalCreateBuilding: "Thêm Tòa Nhà Mới",
