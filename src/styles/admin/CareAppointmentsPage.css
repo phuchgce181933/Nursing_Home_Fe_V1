@@ -4,7 +4,7 @@
   padding: 24px;
   background-color: #f8fafc;
   min-height: 100vh;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: inherit;
 }
 
 .cap-header {
@@ -251,7 +251,8 @@
   border: 1px solid #f1f5f9;
   border-radius: 12px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .cap-table-responsive {
@@ -290,6 +291,22 @@
 
 .cap-table-row:hover {
   background-color: #f8fafc;
+}
+
+.cap-table th:last-child,
+.cap-table td:last-child {
+  position: sticky;
+  right: 0;
+  z-index: 2;
+}
+.cap-table th:last-child {
+  background: #f8fafc;
+}
+.cap-table td:last-child {
+  background: #fff;
+}
+.cap-table-row:hover td:last-child {
+  background: #f8fafc;
 }
 
 .cap-resident-info {
@@ -378,6 +395,11 @@
 .cap-btn-action:hover {
   background-color: #cbd5e1;
   color: #1e293b;
+}
+
+.cap-btn-action--danger:hover {
+  background-color: #fee2e2;
+  color: #b91c1c;
 }
 
 /* Modals styles */
@@ -492,8 +514,16 @@
   color: #ffffff;
 }
 
+.cap-modal-btn-submit--danger {
+  background-color: #dc2626;
+}
+
 .cap-modal-btn-submit:hover {
   background-color: #2b4b7c;
+}
+
+.cap-modal-btn-submit--danger:hover {
+  background-color: #b91c1c;
 }
 
 /* Animations */
@@ -505,4 +535,14 @@
 @keyframes capSlideUp {
   from { transform: translateY(20px); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .cap-container { padding: 16px; }
+  .cap-header { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .cap-metrics-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .cap-filter-grid { grid-template-columns: 1fr; }
+  .cap-filter-row-secondary { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .cap-filter-date-group { flex-wrap: wrap; }
 }

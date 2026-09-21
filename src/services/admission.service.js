@@ -126,6 +126,28 @@ const adminGetAdmissionList = async (params = {}) => {
 };
 
 /**
+ * Admin | Create Walk-in Admission Request
+ * Tạo hồ sơ nhập viện cho người nhà đến trực tiếp tại quầy, chưa có tài khoản
+ * trên hệ thống. Khi hoàn tất check-in, hệ thống tự tạo tài khoản Family và
+ * gửi mật khẩu tạm qua email (nếu có requestedByEmail) hoặc SMS (nếu chỉ có
+ * requestedByPhone).
+ *
+ * @param {object} body
+ * @param {object} body.applicant - Thông tin người cao tuổi (giống submitAdmissionRequest)
+ * @param {string} body.requestedByName - Tên người nhà (BẮT BUỘC)
+ * @param {string} [body.requestedByEmail] - Email người nhà (ưu tiên gửi qua mail nếu có)
+ * @param {string} [body.requestedByPhone] - SĐT người nhà (dùng gửi SMS nếu không có email)
+ * @param {string} [body.preferredAdmissionDate]
+ * @param {string} [body.reasonForAdmission]
+ * @param {string} [body.notes]
+ * @returns {object} { message, admission }
+ */
+const adminCreateWalkInAdmission = async (body) => {
+  const response = await axiosClient.post('/admin/admission-requests/walk-in', body);
+  return response.data;
+};
+
+/**
  * Admin | See Requirements Details
  * Xem chi tiết một yêu cầu nhập viện (Admin/Manager, bao gồm thông tin tài khoản Family).
  *
@@ -216,6 +238,8 @@ const adminAssignServicePackage = async (admissionId, body) => {
  * @param {string} body.contractNumber     - Số hợp đồng (BẮT BUỘC)
  * @param {string} [body.contractStartDate] - Ngày bắt đầu (YYYY-MM-DD)
  * @param {string} [body.contractEndDate]   - Ngày kết thúc (YYYY-MM-DD)
+ * @param {number} [body.contractDurationMonths]  - Thời hạn hợp đồng theo tháng
+ * @param {number} [body.contractDiscountPercent] - Phần trăm giảm giá hợp đồng (0-100)
  * @param {string} [body.contractTerms]     - Điều khoản hợp đồng
  * @param {string} [body.notes]             - Ghi chú thêm
  * @returns {object} { message, admission }
@@ -223,6 +247,22 @@ const adminAssignServicePackage = async (admissionId, body) => {
 const adminCreateContract = async (admissionId, body) => {
   const response = await axiosClient.patch(
     `/admin/admission-requests/${admissionId}/create-contract`,
+    body
+  );
+  return response.data;
+};
+
+const adminCancelContract = async (admissionId, body) => {
+  const response = await axiosClient.patch(
+    `/admin/admission-requests/${admissionId}/cancel-contract`,
+    body
+  );
+  return response.data;
+};
+
+const adminChangeContractServicePackage = async (admissionId, body) => {
+  const response = await axiosClient.patch(
+    `/admin/admission-requests/${admissionId}/change-contract-service-package`,
     body
   );
   return response.data;
@@ -322,6 +362,23 @@ const getStaffList = async (params = {}) => {
   return response.data;
 };
 
+/**
+ * Admin | Update Contract Dates
+ * Gia hạn hợp đồng bằng cách cập nhật ngày hết hạn.
+ *
+ * @param {string} admissionId - ID của admission
+ * @param {object} body
+ * @param {string} body.contractEndDate - Ngày hết hạn mới (ISO 8601 format) (BẮT BUỘC)
+ * @returns {object} { message, admission }
+ */
+const updateAdmissionContractDates = async (admissionId, body) => {
+  const response = await axiosClient.patch(
+    `/admin/admission-requests/${admissionId}/extend-contract`,
+    body
+  );
+  return response.data;
+};
+
 export default {
   // Family
   submitAdmissionRequest,
@@ -329,6 +386,7 @@ export default {
   getAdmissionDetail,
   cancelAdmissionRequest,
   // Admin / Manager
+  adminCreateWalkInAdmission,
   adminGetAdmissionList,
   adminGetAdmissionDetail,
   adminApproveAdmission,
@@ -336,8 +394,11 @@ export default {
   adminAssignConsultant,
   adminAssignServicePackage,
   adminCreateContract,
+  adminCancelContract,
+  adminChangeContractServicePackage,
   adminCheckInResident,
   getStaffList,
+  updateAdmissionContractDates,
   // Medical Staff (Doctor / Nurse)
   medicalRecordConsultation,
   medicalScheduleAssessment,

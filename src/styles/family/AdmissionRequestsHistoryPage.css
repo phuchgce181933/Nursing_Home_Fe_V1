@@ -6,7 +6,10 @@
   display: flex;
   flex-direction: column;
   gap: 24px;
-  animation: arh-slide-in 0.35s ease both;
+  /* No "both" fill-mode: a lingering non-"none" transform after this entrance
+     animation ends creates a new containing block for any position:fixed modal
+     nested in this page, breaking its viewport-relative centering. */
+  animation: arh-slide-in 0.35s ease;
 }
 
 @keyframes arh-slide-in {
@@ -179,6 +182,22 @@
 
 .arh-table tbody tr:hover td {
   background: rgba(26, 54, 93, 0.02);
+}
+
+.arh-table th:last-child,
+.arh-table td:last-child {
+  position: sticky;
+  right: 0;
+  z-index: 2;
+}
+.arh-table th:last-child {
+  background: #f8fafc;
+}
+.arh-table td:last-child {
+  background: #fff;
+}
+.arh-table tbody tr:hover td:last-child {
+  background: #f8fafc;
 }
 
 .arh-table__name {
@@ -707,6 +726,50 @@
 }
 
 /* ─── loading / error / empty ──────────────────────── */
+.arh-error-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 16px;
+  animation: arh-fade-in 0.25s ease both;
+}
+
+.arh-error-banner__retry {
+  flex-shrink: 0;
+  background: #fff;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  border-radius: 8px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.arh-error-banner__retry:hover {
+  background: #fee2e2;
+}
+
+@keyframes arh-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .arh-loading-box {
   display: flex;
   flex-direction: column;

@@ -1,3 +1,4 @@
+import { motion } from 'motion/react';
 import {
   Check,
   User,
@@ -44,12 +45,22 @@ export default function SuccessScreen({ submittedData = {}, formData = {}, navig
   const rawPrefDate = submittedData?.preferredAdmissionDate || formData.preferredDate;
 
   return (
-    <div className="sap-success">
+    <motion.div
+      className="sap-success"
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+    >
       <div className="sap-success__card">
         {/* circle checked icon */}
-        <div className="sap-success__icon-wrap">
+        <motion.div
+          className="sap-success__icon-wrap"
+          initial={{ scale: 0.4, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ delay: 0.15, type: 'spring', stiffness: 260, damping: 18 }}
+        >
           <Check size={36} />
-        </div>
+        </motion.div>
 
         {/* success message */}
         <h2 className="sap-success__title">Gửi yêu cầu tiếp nhận thành công!</h2>
@@ -141,6 +152,6 @@ export default function SuccessScreen({ submittedData = {}, formData = {}, navig
           </div>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }

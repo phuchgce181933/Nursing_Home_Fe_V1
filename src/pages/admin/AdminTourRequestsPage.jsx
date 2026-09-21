@@ -147,7 +147,7 @@ export default function AdminTourRequestsPage() {
       }
     } catch (err) {
       console.error('Failed to load facility tour requests:', err);
-      setError('Could not retrieve facility tour requests. Please check your credentials or network connection.');
+      setError(t('admin.tourRequests.loadError'));
     } finally {
       setLoading(false);
     }
@@ -228,7 +228,7 @@ export default function AdminTourRequestsPage() {
 
         {/* Pending Card */}
         <div className="adm-card-stat">
-          <div className="adm-stat-icon" style={{ backgroundColor: '#eff6ff', color: '#2563eb' }}>
+          <div className="adm-stat-icon" style={{ backgroundColor: 'rgba(15, 118, 110, 0.08)', color: '#0f766e' }}>
             <Clock size={22} />
           </div>
           <div>

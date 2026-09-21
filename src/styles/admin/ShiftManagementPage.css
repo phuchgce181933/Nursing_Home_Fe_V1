@@ -6,6 +6,7 @@
   border: 1px solid #e2e8f0;
   padding: 20px;
   box-shadow: 0 12px 24px rgba(15, 23, 42, 0.04);
+  overflow-x: auto;
 }
 
 .resident-page .tab-toolbar {
@@ -43,7 +44,7 @@
 .resident-page .section-title {
   font-size: 1rem;
   font-weight: 700;
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: inherit;
   color: #0f172a;
   margin: 0;
 }
@@ -326,7 +327,7 @@
 .schedule-day__header {
   font-size: 14px;
   font-weight: 700;
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: inherit;
   color: #0f172a;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -407,6 +408,19 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.schedule-split-section {
+  margin-top: 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.schedule-split-section .schedule-column {
+  border-right: none;
+  min-height: 80px;
 }
 
 @media (max-width: 768px) {

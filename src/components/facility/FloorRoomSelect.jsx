@@ -2,8 +2,13 @@ import { useEffect, useState } from 'react';
 import facilityService, { getFacilityErrorMessage } from '../../services/facility.service';
 import '../../styles/components/FloorRoomSelect.css';
 
-const floorLabel = (f) =>
-  f.label || f.name || (f.floorNumber != null ? `Tầng ${f.floorNumber}` : f._id);
+const floorLabel = (f) => {
+  // Sử dụng label từ backend nếu có, hoặc tự tạo với thông tin tòa nhà
+  if (f.label) return f.label;
+  const floorName = f.name || (f.floorNumber != null ? `Tầng ${f.floorNumber}` : f._id);
+  const buildingName = f.building?.name || (f.buildingId && typeof f.buildingId === 'object' ? f.buildingId.name : null);
+  return buildingName ? `${floorName} — ${buildingName}` : floorName;
+};
 
 const roomLabel = (r) => r.label || `Phòng ${r.roomNumber}`;
 

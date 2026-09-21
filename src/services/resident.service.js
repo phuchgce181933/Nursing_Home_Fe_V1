@@ -1,5 +1,6 @@
 import axiosClient from '../api/axiosClient';
 import facilityService from './facility.service';
+import { getAuthRole } from '../utils/auth';
 
 const createResident = async (body) => {
   const response = await axiosClient.post('/admin/residents', body);
@@ -7,7 +8,7 @@ const createResident = async (body) => {
 };
 
 const getResidentList = async (params = {}) => {
-  const response = await axiosClient.get('/admin/residents', { params });
+  const response = await axiosClient.get('/residents', { params });
   return response.data;
 };
 
@@ -18,6 +19,16 @@ const getFamilyResidentList = async () => {
 
 const updateResidentPersonalInfo = async (residentId, body) => {
   const response = await axiosClient.patch(`/admin/residents/${residentId}/personal-info`, body);
+  return response.data;
+};
+
+const adminUploadAvatar = async (residentId, file) => {
+  const id = residentPathId(residentId);
+  const fd = new FormData();
+  fd.append('avatar', file);
+  const response = await axiosClient.post(`/admin/residents/${id}/avatar`, fd, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
   return response.data;
 };
 
@@ -290,6 +301,32 @@ const listByArea = async (params = {}) => {
   }
 };
 
+const BY_AREA_EXPORT_PAGE_SIZE = 100;
+
+/** Fetch all residents by area matching filters for client-side export (paginated). */
+const fetchAllResidentsByAreaForExport = async (filters = {}) => {
+  const params = {
+    buildingId: filters.buildingId || undefined,
+    floorId: filters.floorId || undefined,
+    roomId: filters.roomId || undefined,
+    search: filters.search || undefined,
+    status: filters.status || undefined,
+    limit: BY_AREA_EXPORT_PAGE_SIZE,
+    page: 1,
+  };
+
+  const first = await listByArea(params);
+  const all = [...(first?.data || [])];
+  const totalPages = first?.totalPages || 1;
+
+  for (let page = 2; page <= totalPages; page += 1) {
+    const next = await listByArea({ ...params, page });
+    all.push(...(next?.data || []));
+  }
+
+  return all;
+};
+
 const buildResidentFromFamily = (family) => {
   const r = family.resident;
   return {
@@ -397,7 +434,7 @@ const enrichResidentDetail = async (residentIdOrCode, resident) => {
 /** GET /api/residents/:id — full profile; enriches drugAllergies / pre-existing / initial health if missing */
 const getResidentDetail = async (residentIdOrCode) => {
   const base = await getResidentDetailRaw(residentIdOrCode);
-  if (!base) throw new Error('Resident not found');
+  if (!base) throw new Error('Không tìm thấy cư dân');
   const resident = await enrichResidentDetail(residentIdOrCode, base);
   return { resident };
 };
@@ -613,7 +650,7 @@ const listDrugAllergies = async (params = {}) => {
 };
 
 const getInitialHealthFallback = async (residentId) => {
-  if (!r) throw new Error('Resident not found');
+  if (!r) throw new Error('Không tìm thấy cư dân');
 
   const initialHealthCondition = r.initialHealthCondition || '';
   return {
@@ -723,12 +760,12 @@ export const RESIDENT_DRUG_ALLERGIES_ROUTE_HINT =
   'Đặt GET /residents/drug-allergies trước /:residentId và mount PUT|POST /:id/drug-allergies.';
 
 export const RESIDENT_TRANSFER_ROUTE_HINT =
-  'Backend chưa có route chuyển phòng cư dân (/transfer-room). ' +
-  'Cập nhật backend và khởi động lại API để dùng tính năng chuyển phòng.';
+  'Route chuyển phòng cư dân đang có vấn đề khi gọi tới API /residents/:id/transfer-room. ' +
+  'Kiểm tra quyền truy cập, dữ liệu đầu vào (targetRoomId/targetBedId), và khởi động lại API nếu server đang chạy phiên bản cũ.';
 
 const getPreExistingConditionsFallback = async (residentId) => {
   const r = await getResidentDetailRaw(residentId);
-  if (!r) throw new Error('Resident not found');
+  if (!r) throw new Error('Không tìm thấy cư dân');
   const chronic = r.chronicConditions || [];
   const history = r.medicalHistory || [];
   return {
@@ -832,7 +869,7 @@ const updatePreExistingConditions = async (residentId, body) => {
 
 const getDrugAllergiesFallback = async (residentId) => {
   const r = await getResidentDetailRaw(residentId);
-  if (!r) throw new Error('Resident not found');
+  if (!r) throw new Error('Không tìm thấy cư dân');
   return {
     resident: r,
     drugAllergies: mapDrugAllergiesFromResident(r),
@@ -877,10 +914,12 @@ const updateDrugAllergiesViaAdmin = async (residentId, payload) => {
   };
 };
 
-/** PUT /api/residents/:id/drug-allergies (fallback: POST, PATCH allergies) */
+/** PUT /api/residents/:id/drug-allergies (fallback: POST, PATCH allergies — doctor only) */
 const updateDrugAllergies = async (residentId, body) => {
   const id = residentPathId(residentId);
   const payload = buildDrugAllergiesPayload(body);
+  const role = getAuthRole();
+  const canUseAdminFallback = role === 'doctor';
 
   const tryPut = () =>
     axiosClient.put(`/residents/${id}/drug-allergies`, payload).then(unwrapResidentApiBody);
@@ -892,7 +931,7 @@ const updateDrugAllergies = async (residentId, body) => {
     return await tryPut();
   } catch (e) {
     const status = e?.response?.status;
-    if (status === 404 || status === 405) {
+    if (canUseAdminFallback && (status === 404 || status === 405)) {
       try {
         return await tryPost();
       } catch (postErr) {
@@ -903,14 +942,16 @@ const updateDrugAllergies = async (residentId, body) => {
         throw postErr;
       }
     }
-    if (status === 403 && shouldUseDrugAllergiesDetailFallback(e)) {
-      return updateDrugAllergiesViaAdmin(residentId, payload);
-    }
     throw e;
   }
 };
 
 /** GET /api/residents/:id/transfer-room/targets?floorId= */
+const adminReleaseResident = async (residentId) => {
+  const response = await axiosClient.patch(`/admin/residents/${residentId}/release`);
+  return response.data;
+};
+
 const getTransferTargets = (residentId, params) =>
   axiosClient.get(`/residents/${residentId}/transfer-room/targets`, { params }).then((r) => r.data);
 
@@ -939,8 +980,10 @@ const transferResidentToRoom = (residentId, body) =>
 const residentService = {
   createResident,
   getResidentList,
+  fetchAllResidentsByAreaForExport,
   getFamilyResidentList,
   updateResidentPersonalInfo,
+  adminUploadAvatar,
   updateResidentFamilyInfo,
   listForAssignment,
   listForFamilyManagement,
@@ -960,6 +1003,7 @@ const residentService = {
   updatePreExistingConditions,
   getDrugAllergies,
   updateDrugAllergies,
+  adminReleaseResident,
   getTransferTargets,
   transferResidentToRoom,
 };

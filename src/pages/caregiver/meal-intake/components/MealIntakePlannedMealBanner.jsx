@@ -1,31 +1,39 @@
+import { useTranslation } from 'react-i18next';
+
 function MealIntakePlannedMealBanner({ context }) {
+  const { t } = useTranslation();
+  const ns = 'caregiver.mealIntake.plannedMealBanner';
+
   if (!context) return null;
 
   if (context.hasExistingRecord) {
+    const name = context.existingRecordedByName;
     return (
       <p className="meal-intake-page__context meal-intake-page__context--warn">
-        Đã có ghi nhận cho bữa này trong ngày. Vui lòng đóng và chọn <strong>Sửa</strong> từ danh sách.
+        {name
+          ? t(`${ns}.duplicateWithRecorder`, { name })
+          : t(`${ns}.duplicate`)}
       </p>
     );
   }
 
   if (context.plannedMeal) {
+    const time = context.plannedMeal.mealTime || context.scheduledMealTime;
     return (
       <p className="meal-intake-page__context">
-        Thực đơn publish: <strong>{context.plannedMeal.mealName}</strong>
-        {context.plannedMeal.calories != null && <> · {context.plannedMeal.calories} kcal</>}
-        {(context.plannedMeal.mealTime || context.scheduledMealTime) && (
-          <> · Giờ {context.plannedMeal.mealTime || context.scheduledMealTime}</>
-        )}
+        {t(`${ns}.published`, { mealName: context.plannedMeal.mealName })}
+        {context.plannedMeal.calories != null &&
+          t(`${ns}.kcal`, { calories: context.plannedMeal.calories })}
+        {time && t(`${ns}.time`, { time })}
       </p>
     );
   }
 
   return (
     <p className="meal-intake-page__context meal-intake-page__context--warn">
-      Chưa có thực đơn publish cho bữa này — không thể ghi nhận.
-      {context.scheduledMealTime && <> Giờ dự kiến: {context.scheduledMealTime}.</>}
-      {' '}Vui lòng liên hệ điều dưỡng để publish thực đơn trước.
+      {t(`${ns}.noMenu`)}
+      {context.scheduledMealTime && t(`${ns}.scheduledTime`, { time: context.scheduledMealTime })}
+      {t(`${ns}.contactNurse`)}
     </p>
   );
 }

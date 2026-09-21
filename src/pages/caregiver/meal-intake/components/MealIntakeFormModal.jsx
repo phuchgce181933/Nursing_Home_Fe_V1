@@ -1,11 +1,19 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import mealIntakeNoteService from '../../../../services/mealIntakeNote.service';
+import { resolveApiError } from '../../../../utils/apiMessage';
 import { mealTypeLabel } from '../../../../utils/nutritionLabels';
-import { INTAKE_STATUS_OPTIONS, MEAL_TYPE_OPTIONS } from '../constants';
+import { getIntakeStatusOptions, getMealTypeOptions } from '../constants';
 import MealIntakePlannedMealBanner from './MealIntakePlannedMealBanner';
 
-function MealIntakeFormModal({ open, mode, recordId, residents, defaultWorkDate, maxDate, onClose, onSuccess }) {
+function MealIntakeFormModal({ open, mode, recordId, residents, defaultWorkDate, maxDate, canMutate = true, onClose, onSuccess }) {
+  const { t } = useTranslation();
   const isEdit = mode === 'edit';
+  const ns = 'caregiver';
+  const c = `${ns}.common`;
+
+  const mealTypeOptions = useMemo(() => getMealTypeOptions(t), [t]);
+  const intakeStatusOptions = useMemo(() => getIntakeStatusOptions(t), [t]);
 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -57,11 +65,11 @@ function MealIntakeFormModal({ open, mode, recordId, residents, defaultWorkDate,
         plannedMealName: data.plannedMealName,
       });
     } catch (e) {
-      setError(e?.response?.data?.message || 'Không tải được chi tiết ghi nhận');
+      setError(resolveApiError(e, t, `${c}.detailLoadFailed`));
     } finally {
       setLoading(false);
     }
-  }, [open, isEdit, recordId]);
+  }, [open, isEdit, recordId, t, c]);
 
   useEffect(() => {
     if (!open) return;
@@ -88,15 +96,15 @@ function MealIntakeFormModal({ open, mode, recordId, residents, defaultWorkDate,
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!isEdit && !residentId) return setError('Vui lòng chọn cư dân');
+    if (!isEdit && !residentId) return setError(t(`${c}.selectResidentRequired`));
     if (!isEdit && context?.hasExistingRecord) {
-      return setError('Đã có ghi nhận cho bữa này. Vui lòng sửa từ danh sách.');
+      return setError(t(`${c}.duplicateMealRecord`));
     }
     if (!isEdit && context && !context.plannedMeal) {
-      return setError('Chưa có thực đơn publish cho bữa này. Không thể ghi nhận.');
+      return setError(t(`${c}.noPublishedMealPlan`));
     }
     if (!isEdit && !context?.plannedMeal) {
-      return setError('Vui lòng chờ tải thực đơn hoặc chọn đủ ngày, cư dân và bữa.');
+      return setError(t(`${c}.waitForMealContext`));
     }
 
     setSaving(true);
@@ -122,7 +130,7 @@ function MealIntakeFormModal({ open, mode, recordId, residents, defaultWorkDate,
       }
       onSuccess();
     } catch (err) {
-      setError(err?.response?.data?.message || 'Lưu thất bại');
+      setError(resolveApiError(err, t, `${c}.saveFailed`));
     } finally {
       setSaving(false);
     }
@@ -130,16 +138,21 @@ function MealIntakeFormModal({ open, mode, recordId, residents, defaultWorkDate,
 
   if (!open) return null;
 
-  const title = isEdit ? 'Sửa ghi nhận bữa ăn' : 'Ghi nhận bữa ăn mới';
+  const title = isEdit
+    ? t(`${ns}.mealIntake.formModal.titleEdit`)
+    : t(`${ns}.mealIntake.formModal.titleCreate`);
   const createBlockedNoMenu =
     !isEdit && context && !context.hasExistingRecord && !context.plannedMeal;
   const createBlockedPending = !isEdit && (!residentId || !workDate || !mealType || !context);
+  const createBlockedShiftWindow = !isEdit && context && context.canRecord === false;
   const saveDisabled =
     saving ||
     loading ||
     (!isEdit && context?.hasExistingRecord) ||
     createBlockedNoMenu ||
-    createBlockedPending;
+    createBlockedPending ||
+    createBlockedShiftWindow ||
+    (!isEdit && canMutate === false);
 
   return (
     <div className="meal-intake-page__modal-overlay" onClick={saving ? undefined : onClose}>
@@ -151,18 +164,19 @@ function MealIntakeFormModal({ open, mode, recordId, residents, defaultWorkDate,
           </button>
         </div>
         <div className="meal-intake-page__modal-body">
-          {loading && <p>Đang tải...</p>}
+          {loading && <p>{t('common.loading')}</p>}
           {!loading && (
             <form onSubmit={handleSubmit}>
               {isEdit && readOnlyMeta && (
                 <div className="meal-intake-page__readonly-meta">
                   <p>
-                    <strong>Cư dân:</strong> {readOnlyMeta.residentName || '—'} · <strong>Ngày:</strong>{' '}
-                    {readOnlyMeta.workDate} · <strong>Bữa:</strong> {mealTypeLabel(readOnlyMeta.mealType)}
+                    <strong>{t(`${c}.residentLabel`)}:</strong> {readOnlyMeta.residentName || '—'} ·{' '}
+                    <strong>{t(`${c}.dateLabel`)}:</strong> {readOnlyMeta.workDate} ·{' '}
+                    <strong>{t(`${c}.mealLabel`)}:</strong> {mealTypeLabel(readOnlyMeta.mealType, t)}
                   </p>
                   {readOnlyMeta.plannedMealName && (
                     <p>
-                      <strong>Món đã lưu:</strong> {readOnlyMeta.plannedMealName}
+                      <strong>{t(`${c}.savedDishLabel`)}:</strong> {readOnlyMeta.plannedMealName}
                     </p>
                   )}
                 </div>
@@ -174,7 +188,7 @@ function MealIntakeFormModal({ open, mode, recordId, residents, defaultWorkDate,
                 {!isEdit && (
                   <>
                     <label>
-                      Ngày *
+                      {t(`${c}.dateLabel`)} *
                       <input
                         type="date"
                         max={maxDate}
@@ -184,9 +198,9 @@ function MealIntakeFormModal({ open, mode, recordId, residents, defaultWorkDate,
                       />
                     </label>
                     <label>
-                      Cư dân *
+                      {t(`${c}.residentLabel`)} *
                       <select required value={residentId} onChange={(e) => setResidentId(e.target.value)}>
-                        <option value="">— Chọn —</option>
+                        <option value="">{t(`${c}.selectOption`)}</option>
                         {residents.map((r) => (
                           <option key={r._id} value={r._id}>
                             {r.fullName || r.residentCode}
@@ -195,9 +209,9 @@ function MealIntakeFormModal({ open, mode, recordId, residents, defaultWorkDate,
                       </select>
                     </label>
                     <label>
-                      Bữa *
+                      {t(`${c}.mealLabel`)} *
                       <select required value={mealType} onChange={(e) => setMealType(e.target.value)}>
-                        {MEAL_TYPE_OPTIONS.map((o) => (
+                        {mealTypeOptions.map((o) => (
                           <option key={o.value} value={o.value}>
                             {o.label}
                           </option>
@@ -207,9 +221,9 @@ function MealIntakeFormModal({ open, mode, recordId, residents, defaultWorkDate,
                   </>
                 )}
                 <label>
-                  Tình trạng *
+                  {t(`${c}.statusLabel`)} *
                   <select required value={intakeStatus} onChange={(e) => setIntakeStatus(e.target.value)}>
-                    {INTAKE_STATUS_OPTIONS.map((o) => (
+                    {intakeStatusOptions.map((o) => (
                       <option key={o.value} value={o.value}>
                         {o.label}
                       </option>
@@ -218,7 +232,7 @@ function MealIntakeFormModal({ open, mode, recordId, residents, defaultWorkDate,
                 </label>
                 {intakeStatus === 'partial' && (
                   <label>
-                    % ăn *
+                    {t(`${c}.portionLabel`)} *
                     <input
                       type="number"
                       min="0"
@@ -230,7 +244,7 @@ function MealIntakeFormModal({ open, mode, recordId, residents, defaultWorkDate,
                   </label>
                 )}
                 <label className="meal-intake-page__field-full">
-                  Ghi chú thêm
+                  {t(`${c}.notesLabel`)}
                   <textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
                 </label>
               </div>
@@ -239,10 +253,10 @@ function MealIntakeFormModal({ open, mode, recordId, residents, defaultWorkDate,
 
               <div className="meal-intake-page__actions">
                 <button type="submit" className="btn-primary" disabled={saveDisabled}>
-                  {saving ? 'Đang lưu...' : isEdit ? 'Cập nhật' : 'Lưu ghi nhận'}
+                  {saving ? t(`${c}.savingRecord`) : isEdit ? t(`${c}.update`) : t(`${c}.saveRecord`)}
                 </button>
                 <button type="button" className="btn-secondary" disabled={saving} onClick={onClose}>
-                  Hủy
+                  {t('common.cancel')}
                 </button>
               </div>
             </form>

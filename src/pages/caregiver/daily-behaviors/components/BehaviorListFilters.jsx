@@ -1,4 +1,6 @@
-import { CATEGORY_FILTER_OPTIONS, SEVERITY_FILTER_OPTIONS } from '../constants';
+import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
+import { getCategoryFilterOptions, getSeverityFilterOptions } from '../constants';
 
 function BehaviorListFilters({
   workDate,
@@ -8,6 +10,8 @@ function BehaviorListFilters({
   residents,
   loading,
   maxDate,
+  readOnly = false,
+  canCreate = true,
   onWorkDateChange,
   onObservationCategoryChange,
   onSeverityChange,
@@ -15,12 +19,15 @@ function BehaviorListFilters({
   onOpenCreate,
   onReload,
 }) {
+  const { t } = useTranslation();
+  const categoryFilterOptions = useMemo(() => getCategoryFilterOptions(t), [t]);
+  const severityFilterOptions = useMemo(() => getSeverityFilterOptions(t), [t]);
+
   return (
-    <div className="behavior-page__panel behavior-page__filters">
-      <h3 className="behavior-page__panel-title">Bộ lọc</h3>
-      <div className="behavior-page__form-grid">
-        <label>
-          Ngày
+    <div className="resident-page__filters">
+      <div className="resident-page__filter-row">
+        <label className="resident-page__filter">
+          <span>{t('common.date')}</span>
           <input
             type="date"
             max={maxDate}
@@ -28,30 +35,30 @@ function BehaviorListFilters({
             onChange={(e) => onWorkDateChange(e.target.value)}
           />
         </label>
-        <label>
-          Loại quan sát
+        <label className="resident-page__filter">
+          <span>{t('caregiver.dailyBehaviors.colType')}</span>
           <select value={observationCategory} onChange={(e) => onObservationCategoryChange(e.target.value)}>
-            {CATEGORY_FILTER_OPTIONS.map((o) => (
+            {categoryFilterOptions.map((o) => (
               <option key={o.value || 'all'} value={o.value}>
                 {o.label}
               </option>
             ))}
           </select>
         </label>
-        <label>
-          Mức độ
+        <label className="resident-page__filter">
+          <span>{t('caregiver.dailyBehaviors.colSeverity')}</span>
           <select value={severity} onChange={(e) => onSeverityChange(e.target.value)}>
-            {SEVERITY_FILTER_OPTIONS.map((o) => (
+            {severityFilterOptions.map((o) => (
               <option key={o.value || 'all'} value={o.value}>
                 {o.label}
               </option>
             ))}
           </select>
         </label>
-        <label>
-          Cư dân
+        <label className="resident-page__filter">
+          <span>{t('common.resident')}</span>
           <select value={residentId} onChange={(e) => onResidentIdChange(e.target.value)}>
-            <option value="">Tất cả</option>
+            <option value="">{t('common.all')}</option>
             {residents.map((r) => (
               <option key={r._id} value={r._id}>
                 {r.fullName || r.residentCode}
@@ -59,14 +66,25 @@ function BehaviorListFilters({
             ))}
           </select>
         </label>
-      </div>
-      <div className="behavior-page__actions">
-        <button type="button" className="btn-primary" onClick={onOpenCreate}>
-          + Ghi nhận mới
-        </button>
-        <button type="button" className="btn-secondary" disabled={loading} onClick={onReload}>
-          {loading ? 'Đang tải...' : 'Tải lại'}
-        </button>
+        <div className="resident-page__filter-actions">
+          {!readOnly && canCreate && (
+            <button
+              type="button"
+              className="resident-page__button resident-page__button--primary"
+              onClick={onOpenCreate}
+            >
+              {t('caregiver.dailyBehaviors.addRecord')}
+            </button>
+          )}
+          <button
+            type="button"
+            className="resident-page__button resident-page__button--ghost"
+            disabled={loading}
+            onClick={onReload}
+          >
+            {loading ? t('common.loading') : t('common.reload')}
+          </button>
+        </div>
       </div>
     </div>
   );

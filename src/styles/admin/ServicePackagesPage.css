@@ -8,7 +8,7 @@
   padding: 28px;
   max-width: 1600px;
   margin: 0 auto;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: inherit;
   color: #334155;
   background-color: #f8fafc;
   min-height: 100vh;
@@ -20,7 +20,7 @@
 .sp-container textarea,
 .sp-container button,
 .sp-container table {
-  font-family: 'Inter', sans-serif !important;
+  font-family: inherit;
 }
 
 /* Header Adjustments */
@@ -194,7 +194,7 @@
 
 .sp-card__header--standard {
   background: linear-gradient(135deg, rgba(59, 130, 246, 0.03) 0%, rgba(59, 130, 246, 0.005) 100%);
-  border-top: 4px solid #3b82f6;
+  border-top: 4px solid var(--nh-primary);
 }
 
 .sp-card__header--premium {
@@ -248,7 +248,7 @@
 
 .sp-tier-tag--standard {
   background-color: #eff6ff;
-  color: #2563eb;
+  color: var(--nh-primary);
   border-color: #bfdbfe;
 }
 
@@ -425,7 +425,7 @@
 }
 
 .dossier-header--standard {
-  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  background: linear-gradient(135deg, var(--nh-primary) 0%, #1d4ed8 100%);
 }
 
 .dossier-header--premium {
@@ -718,5 +718,18 @@
     transform: translateY(0) scale(1);
     opacity: 1;
   }
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .sp-container { padding: 16px; }
+  .sp-header h1 { font-size: 20px; }
+  .sp-stats-grid { grid-template-columns: 1fr; gap: 12px; }
+  .sp-card-grid { grid-template-columns: 1fr; }
+  .sp-action-bar { flex-direction: column; align-items: stretch; }
+  .arh-modal .grid { grid-template-columns: 1fr !important; }
+  .dossier-body { padding: 20px; }
+  .dossier-header { padding: 20px; }
+  .dossier-header__title { font-size: 18px; }
 }
 

@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import AdminPageShell from '../../../components/admin/AdminPageShell';
+import ListPagination from '../../../components/ui/ListPagination';
+import useClientPagination from '../../../hooks/useClientPagination';
+import useAuth from '../../../hooks/useAuth';
 import mealIntakeNoteService from '../../../services/mealIntakeNote.service';
+import { resolveApiError } from '../../../utils/apiMessage';
 import { getLocalDateString } from '../../../utils/dateUtils';
-import { formatVNDate, mealTypeLabel } from '../../../utils/nutritionLabels';
+import { formatLocaleDate, mealTypeLabel } from '../../../utils/nutritionLabels';
 import '../../../styles/caregiver/MealIntakeNotesPage.css';
 import MealIntakeDeleteModal from './components/MealIntakeDeleteModal';
 import MealIntakeFormModal from './components/MealIntakeFormModal';
@@ -11,10 +17,13 @@ import MealIntakeRecordsTable from './components/MealIntakeRecordsTable';
 const today = () => getLocalDateString();
 
 function MealIntakeNotesPage() {
+  const { t, i18n } = useTranslation();
+  const { user } = useAuth();
   const [workDate, setWorkDate] = useState(today());
   const [residentId, setResidentId] = useState('');
   const [residents, setResidents] = useState([]);
   const [records, setRecords] = useState([]);
+  const [canMutate, setCanMutate] = useState(false);
   const [loading, setLoading] = useState(false);
   const [listError, setListError] = useState('');
 
@@ -26,9 +35,9 @@ function MealIntakeNotesPage() {
   const loadResidents = async () => {
     try {
       const res = await mealIntakeNoteService.listResidents();
-      setResidents(Array.isArray(res?.data) ? res.data : []);
+      setResidents(Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : []);
     } catch (e) {
-      setListError(e?.response?.data?.message || 'Không tải được danh sách cư dân');
+      setListError(resolveApiError(e, t, 'caregiver.mealIntake.loadResidentsFailed'));
     }
   };
 
@@ -42,13 +51,15 @@ function MealIntakeNotesPage() {
         limit: 100,
       });
       setRecords(Array.isArray(res?.data) ? res.data : []);
+      setCanMutate(Boolean(res?.meta?.canMutate));
     } catch (e) {
-      setListError(e?.response?.data?.message || 'Không tải được danh sách ghi nhận');
+      setListError(resolveApiError(e, t, 'caregiver.mealIntake.loadRecordsFailed'));
       setRecords([]);
+      setCanMutate(false);
     } finally {
       setLoading(false);
     }
-  }, [workDate, residentId]);
+  }, [workDate, residentId, t]);
 
   useEffect(() => {
     loadResidents();
@@ -57,6 +68,14 @@ function MealIntakeNotesPage() {
   useEffect(() => {
     loadRecords();
   }, [loadRecords]);
+
+  const {
+    paginatedItems: paginatedRecords,
+    page,
+    setPage,
+    totalPages,
+    total,
+  } = useClientPagination(records);
 
   const handleOpenCreate = () => {
     setFormModal({ mode: 'create' });
@@ -69,7 +88,7 @@ function MealIntakeNotesPage() {
   const handleOpenDelete = (row) => {
     const name = row.residentId?.fullName || row.residentId?.residentCode || '—';
     const wd = (row.workDate || '').slice(0, 10);
-    const summary = `${name} · ${mealTypeLabel(row.mealType)} · ${formatVNDate(wd)}`;
+    const summary = `${name} · ${mealTypeLabel(row.mealType, t)} · ${formatLocaleDate(wd, i18n.language)}`;
     setDeleteError('');
     setDeleteModal({ id: row._id, summary });
   };
@@ -83,7 +102,7 @@ function MealIntakeNotesPage() {
       setDeleteModal(null);
       loadRecords();
     } catch (e) {
-      setDeleteError(e?.response?.data?.message || 'Xóa thất bại');
+      setDeleteError(resolveApiError(e, t, 'common.deleteFailed'));
     } finally {
       setDeleting(false);
     }
@@ -95,13 +114,14 @@ function MealIntakeNotesPage() {
   };
 
   return (
-    <div className="page card meal-intake-page">
-      <h1 className="meal-intake-page__title">Ghi nhận bữa ăn</h1>
-      <p className="meal-intake-page__intro">
-        Danh sách ghi nhận tình trạng ăn uống của cư dân phụ trách. Tạo, sửa hoặc xóa qua hộp thoại popup.
-      </p>
+    <AdminPageShell title={t('caregiver.mealIntake.title')} subtitle={t('caregiver.mealIntake.subtitle')}>
+      {listError && <div className="resident-page__error">{listError}</div>}
 
-      {listError && <p className="form-error">{listError}</p>}
+      {!loading && !canMutate && (
+        <p className="meal-intake-page__context meal-intake-page__context--warn">
+          {t('caregiver.mealIntake.shiftWindowClosed')}
+        </p>
+      )}
 
       <MealIntakeListFilters
         workDate={workDate}
@@ -109,6 +129,7 @@ function MealIntakeNotesPage() {
         residents={residents}
         loading={loading}
         maxDate={today()}
+        canCreate={canMutate}
         onWorkDateChange={setWorkDate}
         onResidentIdChange={setResidentId}
         onOpenCreate={handleOpenCreate}
@@ -116,11 +137,18 @@ function MealIntakeNotesPage() {
       />
 
       <MealIntakeRecordsTable
-        records={records}
+        records={paginatedRecords}
         loading={loading}
+        canMutate={canMutate}
+        showRecordedBy
+        currentUserId={user?._id}
         onEdit={handleOpenEdit}
         onDelete={handleOpenDelete}
       />
+
+      {!loading && records.length > 0 && (
+        <ListPagination page={page} totalPages={totalPages} total={total} onPageChange={setPage} />
+      )}
 
       <MealIntakeFormModal
         open={Boolean(formModal)}
@@ -129,6 +157,7 @@ function MealIntakeNotesPage() {
         residents={residents}
         defaultWorkDate={workDate}
         maxDate={today()}
+        canMutate={canMutate}
         onClose={() => setFormModal(null)}
         onSuccess={handleFormSuccess}
       />
@@ -141,7 +170,7 @@ function MealIntakeNotesPage() {
         onClose={() => setDeleteModal(null)}
         onConfirm={handleConfirmDelete}
       />
-    </div>
+    </AdminPageShell>
   );
 }
 

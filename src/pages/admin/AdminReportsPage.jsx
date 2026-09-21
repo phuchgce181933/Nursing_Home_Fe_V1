@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   BarChart3,
   FileText,
@@ -17,22 +18,22 @@ import reportService from '../../services/report.service';
 import '../../styles/admin/AdminReportsPage.css';
 
 const REPORT_TYPES = [
-  { key: 'summary', label: 'Tổng quan', icon: FileText },
-  { key: 'resident-count', label: 'Số lượng cư dân', icon: BarChart3 },
-  { key: 'health-status', label: 'Sức khỏe cư dân', icon: HeartPulse },
-  { key: 'incidents', label: 'Báo cáo sự cố', icon: AlertTriangle },
-  { key: 'care-activity', label: 'Hoạt động chăm sóc', icon: Activity },
-  { key: 'financial', label: 'Báo cáo tài chính', icon: DollarSign },
-  { key: 'time-series', label: 'Báo cáo theo thời gian', icon: Clock5 },
-  { key: 'compare', label: 'So sánh theo thời gian', icon: BarChart3 },
+  { key: 'summary', i18nKey: 'adminReports.reportSummary', icon: FileText },
+  { key: 'resident-count', i18nKey: 'adminReports.reportResidentCount', icon: BarChart3 },
+  { key: 'health-status', i18nKey: 'adminReports.reportHealthStatus', icon: HeartPulse },
+  { key: 'incidents', i18nKey: 'adminReports.reportIncidents', icon: AlertTriangle },
+  { key: 'care-activity', i18nKey: 'adminReports.reportCareActivity', icon: Activity },
+  { key: 'financial', i18nKey: 'adminReports.reportFinancial', icon: DollarSign },
+  { key: 'time-series', i18nKey: 'adminReports.reportTimeSeries', icon: Clock5 },
+  { key: 'compare', i18nKey: 'adminReports.reportCompare', icon: BarChart3 },
 ];
 
 const TIME_SERIES_METRICS = [
-  { value: 'incidents', label: 'Số sự cố' },
-  { value: 'residentAdmissions', label: 'Nhập viện cư dân' },
-  { value: 'activities', label: 'Hoạt động' },
-  { value: 'invoiceRevenue', label: 'Doanh thu hóa đơn' },
-  { value: 'payments', label: 'Thanh toán' },
+  { value: 'incidents', i18nKey: 'adminReports.metricIncidents' },
+  { value: 'residentAdmissions', i18nKey: 'adminReports.metricAdmissions' },
+  { value: 'activities', i18nKey: 'adminReports.metricActivities' },
+  { value: 'invoiceRevenue', i18nKey: 'adminReports.metricInvoiceRevenue' },
+  { value: 'payments', i18nKey: 'adminReports.metricPayments' },
 ];
 
 const TODAY_ISO = () => {
@@ -40,17 +41,18 @@ const TODAY_ISO = () => {
   return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 };
 
-const getDateTimeLocal = (value) => {
-  if (!value) return '';
-  const date = new Date(value);
-  const tzOffset = date.getTimezoneOffset();
-  const localDate = new Date(date.getTime() - tzOffset * 60000);
-  return localDate.toISOString().slice(0, 10);
-};
+const formatCurrency = (value) =>
+  new Intl.NumberFormat('vi-VN', {
+    style: 'currency',
+    currency: 'VND',
+    maximumFractionDigits: 0,
+  }).format(Number(value || 0));
 
-const buildSavePayload = (reportType, filters, reportData) => ({
+const formatPercent = (value) => `${Math.round(Number(value || 0) * 100)}%`;
+
+const buildSavePayload = (reportType, filters, reportData, t) => ({
   reportType,
-  title: `Lưu báo cáo ${reportType}`,
+  title: t('adminReports.saveReportTitle', { type: reportType }),
   filters,
   periodStart: filters.from,
   periodEnd: filters.to,
@@ -59,6 +61,7 @@ const buildSavePayload = (reportType, filters, reportData) => ({
 });
 
 export default function AdminReportsPage() {
+  const { t } = useTranslation();
   const [currentType, setCurrentType] = useState('summary');
   const [reportData, setReportData] = useState(null);
   const [historyData, setHistoryData] = useState(null);
@@ -117,7 +120,7 @@ export default function AdminReportsPage() {
       }
     } catch (err) {
       console.error(err);
-      setError(err.response?.data?.message || 'Không thể tải báo cáo.');
+      setError(err.response?.data?.message || t('adminReports.errorLoadReport'));
       setReportData(null);
     } finally {
       setLoading(false);
@@ -154,7 +157,7 @@ export default function AdminReportsPage() {
       document.body.removeChild(link);
     } catch (err) {
       console.error(err);
-      setError('Không thể xuất báo cáo.');
+      setError(t('adminReports.errorExportReport'));
     }
   };
 
@@ -164,37 +167,38 @@ export default function AdminReportsPage() {
     setError(null);
     setSuccessMessage('');
     try {
-      await reportService.saveReportHistory(buildSavePayload(currentType, filters, reportData));
-      setSuccessMessage('Lưu lịch sử báo cáo thành công.');
+      await reportService.saveReportHistory(buildSavePayload(currentType, filters, reportData, t));
+      setSuccessMessage(t('adminReports.successSaveHistory'));
       loadHistory();
     } catch (err) {
       console.error(err);
-      setError(err.response?.data?.message || 'Không thể lưu lịch sử báo cáo.');
+      setError(err.response?.data?.message || t('adminReports.errorSaveHistory'));
     } finally {
       setSaving(false);
     }
   };
 
-  const currentTitle = REPORT_TYPES.find((item) => item.key === currentType)?.label || 'Báo cáo';
+  const currentTitle = (() => { const found = REPORT_TYPES.find((item) => item.key === currentType); return found ? t(found.i18nKey) : currentType; })();
 
   return (
     <div className="adm-container">
       <div className="adm-header">
-        <div>
+        <div className="adm-header__title-wrap">
+          <div className="adm-header__badge">Admin Analytics</div>
           <h1>
-            <FileText size={28} /> Báo cáo & Phân tích
+            <FileText size={28} /> {t('adminReports.title')}
           </h1>
-          <p>Truy vấn dữ liệu, xem biểu đồ, xuất file và lưu lịch sử báo cáo cho quản trị.</p>
+          <p>{t('adminReports.subtitle')}</p>
         </div>
         <div className="adm-header__buttons">
           <button type="button" className="adm-btn-refresh" onClick={loadReport}>
-            <RefreshCw size={18} /> Làm mới
+            <RefreshCw size={18} /> {t('adminReports.refresh')}
           </button>
           <button type="button" className="adm-btn-refresh" onClick={handleExport}>
-            <Download size={18} /> Xuất CSV
+            <Download size={18} /> {t('adminReports.exportCsv')}
           </button>
           <button type="button" className="adm-btn-refresh" onClick={handleSaveHistory} disabled={saving || !reportData}>
-            <Save size={18} /> {saving ? 'Đang lưu...' : 'Lưu lịch sử'}
+            <Save size={18} /> {saving ? t('adminReports.saving') : t('adminReports.saveHistory')}
           </button>
         </div>
       </div>
@@ -212,29 +216,38 @@ export default function AdminReportsPage() {
                 setPage(1);
               }}
             >
-              <Icon size={18} /> {item.label}
+              <Icon size={18} /> {t(item.i18nKey)}
             </button>
           );
         })}
       </div>
 
       <div className="adm-filter-panel">
+        <div className="adm-filter-panel__header">
+          <div>
+            <div className="adm-section-eyebrow">{t('adminReports.filterSection')}</div>
+            <h2>{t('adminReports.filterDesc')}</h2>
+          </div>
+          <div className="adm-filter-panel__hint">
+            <CalendarDays size={16} /> {t('adminReports.filterHint')}
+          </div>
+        </div>
         <div className="adm-filter-grid">
           <div className="adm-filter-group">
-            <label>Ngày bắt đầu</label>
+            <label>{t('adminReports.filterFrom')}</label>
             <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
           </div>
           <div className="adm-filter-group">
-            <label>Ngày kết thúc</label>
+            <label>{t('adminReports.filterTo')}</label>
             <input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
           </div>
           {(currentType === 'time-series' || currentType === 'compare') && (
             <div className="adm-filter-group">
-              <label>Chỉ số thống kê</label>
+              <label>{t('adminReports.filterMetric')}</label>
               <select value={metric} onChange={(e) => setMetric(e.target.value)}>
                 {TIME_SERIES_METRICS.map((option) => (
                   <option key={option.value} value={option.value}>
-                    {option.label}
+                    {t(option.i18nKey)}
                   </option>
                 ))}
               </select>
@@ -243,21 +256,21 @@ export default function AdminReportsPage() {
           {currentType === 'incidents' && (
             <>
               <div className="adm-filter-group">
-                <label>Trạng thái</label>
-                <input value={status} onChange={(e) => setStatus(e.target.value)} placeholder="open, investigating, resolved... (để trống = tất cả)" />
+                <label>{t('adminReports.filterStatus')}</label>
+                <input value={status} onChange={(e) => setStatus(e.target.value)} placeholder="open, investigating, resolved..." />
               </div>
               <div className="adm-filter-group">
-                <label>Độ nghiêm trọng</label>
-                <input value={severity} onChange={(e) => setSeverity(e.target.value)} placeholder="low, medium, high, critical (để trống = tất cả)" />
+                <label>{t('adminReports.filterSeverity')}</label>
+                <input value={severity} onChange={(e) => setSeverity(e.target.value)} placeholder="low, medium, high, critical" />
               </div>
             </>
           )}
           {(currentType === 'incidents' || currentType === 'care-activity') && (
             <div className="adm-filter-group">
-              <label>Tìm kiếm</label>
+              <label>{t('adminReports.filterSearch')}</label>
               <div className="adm-filter-input-wrapper">
                 <Search size={16} className="adm-filter-input-icon" />
-                <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm theo từ khóa" />
+                <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('adminReports.filterSearchPlaceholder')} />
               </div>
             </div>
           )}
@@ -273,7 +286,7 @@ export default function AdminReportsPage() {
             <FileText size={20} />
           </div>
           <div>
-            <span className="adm-stat-label">Báo cáo đang hiển thị</span>
+            <span className="adm-stat-label">{t('adminReports.statCurrentReport')}</span>
             <div className="adm-stat-value">{currentTitle}</div>
           </div>
         </div>
@@ -282,17 +295,17 @@ export default function AdminReportsPage() {
             <AlertTriangle size={20} />
           </div>
           <div>
-            <span className="adm-stat-label">Tình trạng</span>
-            <div className="adm-stat-value">{loading ? 'Đang tải...' : 'Sẵn sàng'}</div>
+            <span className="adm-stat-label">{t('adminReports.statStatus')}</span>
+            <div className="adm-stat-value">{loading ? t('adminReports.statLoading') : t('adminReports.statReady')}</div>
           </div>
         </div>
         <div className="adm-card-stat">
-          <div className="adm-stat-icon" style={{ background: '#eff6ff', color: '#1d4ed8' }}>
+          <div className="adm-stat-icon" style={{ background: 'rgba(15, 118, 110, 0.08)', color: '#0f766e' }}>
             <Clock5 size={20} />
           </div>
           <div>
-            <span className="adm-stat-label">Thời gian</span>
-            <div className="adm-stat-value">{from || 'Không'} → {to || 'Không'}</div>
+            <span className="adm-stat-label">{t('adminReports.statTime')}</span>
+            <div className="adm-stat-value">{from || t('adminReports.statNone')} → {to || t('adminReports.statNone')}</div>
           </div>
         </div>
         <div className="adm-card-stat">
@@ -300,48 +313,48 @@ export default function AdminReportsPage() {
             <Save size={20} />
           </div>
           <div>
-            <span className="adm-stat-label">Lịch sử</span>
+            <span className="adm-stat-label">{t('adminReports.statHistory')}</span>
             <div className="adm-stat-value">{historyData?.total || 0}</div>
           </div>
         </div>
       </div>
 
       <div className="adm-report-content">
-        {loading && <div className="adm-loading">Đang tải báo cáo...</div>}
+        {loading && <div className="adm-loading">{t('adminReports.loadingReport')}</div>}
 
         {!loading && reportData && (
           <>
             {currentType === 'summary' && (
               <div className="adm-summary-grid">
-                <div className="adm-summary-card">
-                  <strong>Tổng số cư dân</strong>
+                <div className="adm-summary-card adm-summary-card--accent">
+                  <span className="adm-summary-card__label">{t('adminReports.totalResidents')}</span>
                   <div>{reportData.totalResidents ?? '-'}</div>
                 </div>
-                <div className="adm-summary-card">
-                  <strong>Sự cố</strong>
+                <div className="adm-summary-card adm-summary-card--rose">
+                  <span className="adm-summary-card__label">{t('adminReports.totalIncidents')}</span>
                   <div>{reportData.totalIncidents ?? '-'}</div>
                 </div>
-                <div className="adm-summary-card">
-                  <strong>Hoạt động</strong>
+                <div className="adm-summary-card adm-summary-card--green">
+                  <span className="adm-summary-card__label">{t('adminReports.totalActivities')}</span>
                   <div>{reportData.totalActivities ?? '-'}</div>
                 </div>
-                <div className="adm-summary-card">
-                  <strong>Doanh thu</strong>
-                  <div>{reportData.invoiceSummary?.totalAmount ?? '-'}</div>
+                <div className="adm-summary-card adm-summary-card--violet">
+                  <span className="adm-summary-card__label">{t('adminReports.totalRevenue')}</span>
+                  <div>{formatCurrency(reportData.invoiceSummary?.totalAmount)}</div>
                 </div>
               </div>
             )}
 
             {currentType === 'resident-count' && (
               <div className="adm-table-card">
-                <h2>Phân bổ cư dân</h2>
+                <h2>{t('adminReports.residentDistribution')}</h2>
                 <div className="adm-data-grid">
                   <div className="adm-data-block">
-                    <div className="adm-data-block__title">Tổng cư dân</div>
+                    <div className="adm-data-block__title">{t('adminReports.totalResidentCount')}</div>
                     <div className="adm-data-block__value">{reportData.totalResidents ?? 0}</div>
                   </div>
                   <div className="adm-data-block">
-                    <div className="adm-data-block__title">Theo trạng thái</div>
+                    <div className="adm-data-block__title">{t('adminReports.byStatus')}</div>
                     <ul>
                       {reportData.statuses?.map((item) => (
                         <li key={item.residencyStatus}>{item.residencyStatus}: {item.count}</li>
@@ -354,34 +367,34 @@ export default function AdminReportsPage() {
 
             {currentType === 'health-status' && (
               <div className="adm-table-card">
-                <h2>Báo cáo sức khỏe</h2>
+                <h2>{t('adminReports.healthReport')}</h2>
                 <div className="adm-data-grid">
                   <div className="adm-data-block">
-                    <strong>Ghi nhận</strong>
+                    <strong>{t('adminReports.totalRecords')}</strong>
                     <div>{reportData.totalRecords}</div>
                   </div>
                   <div className="adm-data-block">
-                    <strong>Bất thường</strong>
+                    <strong>{t('adminReports.abnormalRecords')}</strong>
                     <div>{reportData.abnormalRecords}</div>
                   </div>
                   <div className="adm-data-block">
-                    <strong>Tỷ lệ bất thường</strong>
+                    <strong>{t('adminReports.abnormalRatio')}</strong>
                     <div>{Math.round((reportData.abnormalRatio || 0) * 100)}%</div>
                   </div>
                 </div>
                 <table className="adm-table">
                   <thead>
                     <tr>
-                      <th>Người cư dân</th>
-                      <th>Số ghi nhận</th>
-                      <th>Bất thường</th>
-                      <th>Tỷ lệ</th>
+                      <th>{t('adminReports.colResident')}</th>
+                      <th>{t('adminReports.colRecordCount')}</th>
+                      <th>{t('adminReports.colAbnormal')}</th>
+                      <th>{t('adminReports.colRatio')}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {reportData.topResidents?.map((item) => (
                       <tr key={item.residentId} className="adm-table-row">
-                        <td>{item.residentName || 'Không xác định'}</td>
+                        <td>{item.residentName || t('adminReports.unknown')}</td>
                         <td>{item.totalRecords}</td>
                         <td>{item.abnormalCount}</td>
                         <td>{Math.round((item.abnormalRatio || 0) * 100)}%</td>
@@ -394,16 +407,16 @@ export default function AdminReportsPage() {
 
             {currentType === 'incidents' && (
               <div className="adm-table-card">
-                <h2>Danh sách sự cố</h2>
+                <h2>{t('adminReports.incidentList')}</h2>
                 <div className="adm-table-responsive">
                   <table className="adm-table">
                     <thead>
                       <tr>
-                        <th>Ngày</th>
-                        <th>Cư dân</th>
-                        <th>Loại sự cố</th>
-                        <th>Độ nghiêm trọng</th>
-                        <th>Trạng thái</th>
+                        <th>{t('adminReports.colDate')}</th>
+                        <th>{t('adminReports.colResidentName')}</th>
+                        <th>{t('adminReports.colIncidentType')}</th>
+                        <th>{t('adminReports.colSeverity')}</th>
+                        <th>{t('adminReports.colStatus')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -424,14 +437,14 @@ export default function AdminReportsPage() {
 
             {currentType === 'care-activity' && (
               <div className="adm-table-card">
-                <h2>Hoạt động chăm sóc</h2>
+                <h2>{t('adminReports.careActivityTitle')}</h2>
                 <div className="adm-data-grid">
                   <div className="adm-data-block">
-                    <div className="adm-data-block__title">Tổng số hoạt động</div>
+                    <div className="adm-data-block__title">{t('adminReports.totalActivityCount')}</div>
                     <div className="adm-data-block__value">{reportData.totalActivities}</div>
                   </div>
                   <div className="adm-data-block">
-                    <div className="adm-data-block__title">Theo trạng thái</div>
+                    <div className="adm-data-block__title">{t('adminReports.byActivityStatus')}</div>
                     <ul>
                       {reportData.tasksByStatus?.map((item) => (
                         <li key={item.status}>{item.status}: {item.count}</li>
@@ -439,7 +452,7 @@ export default function AdminReportsPage() {
                     </ul>
                   </div>
                   <div className="adm-data-block">
-                    <div className="adm-data-block__title">Theo loại nhiệm vụ</div>
+                    <div className="adm-data-block__title">{t('adminReports.byTaskType')}</div>
                     <ul>
                       {reportData.tasksByType?.map((item) => (
                         <li key={item.taskType}>{item.taskType}: {item.count}</li>
@@ -452,39 +465,44 @@ export default function AdminReportsPage() {
 
             {currentType === 'financial' && (
               <div className="adm-table-card">
-                <h2>Báo cáo tài chính</h2>
-                <div className="adm-data-grid">
-                  <div className="adm-data-block">
-                    <strong>Hóa đơn</strong>
-                    <div>{reportData.invoiceSummary?.totalInvoices ?? 0}</div>
-                  </div>
-                  <div className="adm-data-block">
-                    <strong>Tổng tiền hóa đơn</strong>
-                    <div>{reportData.invoiceSummary?.totalAmount ?? 0} VND</div>
-                  </div>
-                  <div className="adm-data-block">
-                    <strong>Thanh toán</strong>
-                    <div>{reportData.paymentSummary?.totalPayments ?? 0}</div>
+                <div className="adm-section-head">
+                  <div>
+                    <div className="adm-section-eyebrow">{t('adminReports.financialSection')}</div>
+                    <h2>{t('adminReports.financialReport')}</h2>
                   </div>
                 </div>
-                <div className="adm-data-block">
-                  <strong>Tiền chưa thanh toán</strong>
-                  <div>{reportData.invoiceSummary?.outstandingAmount ?? 0} VND</div>
+                <div className="adm-data-grid">
+                  <div className="adm-data-block">
+                    <div className="adm-data-block__title">{t('adminReports.invoices')}</div>
+                    <div className="adm-data-block__value">{reportData.invoiceSummary?.totalInvoices ?? 0}</div>
+                  </div>
+                  <div className="adm-data-block">
+                    <div className="adm-data-block__title">{t('adminReports.totalInvoiceAmount')}</div>
+                    <div className="adm-data-block__value">{formatCurrency(reportData.invoiceSummary?.totalAmount)}</div>
+                  </div>
+                  <div className="adm-data-block">
+                    <div className="adm-data-block__title">{t('adminReports.payments')}</div>
+                    <div className="adm-data-block__value">{reportData.paymentSummary?.totalPayments ?? 0}</div>
+                  </div>
+                </div>
+                <div className="adm-data-block adm-data-block--wide">
+                  <div className="adm-data-block__title">{t('adminReports.outstandingAmount')}</div>
+                  <div className="adm-data-block__value">{formatCurrency(reportData.invoiceSummary?.outstandingAmount)}</div>
                 </div>
               </div>
             )}
 
             {(currentType === 'time-series' || currentType === 'compare') && (
               <div className="adm-table-card">
-                <h2>{currentType === 'time-series' ? 'Báo cáo theo thời gian' : 'So sánh theo thời gian'}</h2>
+                <h2>{currentType === 'time-series' ? t('adminReports.timeSeriesTitle') : t('adminReports.compareTitle')}</h2>
                 <div className="adm-data-grid">
                   <div className="adm-data-block">
-                    <strong>Chỉ số</strong>
-                    <div>{TIME_SERIES_METRICS.find((item) => item.value === metric)?.label}</div>
+                    <strong>{t('adminReports.metricLabel')}</strong>
+                    <div>{t(TIME_SERIES_METRICS.find((item) => item.value === metric)?.i18nKey || '')}</div>
                   </div>
                   <div className="adm-data-block">
-                    <strong>Dữ liệu</strong>
-                    <div>{currentType === 'time-series' ? reportData.series?.length ?? 0 : reportData.currentSeries?.length ?? 0} mốc</div>
+                    <strong>{t('adminReports.dataLabel')}</strong>
+                    <div>{currentType === 'time-series' ? reportData.series?.length ?? 0 : reportData.currentSeries?.length ?? 0} {t('adminReports.dataPoints')}</div>
                   </div>
                 </div>
                 <div className="adm-chart-card">
@@ -506,7 +524,7 @@ export default function AdminReportsPage() {
                           })}
                         </div>
                       ) : (
-                        <div>Không có dữ liệu biểu đồ.</div>
+                        <div>{t('adminReports.noChartData')}</div>
                       )}
                     </div>
                   ) : (
@@ -514,8 +532,8 @@ export default function AdminReportsPage() {
                       {reportData.currentSeries?.length ? (
                         <div className="adm-chart-grid adm-chart-grid--compare">
                           <div className="adm-chart-legend">
-                            <span><span className="adm-chart-legend-dot adm-chart-legend-dot--current" /> Hiện tại</span>
-                            <span><span className="adm-chart-legend-dot adm-chart-legend-dot--previous" /> Trước đó</span>
+                            <span><span className="adm-chart-legend-dot adm-chart-legend-dot--current" /> {t('adminReports.currentLabel')}</span>
+                            <span><span className="adm-chart-legend-dot adm-chart-legend-dot--previous" /> {t('adminReports.previousLabel')}</span>
                           </div>
                           {(() => {
                             const previousMap = new Map(reportData.previousSeries?.map((item) => [item.period, Number(item.value || 0)]));
@@ -544,7 +562,7 @@ export default function AdminReportsPage() {
                           })()}
                         </div>
                       ) : (
-                        <div>Không có dữ liệu so sánh.</div>
+                        <div>{t('adminReports.noCompareData')}</div>
                       )}
                     </div>
                   )}
@@ -554,8 +572,8 @@ export default function AdminReportsPage() {
                     <table className="adm-table">
                       <thead>
                         <tr>
-                          <th>Giai đoạn</th>
-                          <th>Giá trị</th>
+                          <th>{t('adminReports.colPeriod')}</th>
+                          <th>{t('adminReports.colValue')}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -571,9 +589,9 @@ export default function AdminReportsPage() {
                     <table className="adm-table">
                       <thead>
                         <tr>
-                          <th>Giai đoạn</th>
-                          <th>Hiện tại</th>
-                          <th>Trước đó</th>
+                          <th>{t('adminReports.colPeriod')}</th>
+                          <th>{t('adminReports.currentLabel')}</th>
+                          <th>{t('adminReports.previousLabel')}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -597,25 +615,40 @@ export default function AdminReportsPage() {
         )}
       </div>
 
-      <div className="adm-table-card">
-        <h2>Lịch sử báo cáo</h2>
+      <div className="adm-table-card adm-table-card--history">
+        <div className="adm-section-head">
+          <div>
+            <div className="adm-section-eyebrow">{t('adminReports.historySection')}</div>
+            <h2>{t('adminReports.reportHistory')}</h2>
+          </div>
+        </div>
         <div className="adm-table-responsive">
           <table className="adm-table">
             <thead>
               <tr>
-                <th>Tiêu đề</th>
-                <th>Loại báo cáo</th>
-                <th>Ngày tạo</th>
+                <th>{t('adminReports.colTitle')}</th>
+                <th>{t('adminReports.colReportType')}</th>
+                <th>{t('adminReports.colCreatedAt')}</th>
               </tr>
             </thead>
             <tbody>
-              {historyData?.items?.map((item) => (
-                <tr key={item._id} className="adm-table-row">
-                  <td>{item.title}</td>
-                  <td>{item.reportType}</td>
-                  <td>{new Date(item.generatedAt).toLocaleString()}</td>
+              {historyData?.items?.length ? (
+                historyData.items.map((item) => (
+                  <tr key={item._id} className="adm-table-row">
+                    <td>{item.title}</td>
+                    <td>
+                      <span className="adm-pill">{item.reportType}</span>
+                    </td>
+                    <td>{new Date(item.generatedAt).toLocaleString()}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={3} className="adm-empty-state">
+                    {t('adminReports.noHistorySaved')}
+                  </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>

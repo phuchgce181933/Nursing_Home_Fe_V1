@@ -1,51 +1,85 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import mealPlanService from '../../services/mealPlan.service';
 import mealTimeScheduleService from '../../services/mealTimeSchedule.service';
 import specialDietService from '../../services/specialDiet.service';
-import { getLocalDateString } from '../../utils/dateUtils';
+import dishService from '../../services/dish.service';
+import { todayVN, addDaysToDateStr } from '../../utils/dateUtils';
+import {
+  careStageLabel,
+  dietTypeLabel,
+  formatLocaleDate,
+  mealTypeLabel,
+  planStatusLabel,
+  sourceLabel,
+} from '../../utils/nutritionLabels';
 import '../../styles/nurse/MealPlansPage.css';
+import { resolveApiError } from '../../utils/apiMessage';
+import {
+  getResidentCoverage,
+  ResidentCoverageBadge,
+  SelectedCoverageBanner,
+  useNutritionCoverage,
+} from './components/mealPlanCoverage';
 
-const today = () => getLocalDateString();
-const addDays = (dateStr, delta) => {
-  const d = new Date(`${dateStr}T12:00:00`);
-  d.setDate(d.getDate() + delta);
-  return getLocalDateString(d);
+const MP = 'nurse.mealPlans';
+const CUSTOM_DISH_VALUE = '__custom__';
+
+const today = () => todayVN();
+const addDays = (dateStr, delta) => addDaysToDateStr(dateStr, delta);
+const clampWorkDate = (dateStr) => {
+  const normalized = (dateStr || '').slice(0, 10) || today();
+  return normalized < today() ? today() : normalized;
 };
-const formatVNDate = (dateStr) => {
-  if (!dateStr) return '—';
-  return new Date(`${dateStr}T00:00:00`).toLocaleDateString('vi-VN');
-};
+
+function WorkDatePicker({ value, onChange, t }) {
+  return (
+    <div className="mp-date-switch mp-date-switch--form">
+      <button type="button" className="mp-btn-secondary" onClick={() => onChange(today())}>
+        {t('common.today')}
+      </button>
+      <button type="button" className="mp-btn-secondary" onClick={() => onChange(addDays(today(), 1))}>
+        {t(`${MP}.tomorrow`)}
+      </button>
+      <button type="button" className="mp-btn-secondary" onClick={() => onChange(addDays(today(), 7))}>
+        {t(`${MP}.in7Days`)}
+      </button>
+      <input type="date" min={today()} value={value} onChange={(e) => onChange(e.target.value)} />
+    </div>
+  );
+}
 const defaultMealTimeByType = (mealType) => {
   if (mealType === 'breakfast') return '07:30';
   if (mealType === 'lunch') return '11:30';
   return '17:30';
 };
 
-const mealTypeLabel = (v) => {
-  if (v === 'breakfast') return 'Sáng';
-  if (v === 'lunch') return 'Trưa';
-  if (v === 'dinner') return 'Tối';
-  return v;
+const residentIdsFromScheduleEntries = (scheduleEntries) =>
+  [...new Set((scheduleEntries || []).map((e) => String(e.residentId?._id || e.residentId || '')).filter(Boolean))];
+
+const publishedTimesFromScheduleEntries = (scheduleEntries) => {
+  const byResident = {};
+  for (const entry of scheduleEntries || []) {
+    const rid = String(entry.residentId?._id || entry.residentId || '');
+    if (!rid) continue;
+    byResident[rid] = {
+      breakfast: entry.breakfastTime,
+      lunch: entry.lunchTime,
+      dinner: entry.dinnerTime,
+    };
+  }
+  return {
+    byResident,
+    source: Object.keys(byResident).length ? 'published_schedule' : 'system_default',
+  };
 };
 
-const statusLabel = (v) => {
-  if (v === 'draft') return 'Nháp';
-  if (v === 'published') return 'Đã đăng';
-  return v;
-};
-
-const dietTypeLabel = (v) => {
-  if (v === 'diabetic') return 'Tiểu đường';
-  if (v === 'low_sodium') return 'Ít muối';
-  if (v === 'renal') return 'Hỗ trợ thận';
-  if (v === 'high_protein') return 'Giàu đạm';
-  if (v === 'soft_texture') return 'Mềm dễ nuốt';
-  if (v === 'liquid_only') return 'Lỏng hoàn toàn';
-  if (v === 'custom') return 'Tùy chỉnh';
-  return v;
-};
+const scheduleResidentCount = (schedule) =>
+  residentIdsFromScheduleEntries(schedule?.entries).length;
 
 function MealPlanTab() {
+  const { t, i18n } = useTranslation();
+  const TAB = `${MP}.mealTab`;
   const [formWorkDate, setFormWorkDate] = useState(today());
   const [listDate, setListDate] = useState(today());
   const [careStages, setCareStages] = useState([]);
@@ -63,7 +97,29 @@ function MealPlanTab() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailPlan, setDetailPlan] = useState(null);
   const [publishedTimes, setPublishedTimes] = useState({ byResident: {}, source: 'system_default' });
+  const [mealTimeScheduleDayId, setMealTimeScheduleDayId] = useState('');
+  const [publishedSchedules, setPublishedSchedules] = useState([]);
+  const [scheduleResidentIds, setScheduleResidentIds] = useState([]);
+  const [dishCatalog, setDishCatalog] = useState([]);
   const [error, setError] = useState('');
+  const suppressScheduleLoadRef = useRef(false);
+
+  const hasSelectedSchedule = Boolean(mealTimeScheduleDayId);
+
+  const selectableResidents = useMemo(() => {
+    if (!hasSelectedSchedule) return [];
+    const allowed = new Set(scheduleResidentIds);
+    return residents.filter((r) => allowed.has(String(r._id)));
+  }, [residents, hasSelectedSchedule, scheduleResidentIds]);
+
+  const coverageByResident = useNutritionCoverage(formWorkDate, selectableResidents);
+
+  useEffect(() => {
+    if (!Object.keys(coverageByResident).length) return;
+    setSelectedResidents((prev) =>
+      prev.filter((id) => !getResidentCoverage(coverageByResident, id, 'mealPlan').published)
+    );
+  }, [coverageByResident]);
 
   const resolveMealTime = (residentId, mealType) => {
     const rid = String(residentId || '');
@@ -77,41 +133,108 @@ function MealPlanTab() {
     [residents]
   );
 
+  const mealPlanCoverageBannerItems = useMemo(
+    () =>
+      selectedResidents
+        .map((id) => {
+          const info = getResidentCoverage(coverageByResident, id, 'mealPlan');
+          if (!info.published) return null;
+          const name = residentMap[id] || id;
+          const titleSuffix = info.planTitle ? ` (${info.planTitle})` : '';
+          return {
+            key: id,
+            text: t(`${MP}.coverageWarningMealPlan`, {
+              name,
+              publisher: info.publishedByName || '—',
+              title: titleSuffix,
+            }),
+          };
+        })
+        .filter(Boolean),
+    [selectedResidents, coverageByResident, residentMap, t]
+  );
+
   const loadBoot = async () => {
     setLoading(true);
     setError('');
     try {
-      const [tplRes, residentRes] = await Promise.all([
+      const [tplRes, residentRes, dishRes] = await Promise.all([
         mealPlanService.getTemplates(),
         mealPlanService.listResidents({ status: 'admitted' }),
+        dishService.listDishes({ activeOnly: true }),
       ]);
       setCareStages(Array.isArray(tplRes.careStages) ? tplRes.careStages : []);
       setCareStage(Array.isArray(tplRes.careStages) && tplRes.careStages[0] ? tplRes.careStages[0] : '');
       setTemplates(Array.isArray(tplRes.templates) ? tplRes.templates : []);
       setResidents(Array.isArray(residentRes?.data) ? residentRes.data : []);
+      setDishCatalog(Array.isArray(dishRes?.data) ? dishRes.data : []);
     } catch (e) {
-      setError(e?.response?.data?.message || 'Không tải được dữ liệu khởi tạo');
+      setError(resolveApiError(e, t, `${MP}.loadBootFailed`));
     } finally {
       setLoading(false);
     }
   };
 
-  const loadPublishedMealTimes = () => {
-    mealTimeScheduleService
-      .getPublishedTimes({
-        workDate: formWorkDate,
-        residentIds: selectedResidents.join(','),
-      })
-      .then((data) => {
-        setPublishedTimes({
-          byResident: data?.byResident || {},
-          source: data?.source || 'system_default',
-        });
-      })
-      .catch(() => {
+  const syncScheduleContext = useCallback(
+    async (scheduleId, { preserveSelections = false } = {}) => {
+      if (!scheduleId) {
+        setMealTimeScheduleDayId('');
+        setScheduleResidentIds([]);
         setPublishedTimes({ byResident: {}, source: 'system_default' });
-      });
-  };
+        if (!preserveSelections) {
+          setSelectedResidents([]);
+          setEntries([]);
+        }
+        return;
+      }
+      const data = await mealTimeScheduleService.getSchedule(scheduleId);
+      const ids = residentIdsFromScheduleEntries(data.entries);
+      setMealTimeScheduleDayId(String(scheduleId));
+      setScheduleResidentIds(ids);
+      setPublishedTimes(publishedTimesFromScheduleEntries(data.entries));
+      if (!preserveSelections) {
+        setSelectedResidents(ids);
+        setEntries([]);
+      }
+    },
+    []
+  );
+
+  const loadPublishedSchedules = useCallback(
+    async (date, { preferredId } = {}) => {
+      try {
+        const res = await mealTimeScheduleService.listSchedules({
+          workDate: date,
+          status: 'published',
+          limit: 50,
+        });
+        const list = Array.isArray(res?.data) ? res.data : [];
+        setPublishedSchedules(list);
+        const preferred = preferredId ? String(preferredId) : '';
+        if (preferred && list.some((s) => String(s._id) === preferred)) {
+          await syncScheduleContext(preferred, { preserveSelections: true });
+          return;
+        }
+        if (list.length === 1) {
+          await syncScheduleContext(String(list[0]._id));
+          return;
+        }
+        if (!preferred) {
+          setMealTimeScheduleDayId('');
+          setScheduleResidentIds([]);
+          setPublishedTimes({ byResident: {}, source: 'system_default' });
+        }
+      } catch {
+        setPublishedSchedules([]);
+        if (!preferredId) {
+          setMealTimeScheduleDayId('');
+          setScheduleResidentIds([]);
+          setPublishedTimes({ byResident: {}, source: 'system_default' });
+        }
+      }
+    },
+    [syncScheduleContext]
+  );
 
   const loadPlans = async (date) => {
     try {
@@ -139,14 +262,38 @@ function MealPlanTab() {
   }, [listDate]);
 
   useEffect(() => {
-    loadPublishedMealTimes();
-  }, [formWorkDate, selectedResidents]);
+    if (suppressScheduleLoadRef.current) {
+      suppressScheduleLoadRef.current = false;
+      return;
+    }
+    loadPublishedSchedules(formWorkDate);
+  }, [formWorkDate, loadPublishedSchedules]);
+
+  const handleWorkDateChange = (nextDate) => {
+    setFormWorkDate(nextDate);
+    setMealTimeScheduleDayId('');
+    setScheduleResidentIds([]);
+    setSelectedResidents([]);
+    setEntries([]);
+    setError('');
+  };
+
+  const handleScheduleChange = async (e) => {
+    const nextId = e.target.value;
+    setError('');
+    try {
+      await syncScheduleContext(nextId);
+    } catch (err) {
+      setError(resolveApiError(err, t, `${MP}.loadScheduleBootFailed`));
+    }
+  };
 
   const addFromTemplate = () => {
     setError('');
-    const tpl = templates.find((t) => t.key === selectedTemplate);
-    if (!tpl) return setError('Vui lòng chọn template');
-    if (selectedResidents.length < 2) return setError('Vui lòng chọn ít nhất 2 cư dân');
+    if (!mealTimeScheduleDayId) return setError(t(`${MP}.selectSchedule`));
+    const tpl = templates.find((tp) => tp.key === selectedTemplate);
+    if (!tpl) return setError(t(`${MP}.selectTemplate`));
+    if (selectedResidents.length < 1) return setError(t(`${MP}.selectResidents`));
     const generated = [];
     selectedResidents.forEach((residentId) => {
       tpl.entries.forEach((it) => {
@@ -164,11 +311,17 @@ function MealPlanTab() {
         });
       });
     });
-    setEntries((prev) => [...prev, ...generated]);
+    setEntries((prev) => {
+      const existingKeys = new Set(prev.map((e) => `${String(e.residentId)}:${e.mealType}`));
+      const toAdd = generated.filter((g) => !existingKeys.has(`${String(g.residentId)}:${g.mealType}`));
+      return [...prev, ...toAdd];
+    });
   };
 
   const addManual = () => {
+    if (!mealTimeScheduleDayId) return setError(t(`${MP}.selectSchedule`));
     const rid = selectedResidents[0] || '';
+    if (!rid) return setError(t(`${MP}.selectResidents`));
     setEntries((prev) => [
       ...prev,
       {
@@ -180,6 +333,7 @@ function MealPlanTab() {
         nutritionNote: '',
         stageNote: '',
         source: 'manual',
+        dishId: '',
         mealTime: resolveMealTime(rid, 'breakfast'),
       },
     ]);
@@ -201,6 +355,27 @@ function MealPlanTab() {
     );
   };
 
+  const handleDishSelect = (idx, value) => {
+    if (value === CUSTOM_DISH_VALUE) {
+      patchEntry(idx, { dishId: '', source: 'manual' });
+      return;
+    }
+    const dish = dishCatalog.find((d) => String(d._id) === String(value));
+    if (!dish) return;
+    patchEntry(idx, {
+      dishId: String(dish._id),
+      mealName: dish.name,
+      calories: dish.calories,
+      ingredients: Array.isArray(dish.ingredients) ? dish.ingredients : [],
+      source: 'catalog',
+    });
+  };
+
+  const dishCatalogIds = useMemo(
+    () => new Set(dishCatalog.map((d) => String(d._id))),
+    [dishCatalog]
+  );
+
   const removeEntry = (idx) => setEntries((prev) => prev.filter((_, i) => i !== idx));
 
   const resetForm = () => {
@@ -209,21 +384,51 @@ function MealPlanTab() {
     setSelectedResidents([]);
     setEntries([]);
     setEditingId('');
+    setMealTimeScheduleDayId('');
+    setScheduleResidentIds([]);
+    setPublishedTimes({ byResident: {}, source: 'system_default' });
     setError('');
+    loadPublishedSchedules(formWorkDate);
   };
 
   const validate = () => {
-    if (!careStage) return 'Vui lòng chọn giai đoạn chăm sóc';
-    if (formWorkDate < today()) return 'Không thể tạo meal plan cho ngày quá khứ';
-    if (selectedResidents.length < 2) return 'Vui lòng chọn tối thiểu 2 cư dân';
-    if (!entries.length) return 'Vui lòng thêm ít nhất 1 dòng thực đơn';
+    if (!careStage) return t(`${MP}.selectCareStage`);
+    if (formWorkDate < today()) return t(`${MP}.pastDateMealPlan`);
+    if (!mealTimeScheduleDayId) return t(`${MP}.selectSchedule`);
+    if (selectedResidents.length < 1) return t(`${MP}.selectResidents`);
+    const allowedResidents = new Set(scheduleResidentIds);
+    if (selectedResidents.some((id) => !allowedResidents.has(String(id)))) {
+      return t(`${TAB}.scheduleNoResidentsWarn`);
+    }
+    if (!entries.length) return t(`${MP}.addAtLeastOneMealEntry`);
+    const typeKeys = new Set();
+    const timeKeys = new Set();
+    for (const e of entries) {
+      const rid = String(e.residentId || '');
+      const typeKey = `${rid}:${e.mealType}`;
+      if (typeKeys.has(typeKey)) return t(`${TAB}.duplicateMealType`);
+      typeKeys.add(typeKey);
+      const mealTime = e.mealTime || resolveMealTime(e.residentId, e.mealType);
+      if (mealTime) {
+        const timeKey = `${rid}:${mealTime}`;
+        if (timeKeys.has(timeKey)) return t(`${TAB}.duplicateMealTime`, { time: mealTime });
+        timeKeys.add(timeKey);
+      }
+    }
     const hasInvalid = entries.some((e) => !e.residentId || !e.mealType || !e.mealName?.trim() || !e.mealTime);
-    if (hasInvalid) return 'Mỗi dòng phải có cư dân, loại bữa, tên món và giờ';
+    if (hasInvalid) return t(`${MP}.invalidMealRow`);
+    const hasInvalidCalories = entries.some((e) => {
+      if (e.calories === '' || e.calories === undefined || e.calories === null) return false;
+      const num = Number(e.calories);
+      return Number.isNaN(num) || num < 0 || num > 5000;
+    });
+    if (hasInvalidCalories) return t(`${MP}.invalidCalories`, { defaultValue: 'Calories must be between 0 and 5000.' });
     return '';
   };
 
   const buildPayload = () => ({
     workDate: formWorkDate,
+    mealTimeScheduleDayId,
     careStage,
     title,
     entries: entries.map((e) => ({
@@ -231,12 +436,13 @@ function MealPlanTab() {
       mealType: e.mealType,
       mealName: e.mealName,
       calories: e.calories === '' ? undefined : Number(e.calories),
+      dishId: e.dishId || undefined,
       ingredients: Array.isArray(e.ingredients)
         ? e.ingredients
         : String(e.ingredients || '')
-            .split(',')
-            .map((x) => x.trim())
-            .filter(Boolean),
+          .split(',')
+          .map((x) => x.trim())
+          .filter(Boolean),
       nutritionNote: e.nutritionNote || undefined,
       stageNote: e.stageNote || undefined,
       source: e.source || 'manual',
@@ -260,7 +466,7 @@ function MealPlanTab() {
       resetForm();
       loadPlans(listDate);
     } catch (e) {
-      setError(e?.response?.data?.message || 'Lưu draft thất bại');
+      setError(resolveApiError(e, t, `${MP}.saveDraftFailed`));
     } finally {
       setSaving(false);
     }
@@ -273,7 +479,6 @@ function MealPlanTab() {
       const data = await mealPlanService.getPlan(id);
       setEditingId(data._id);
       setTitle(data.title || '');
-      setFormWorkDate((data.workDate || '').slice(0, 10) || today());
       setCareStage(data.careStage || '');
       const rows = Array.isArray(data.entries) ? data.entries : [];
       setEntries(
@@ -287,13 +492,19 @@ function MealPlanTab() {
           stageNote: r.stageNote || '',
           source: r.source || 'manual',
           templateKey: r.templateKey || '',
+          dishId: String(r.dishId?._id || r.dishId || ''),
           mealTime: r.mealTime || defaultMealTimeByType(r.mealType),
         }))
       );
       const picked = [...new Set(rows.map((r) => String(r.residentId?._id || r.residentId || '')).filter(Boolean))];
+      const scheduleId = String(data.mealTimeScheduleDayId?._id || data.mealTimeScheduleDayId || '');
+      const workDateStr = clampWorkDate(data.workDate);
+      suppressScheduleLoadRef.current = true;
+      setFormWorkDate(workDateStr);
+      await loadPublishedSchedules(workDateStr, { preferredId: scheduleId });
       setSelectedResidents(picked);
     } catch (e) {
-      setError(e?.response?.data?.message || 'Không mở được draft');
+      setError(resolveApiError(e, t, `${MP}.openDraftFailed`));
     } finally {
       setSaving(false);
     }
@@ -307,14 +518,14 @@ function MealPlanTab() {
       if (editingId === id) resetForm();
       loadPlans(listDate);
     } catch (e) {
-      setError(e?.response?.data?.message || 'Publish thất bại');
+      setError(resolveApiError(e, t, `${MP}.publishFailed`));
     } finally {
       setSaving(false);
     }
   };
 
   const deleteDraft = async (id) => {
-    if (!window.confirm('Bạn có chắc muốn xóa bản nháp meal plan này?')) return;
+    if (!window.confirm(t(`${MP}.confirmDeleteMealPlan`))) return;
     setSaving(true);
     setError('');
     try {
@@ -322,7 +533,7 @@ function MealPlanTab() {
       if (editingId === id) resetForm();
       loadPlans(listDate);
     } catch (e) {
-      setError(e?.response?.data?.message || 'Xóa draft thất bại');
+      setError(resolveApiError(e, t, `${MP}.deleteDraftFailed`));
     } finally {
       setSaving(false);
     }
@@ -335,7 +546,7 @@ function MealPlanTab() {
       const data = await mealPlanService.getPlan(id);
       setDetailPlan(data || null);
     } catch (e) {
-      setError(e?.response?.data?.message || 'Không tải được chi tiết lịch');
+      setError(resolveApiError(e, t, `${MP}.detailLoadFailed`));
     } finally {
       setDetailLoading(false);
     }
@@ -344,144 +555,250 @@ function MealPlanTab() {
   const closePlanDetail = () => setDetailPlan(null);
 
   return (
-    <div className="page card meal-page">
-      <h1 className="meal-page__title">Create Meal Plans</h1>
-      <p className="meal-page__intro">
-        Điều dưỡng tạo thực đơn theo ngày cho nhiều cư dân theo từng giai đoạn chăm sóc (Draft → Publish).
+    <div className="mp-page">
+      <h2 className="mp-page__title">{t(`${TAB}.title`)}</h2>
+      <p className="mp-intro">
+        {t(`${TAB}.intro`)}
       </p>
-      {error && <p className="form-error">{error}</p>}
-      {loading && <p>Đang tải...</p>}
+      {error && <p className="mp-error">{error}</p>}
+      {loading && <p className="mp-loading">{t('common.loading')}</p>}
 
       {!loading && (
         <>
-          <div className="form-grid">
+          <div className="mp-form-grid form-grid">
             <div className="form-group">
-              <label>Ngày áp dụng *</label>
-              <input type="date" min={today()} value={formWorkDate} onChange={(e) => setFormWorkDate(e.target.value)} />
+              <label>{t(`${TAB}.workDate`)} *</label>
+              <WorkDatePicker value={formWorkDate} onChange={handleWorkDateChange} t={t} />
             </div>
             <div className="form-group">
-              <label>Giai đoạn chăm sóc *</label>
-              <select value={careStage} onChange={(e) => setCareStage(e.target.value)}>
-                <option value="">— Chọn —</option>
-                {careStages.map((s) => (
-                  <option key={s} value={s}>{s}</option>
+              <label>{t(`${TAB}.mealTimeSchedule`)} *</label>
+              <select
+                className="mp-schedule-select"
+                value={mealTimeScheduleDayId}
+                onChange={handleScheduleChange}
+              >
+                <option value="">{t(`${TAB}.selectPublishedSchedule`)}</option>
+                {publishedSchedules.map((s) => (
+                  <option key={s._id} value={s._id}>
+                    {t(`${TAB}.scheduleOption`, {
+                      title: s.title || t(`${TAB}.defaultScheduleTitle`),
+                      count: scheduleResidentCount(s),
+                    })}
+                  </option>
                 ))}
               </select>
             </div>
             <div className="form-group">
-              <label>Tiêu đề</label>
-              <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="VD: Tuần phục hồi đầu tháng 6" />
+              <label>{t(`${TAB}.careStage`)} *</label>
+              <select value={careStage} onChange={(e) => setCareStage(e.target.value)}>
+                <option value="">{t(`${TAB}.selectOption`)}</option>
+                {careStages.map((s) => (
+                  <option key={s} value={s}>{careStageLabel(s, t)}</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>{t(`${TAB}.titleLabel`)}</label>
+              <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t(`${TAB}.titlePlaceholder`)} />
             </div>
           </div>
 
-          <div className="meal-page__resident-section">
-            <label className="meal-page__resident-label">Cư dân áp dụng (nhiều người) *</label>
-            <div className="meal-page__resident-grid">
-              {residents.map((r) => {
+          <SelectedCoverageBanner items={mealPlanCoverageBannerItems} />
+
+          <div className={`mp-resident-section${!hasSelectedSchedule ? ' mp-resident-section--disabled' : ''}`}>
+            <label className="mp-resident-label">
+              {hasSelectedSchedule
+                ? t(`${TAB}.residentsFromSchedule`, { count: scheduleResidentIds.length })
+                : t(`${TAB}.residentsLabel`)} *
+            </label>
+            <div className="mp-resident-grid">
+              {hasSelectedSchedule ? (
+                selectableResidents.map((r) => {
                 const id = String(r._id);
                 const checked = selectedResidents.includes(id);
+                const planCoverage = getResidentCoverage(coverageByResident, id, 'mealPlan');
+                const covered = planCoverage.published;
+                const disabled = covered;
                 return (
-                  <label key={id} className="meal-page__resident-item">
+                  <label
+                    key={id}
+                    className={`mp-resident-item${disabled ? ' mp-resident-item--disabled' : ''}${covered ? ' mp-resident-item--covered' : ''}`}
+                  >
                     <input
                       type="checkbox"
                       checked={checked}
+                      disabled={disabled}
                       onChange={(e) =>
                         setSelectedResidents((prev) => (e.target.checked ? [...prev, id] : prev.filter((x) => x !== id)))
                       }
                     />{' '}
                     {r.fullName || r.residentCode}
+                    <ResidentCoverageBadge
+                      info={planCoverage}
+                      label={t(`${MP}.coverageBadgeMealPlan`)}
+                      publisherLabel={
+                        planCoverage.publishedByName
+                          ? t(`${MP}.coveragePublishedBy`, { name: planCoverage.publishedByName })
+                          : undefined
+                      }
+                    />
                   </label>
                 );
-              })}
+              })
+              ) : (
+                <p className="mp-hint mp-hint--inline">
+                  {publishedSchedules.length
+                    ? t(`${TAB}.selectScheduleHint`)
+                    : t(`${TAB}.noPublishedScheduleHint`)}
+                </p>
+              )}
             </div>
           </div>
 
-          <p className="meal-page__hint">
-            {publishedTimes.source === 'published_schedule'
-              ? 'Đang dùng giờ từ lịch đã publish cho ngày này.'
-              : 'Chưa có lịch publish — dùng giờ mặc định hệ thống (07:30 / 11:30 / 17:30).'}
+          <p className="mp-hint">
+            {!hasSelectedSchedule
+              ? publishedSchedules.length
+                ? t(`${TAB}.selectScheduleHint`)
+                : t(`${TAB}.noPublishedScheduleHint`)
+              : publishedTimes.source === 'published_schedule'
+                ? t(`${TAB}.timesFromScheduleHint`)
+                : t(`${TAB}.scheduleNoResidentsWarn`)}
           </p>
 
-          <div className="tab-toolbar">
-            <select value={selectedTemplate} onChange={(e) => setSelectedTemplate(e.target.value)}>
-              <option value="">— Chọn template 3 bữa —</option>
-              {templates.map((t) => <option key={t.key} value={t.key}>{t.name}</option>)}
+          <div className={`mp-toolbar${!hasSelectedSchedule ? ' mp-toolbar--disabled' : ''}`}>
+            <select
+              value={selectedTemplate}
+              disabled={!hasSelectedSchedule}
+              onChange={(e) => setSelectedTemplate(e.target.value)}
+            >
+              <option value="">{t(`${TAB}.selectThreeMealTemplate`)}</option>
+              {templates.map((tpl) => <option key={tpl.key} value={tpl.key}>{tpl.name}</option>)}
             </select>
-            <button type="button" className="btn-primary" onClick={addFromTemplate}>+ Thêm từ template</button>
-            <button type="button" className="btn-secondary" onClick={addManual}>+ Thêm thủ công</button>
+            <button type="button" className="mp-btn-primary" disabled={!hasSelectedSchedule} onClick={addFromTemplate}>+ {t(`${MP}.addFromTemplate`)}</button>
+            <button type="button" className="mp-btn-secondary" disabled={!hasSelectedSchedule} onClick={addManual}>+ {t(`${MP}.addManual`)}</button>
           </div>
 
-          <table className="data-table">
+          {!dishCatalog.length && <p className="mp-hint mp-hint--catalog">{t(`${TAB}.noDishCatalog`)}</p>}
+
+          <table className="mp-table">
             <thead>
               <tr>
-                <th>Cư dân</th><th>Bữa</th><th>Tên món</th><th>Kcal</th><th>Giờ</th><th>Thành phần</th><th>Nguồn</th><th>Ghi chú</th><th />
+                <th>{t(`${TAB}.colResident`)}</th><th>{t(`${TAB}.colMeal`)}</th><th>{t(`${TAB}.colDish`)}</th><th>{t(`${TAB}.colKcal`)}</th><th>{t(`${TAB}.colTime`)}</th><th>{t(`${TAB}.colIngredients`)}</th><th>{t(`${TAB}.colSource`)}</th><th>{t(`${TAB}.colNotes`)}</th><th />
               </tr>
             </thead>
             <tbody>
-              {entries.length === 0 && <tr><td colSpan={9} className="empty-state">Chưa có dòng thực đơn</td></tr>}
+              {entries.length === 0 && <tr><td colSpan={9} className="mp-empty">{t(`${MP}.emptyEntries`)}</td></tr>}
               {entries.map((row, idx) => (
                 <tr key={`${idx}-${row.residentId}-${row.mealType}`}>
                   <td>
-                    <select value={row.residentId} onChange={(e) => patchEntry(idx, { residentId: e.target.value })}>
+                    <select
+                      value={row.residentId}
+                      disabled={!hasSelectedSchedule}
+                      onChange={(e) => patchEntry(idx, { residentId: e.target.value })}
+                    >
                       <option value="">—</option>
-                      {residents.map((r) => <option key={r._id} value={r._id}>{r.fullName || r.residentCode}</option>)}
+                      {(hasSelectedSchedule ? selectableResidents : residents).map((r) => (
+                        <option key={r._id} value={r._id}>{r.fullName || r.residentCode}</option>
+                      ))}
                     </select>
                   </td>
                   <td>
                     <select value={row.mealType} onChange={(e) => patchEntry(idx, { mealType: e.target.value })}>
-                      <option value="breakfast">Sáng</option>
-                      <option value="lunch">Trưa</option>
-                      <option value="dinner">Tối</option>
+                      <option value="breakfast">{mealTypeLabel('breakfast', t)}</option>
+                      <option value="lunch">{mealTypeLabel('lunch', t)}</option>
+                      <option value="dinner">{mealTypeLabel('dinner', t)}</option>
                     </select>
                   </td>
-                  <td><input value={row.mealName} onChange={(e) => patchEntry(idx, { mealName: e.target.value })} /></td>
-                  <td><input type="number" min="0" value={row.calories} onChange={(e) => patchEntry(idx, { calories: e.target.value })} /></td>
+                  <td>
+                    <div className="mp-dish-cell">
+                      <select
+                        className="mp-dish-select"
+                        value={
+                          row.dishId && (row.source === 'catalog' || dishCatalogIds.has(String(row.dishId)))
+                            ? String(row.dishId)
+                            : CUSTOM_DISH_VALUE
+                        }
+                        onChange={(e) => handleDishSelect(idx, e.target.value)}
+                      >
+                        <option value={CUSTOM_DISH_VALUE}>{t(`${TAB}.customDish`)}</option>
+                        {dishCatalog.map((dish) => (
+                          <option key={dish._id} value={dish._id}>
+                            {t(`${TAB}.dishOption`, { name: dish.name, calories: dish.calories })}
+                          </option>
+                        ))}
+                        {row.dishId &&
+                          row.source === 'catalog' &&
+                          !dishCatalogIds.has(String(row.dishId)) && (
+                            <option value={row.dishId}>
+                              {row.mealName} — {t(`${TAB}.dishUnavailable`)}
+                            </option>
+                          )}
+                      </select>
+                      {(!row.dishId || row.source !== 'catalog') && (
+                        <input
+                          className="mp-dish-custom-input"
+                          value={row.mealName}
+                          onChange={(e) => patchEntry(idx, { mealName: e.target.value, dishId: '', source: 'manual' })}
+                        />
+                      )}
+                    </div>
+                  </td>
+                  <td>
+                    <input
+                      type="number"
+                      min="0"
+                      max="5000"
+                      value={row.calories}
+                      readOnly={Boolean(row.dishId && row.source === 'catalog')}
+                      onChange={(e) => patchEntry(idx, { calories: e.target.value })}
+                    />
+                  </td>
                   <td><input type="time" value={row.mealTime || defaultMealTimeByType(row.mealType)} onChange={(e) => patchEntry(idx, { mealTime: e.target.value })} /></td>
                   <td><input value={Array.isArray(row.ingredients) ? row.ingredients.join(', ') : row.ingredients || ''} onChange={(e) => patchEntry(idx, { ingredients: e.target.value })} /></td>
-                  <td>{row.source === 'template' ? 'Template' : 'Thủ công'}</td>
+                  <td>{sourceLabel(row.source, t)}</td>
                   <td><input value={row.nutritionNote || ''} onChange={(e) => patchEntry(idx, { nutritionNote: e.target.value })} /></td>
-                  <td><button type="button" className="btn btn--sm btn--delete" onClick={() => removeEntry(idx)}>Xóa</button></td>
+                  <td><button type="button" className="mp-btn-sm mp-btn-sm--delete" onClick={() => removeEntry(idx)}>{t('common.delete')}</button></td>
                 </tr>
               ))}
             </tbody>
           </table>
 
-          <div className="tab-toolbar">
-            <button type="button" className="btn-primary" disabled={saving} onClick={saveDraft}>
-              {saving ? 'Đang lưu...' : editingId ? 'Cập nhật Draft' : 'Lưu Draft'}
+          <div className="mp-toolbar">
+            <button type="button" className="mp-btn-primary" disabled={saving} onClick={saveDraft}>
+              {saving ? t('common.saving') : editingId ? t(`${MP}.updateDraft`) : t(`${MP}.saveDraft`)}
             </button>
-            <button type="button" className="btn-secondary" onClick={resetForm}>Làm mới</button>
+            <button type="button" className="mp-btn-secondary" onClick={resetForm}>{t(`${MP}.reset`)}</button>
           </div>
 
-          <div className="meal-page__list-header">
-            <h3 className="meal-page__draft-title">Lịch meal plans ngày {formatVNDate(listDate)}</h3>
-            <div className="meal-page__date-switch">
-              <button type="button" className="btn-secondary" onClick={() => setListDate(addDays(listDate, -1))}>← Hôm qua</button>
-              <button type="button" className="btn-secondary" onClick={() => setListDate(today())}>Hôm nay</button>
+          <div className="mp-list-header">
+            <h3 className="mp-draft-title">{t(`${MP}.listTitleMealPlans`, { date: formatLocaleDate(listDate, i18n.language) })}</h3>
+            <div className="mp-date-switch">
+              <button type="button" className="mp-btn-secondary" onClick={() => setListDate(addDays(listDate, -1))}>{t(`${MP}.yesterday`)}</button>
+              <button type="button" className="mp-btn-secondary" onClick={() => setListDate(today())}>{t('common.today')}</button>
               <input type="date" value={listDate} onChange={(e) => setListDate(e.target.value)} />
-              <button type="button" className="btn-secondary" onClick={() => setListDate(addDays(listDate, 1))}>Ngày mai →</button>
+              <button type="button" className="mp-btn-secondary" onClick={() => setListDate(addDays(listDate, 1))}>{t(`${MP}.tomorrow`)}</button>
             </div>
           </div>
-          <table className="data-table">
-            <thead><tr><th>Tiêu đề</th><th>Giai đoạn</th><th>Ngày</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
+          <table className="mp-table">
+            <thead><tr><th>{t(`${TAB}.titleLabel`)}</th><th>{t(`${TAB}.detailStage`)}</th><th>{t('common.date')}</th><th>{t('common.colStatus')}</th><th>{t('common.colActions')}</th></tr></thead>
             <tbody>
-              {plans.length === 0 && <tr><td colSpan={5} className="empty-state">Không có lịch</td></tr>}
+              {plans.length === 0 && <tr><td colSpan={5} className="mp-empty">{t(`${MP}.emptyPlans`)}</td></tr>}
               {plans.map((d) => (
                 <tr key={d._id}>
                   <td>{d.title || '—'}</td>
-                  <td>{d.careStage || '—'}</td>
-                  <td>{formatVNDate((d.workDate || '').slice(0, 10))}</td>
-                  <td>{statusLabel(d.status)}</td>
+                  <td>{careStageLabel(d.careStage, t) || '—'}</td>
+                  <td>{formatLocaleDate((d.workDate || '').slice(0, 10), i18n.language)}</td>
+                  <td>{planStatusLabel(d.status, t)}</td>
                   <td>
                     {d.status === 'draft' ? (
                       <>
-                        <button type="button" className="btn btn--sm btn--edit" onClick={() => openDraft(d._id)}>Mở</button>{' '}
-                        <button type="button" className="btn btn--sm btn--primary" onClick={() => publishDraft(d._id)}>Publish</button>{' '}
-                        <button type="button" className="btn btn--sm btn--delete" onClick={() => deleteDraft(d._id)}>Xóa</button>
+                        <button type="button" className="mp-btn-sm mp-btn-sm--edit" onClick={() => openDraft(d._id)}>{t(`${MP}.open`)}</button>{' '}
+                        <button type="button" className="mp-btn-sm mp-btn-sm--publish" onClick={() => publishDraft(d._id)}>{t(`${MP}.publish`)}</button>{' '}
+                        <button type="button" className="mp-btn-sm mp-btn-sm--delete" onClick={() => deleteDraft(d._id)}>{t('common.delete')}</button>
                       </>
                     ) : (
-                      <button type="button" className="btn btn--sm meal-page__btn-view" onClick={() => openPlanDetail(d._id)}>
-                        Chi tiết
+                      <button type="button" className="mp-btn-sm mp-btn-sm--view" onClick={() => openPlanDetail(d._id)}>
+                        {t('common.viewDetails')}
                       </button>
                     )}
                   </td>
@@ -491,13 +808,13 @@ function MealPlanTab() {
           </table>
 
           {!!editingId && (
-            <p className="meal-page__editing-meta">
-              Đang chỉnh draft: <code>{editingId}</code>
+            <p className="mp-editing-meta">
+              {t(`${MP}.updateDraft`)}: <code>{editingId}</code>
               {entries.length > 0 && (
-                <> · Cư dân: {[...new Set(entries.map((e) => residentMap[e.residentId]).filter(Boolean))].join(', ')}</>
+                <> · {t('common.residents')}: {[...new Set(entries.map((e) => residentMap[e.residentId]).filter(Boolean))].join(', ')}</>
               )}
               {entries.length > 0 && (
-                <> · Bữa: {[...new Set(entries.map((e) => mealTypeLabel(e.mealType)))].join(', ')}</>
+                <> · {t(`${TAB}.colMeal`)}: {[...new Set(entries.map((e) => mealTypeLabel(e.mealType, t)))].join(', ')}</>
               )}
             </p>
           )}
@@ -505,24 +822,24 @@ function MealPlanTab() {
       )}
 
       {(detailLoading || detailPlan) && (
-        <div className="meal-page__modal-overlay" onClick={!detailLoading ? closePlanDetail : undefined}>
-          <div className="meal-page__modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
-            <div className="meal-page__modal-header">
-              <h3 className="meal-page__modal-title">Chi tiết lịch đã publish</h3>
+        <div className="mp-modal-overlay" onClick={!detailLoading ? closePlanDetail : undefined}>
+          <div className="mp-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+            <div className="mp-modal-header">
+              <h3 className="mp-modal-title">{t(`${TAB}.detailPublishedTitle`)}</h3>
               {!detailLoading && (
-                <button type="button" className="meal-page__modal-close" onClick={closePlanDetail}>×</button>
+                <button type="button" className="mp-modal-close" onClick={closePlanDetail}>×</button>
               )}
             </div>
-            {detailLoading && <p className="meal-page__modal-loading">Đang tải chi tiết...</p>}
+            {detailLoading && <p className="mp-modal-loading">{t('common.loading')}</p>}
             {!detailLoading && detailPlan && (
-              <div className="meal-page__modal-body">
-                <p className="meal-page__modal-meta">
-                  <strong>Tiêu đề:</strong> {detailPlan.title || '—'} · <strong>Ngày:</strong> {formatVNDate((detailPlan.workDate || '').slice(0, 10))} · <strong>Giai đoạn:</strong> {detailPlan.careStage || '—'}
+              <div className="mp-modal-body">
+                <p className="mp-modal-meta">
+                  <strong>{t(`${TAB}.detailTitle`)}:</strong> {detailPlan.title || '—'} · <strong>{t(`${TAB}.detailDate`)}:</strong> {formatLocaleDate((detailPlan.workDate || '').slice(0, 10), i18n.language)} · <strong>{t(`${TAB}.detailStage`)}:</strong> {careStageLabel(detailPlan.careStage, t) || '—'}
                 </p>
-                <table className="data-table meal-page__detail-table">
+                <table className="mp-table mp-detail-table">
                   <thead>
                     <tr>
-                      <th>Cư dân</th><th>Bữa</th><th>Món</th><th>Kcal</th><th>Giờ</th><th>Thành phần</th><th>Nguồn</th><th>Ghi chú</th>
+                      <th>{t(`${TAB}.colResident`)}</th><th>{t(`${TAB}.colMeal`)}</th><th>{t(`${TAB}.colDish`)}</th><th>{t(`${TAB}.colKcal`)}</th><th>{t(`${TAB}.colTime`)}</th><th>{t(`${TAB}.colIngredients`)}</th><th>{t(`${TAB}.colSource`)}</th><th>{t(`${TAB}.colNotes`)}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -532,17 +849,17 @@ function MealPlanTab() {
                       return (
                         <tr key={`${rid}-${row.mealType}-${idx}`}>
                           <td>{name}</td>
-                          <td>{mealTypeLabel(row.mealType)}</td>
+                          <td>{mealTypeLabel(row.mealType, t)}</td>
                           <td>{row.mealName || '—'}</td>
                           <td>{row.calories ?? '—'}</td>
                           <td>{row.mealTime || '—'}</td>
                           <td>{Array.isArray(row.ingredients) ? row.ingredients.join(', ') || '—' : row.ingredients || '—'}</td>
-                          <td>{row.source === 'template' ? 'Template' : 'Thủ công'}</td>
+                          <td>{sourceLabel(row.source, t)}</td>
                           <td>{row.nutritionNote || row.stageNote || '—'}</td>
                         </tr>
                       );
                     }) : (
-                      <tr><td colSpan={8} className="empty-state">Lịch chưa có chi tiết món ăn</td></tr>
+                      <tr><td colSpan={8} className="mp-empty">{t(`${TAB}.emptyDetailMeals`)}</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -556,6 +873,8 @@ function MealPlanTab() {
 }
 
 function SpecialDietTab() {
+  const { t, i18n } = useTranslation();
+  const TAB = `${MP}.specialTab`;
   const [workDate, setWorkDate] = useState(today());
   const [listDate, setListDate] = useState(today());
   const [title, setTitle] = useState('');
@@ -572,6 +891,33 @@ function SpecialDietTab() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailPlan, setDetailPlan] = useState(null);
   const [error, setError] = useState('');
+  const coverageByResident = useNutritionCoverage(workDate, residents);
+
+  const residentMap = useMemo(
+    () => Object.fromEntries(residents.map((r) => [String(r._id), r.fullName || r.residentCode])),
+    [residents]
+  );
+
+  const specialCoverageBannerItems = useMemo(
+    () =>
+      selectedResidents
+        .map((id) => {
+          const info = getResidentCoverage(coverageByResident, id, 'specialDiet');
+          if (!info.published) return null;
+          const name = residentMap[id] || id;
+          const titleSuffix = info.planTitle ? ` (${info.planTitle})` : '';
+          return {
+            key: id,
+            text: t(`${MP}.coverageWarningSpecialDiet`, {
+              name,
+              publisher: info.publishedByName || '—',
+              title: titleSuffix,
+            }),
+          };
+        })
+        .filter(Boolean),
+    [selectedResidents, coverageByResident, residentMap, t]
+  );
 
   const loadBoot = async () => {
     setLoading(true);
@@ -585,7 +931,7 @@ function SpecialDietTab() {
       setDietTypes(Array.isArray(tplRes.dietTypes) ? tplRes.dietTypes : []);
       setResidents(Array.isArray(residentRes?.data) ? residentRes.data : []);
     } catch (e) {
-      setError(e?.response?.data?.message || 'Không tải được dữ liệu special diets');
+      setError(resolveApiError(e, t, `${MP}.loadSpecialBootFailed`));
     } finally {
       setLoading(false);
     }
@@ -618,10 +964,14 @@ function SpecialDietTab() {
 
   const addFromTemplate = () => {
     setError('');
-    const tpl = templates.find((t) => t.key === selectedTemplate);
-    if (!tpl) return setError('Vui lòng chọn template');
-    if (selectedResidents.length < 2) return setError('Vui lòng chọn ít nhất 2 cư dân');
-    const generated = selectedResidents.map((residentId) => ({
+    const tpl = templates.find((tp) => tp.key === selectedTemplate);
+    if (!tpl) return setError(t(`${MP}.selectTemplate`));
+    if (selectedResidents.length < 1) return setError(t(`${MP}.selectResidents`));
+    const eligibleResidents = selectedResidents.filter(
+      (id) => !getResidentCoverage(coverageByResident, id, 'specialDiet').published
+    );
+    if (!eligibleResidents.length) return setError(t(`${MP}.residentsAlreadyPublished`));
+    const generated = eligibleResidents.map((residentId) => ({
       residentId,
       dietType: tpl.dietType,
       restrictions: Array.isArray(tpl.restrictions) ? tpl.restrictions : [],
@@ -635,10 +985,15 @@ function SpecialDietTab() {
   };
 
   const addManual = () => {
+    const rid = selectedResidents[0] || '';
+    if (!rid) return setError(t(`${MP}.selectResidentsBeforeManual`));
+    if (getResidentCoverage(coverageByResident, rid, 'specialDiet').published) {
+      return setError(t(`${MP}.residentsAlreadyPublished`));
+    }
     setEntries((prev) => [
       ...prev,
       {
-        residentId: selectedResidents[0] || '',
+        residentId: rid,
         dietType: 'custom',
         restrictions: [],
         nutritionGoal: '',
@@ -665,11 +1020,19 @@ function SpecialDietTab() {
   };
 
   const validate = () => {
-    if (workDate < today()) return 'Không thể tạo special diet plan cho ngày quá khứ';
-    if (selectedResidents.length < 2) return 'Vui lòng chọn tối thiểu 2 cư dân';
-    if (!entries.length) return 'Vui lòng thêm ít nhất 1 dòng chế độ ăn đặc biệt';
+    if (workDate < today()) return t(`${MP}.pastDateSpecialDiet`);
+    if (selectedResidents.length < 1) return t(`${MP}.selectResidents`);
+    if (!entries.length) return t(`${MP}.addAtLeastOneSpecialEntry`);
     const hasInvalid = entries.some((e) => !e.residentId || !e.dietType || !e.effectiveTime);
-    if (hasInvalid) return 'Mỗi dòng phải có cư dân, loại chế độ ăn và giờ hiệu lực';
+    if (hasInvalid) return t(`${MP}.invalidSpecialRow`);
+    const seenResidents = new Set();
+    for (const e of entries) {
+      const rid = String(e.residentId || '');
+      if (rid && seenResidents.has(rid)) {
+        return t(`${MP}.duplicateResidentEntry`, { defaultValue: 'Each resident can only have one special diet entry.' });
+      }
+      seenResidents.add(rid);
+    }
     return '';
   };
 
@@ -682,9 +1045,9 @@ function SpecialDietTab() {
       restrictions: Array.isArray(e.restrictions)
         ? e.restrictions
         : String(e.restrictions || '')
-            .split(',')
-            .map((x) => x.trim())
-            .filter(Boolean),
+          .split(',')
+          .map((x) => x.trim())
+          .filter(Boolean),
       nutritionGoal: e.nutritionGoal || undefined,
       notes: e.notes || undefined,
       source: e.source || 'manual',
@@ -708,7 +1071,7 @@ function SpecialDietTab() {
       resetForm();
       loadPlans(listDate);
     } catch (e) {
-      setError(e?.response?.data?.message || 'Lưu draft thất bại');
+      setError(resolveApiError(e, t, `${MP}.saveDraftFailed`));
     } finally {
       setSaving(false);
     }
@@ -721,7 +1084,7 @@ function SpecialDietTab() {
       const data = await specialDietService.getPlan(id);
       setEditingId(data._id);
       setTitle(data.title || '');
-      setWorkDate((data.workDate || '').slice(0, 10) || today());
+      setWorkDate(clampWorkDate(data.workDate));
       const rows = Array.isArray(data.entries) ? data.entries : [];
       setEntries(
         rows.map((r) => ({
@@ -738,7 +1101,7 @@ function SpecialDietTab() {
       const picked = [...new Set(rows.map((r) => String(r.residentId?._id || r.residentId || '')).filter(Boolean))];
       setSelectedResidents(picked);
     } catch (e) {
-      setError(e?.response?.data?.message || 'Không mở được draft');
+      setError(resolveApiError(e, t, `${MP}.openDraftFailed`));
     } finally {
       setSaving(false);
     }
@@ -752,14 +1115,14 @@ function SpecialDietTab() {
       if (editingId === id) resetForm();
       loadPlans(listDate);
     } catch (e) {
-      setError(e?.response?.data?.message || 'Publish thất bại');
+      setError(resolveApiError(e, t, `${MP}.publishFailed`));
     } finally {
       setSaving(false);
     }
   };
 
   const deleteDraft = async (id) => {
-    if (!window.confirm('Bạn có chắc muốn xóa bản nháp special diet này?')) return;
+    if (!window.confirm(t(`${MP}.confirmDeleteSpecialDiet`))) return;
     setSaving(true);
     setError('');
     try {
@@ -767,7 +1130,7 @@ function SpecialDietTab() {
       if (editingId === id) resetForm();
       loadPlans(listDate);
     } catch (e) {
-      setError(e?.response?.data?.message || 'Xóa draft thất bại');
+      setError(resolveApiError(e, t, `${MP}.deleteDraftFailed`));
     } finally {
       setSaving(false);
     }
@@ -780,7 +1143,7 @@ function SpecialDietTab() {
       const data = await specialDietService.getPlan(id);
       setDetailPlan(data || null);
     } catch (e) {
-      setError(e?.response?.data?.message || 'Không tải được chi tiết lịch');
+      setError(resolveApiError(e, t, `${MP}.detailLoadFailed`));
     } finally {
       setDetailLoading(false);
     }
@@ -789,65 +1152,82 @@ function SpecialDietTab() {
   const closePlanDetail = () => setDetailPlan(null);
 
   return (
-    <div className="meal-page">
-      <p className="meal-page__intro">
-        Điều dưỡng chỉ định chế độ ăn đặc biệt theo ngày cho nhiều cư dân (Draft → Publish).
+    <div className="mp-page">
+      <p className="mp-intro">
+        {t(`${TAB}.intro`)}
       </p>
-      {error && <p className="form-error">{error}</p>}
-      {loading && <p>Đang tải...</p>}
+      {error && <p className="mp-error">{error}</p>}
+      {loading && <p className="mp-loading">{t('common.loading')}</p>}
 
       {!loading && (
         <>
-          <div className="form-grid">
+          <div className="mp-form-grid form-grid">
             <div className="form-group">
-              <label>Ngày áp dụng *</label>
-              <input type="date" min={today()} value={workDate} onChange={(e) => setWorkDate(e.target.value)} />
+              <label>{t(`${TAB}.workDate`)} *</label>
+              <WorkDatePicker value={workDate} onChange={setWorkDate} t={t} />
             </div>
             <div className="form-group">
-              <label>Tiêu đề</label>
-              <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="VD: Chế độ ăn đặc biệt tuần 1" />
+              <label>{t(`${TAB}.titleLabel`)}</label>
+              <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t(`${TAB}.titlePlaceholder`)} />
             </div>
           </div>
 
-          <div className="meal-page__resident-section">
-            <label className="meal-page__resident-label">Cư dân áp dụng (nhiều người) *</label>
-            <div className="meal-page__resident-grid">
+          <SelectedCoverageBanner items={specialCoverageBannerItems} />
+
+          <div className="mp-resident-section">
+            <label className="mp-resident-label">{t(`${TAB}.residentsLabel`)} *</label>
+            <div className="mp-resident-grid">
               {residents.map((r) => {
                 const id = String(r._id);
                 const checked = selectedResidents.includes(id);
+                const dietCoverage = getResidentCoverage(coverageByResident, id, 'specialDiet');
+                const covered = dietCoverage.published;
                 return (
-                  <label key={id} className="meal-page__resident-item">
+                  <label
+                    key={id}
+                    className={`mp-resident-item${covered ? ' mp-resident-item--covered' : ''}`}
+                  >
                     <input
                       type="checkbox"
                       checked={checked}
+                      disabled={covered}
                       onChange={(e) =>
                         setSelectedResidents((prev) => (e.target.checked ? [...prev, id] : prev.filter((x) => x !== id)))
                       }
                     />{' '}
                     {r.fullName || r.residentCode}
+                    <ResidentCoverageBadge
+                      info={dietCoverage}
+                      label={t(`${MP}.coverageBadgeSpecialDiet`)}
+                      publisherLabel={
+                        dietCoverage.publishedByName
+                          ? t(`${MP}.coveragePublishedBy`, { name: dietCoverage.publishedByName })
+                          : undefined
+                      }
+                    />
                   </label>
                 );
               })}
             </div>
           </div>
 
-          <div className="tab-toolbar">
+          <div className="mp-toolbar">
             <select value={selectedTemplate} onChange={(e) => setSelectedTemplate(e.target.value)}>
-              <option value="">— Chọn template special diet —</option>
-              {templates.map((t) => <option key={t.key} value={t.key}>{t.name}</option>)}
+              <option value="">{t(`${TAB}.selectSpecialTemplate`)}</option>
+              {templates.map((tp) => <option key={tp.key} value={tp.key}>{tp.name}</option>)}
             </select>
-            <button type="button" className="btn-primary" onClick={addFromTemplate}>+ Thêm từ template</button>
-            <button type="button" className="btn-secondary" onClick={addManual}>+ Thêm thủ công</button>
+            <button type="button" className="mp-btn-primary" onClick={addFromTemplate}>+ {t(`${MP}.addFromTemplate`)}</button>
+            <button type="button" className="mp-btn-secondary" onClick={addManual}>+ {t(`${MP}.addManual`)}</button>
           </div>
 
-          <table className="data-table">
+          <table className="mp-table">
             <thead>
               <tr>
-                <th>Cư dân</th><th>Chế độ ăn</th><th>Hạn chế</th><th>Mục tiêu</th><th>Giờ hiệu lực</th><th>Nguồn</th><th>Ghi chú</th><th />
+                <th>{t(`${TAB}.colResident`)}</th><th>{t(`${TAB}.colDietType`)}</th><th>{t(`${TAB}.colRestrictions`)}</th><th>{t(`${TAB}.colGoal`)}</th><th>{t(`${TAB}.colEffectiveTime`)}</th><th>{t(`${TAB}.colSource`)}</th><th>{t(`${TAB}.colNotes`)}</th><th />
               </tr>
             </thead>
             <tbody>
-              {entries.length === 0 && <tr><td colSpan={8} className="empty-state">Chưa có chỉ định special diet</td></tr>}
+              {entries.length === 0 && <tr><td colSpan={8} className="mp-empty">{t(`${TAB}.emptyEntries`)}</td></tr>}
               {entries.map((row, idx) => (
                 <tr key={`${idx}-${row.residentId}-${row.dietType}`}>
                   <td>
@@ -858,7 +1238,7 @@ function SpecialDietTab() {
                   </td>
                   <td>
                     <select value={row.dietType} onChange={(e) => patchEntry(idx, { dietType: e.target.value })}>
-                      {dietTypes.map((t) => <option key={t} value={t}>{dietTypeLabel(t)}</option>)}
+                      {dietTypes.map((dt) => <option key={dt} value={dt}>{dietTypeLabel(dt, t)}</option>)}
                     </select>
                   </td>
                   <td>
@@ -869,49 +1249,49 @@ function SpecialDietTab() {
                   </td>
                   <td><input value={row.nutritionGoal || ''} onChange={(e) => patchEntry(idx, { nutritionGoal: e.target.value })} /></td>
                   <td><input type="time" value={row.effectiveTime || '07:00'} onChange={(e) => patchEntry(idx, { effectiveTime: e.target.value })} /></td>
-                  <td>{row.source === 'template' ? 'Template' : 'Thủ công'}</td>
+                  <td>{sourceLabel(row.source, t)}</td>
                   <td><input value={row.notes || ''} onChange={(e) => patchEntry(idx, { notes: e.target.value })} /></td>
-                  <td><button type="button" className="btn btn--sm btn--delete" onClick={() => removeEntry(idx)}>Xóa</button></td>
+                  <td><button type="button" className="mp-btn-sm mp-btn-sm--delete" onClick={() => removeEntry(idx)}>{t('common.delete')}</button></td>
                 </tr>
               ))}
             </tbody>
           </table>
 
-          <div className="tab-toolbar">
-            <button type="button" className="btn-primary" disabled={saving} onClick={saveDraft}>
-              {saving ? 'Đang lưu...' : editingId ? 'Cập nhật Draft' : 'Lưu Draft'}
+          <div className="mp-toolbar">
+            <button type="button" className="mp-btn-primary" disabled={saving} onClick={saveDraft}>
+              {saving ? t('common.saving') : editingId ? t(`${MP}.updateDraft`) : t(`${MP}.saveDraft`)}
             </button>
-            <button type="button" className="btn-secondary" onClick={resetForm}>Làm mới</button>
+            <button type="button" className="mp-btn-secondary" onClick={resetForm}>{t(`${MP}.reset`)}</button>
           </div>
 
-          <div className="meal-page__list-header">
-            <h3 className="meal-page__draft-title">Lịch special diets ngày {formatVNDate(listDate)}</h3>
-            <div className="meal-page__date-switch">
-              <button type="button" className="btn-secondary" onClick={() => setListDate(addDays(listDate, -1))}>← Hôm qua</button>
-              <button type="button" className="btn-secondary" onClick={() => setListDate(today())}>Hôm nay</button>
+          <div className="mp-list-header">
+            <h3 className="mp-draft-title">{t(`${MP}.listTitleSpecialDiets`, { date: formatLocaleDate(listDate, i18n.language) })}</h3>
+            <div className="mp-date-switch">
+              <button type="button" className="mp-btn-secondary" onClick={() => setListDate(addDays(listDate, -1))}>{t(`${MP}.yesterday`)}</button>
+              <button type="button" className="mp-btn-secondary" onClick={() => setListDate(today())}>{t('common.today')}</button>
               <input type="date" value={listDate} onChange={(e) => setListDate(e.target.value)} />
-              <button type="button" className="btn-secondary" onClick={() => setListDate(addDays(listDate, 1))}>Ngày mai →</button>
+              <button type="button" className="mp-btn-secondary" onClick={() => setListDate(addDays(listDate, 1))}>{t(`${MP}.tomorrow`)}</button>
             </div>
           </div>
-          <table className="data-table">
-            <thead><tr><th>Tiêu đề</th><th>Ngày</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
+          <table className="mp-table">
+            <thead><tr><th>{t(`${TAB}.titleLabel`)}</th><th>{t('common.date')}</th><th>{t('common.colStatus')}</th><th>{t('common.colActions')}</th></tr></thead>
             <tbody>
-              {plans.length === 0 && <tr><td colSpan={4} className="empty-state">Không có lịch</td></tr>}
+              {plans.length === 0 && <tr><td colSpan={4} className="mp-empty">{t(`${MP}.emptyPlans`)}</td></tr>}
               {plans.map((d) => (
                 <tr key={d._id}>
                   <td>{d.title || '—'}</td>
-                  <td>{formatVNDate((d.workDate || '').slice(0, 10))}</td>
-                  <td>{statusLabel(d.status)}</td>
+                  <td>{formatLocaleDate((d.workDate || '').slice(0, 10), i18n.language)}</td>
+                  <td>{planStatusLabel(d.status, t)}</td>
                   <td>
                     {d.status === 'draft' ? (
                       <>
-                        <button type="button" className="btn btn--sm btn--edit" onClick={() => openDraft(d._id)}>Mở</button>{' '}
-                        <button type="button" className="btn btn--sm btn--primary" onClick={() => publishDraft(d._id)}>Publish</button>{' '}
-                        <button type="button" className="btn btn--sm btn--delete" onClick={() => deleteDraft(d._id)}>Xóa</button>
+                        <button type="button" className="mp-btn-sm mp-btn-sm--edit" onClick={() => openDraft(d._id)}>{t(`${MP}.open`)}</button>{' '}
+                        <button type="button" className="mp-btn-sm mp-btn-sm--publish" onClick={() => publishDraft(d._id)}>{t(`${MP}.publish`)}</button>{' '}
+                        <button type="button" className="mp-btn-sm mp-btn-sm--delete" onClick={() => deleteDraft(d._id)}>{t('common.delete')}</button>
                       </>
                     ) : (
-                      <button type="button" className="btn btn--sm meal-page__btn-view" onClick={() => openPlanDetail(d._id)}>
-                        Chi tiết
+                      <button type="button" className="mp-btn-sm mp-btn-sm--view" onClick={() => openPlanDetail(d._id)}>
+                        {t('common.viewDetails')}
                       </button>
                     )}
                   </td>
@@ -923,24 +1303,24 @@ function SpecialDietTab() {
       )}
 
       {(detailLoading || detailPlan) && (
-        <div className="meal-page__modal-overlay" onClick={!detailLoading ? closePlanDetail : undefined}>
-          <div className="meal-page__modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
-            <div className="meal-page__modal-header">
-              <h3 className="meal-page__modal-title">Chi tiết special diet đã publish</h3>
+        <div className="mp-modal-overlay" onClick={!detailLoading ? closePlanDetail : undefined}>
+          <div className="mp-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+            <div className="mp-modal-header">
+              <h3 className="mp-modal-title">{t(`${TAB}.detailPublishedTitle`)}</h3>
               {!detailLoading && (
-                <button type="button" className="meal-page__modal-close" onClick={closePlanDetail}>×</button>
+                <button type="button" className="mp-modal-close" onClick={closePlanDetail}>×</button>
               )}
             </div>
-            {detailLoading && <p className="meal-page__modal-loading">Đang tải chi tiết...</p>}
+            {detailLoading && <p className="mp-modal-loading">{t('common.loading')}</p>}
             {!detailLoading && detailPlan && (
-              <div className="meal-page__modal-body">
-                <p className="meal-page__modal-meta">
-                  <strong>Tiêu đề:</strong> {detailPlan.title || '—'} · <strong>Ngày:</strong> {formatVNDate((detailPlan.workDate || '').slice(0, 10))}
+              <div className="mp-modal-body">
+                <p className="mp-modal-meta">
+                  <strong>{t(`${TAB}.titleLabel`)}:</strong> {detailPlan.title || '—'} · <strong>{t('common.date')}:</strong> {formatLocaleDate((detailPlan.workDate || '').slice(0, 10), i18n.language)}
                 </p>
-                <table className="data-table meal-page__detail-table">
+                <table className="mp-table mp-detail-table">
                   <thead>
                     <tr>
-                      <th>Cư dân</th><th>Chế độ ăn</th><th>Hạn chế</th><th>Mục tiêu</th><th>Giờ hiệu lực</th><th>Nguồn</th><th>Ghi chú</th>
+                      <th>{t(`${TAB}.colResident`)}</th><th>{t(`${TAB}.colDietType`)}</th><th>{t(`${TAB}.colRestrictions`)}</th><th>{t(`${TAB}.colGoal`)}</th><th>{t(`${TAB}.colEffectiveTime`)}</th><th>{t(`${TAB}.colSource`)}</th><th>{t(`${TAB}.colNotes`)}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -949,16 +1329,16 @@ function SpecialDietTab() {
                       return (
                         <tr key={`${detailPlan._id || 'detail-special'}-${idx}`}>
                           <td>{name}</td>
-                          <td>{dietTypeLabel(row.dietType) || '—'}</td>
+                          <td>{dietTypeLabel(row.dietType, t) || '—'}</td>
                           <td>{Array.isArray(row.restrictions) ? row.restrictions.join(', ') || '—' : row.restrictions || '—'}</td>
                           <td>{row.nutritionGoal || '—'}</td>
                           <td>{row.effectiveTime || '—'}</td>
-                          <td>{row.source === 'template' ? 'Template' : 'Thủ công'}</td>
+                          <td>{sourceLabel(row.source, t)}</td>
                           <td>{row.notes || '—'}</td>
                         </tr>
                       );
                     }) : (
-                      <tr><td colSpan={7} className="empty-state">Lịch chưa có chi tiết special diet</td></tr>
+                      <tr><td colSpan={7} className="mp-empty">{t(`${TAB}.emptyDetail`)}</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -972,6 +1352,8 @@ function SpecialDietTab() {
 }
 
 function MealTimeScheduleTab() {
+  const { t, i18n } = useTranslation();
+  const TAB = `${MP}.scheduleTab`;
   const [formWorkDate, setFormWorkDate] = useState(today());
   const [listDate, setListDate] = useState(today());
   const [title, setTitle] = useState('');
@@ -992,10 +1374,32 @@ function MealTimeScheduleTab() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailSchedule, setDetailSchedule] = useState(null);
   const [error, setError] = useState('');
+  const coverageByResident = useNutritionCoverage(formWorkDate, residents);
 
   const residentMap = useMemo(
     () => Object.fromEntries(residents.map((r) => [String(r._id), r.fullName || r.residentCode])),
     [residents]
+  );
+
+  const scheduleCoverageBannerItems = useMemo(
+    () =>
+      selectedResidents
+        .map((id) => {
+          const info = getResidentCoverage(coverageByResident, id, 'mealTimeSchedule');
+          if (!info.published) return null;
+          const name = residentMap[id] || id;
+          const titleSuffix = info.scheduleTitle ? ` (${info.scheduleTitle})` : '';
+          return {
+            key: id,
+            text: t(`${MP}.coverageWarningSchedule`, {
+              name,
+              publisher: info.publishedByName || '—',
+              title: titleSuffix,
+            }),
+          };
+        })
+        .filter(Boolean),
+    [selectedResidents, coverageByResident, residentMap, t]
   );
 
   const loadBoot = async () => {
@@ -1012,7 +1416,7 @@ function MealTimeScheduleTab() {
       }
       setResidents(Array.isArray(residentRes?.data) ? residentRes.data : []);
     } catch (e) {
-      setError(e?.response?.data?.message || 'Không tải được dữ liệu lịch giờ ăn');
+      setError(resolveApiError(e, t, `${MP}.loadScheduleBootFailed`));
     } finally {
       setLoading(false);
     }
@@ -1045,12 +1449,13 @@ function MealTimeScheduleTab() {
 
   const addFromTemplate = () => {
     setError('');
-    const tpl = templates.find((t) => t.key === selectedTemplate);
-    if (!tpl) return setError('Vui lòng chọn template');
-    if (selectedResidents.length < 2) return setError('Vui lòng chọn ít nhất 2 cư dân');
+    const tpl = templates.find((tp) => tp.key === selectedTemplate);
+    if (!tpl) return setError(t(`${MP}.selectTemplate`));
+    if (selectedResidents.length < 1) return setError(t(`${MP}.selectResidents`));
     const existing = new Set(entries.map((e) => String(e.residentId)));
     const generated = selectedResidents
       .filter((id) => !existing.has(String(id)))
+      .filter((id) => !getResidentCoverage(coverageByResident, id, 'mealTimeSchedule').published)
       .map((residentId) => ({
         residentId,
         breakfastTime: tpl.breakfastTime || defaultMealTimes.breakfast,
@@ -1060,15 +1465,18 @@ function MealTimeScheduleTab() {
         source: 'template',
         templateKey: tpl.key,
       }));
-    if (!generated.length) return setError('Các cư dân đã chọn đều có trong bảng');
+    if (!generated.length) return setError(t(`${MP}.residentsAlreadyPublished`));
     setEntries((prev) => [...prev, ...generated]);
   };
 
   const addManual = () => {
     const rid = selectedResidents[0] || '';
-    if (!rid) return setError('Vui lòng chọn ít nhất 1 cư dân trước khi thêm thủ công');
+    if (!rid) return setError(t(`${MP}.selectResidentsBeforeManual`));
+    if (getResidentCoverage(coverageByResident, rid, 'mealTimeSchedule').published) {
+      return setError(t(`${MP}.residentsAlreadyPublished`));
+    }
     if (entries.some((e) => String(e.residentId) === String(rid))) {
-      return setError('Cư dân này đã có trong bảng');
+      return setError(t(`${MP}.residentAlreadyInTable`));
     }
     setEntries((prev) => [
       ...prev,
@@ -1099,15 +1507,27 @@ function MealTimeScheduleTab() {
   };
 
   const validate = () => {
-    if (formWorkDate < today()) return 'Không thể tạo lịch giờ ăn cho ngày quá khứ';
-    if (selectedResidents.length < 2) return 'Vui lòng chọn tối thiểu 2 cư dân';
-    if (!entries.length) return 'Vui lòng thêm ít nhất 1 dòng lịch giờ ăn';
+    if (formWorkDate < today()) return t(`${MP}.pastDateMealTime`);
+    if (selectedResidents.length < 1) return t(`${MP}.selectResidents`);
+    if (!entries.length) return t(`${MP}.addAtLeastOneTimeEntry`);
     const hasInvalid = entries.some(
       (e) => !e.residentId || !e.breakfastTime || !e.lunchTime || !e.dinnerTime
     );
-    if (hasInvalid) return 'Mỗi dòng phải có cư dân và đủ 3 giờ (sáng/trưa/tối)';
+    if (hasInvalid) return t(`${MP}.invalidTimeRow`);
     const uniqueResidents = new Set(entries.map((e) => String(e.residentId)));
-    if (uniqueResidents.size !== entries.length) return 'Mỗi cư dân chỉ được 1 dòng trong lịch';
+    if (uniqueResidents.size !== entries.length) return t(`${MP}.oneRowPerResident`);
+    const toMinutes = (hhmm) => {
+      const [h, m] = String(hhmm || '').split(':').map(Number);
+      return Number.isNaN(h) || Number.isNaN(m) ? null : h * 60 + m;
+    };
+    const hasOutOfOrder = entries.some((e) => {
+      const b = toMinutes(e.breakfastTime);
+      const l = toMinutes(e.lunchTime);
+      const d = toMinutes(e.dinnerTime);
+      if (b === null || l === null || d === null) return false;
+      return !(b < l && l < d);
+    });
+    if (hasOutOfOrder) return t(`${MP}.mealTimeOrderInvalid`, { defaultValue: 'Breakfast time must be before lunch, which must be before dinner.' });
     return '';
   };
 
@@ -1140,7 +1560,7 @@ function MealTimeScheduleTab() {
       resetForm();
       loadSchedules(listDate);
     } catch (e) {
-      setError(e?.response?.data?.message || 'Lưu draft thất bại');
+      setError(resolveApiError(e, t, `${MP}.saveDraftFailed`));
     } finally {
       setSaving(false);
     }
@@ -1153,7 +1573,7 @@ function MealTimeScheduleTab() {
       const data = await mealTimeScheduleService.getSchedule(id);
       setEditingId(data._id);
       setTitle(data.title || '');
-      setFormWorkDate((data.workDate || '').slice(0, 10) || today());
+      setFormWorkDate(clampWorkDate(data.workDate));
       const rows = Array.isArray(data.entries) ? data.entries : [];
       setEntries(
         rows.map((r) => ({
@@ -1169,7 +1589,7 @@ function MealTimeScheduleTab() {
       const picked = [...new Set(rows.map((r) => String(r.residentId?._id || r.residentId || '')).filter(Boolean))];
       setSelectedResidents(picked);
     } catch (e) {
-      setError(e?.response?.data?.message || 'Không mở được draft');
+      setError(resolveApiError(e, t, `${MP}.openDraftFailed`));
     } finally {
       setSaving(false);
     }
@@ -1183,14 +1603,14 @@ function MealTimeScheduleTab() {
       if (editingId === id) resetForm();
       loadSchedules(listDate);
     } catch (e) {
-      setError(e?.response?.data?.message || 'Publish thất bại');
+      setError(resolveApiError(e, t, `${MP}.publishFailed`));
     } finally {
       setSaving(false);
     }
   };
 
   const removeDraft = async (id) => {
-    if (!window.confirm('Xóa lịch giờ ăn nháp này?')) return;
+    if (!window.confirm(t(`${MP}.confirmDeleteMealTime`))) return;
     setSaving(true);
     setError('');
     try {
@@ -1198,7 +1618,7 @@ function MealTimeScheduleTab() {
       if (editingId === id) resetForm();
       loadSchedules(listDate);
     } catch (e) {
-      setError(e?.response?.data?.message || 'Xóa draft thất bại');
+      setError(resolveApiError(e, t, `${MP}.deleteDraftFailed`));
     } finally {
       setSaving(false);
     }
@@ -1211,7 +1631,7 @@ function MealTimeScheduleTab() {
       const data = await mealTimeScheduleService.getSchedule(id);
       setDetailSchedule(data || null);
     } catch (e) {
-      setError(e?.response?.data?.message || 'Không tải được chi tiết lịch');
+      setError(resolveApiError(e, t, `${MP}.detailLoadFailed`));
     } finally {
       setDetailLoading(false);
     }
@@ -1220,68 +1640,85 @@ function MealTimeScheduleTab() {
   const closeScheduleDetail = () => setDetailSchedule(null);
 
   return (
-    <div className="page card meal-page">
-      <h1 className="meal-page__title">Schedule Meal Times</h1>
-      <p className="meal-page__intro">
-        Thiết lập giờ ăn Sáng/Trưa/Tối theo ngày cho nhiều cư dân (Draft → Publish). Create Meal Plans sẽ tự lấy giờ từ lịch đã publish.
+    <div className="mp-page">
+      <h2 className="mp-page__title">{t(`${TAB}.title`)}</h2>
+      <p className="mp-intro">
+        {t(`${TAB}.intro`)}
       </p>
-      {error && <p className="form-error">{error}</p>}
-      {loading && <p>Đang tải...</p>}
+      {error && <p className="mp-error">{error}</p>}
+      {loading && <p className="mp-loading">{t('common.loading')}</p>}
 
       {!loading && (
         <>
-          <div className="form-grid">
+          <div className="mp-form-grid form-grid">
             <div className="form-group">
-              <label>Ngày áp dụng *</label>
-              <input type="date" min={today()} value={formWorkDate} onChange={(e) => setFormWorkDate(e.target.value)} />
+              <label>{t(`${TAB}.workDate`)} *</label>
+              <WorkDatePicker value={formWorkDate} onChange={setFormWorkDate} t={t} />
             </div>
             <div className="form-group">
-              <label>Tiêu đề</label>
-              <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="VD: Lịch giờ ăn đầu tháng 6" />
+              <label>{t(`${TAB}.titleLabel`)}</label>
+              <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t(`${TAB}.titlePlaceholder`)} />
             </div>
           </div>
 
-          <div className="meal-page__resident-section">
-            <label className="meal-page__resident-label">Cư dân áp dụng (nhiều người) *</label>
-            <div className="meal-page__resident-grid">
+          <SelectedCoverageBanner items={scheduleCoverageBannerItems} />
+
+          <div className="mp-resident-section">
+            <label className="mp-resident-label">{t(`${TAB}.residentsLabel`)} *</label>
+            <div className="mp-resident-grid">
               {residents.map((r) => {
                 const id = String(r._id);
                 const checked = selectedResidents.includes(id);
+                const scheduleCoverage = getResidentCoverage(coverageByResident, id, 'mealTimeSchedule');
+                const covered = scheduleCoverage.published;
                 return (
-                  <label key={id} className="meal-page__resident-item">
+                  <label
+                    key={id}
+                    className={`mp-resident-item${covered ? ' mp-resident-item--covered' : ''}`}
+                  >
                     <input
                       type="checkbox"
                       checked={checked}
+                      disabled={covered}
                       onChange={(e) =>
                         setSelectedResidents((prev) => (e.target.checked ? [...prev, id] : prev.filter((x) => x !== id)))
                       }
                     />{' '}
                     {r.fullName || r.residentCode}
+                    <ResidentCoverageBadge
+                      info={scheduleCoverage}
+                      label={t(`${MP}.coverageBadgeSchedule`)}
+                      publisherLabel={
+                        scheduleCoverage.publishedByName
+                          ? t(`${MP}.coveragePublishedBy`, { name: scheduleCoverage.publishedByName })
+                          : undefined
+                      }
+                    />
                   </label>
                 );
               })}
             </div>
           </div>
 
-          <div className="tab-toolbar">
+          <div className="mp-toolbar">
             <select value={selectedTemplate} onChange={(e) => setSelectedTemplate(e.target.value)}>
-              <option value="">— Chọn mẫu giờ ăn —</option>
-              {templates.map((t) => (
-                <option key={t.key} value={t.key}>{t.name}</option>
+              <option value="">{t(`${TAB}.selectPattern`)}</option>
+              {templates.map((tp) => (
+                <option key={tp.key} value={tp.key}>{tp.name}</option>
               ))}
             </select>
-            <button type="button" className="btn-primary" onClick={addFromTemplate}>+ Thêm từ mẫu</button>
-            <button type="button" className="btn-secondary" onClick={addManual}>+ Thêm thủ công</button>
+            <button type="button" className="mp-btn-primary" onClick={addFromTemplate}>+ {t(`${MP}.addFromPattern`)}</button>
+            <button type="button" className="mp-btn-secondary" onClick={addManual}>+ {t(`${MP}.addManual`)}</button>
           </div>
 
-          <table className="data-table">
+          <table className="mp-table">
             <thead>
               <tr>
-                <th>Cư dân</th><th>Giờ sáng</th><th>Giờ trưa</th><th>Giờ tối</th><th>Ghi chú</th><th>Nguồn</th><th />
+                <th>{t(`${TAB}.colResident`)}</th><th>{t(`${TAB}.colBreakfast`)}</th><th>{t(`${TAB}.colLunch`)}</th><th>{t(`${TAB}.colDinner`)}</th><th>{t(`${TAB}.colNotes`)}</th><th>{t(`${TAB}.colSource`)}</th><th />
               </tr>
             </thead>
             <tbody>
-              {entries.length === 0 && <tr><td colSpan={7} className="empty-state">Chưa có dòng lịch giờ ăn</td></tr>}
+              {entries.length === 0 && <tr><td colSpan={7} className="mp-empty">{t(`${TAB}.emptyEntries`)}</td></tr>}
               {entries.map((row, idx) => (
                 <tr key={`${idx}-${row.residentId}`}>
                   <td>
@@ -1296,48 +1733,48 @@ function MealTimeScheduleTab() {
                   <td><input type="time" value={row.lunchTime} onChange={(e) => patchEntry(idx, { lunchTime: e.target.value })} /></td>
                   <td><input type="time" value={row.dinnerTime} onChange={(e) => patchEntry(idx, { dinnerTime: e.target.value })} /></td>
                   <td><input value={row.notes || ''} onChange={(e) => patchEntry(idx, { notes: e.target.value })} /></td>
-                  <td>{row.source === 'template' ? 'Mẫu' : 'Thủ công'}</td>
-                  <td><button type="button" className="btn btn--sm btn--delete" onClick={() => removeEntry(idx)}>Xóa</button></td>
+                  <td>{row.source === 'template' ? t(`${MP}.sourcePattern`) : sourceLabel(row.source, t)}</td>
+                  <td><button type="button" className="mp-btn-sm mp-btn-sm--delete" onClick={() => removeEntry(idx)}>{t('common.delete')}</button></td>
                 </tr>
               ))}
             </tbody>
           </table>
 
-          <div className="tab-toolbar">
-            <button type="button" className="btn-primary" disabled={saving} onClick={saveDraft}>
-              {saving ? 'Đang lưu...' : editingId ? 'Cập nhật Draft' : 'Lưu Draft'}
+          <div className="mp-toolbar">
+            <button type="button" className="mp-btn-primary" disabled={saving} onClick={saveDraft}>
+              {saving ? t('common.saving') : editingId ? t(`${MP}.updateDraft`) : t(`${MP}.saveDraft`)}
             </button>
-            <button type="button" className="btn-secondary" onClick={resetForm}>Làm mới</button>
+            <button type="button" className="mp-btn-secondary" onClick={resetForm}>{t(`${MP}.reset`)}</button>
           </div>
 
-          <div className="meal-page__list-header">
-            <h3 className="meal-page__draft-title">Lịch giờ ăn ngày {formatVNDate(listDate)}</h3>
-            <div className="meal-page__date-switch">
-              <button type="button" className="btn-secondary" onClick={() => setListDate(addDays(listDate, -1))}>← Hôm qua</button>
-              <button type="button" className="btn-secondary" onClick={() => setListDate(today())}>Hôm nay</button>
+          <div className="mp-list-header">
+            <h3 className="mp-draft-title">{t(`${MP}.listTitleMealTimes`, { date: formatLocaleDate(listDate, i18n.language) })}</h3>
+            <div className="mp-date-switch">
+              <button type="button" className="mp-btn-secondary" onClick={() => setListDate(addDays(listDate, -1))}>{t(`${MP}.yesterday`)}</button>
+              <button type="button" className="mp-btn-secondary" onClick={() => setListDate(today())}>{t('common.today')}</button>
               <input type="date" value={listDate} onChange={(e) => setListDate(e.target.value)} />
-              <button type="button" className="btn-secondary" onClick={() => setListDate(addDays(listDate, 1))}>Ngày mai →</button>
+              <button type="button" className="mp-btn-secondary" onClick={() => setListDate(addDays(listDate, 1))}>{t(`${MP}.tomorrow`)}</button>
             </div>
           </div>
-          <table className="data-table">
-            <thead><tr><th>Tiêu đề</th><th>Ngày</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
+          <table className="mp-table">
+            <thead><tr><th>{t(`${TAB}.titleLabel`)}</th><th>{t('common.date')}</th><th>{t('common.colStatus')}</th><th>{t('common.colActions')}</th></tr></thead>
             <tbody>
-              {schedules.length === 0 && <tr><td colSpan={4} className="empty-state">Không có lịch</td></tr>}
+              {schedules.length === 0 && <tr><td colSpan={4} className="mp-empty">{t(`${MP}.emptyPlans`)}</td></tr>}
               {schedules.map((d) => (
                 <tr key={d._id}>
                   <td>{d.title || '—'}</td>
-                  <td>{formatVNDate((d.workDate || '').slice(0, 10))}</td>
-                  <td>{statusLabel(d.status)}</td>
+                  <td>{formatLocaleDate((d.workDate || '').slice(0, 10), i18n.language)}</td>
+                  <td>{planStatusLabel(d.status, t)}</td>
                   <td>
                     {d.status === 'draft' ? (
                       <>
-                        <button type="button" className="btn btn--sm btn--edit" onClick={() => openDraft(d._id)}>Mở</button>{' '}
-                        <button type="button" className="btn btn--sm btn--primary" onClick={() => publishDraft(d._id)}>Publish</button>{' '}
-                        <button type="button" className="btn btn--sm btn--delete" onClick={() => removeDraft(d._id)}>Xóa</button>
+                        <button type="button" className="mp-btn-sm mp-btn-sm--edit" onClick={() => openDraft(d._id)}>{t(`${MP}.open`)}</button>{' '}
+                        <button type="button" className="mp-btn-sm mp-btn-sm--publish" onClick={() => publishDraft(d._id)}>{t(`${MP}.publish`)}</button>{' '}
+                        <button type="button" className="mp-btn-sm mp-btn-sm--delete" onClick={() => removeDraft(d._id)}>{t('common.delete')}</button>
                       </>
                     ) : (
-                      <button type="button" className="btn btn--sm meal-page__btn-view" onClick={() => openScheduleDetail(d._id)}>
-                        Chi tiết
+                      <button type="button" className="mp-btn-sm mp-btn-sm--view" onClick={() => openScheduleDetail(d._id)}>
+                        {t('common.viewDetails')}
                       </button>
                     )}
                   </td>
@@ -1347,10 +1784,10 @@ function MealTimeScheduleTab() {
           </table>
 
           {!!editingId && (
-            <p className="meal-page__editing-meta">
-              Đang chỉnh draft: <code>{editingId}</code>
+            <p className="mp-editing-meta">
+              {t(`${MP}.updateDraft`)}: <code>{editingId}</code>
               {entries.length > 0 && (
-                <> · Cư dân: {[...new Set(entries.map((e) => residentMap[e.residentId]).filter(Boolean))].join(', ')}</>
+                <> · {t('common.residents')}: {[...new Set(entries.map((e) => residentMap[e.residentId]).filter(Boolean))].join(', ')}</>
               )}
             </p>
           )}
@@ -1358,25 +1795,25 @@ function MealTimeScheduleTab() {
       )}
 
       {(detailLoading || detailSchedule) && (
-        <div className="meal-page__modal-overlay" onClick={!detailLoading ? closeScheduleDetail : undefined}>
-          <div className="meal-page__modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
-            <div className="meal-page__modal-header">
-              <h3 className="meal-page__modal-title">Chi tiết lịch giờ ăn đã publish</h3>
+        <div className="mp-modal-overlay" onClick={!detailLoading ? closeScheduleDetail : undefined}>
+          <div className="mp-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+            <div className="mp-modal-header">
+              <h3 className="mp-modal-title">{t(`${TAB}.detailPublishedTitle`)}</h3>
               {!detailLoading && (
-                <button type="button" className="meal-page__modal-close" onClick={closeScheduleDetail}>×</button>
+                <button type="button" className="mp-modal-close" onClick={closeScheduleDetail}>×</button>
               )}
             </div>
-            {detailLoading && <p className="meal-page__modal-loading">Đang tải chi tiết...</p>}
+            {detailLoading && <p className="mp-modal-loading">{t('common.loading')}</p>}
             {!detailLoading && detailSchedule && (
-              <div className="meal-page__modal-body">
-                <p className="meal-page__modal-meta">
-                  <strong>Tiêu đề:</strong> {detailSchedule.title || '—'} · <strong>Ngày:</strong>{' '}
-                  {formatVNDate((detailSchedule.workDate || '').slice(0, 10))}
+              <div className="mp-modal-body">
+                <p className="mp-modal-meta">
+                  <strong>{t(`${TAB}.titleLabel`)}:</strong> {detailSchedule.title || '—'} · <strong>{t('common.date')}:</strong>{' '}
+                  {formatLocaleDate((detailSchedule.workDate || '').slice(0, 10), i18n.language)}
                 </p>
-                <table className="data-table meal-page__detail-table">
+                <table className="mp-table mp-detail-table">
                   <thead>
                     <tr>
-                      <th>Cư dân</th><th>Sáng</th><th>Trưa</th><th>Tối</th><th>Ghi chú</th><th>Nguồn</th>
+                      <th>{t(`${TAB}.colResident`)}</th><th>{t(`${TAB}.colBreakfast`)}</th><th>{t(`${TAB}.colLunch`)}</th><th>{t(`${TAB}.colDinner`)}</th><th>{t(`${TAB}.colNotes`)}</th><th>{t(`${TAB}.colSource`)}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1391,12 +1828,12 @@ function MealTimeScheduleTab() {
                             <td>{row.lunchTime || '—'}</td>
                             <td>{row.dinnerTime || '—'}</td>
                             <td>{row.notes || '—'}</td>
-                            <td>{row.source === 'template' ? 'Mẫu' : 'Thủ công'}</td>
+                            <td>{row.source === 'template' ? t(`${MP}.sourcePattern`) : sourceLabel(row.source, t)}</td>
                           </tr>
                         );
                       })
                     ) : (
-                      <tr><td colSpan={6} className="empty-state">Lịch chưa có chi tiết</td></tr>
+                      <tr><td colSpan={6} className="mp-empty">{t(`${TAB}.emptyDetail`)}</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -1410,20 +1847,21 @@ function MealTimeScheduleTab() {
 }
 
 export default function MealPlansPage() {
+  const { t } = useTranslation();
   const [tab, setTab] = useState('meal');
 
   return (
-    <div className="page card meal-page">
-      <h1 className="meal-page__title">Nurse Nutrition Planning</h1>
-      <div className="tabs meal-page__tabs">
-        <button className={`tab-btn ${tab === 'schedule' ? 'tab-btn--active' : ''}`} onClick={() => setTab('schedule')}>
-          Schedule Meal Times
+    <div className="page card mp-page">
+      <h1 className="mp-page__title">{t(`${MP}.title`)}</h1>
+      <div className="mp-tabs">
+        <button className={`mp-tab-btn ${tab === 'schedule' ? 'mp-tab-btn--active' : ''}`} onClick={() => setTab('schedule')}>
+          {t(`${MP}.tabSchedule`)}
         </button>
-        <button className={`tab-btn ${tab === 'meal' ? 'tab-btn--active' : ''}`} onClick={() => setTab('meal')}>
-          Create Meal Plans
+        <button className={`mp-tab-btn ${tab === 'meal' ? 'mp-tab-btn--active' : ''}`} onClick={() => setTab('meal')}>
+          {t(`${MP}.tabMealPlans`)}
         </button>
-        <button className={`tab-btn ${tab === 'special' ? 'tab-btn--active' : ''}`} onClick={() => setTab('special')}>
-          Assign Special Diets
+        <button className={`mp-tab-btn ${tab === 'special' ? 'mp-tab-btn--active' : ''}`} onClick={() => setTab('special')}>
+          {t(`${MP}.tabSpecialDiets`)}
         </button>
       </div>
 
@@ -1433,4 +1871,3 @@ export default function MealPlansPage() {
     </div>
   );
 }
-

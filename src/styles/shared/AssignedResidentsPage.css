@@ -1,0 +1,239 @@
+/* Shared assigned residents list + detail (doctor, nurse, caregiver) */
+
+.ar-page__empty-hint {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 10px;
+  color: #9a3412;
+  font-size: 0.9rem;
+}
+
+.ar-page__footer-link {
+  margin: 8px 0 0;
+  font-size: 0.875rem;
+  color: #64748b;
+}
+
+.ar-page__footer-link a {
+  color: #0f766e;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.ar-page__footer-link a:hover {
+  text-decoration: underline;
+}
+
+/* Compact table */
+.ar-table-compact .resident-page__table-element {
+  min-width: 560px;
+}
+
+.ar-table-row--clickable {
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.ar-table-row--clickable:hover {
+  background: #f8fafc;
+}
+
+.ar-table__code {
+  font-family: ui-monospace, monospace;
+  font-size: 0.82rem;
+  color: #475569;
+}
+
+.ar-table__area {
+  font-size: 0.85rem;
+  color: #64748b;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ar-staff-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+}
+
+.ar-staff-cell__name {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.ar-alert-badge {
+  display: inline-flex;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+.ar-actions-cell {
+  white-space: nowrap;
+}
+
+.ar-view-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border-radius: 10px;
+  cursor: pointer;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #0f766e;
+  transition: all 0.15s ease;
+}
+
+.ar-view-btn:hover {
+  background: #ecfdf5;
+  border-color: #99f6e4;
+}
+
+/* Detail page */
+.ar-detail-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  margin-bottom: 4px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ar-detail-back:hover {
+  border-color: #0f766e;
+  color: #0f766e;
+  background: #f0fdfa;
+}
+
+.ar-detail-loading {
+  color: #64748b;
+  font-size: 14px;
+}
+
+.ar-detail-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+}
+
+.ar-detail-warning {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  color: #991b1b;
+}
+
+.ar-detail-warning p {
+  margin: 0 0 4px;
+}
+
+.ar-detail-warning p:last-child {
+  margin-bottom: 0;
+}
+
+.ar-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin: 20px 0;
+}
+
+.ar-detail-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ar-detail-field__label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #94a3b8;
+}
+
+.ar-detail-field__value {
+  font-size: 14px;
+  font-weight: 500;
+  color: #334155;
+}
+
+.ar-detail-section {
+  margin-bottom: 16px;
+}
+
+.ar-detail-text {
+  margin: 6px 0 0;
+  padding: 14px 16px;
+  background: #f8fafc;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: #475569;
+  white-space: pre-wrap;
+}
+
+.ar-detail-text--muted {
+  color: #94a3b8;
+  font-style: italic;
+}
+
+.ar-activity-list {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ar-activity-item {
+  padding: 12px 14px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+}
+
+.ar-activity-item__title {
+  font-weight: 600;
+  color: #0f172a;
+  margin-bottom: 4px;
+}
+
+.ar-activity-item__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  color: #64748b;
+  font-size: 0.875rem;
+}
+
+@media (max-width: 768px) {
+  .ar-table__area {
+    max-width: 140px;
+  }
+}

@@ -1,0 +1,68 @@
+/* Dish modals — reuse staff profile modal styles */
+@import '../staff/profiles/profiles.css';
+
+/* Table status badges (aligned with StaffProfilesPage) */
+.status-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.status-badge--active {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.status-badge--inactive {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.dish-table__ingredients {
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #64748b;
+  font-size: 0.875rem;
+}
+
+.dish-form-modal .form-grid--full {
+  grid-column: 1 / -1;
+}
+
+.dish-form-modal__active-row {
+  grid-column: 1 / -1;
+  margin-top: 4px;
+}
+
+.dish-form-modal__active-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 14px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.dish-form-modal__active-toggle input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  background: #fff;
+  accent-color: #0f766e;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.dish-form-modal .dish-form-modal__active-toggle input[type='checkbox']:focus {
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
+  outline: none;
+}

@@ -30,6 +30,15 @@ const formatViDate = (dateStr) => {
   }
 };
 
+const cleanCancellationReason = (reason) => {
+  if (!reason) return '';
+  return reason
+    .replace(/^\[Admin reject(?:ed)?\]\s*/i, '')
+    .replace(/^\[Doctor evaluation\]\s*/i, '')
+    .replace(/^\[Cancelled by admin\]\s*/i, '')
+    .trim();
+};
+
 const getStatusTheme = (status) => {
   switch (status) {
     case 'pending':
@@ -109,7 +118,7 @@ export default function FacilityTourDetailDrawer({ isOpen, onClose, tour, onCanc
     {
       key: 'submitted',
       title: 'Đã gửi yêu cầu',
-      desc: `Lịch hẹn đăng ký ngày ${formatEnglishDate(tour.createdAt)}`,
+      desc: `Lịch hẹn đăng ký ngày ${formatViDate(tour.createdAt)}`,
       isDone: true,
       isActive: false,
     },
@@ -124,9 +133,9 @@ export default function FacilityTourDetailDrawer({ isOpen, onClose, tour, onCanc
       key: 'confirmed',
       title: isCancelled ? 'Yêu cầu đã hủy' : 'Lịch tham quan đã xác nhận',
       desc: isCancelled
-        ? `Hủy ngày ${formatEnglishDate(tour.cancelledAt || tour.rejectedAt)}`
+        ? `Hủy ngày ${formatViDate(tour.cancelledAt || tour.rejectedAt)}`
         : tour.status === 'confirmed' || tour.status === 'completed'
-        ? `Xác nhận lịch vào ${formatEnglishDate(tour.preferredDate)}`
+        ? `Xác nhận lịch vào ${formatViDate(tour.preferredDate)}`
         : 'Đang chờ phê duyệt',
       isDone: tour.status === 'completed' || (isCancelled && true),
       isActive: tour.status === 'confirmed' || (isCancelled && true),
@@ -292,7 +301,7 @@ export default function FacilityTourDetailDrawer({ isOpen, onClose, tour, onCanc
                       {tour.rejectionReason ? 'Bị từ chối bởi nhân viên' : 'Hủy bởi gia đình'}
                     </div>
                     <p className="ftd-cancellation-card__text">
-                      "{tour.cancellationReason || tour.rejectionReason}"
+                      "{cleanCancellationReason(tour.cancellationReason || tour.rejectionReason)}"
                     </p>
                   </div>
                 </div>
@@ -342,7 +351,7 @@ export default function FacilityTourDetailDrawer({ isOpen, onClose, tour, onCanc
           {showCancelConfirm ? (
             <form onSubmit={handleCancelSubmit} className="w-full flex flex-col gap-3.5">
               <span className="ftd-cancel-label">
-                Vui lòng nhập lý do hủy yêu cầu:
+                Lý do hủy yêu cầu (không bắt buộc):
               </span>
               <div>
                 <textarea
@@ -350,7 +359,7 @@ export default function FacilityTourDetailDrawer({ isOpen, onClose, tour, onCanc
                   placeholder="Hãy chia sẻ lý do bạn cần hủy lịch..."
                   value={cancelReason}
                   onChange={(e) => setCancelReason(e.target.value)}
-                  required
+                  maxLength={500}
                   disabled={cancelling}
                 />
               </div>

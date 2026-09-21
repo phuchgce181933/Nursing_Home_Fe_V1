@@ -1,4 +1,5 @@
-import { formatVNDateTime } from '../../../../utils/nutritionLabels';
+import { useTranslation } from 'react-i18next';
+import { formatLocaleDateTime } from '../../../../utils/nutritionLabels';
 import {
   behaviorTypeLabel,
   moodLevelLabel,
@@ -6,12 +7,12 @@ import {
   severityLabel,
 } from '../../../../utils/behaviorLabels';
 
-function detailText(row) {
+function detailText(row, t) {
   if (row.observationCategory === 'mood' && row.moodLevel) {
-    return moodLevelLabel(row.moodLevel);
+    return moodLevelLabel(row.moodLevel, t);
   }
   if (row.behaviorType) {
-    return behaviorTypeLabel(row.behaviorType);
+    return behaviorTypeLabel(row.behaviorType, t);
   }
   if (row.notes) {
     const short = row.notes.length > 48 ? `${row.notes.slice(0, 48)}…` : row.notes;
@@ -20,67 +21,120 @@ function detailText(row) {
   return '—';
 }
 
-function BehaviorRecordsTable({ records, loading, onEdit, onDelete }) {
+function recordedByLabel(row) {
   return (
-    <div className="behavior-page__panel">
-      <h3 className="behavior-page__panel-title">Danh sách ghi nhận</h3>
-      <table className="data-table">
-        <thead>
-          <tr>
-            <th>Cư dân</th>
-            <th>Loại</th>
-            <th>Chi tiết</th>
-            <th>Mức độ</th>
-            <th>Thời điểm quan sát</th>
-            <th>Thao tác</th>
-          </tr>
-        </thead>
-        <tbody>
-          {loading && (
-            <tr>
-              <td colSpan={6} className="empty-state">
-                Đang tải...
-              </td>
+    row.recordedByStaffId?.userId?.fullName ||
+    row.recordedByStaffId?.staffCode ||
+    '—'
+  );
+}
+
+function isOwnRecord(row, currentUserId) {
+  if (!currentUserId) return true;
+  const recorderUserId = row.recordedByStaffId?.userId?._id || row.recordedByStaffId?.userId;
+  return String(recorderUserId || '') === String(currentUserId);
+}
+
+function BehaviorRecordsTable({
+  records,
+  loading,
+  onEdit,
+  onDelete,
+  readOnly = false,
+  canMutate = true,
+  showRecordedBy = false,
+  currentUserId,
+  recordsListTitle,
+  colRecordedByLabel,
+  emptyMessage,
+}) {
+  const { t, i18n } = useTranslation();
+  const showActionsCol = !readOnly && canMutate;
+  const colCount = 5 + (showRecordedBy ? 1 : 0) + (showActionsCol ? 1 : 0);
+  const listTitle = recordsListTitle || t('caregiver.dailyBehaviors.recordsList');
+  const emptyText = emptyMessage || t('caregiver.dailyBehaviors.emptyFiltered');
+  const recordedByHeader = colRecordedByLabel || t('admin.dailyBehaviors.colRecordedBy');
+
+  return (
+    <>
+      <h3 className="behavior-page__section-title">{listTitle}</h3>
+      <div className="resident-page__table">
+        <table className="resident-page__table-element">
+          <thead>
+            <tr className="resident-page__table-header">
+              <th>{t('common.colResident')}</th>
+              <th>{t('caregiver.dailyBehaviors.colType')}</th>
+              <th>{t('caregiver.dailyBehaviors.colDetail')}</th>
+              <th>{t('caregiver.dailyBehaviors.colSeverity')}</th>
+              <th>{t('caregiver.dailyBehaviors.colObservedAt')}</th>
+              {showRecordedBy && <th>{recordedByHeader}</th>}
+              {showActionsCol && <th>{t('common.colActions')}</th>}
             </tr>
-          )}
-          {!loading && records.length === 0 && (
-            <tr>
-              <td colSpan={6} className="empty-state">
-                Chưa có ghi nhận trong bộ lọc này
-              </td>
-            </tr>
-          )}
-          {!loading &&
-            records.map((row) => (
-              <tr key={row._id}>
-                <td>{row.residentId?.fullName || row.residentId?.residentCode || '—'}</td>
-                <td>
-                  <span className={`behavior-page__category behavior-page__category--${row.observationCategory}`}>
-                    {observationCategoryLabel(row.observationCategory)}
-                  </span>
-                </td>
-                <td>
-                  <span className="behavior-page__detail">{detailText(row)}</span>
-                </td>
-                <td>
-                  <span className={`behavior-page__severity behavior-page__severity--${row.severity || 'normal'}`}>
-                    {severityLabel(row.severity)}
-                  </span>
-                </td>
-                <td>{formatVNDateTime(row.observedAt)}</td>
-                <td className="behavior-page__row-actions">
-                  <button type="button" className="btn btn--sm btn--edit" onClick={() => onEdit(row)}>
-                    Sửa
-                  </button>
-                  <button type="button" className="btn btn--sm btn--delete" onClick={() => onDelete(row)}>
-                    Xóa
-                  </button>
+          </thead>
+          <tbody>
+            {loading && (
+              <tr>
+                <td colSpan={colCount} className="empty-state">
+                  {t('common.loading')}
                 </td>
               </tr>
-            ))}
-        </tbody>
-      </table>
-    </div>
+            )}
+            {!loading && records.length === 0 && (
+              <tr>
+                <td colSpan={colCount} className="empty-state">
+                  {emptyText}
+                </td>
+              </tr>
+            )}
+            {!loading &&
+              records.map((row) => (
+                <tr key={row._id}>
+                  <td>{row.residentId?.fullName || row.residentId?.residentCode || '—'}</td>
+                  <td>
+                    <span className={`behavior-page__category behavior-page__category--${row.observationCategory}`}>
+                      {observationCategoryLabel(row.observationCategory, t)}
+                    </span>
+                  </td>
+                  <td>
+                    <span className="behavior-page__detail">{detailText(row, t)}</span>
+                  </td>
+                  <td>
+                    <span className={`behavior-page__severity behavior-page__severity--${row.severity || 'normal'}`}>
+                      {severityLabel(row.severity, t)}
+                    </span>
+                  </td>
+                  <td>{formatLocaleDateTime(row.observedAt, i18n.language)}</td>
+                  {showRecordedBy && <td>{recordedByLabel(row)}</td>}
+                  {showActionsCol && (
+                    <td className="behavior-page__row-actions">
+                      {isOwnRecord(row, currentUserId) ? (
+                        <>
+                          <button
+                            type="button"
+                            className="resident-page__button resident-page__button--ghost"
+                            onClick={() => onEdit(row)}
+                          >
+                            {t('common.edit')}
+                          </button>
+                          <button
+                            type="button"
+                            className="resident-page__button resident-page__button--ghost"
+                            onClick={() => onDelete(row)}
+                          >
+                            {t('common.delete')}
+                          </button>
+                        </>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
+                  )}
+                </tr>
+              ))}
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 }
 

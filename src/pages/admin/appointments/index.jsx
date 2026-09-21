@@ -12,12 +12,15 @@ import {
   XCircle,
   Eye,
   Edit,
+  Trash2,
   Loader2,
   ChevronLeft,
   ChevronRight,
   UserCheck,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../../hooks/useAuth';
+import useToast from '../../../hooks/useToast';
 import careAppointmentService from '../../../services/careAppointment.service';
 import staffService from '../../../services/staff.service';
 import residentService from '../../../services/resident.service';
@@ -25,14 +28,33 @@ import admissionService from '../../../services/admission.service';
 import medicalRecordService from '../../../services/medicalRecord.service';
 import '../../../styles/admin/CareAppointmentsPage.css';
 
-const STATUS_OPTIONS = [
-  { value: '', label: 'All Statuses' },
-  { value: 'scheduled', label: 'Scheduled' },
-  { value: 'in_progress', label: 'In Progress' },
-  { value: 'completed', label: 'Completed' },
-  { value: 'cancelled', label: 'Cancelled' },
+const getStatusOptions = (t) => [
+  { value: '', label: t('careAppointments.statusAll') },
+  { value: 'scheduled', label: t('careAppointments.statusScheduled') },
+  { value: 'in_progress', label: t('careAppointments.statusInProgress') },
+  { value: 'completed', label: t('careAppointments.statusCompleted') },
+  { value: 'cancelled', label: t('careAppointments.statusCancelled') },
 ];
 
+// Mirrors STATUS_TRANSITIONS in backend services/careAppointmentService.js —
+// keep in sync so the dropdown never offers a transition the API will reject.
+const STATUS_TRANSITIONS = {
+  scheduled: ['in_progress', 'cancelled'],
+  in_progress: ['completed', 'cancelled'],
+  completed: [],
+  cancelled: [],
+};
+
+const getStatusLabels = (t) => ({
+  scheduled: t('careAppointments.statusLabelScheduled'),
+  in_progress: t('careAppointments.statusLabelInProgress'),
+  completed: t('careAppointments.statusLabelCompleted'),
+  cancelled: t('careAppointments.statusLabelCancelled'),
+});
+
+// Domain values, not UI labels — stored as appointment data (matched by exact
+// string elsewhere, e.g. the "Khám lâm sàng đầu vào" clinical-wizard trigger),
+// so they intentionally stay in Vietnamese regardless of UI language.
 const APPOINTMENT_TYPES = [
   'Khám lâm sàng đầu vào',
   'Khám tổng quát định kỳ',
@@ -73,10 +95,14 @@ const formatTimeRange = (startStr, endStr) => {
 };
 
 export default function CareAppointmentsPage() {
+  const { t } = useTranslation();
   const { user } = useAuth();
+  const { showToast } = useToast();
   const userRole = user?.role || '';
-  const isAdminRole = ['admin', 'manager'].includes(userRole);
+  const isAdminRole = userRole === 'admin';
   const isMedicalRole = ['doctor', 'nurse'].includes(userRole);
+  const STATUS_OPTIONS = getStatusOptions(t);
+  const STATUS_LABELS = getStatusLabels(t);
 
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -138,6 +164,11 @@ export default function CareAppointmentsPage() {
   const [savingAppt, setSavingAppt] = useState(false);
   const [apptFormError, setApptFormError] = useState(null);
 
+  // Delete Appointment Modal state (Admin only)
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletingAppt, setDeletingAppt] = useState(false);
+  const [deleteError, setDeleteError] = useState(null);
+
   // Update Status Modal state (for medical staff)
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [targetApptStatus, setTargetApptStatus] = useState('');
@@ -149,6 +180,12 @@ export default function CareAppointmentsPage() {
   const [wizardStep, setWizardStep] = useState(1);
   const [activeAdmission, setActiveAdmission] = useState(null);
   const [loadingAdmission, setLoadingAdmission] = useState(false);
+  // Realtime field-level errors for step 2
+  const [step2FieldErrors, setStep2FieldErrors] = useState({});
+  // Snapshot of old vitals loaded from API — used as fallback when a field is left blank
+  const [prefilledVitals, setPrefilledVitals] = useState(null);
+  // Track which step-2 fields the doctor has actually touched/changed
+  const [step2Touched, setStep2Touched] = useState({});
 
   const initialWizardValues = {
     heightCm: '',
@@ -207,11 +244,11 @@ export default function CareAppointmentsPage() {
 
     } catch (err) {
       console.error('Failed to load care appointments:', err);
-      setError('Could not retrieve care appointments. Please check your credentials or network connection.');
+      setError(t('careAppointments.errorLoadList'));
     } finally {
       setLoading(false);
     }
-  }, [page, limit, appliedFilters, isMedicalRole]);
+  }, [page, limit, appliedFilters, isMedicalRole, t]);
 
   useEffect(() => {
     fetchAppointments();
@@ -282,7 +319,7 @@ export default function CareAppointmentsPage() {
       setAvailableNurses(res.nurses || []);
     } catch (err) {
       console.error('Failed to load available staff for slot:', err);
-      const errMsg = err.response?.data?.message || 'Không thể tải danh sách bác sĩ/y tá trực ca tại khung giờ này.';
+      const errMsg = err.response?.data?.message || t('careAppointments.assignErrorFallback');
       setAssignmentError(errMsg);
     } finally {
       setLoadingAvailableStaff(false);
@@ -294,6 +331,12 @@ export default function CareAppointmentsPage() {
     if (e) e.preventDefault();
     if (!selectedAppt) return;
     
+    if (!selectedDocId || !selectedNurId) {
+      setAssignmentError(t('adminAppointments.assignBothRequired'));
+      showToast(t('adminAppointments.assignBothRequired'), 'error');
+      return;
+    }
+
     setSavingAssignment(true);
     setAssignmentError(null);
 
@@ -313,12 +356,14 @@ export default function CareAppointmentsPage() {
       setShowAssignModal(false);
       setSelectedAppt(null);
       fetchAppointments();
+      showToast(t('careAppointments.assignSuccess'), 'success');
 
     } catch (err) {
       console.error('Failed to save staff assignment:', err);
-      // Grab detailed Vietnamese error message from backend
-      const errMsg = err.response?.data?.message || 'An error occurred during staff assignment.';
+      // Grab detailed error message from backend (may already be localized server-side)
+      const errMsg = err.response?.data?.message || t('careAppointments.assignErrorGeneric');
       setAssignmentError(errMsg);
+      showToast(errMsg, 'error');
     } finally {
       setSavingAssignment(false);
     }
@@ -356,14 +401,64 @@ export default function CareAppointmentsPage() {
   // Handle Save (Create/Edit) Appointment
   const handleSaveAppointment = async (e) => {
     if (e) e.preventDefault();
-    setSavingAppt(true);
     setApptFormError(null);
+
+    const start = new Date(formValues.scheduledStartAt);
+    const end = new Date(formValues.scheduledEndAt);
+    if (end <= start) {
+      setApptFormError(t('careAppointments.endBeforeStartError'));
+      return;
+    }
+    const diffMs = end.getTime() - start.getTime();
+    if (diffMs > 24 * 60 * 60 * 1000) {
+      setApptFormError(t('adminAppointments.durationMax24h'));
+      return;
+    }
+    // On create, or when the start time is actually being changed on edit, block past times
+    // client-side too — the backend enforces the same rule (see careAppointmentService.js).
+    const originalStartAt = isEditMode && selectedAppt ? new Date(selectedAppt.scheduledStartAt) : null;
+    const startTimeChanged = !originalStartAt || start.getTime() !== originalStartAt.getTime();
+    if (startTimeChanged && start < new Date()) {
+      setApptFormError(t('careAppointments.pastStartError'));
+      return;
+    }
+
+    // ── Validate thêm cho loại "Khám lâm sàng đầu vào" ──
+    if (formValues.appointmentType === 'Khám lâm sàng đầu vào') {
+      // 1. Start và End phải cùng ngày
+      const isSameDay =
+        start.getFullYear() === end.getFullYear() &&
+        start.getMonth() === end.getMonth() &&
+        start.getDate() === end.getDate();
+
+      if (!isSameDay) {
+        setApptFormError(t('adminAppointments.sameDayRequired'));
+        return;
+      }
+
+      // 3. Giờ bắt đầu và kết thúc phải trong khoảng 08:00 – 16:00
+      const startHour = start.getHours();
+      const startMin = start.getMinutes();
+      const endHour = end.getHours();
+      const endMin = end.getMinutes();
+
+      if (startHour < 8 || startHour > 16 || (startHour === 16 && startMin > 0)) {
+        setApptFormError(t('adminAppointments.startTimeRange'));
+        return;
+      }
+      if (endHour < 8 || endHour > 16 || (endHour === 16 && endMin > 0)) {
+        setApptFormError(t('adminAppointments.endTimeRange'));
+        return;
+      }
+    }
+
+    setSavingAppt(true);
 
     try {
       const payload = {
         residentId: formValues.residentId,
-        scheduledStartAt: new Date(formValues.scheduledStartAt).toISOString(),
-        scheduledEndAt: new Date(formValues.scheduledEndAt).toISOString(),
+        scheduledStartAt: start.toISOString(),
+        scheduledEndAt: end.toISOString(),
         appointmentType: formValues.appointmentType,
         notes: formValues.notes.trim() || undefined,
       };
@@ -377,20 +472,66 @@ export default function CareAppointmentsPage() {
       setShowCreateModal(false);
       setSelectedAppt(null);
       fetchAppointments();
+      showToast(isEditMode ? t('careAppointments.updateSuccess') : t('careAppointments.createSuccess'), 'success');
 
     } catch (err) {
       console.error('Failed to save appointment:', err);
-      const errMsg = err.response?.data?.message || 'An error occurred while saving the appointment.';
+      const errMsg = err.response?.data?.message || t('careAppointments.saveErrorGeneric');
       setApptFormError(errMsg);
+      showToast(errMsg, 'error');
     } finally {
       setSavingAppt(false);
     }
   };
 
+  // Open Delete confirmation modal (Admin only)
+  const handleOpenDelete = (appt) => {
+    setSelectedAppt(appt);
+    setDeleteError(null);
+    setShowDeleteModal(true);
+  };
+
+  // Handle Delete Appointment
+  const handleConfirmDelete = async () => {
+    if (!selectedAppt) return;
+
+    setDeletingAppt(true);
+    setDeleteError(null);
+
+    try {
+      await careAppointmentService.deleteAppointment(selectedAppt._id);
+      setShowDeleteModal(false);
+      setSelectedAppt(null);
+      fetchAppointments();
+      showToast(t('careAppointments.deleteSuccess'), 'success');
+    } catch (err) {
+      console.error('Failed to delete appointment:', err);
+      const errMsg = err.response?.data?.message || t('careAppointments.deleteErrorGeneric');
+      setDeleteError(errMsg);
+      showToast(errMsg, 'error');
+    } finally {
+      setDeletingAppt(false);
+    }
+  };
+
   // Open Status modal (for medical staff) or launch Clinical Wizard if clinical exam
   const handleOpenStatus = async (appt) => {
+    if (appt.status !== 'completed') {
+      const apptDate = new Date(appt.scheduledStartAt);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const apptDateOnly = new Date(apptDate);
+      apptDateOnly.setHours(0, 0, 0, 0);
+
+      if (apptDateOnly > today) {
+        showToast(t('adminAppointments.appointmentNotYet'), 'error');
+        return;
+      }
+    }
+
     setSelectedAppt(appt);
-    setTargetApptStatus(appt.status);
+    const allowedNext = STATUS_TRANSITIONS[appt.status] || [];
+    setTargetApptStatus(allowedNext[0] || '');
     setStatusError(null);
 
     if (appt.appointmentType === 'Khám lâm sàng đầu vào') {
@@ -416,18 +557,24 @@ export default function CareAppointmentsPage() {
           console.error('Failed to load vitals history:', vErr);
         }
 
+        // Save snapshot of old vitals for fallback logic
+        setPrefilledVitals(vitals);
+        // Reset touched state whenever wizard opens fresh
+        setStep2Touched({});
+        setStep2FieldErrors({});
+
         if (res?.data && res.data.length > 0) {
           const adm = res.data[0];
           setActiveAdmission(adm);
           setWizardValues({
-            heightCm: vitals?.heightCm || '',
-            weightKg: vitals?.weightKg || '',
-            bloodPressureSystolic: vitals?.bloodPressureSystolic || '',
-            bloodPressureDiastolic: vitals?.bloodPressureDiastolic || '',
-            pulse: vitals?.pulse || '',
-            temperatureCelsius: vitals?.temperatureCelsius || '',
-            oxygenSaturation: vitals?.oxygenSaturation || '',
-            bloodSugar: vitals?.bloodSugar || '',
+            heightCm: vitals?.heightCm != null ? String(vitals.heightCm) : '',
+            weightKg: vitals?.weightKg != null ? String(vitals.weightKg) : '',
+            bloodPressureSystolic: vitals?.bloodPressureSystolic != null ? String(vitals.bloodPressureSystolic) : '',
+            bloodPressureDiastolic: vitals?.bloodPressureDiastolic != null ? String(vitals.bloodPressureDiastolic) : '',
+            pulse: vitals?.pulse != null ? String(vitals.pulse) : '',
+            temperatureCelsius: vitals?.temperatureCelsius != null ? String(vitals.temperatureCelsius) : '',
+            oxygenSaturation: vitals?.oxygenSaturation != null ? String(vitals.oxygenSaturation) : '',
+            bloodSugar: vitals?.bloodSugar != null ? String(vitals.bloodSugar) : '',
             bloodType: adm.applicant?.bloodType || vitals?.bloodType || 'unknown',
             summary: vitals?.summary || adm.applicant?.initialHealthCondition || '',
             consultationNotes: adm.consultationNotes || '',
@@ -437,13 +584,14 @@ export default function CareAppointmentsPage() {
           });
         } else {
           setActiveAdmission(null);
+          setPrefilledVitals(null);
           setWizardValues(initialWizardValues);
         }
         setWizardStep(1);
         setShowWizardModal(true);
       } catch (err) {
         console.error('Failed to load admission details for clinical wizard:', err);
-        setStatusError('Không thể tải thông tin hồ sơ nhập viện của cư dân này.');
+        setStatusError(t('careAppointments.admissionLoadError'));
         setShowStatusModal(true);
       } finally {
         setLoadingAdmission(false);
@@ -466,13 +614,114 @@ export default function CareAppointmentsPage() {
       setShowStatusModal(false);
       setSelectedAppt(null);
       fetchAppointments();
+      showToast(t('careAppointments.statusUpdateSuccess'), 'success');
     } catch (err) {
       console.error('Failed to update appointment status:', err);
-      const errMsg = err.response?.data?.message || 'An error occurred while updating status.';
+      const errMsg = err.response?.data?.message || t('careAppointments.statusUpdateErrorGeneric');
       setStatusError(errMsg);
+      showToast(errMsg, 'error');
     } finally {
       setUpdatingStatus(false);
     }
+  };
+
+  // ── Validate một field đơn lẻ (dùng cho realtime + batch) ──────────────────
+  const validateSingleField = (field, value, allValues) => {
+    const vals = allValues || wizardValues;
+    switch (field) {
+      case 'heightCm': {
+        if (!value && !prefilledVitals?.heightCm) return t('adminAppointments.heightRequired');
+        if (value) {
+          const h = parseFloat(value);
+          if (isNaN(h) || h <= 0 || h > 300) return t('adminAppointments.heightInvalid');
+        }
+        return null;
+      }
+      case 'weightKg': {
+        if (!value && !prefilledVitals?.weightKg) return t('adminAppointments.weightRequired');
+        if (value) {
+          const w = parseFloat(value);
+          if (isNaN(w) || w <= 0 || w > 500) return t('adminAppointments.weightInvalid');
+        }
+        return null;
+      }
+      case 'temperatureCelsius': {
+        if (!value && !prefilledVitals?.temperatureCelsius) return t('adminAppointments.temperatureRequired');
+        if (value) {
+          const temp = parseFloat(value);
+          if (isNaN(temp) || temp < 30 || temp > 45) return t('adminAppointments.temperatureInvalid');
+        }
+        return null;
+      }
+      case 'bloodPressureSystolic': {
+        const bpd = vals.bloodPressureDiastolic;
+        if (value || bpd) {
+          if (!value) return t('adminAppointments.systolicRequiredWithDiastolic');
+          const sys = parseInt(value, 10);
+          if (isNaN(sys) || sys <= 0 || sys > 300) return t('adminAppointments.systolicInvalid');
+          if (bpd) {
+            const dia = parseInt(bpd, 10);
+            if (!isNaN(dia) && sys <= dia) return t('adminAppointments.systolicMustBeHigher');
+          }
+        }
+        return null;
+      }
+      case 'bloodPressureDiastolic': {
+        const bps = vals.bloodPressureSystolic;
+        if (value || bps) {
+          if (!value) return t('adminAppointments.diastolicRequiredWithSystolic');
+          const dia = parseInt(value, 10);
+          if (isNaN(dia) || dia <= 0 || dia > 300) return t('adminAppointments.diastolicInvalid');
+          if (bps) {
+            const sys = parseInt(bps, 10);
+            if (!isNaN(sys) && sys <= dia) return t('adminAppointments.systolicMustBeHigher');
+          }
+        }
+        return null;
+      }
+      case 'pulse': {
+        if (value) {
+          const p = parseInt(value, 10);
+          if (isNaN(p) || p <= 0 || p > 300) return t('adminAppointments.pulseInvalid');
+        }
+        return null;
+      }
+      case 'oxygenSaturation': {
+        if (value) {
+          const spo2 = parseInt(value, 10);
+          if (isNaN(spo2) || spo2 < 0 || spo2 > 100) return t('adminAppointments.oxygenInvalid');
+        }
+        return null;
+      }
+      case 'bloodSugar': {
+        if (value) {
+          const bs = parseFloat(value);
+          if (isNaN(bs) || bs <= 0 || bs > 1000) return t('adminAppointments.bloodSugarInvalid');
+        }
+        return null;
+      }
+      default:
+        return null;
+    }
+  };
+
+  // Validate tất cả field step 2, trả về object lỗi { field: message }
+  const validateStep2All = (vals) => {
+    const v = vals || wizardValues;
+    const fields = ['heightCm', 'weightKg', 'temperatureCelsius', 'bloodPressureSystolic', 'bloodPressureDiastolic', 'pulse', 'oxygenSaturation', 'bloodSugar'];
+    const errors = {};
+    for (const f of fields) {
+      const err = validateSingleField(f, v[f], v);
+      if (err) errors[f] = err;
+    }
+    return errors;
+  };
+
+  // Legacy single-string validator kept for form submission (backward-compat)
+  const validateStep2 = () => {
+    const errors = validateStep2All();
+    const firstKey = Object.keys(errors)[0];
+    return firstKey ? errors[firstKey] : null;
   };
 
   // Handle clinical wizard form submission (vital signs + consultation + eligibility assessment)
@@ -480,57 +729,92 @@ export default function CareAppointmentsPage() {
     if (e) e.preventDefault();
     if (!selectedAppt) return;
 
+    // Re-validate all step-2 fields before final submit
+    const allErrors = validateStep2All();
+    if (Object.keys(allErrors).length > 0) {
+      setStep2FieldErrors(allErrors);
+      setStatusError(Object.values(allErrors)[0]);
+      setWizardStep(2);
+      return;
+    }
+
     setUpdatingStatus(true);
     setStatusError(null);
+
+    // ── Helper: resolve value or fall back to old vitals ────────────────────
+    // If user left a field empty, use the old value instead of saving null/undefined
+    const resolveNum = (field, parseFn, currentVal) => {
+      if (currentVal !== '' && currentVal != null) return parseFn(currentVal);
+      const old = prefilledVitals?.[field];
+      return old != null ? old : undefined;
+    };
 
     try {
       const residentId = selectedAppt.residentId?._id || selectedAppt.residentId;
       const admissionId = activeAdmission?._id;
 
       // 1. Save vital signs (UC-9)
+      // For each numeric field: use entered value, OR fall back to old vitals value, OR omit
       const vitalsBody = {
-        heightCm: wizardValues.heightCm ? parseFloat(wizardValues.heightCm) : undefined,
-        weightKg: wizardValues.weightKg ? parseFloat(wizardValues.weightKg) : undefined,
-        bloodPressureSystolic: wizardValues.bloodPressureSystolic ? parseInt(wizardValues.bloodPressureSystolic, 10) : undefined,
-        bloodPressureDiastolic: wizardValues.bloodPressureDiastolic ? parseInt(wizardValues.bloodPressureDiastolic, 10) : undefined,
-        pulse: wizardValues.pulse ? parseInt(wizardValues.pulse, 10) : undefined,
-        temperatureCelsius: wizardValues.temperatureCelsius ? parseFloat(wizardValues.temperatureCelsius) : undefined,
-        oxygenSaturation: wizardValues.oxygenSaturation ? parseInt(wizardValues.oxygenSaturation, 10) : undefined,
-        bloodSugar: wizardValues.bloodSugar ? parseFloat(wizardValues.bloodSugar) : undefined,
+        heightCm:              resolveNum('heightCm',              parseFloat, wizardValues.heightCm),
+        weightKg:              resolveNum('weightKg',              parseFloat, wizardValues.weightKg),
+        bloodPressureSystolic: resolveNum('bloodPressureSystolic', (v) => parseInt(v, 10), wizardValues.bloodPressureSystolic),
+        bloodPressureDiastolic:resolveNum('bloodPressureDiastolic',(v) => parseInt(v, 10), wizardValues.bloodPressureDiastolic),
+        pulse:                 resolveNum('pulse',                 (v) => parseInt(v, 10), wizardValues.pulse),
+        temperatureCelsius:    resolveNum('temperatureCelsius',    parseFloat, wizardValues.temperatureCelsius),
+        oxygenSaturation:      resolveNum('oxygenSaturation',      (v) => parseInt(v, 10), wizardValues.oxygenSaturation),
+        bloodSugar:            resolveNum('bloodSugar',            parseFloat, wizardValues.bloodSugar),
         bloodType: wizardValues.bloodType !== 'unknown' ? wizardValues.bloodType : undefined,
         summary: wizardValues.summary.trim() || undefined,
       };
+      // Remove undefined keys to keep payload clean
+      Object.keys(vitalsBody).forEach(k => vitalsBody[k] === undefined && delete vitalsBody[k]);
 
       await medicalRecordService.recordVitals(residentId, vitalsBody);
 
       // 2. Call Pre-admission Consultation API if admission request is present (UC-6.16)
       if (admissionId) {
-        await admissionService.medicalRecordConsultation(admissionId, {
-          consultationNotes: wizardValues.consultationNotes.trim() || 'Đã thực hiện thăm khám lâm sàng.',
-          notes: wizardValues.summary.trim() || undefined,
-        });
+        try {
+          await admissionService.medicalRecordConsultation(admissionId, {
+            consultationNotes: wizardValues.consultationNotes.trim() || t('adminAppointments.clinicalExamDefault'),
+            notes: wizardValues.summary.trim() || undefined,
+          });
+        } catch (cErr) {
+          console.warn('Admission consultation step skipped or already completed:', cErr);
+        }
 
         // 3. Evaluate Eligibility if Bác sĩ role (UC-6.19)
         if (userRole === 'doctor') {
-          await admissionService.medicalEvaluateEligibility(admissionId, {
-            eligibilityStatus: wizardValues.eligibilityStatus,
-            assessmentResult: wizardValues.assessmentResult.trim() || 'Đã kiểm tra các chỉ số sinh tồn lâm sàng.',
-            rejectionReason: wizardValues.eligibilityStatus === 'not_eligible' ? (wizardValues.rejectionReason.trim() || undefined) : undefined,
-            notes: wizardValues.summary.trim() || undefined,
-          });
+          try {
+            await admissionService.medicalEvaluateEligibility(admissionId, {
+              eligibilityStatus: wizardValues.eligibilityStatus,
+              assessmentResult: wizardValues.assessmentResult.trim() || t('adminAppointments.assessmentDefault'),
+              rejectionReason: wizardValues.eligibilityStatus === 'not_eligible' ? (wizardValues.rejectionReason.trim() || undefined) : undefined,
+              notes: wizardValues.summary.trim() || undefined,
+            });
+          } catch (eErr) {
+            console.warn('Admission eligibility step skipped or already completed:', eErr);
+          }
         }
       }
 
-      // 4. Set appointment status to completed
-      await careAppointmentService.updateStatus(selectedAppt._id, 'completed');
+      // 4. Mark appointment complete once the clinical exam workflow is finished.
+      if (selectedAppt?.status && selectedAppt.status !== 'completed') {
+        if (selectedAppt.status === 'scheduled') {
+          await careAppointmentService.updateStatus(selectedAppt._id, 'in_progress');
+        }
+        await careAppointmentService.updateStatus(selectedAppt._id, 'completed');
+      }
 
       setShowWizardModal(false);
       setSelectedAppt(null);
       fetchAppointments();
+      showToast(t('adminAppointments.wizardSaveSuccess'), 'success');
     } catch (err) {
       console.error('Failed to complete clinical wizard:', err);
-      const errMsg = err.response?.data?.message || 'Có lỗi xảy ra trong quá trình lưu hồ sơ khám lâm sàng.';
+      const errMsg = err.response?.data?.message || t('adminAppointments.wizardSaveError');
       setStatusError(errMsg);
+      showToast(errMsg, 'error');
     } finally {
       setUpdatingStatus(false);
     }
@@ -543,23 +827,23 @@ export default function CareAppointmentsPage() {
         <div>
           <h1>
             <Calendar className="text-navy-deep" size={26} />
-            Lịch Hẹn Khám (Appointments)
+            {t('careAppointments.pageTitle')}
           </h1>
           <p>
-            {isAdminRole 
-              ? 'Lập lịch trình khám, điều phối Bác sĩ và Y tá phụ trách khám lâm sàng đầu vào cho người cao tuổi.'
-              : 'Theo dõi, cập nhật trạng thái các lịch khám bệnh và lịch trình của cư dân được phân công.'}
+            {isAdminRole
+              ? t('careAppointments.subtitleAdmin')
+              : t('careAppointments.subtitleStaff')}
           </p>
         </div>
         <div style={{ display: 'flex', gap: '12px' }}>
           <button onClick={fetchAppointments} disabled={loading} className="cap-btn-refresh">
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            Làm mới
+            {t('careAppointments.refresh')}
           </button>
           {isAdminRole && (
             <button onClick={handleOpenCreate} className="cap-btn-primary">
               <Plus size={16} />
-              Tạo Lịch Khám
+              {t('careAppointments.createAppointment')}
             </button>
           )}
         </div>
@@ -572,17 +856,17 @@ export default function CareAppointmentsPage() {
             <Calendar size={22} />
           </div>
           <div>
-            <span className="cap-stat-label">Tổng cuộc hẹn</span>
+            <span className="cap-stat-label">{t('careAppointments.statTotal')}</span>
             <span className="cap-stat-value">{metrics.total}</span>
           </div>
         </div>
 
         <div className="cap-card-stat">
-          <div className="cap-stat-icon" style={{ backgroundColor: '#eff6ff', color: '#1d4ed8' }}>
+          <div className="cap-stat-icon" style={{ backgroundColor: 'rgba(15, 118, 110, 0.08)', color: '#0f766e' }}>
             <Clock size={22} />
           </div>
           <div>
-            <span className="cap-stat-label">Chờ khám</span>
+            <span className="cap-stat-label">{t('careAppointments.statScheduled')}</span>
             <span className="cap-stat-value">{metrics.scheduled}</span>
           </div>
         </div>
@@ -592,7 +876,7 @@ export default function CareAppointmentsPage() {
             <Activity size={22} />
           </div>
           <div>
-            <span className="cap-stat-label">Đang khám</span>
+            <span className="cap-stat-label">{t('careAppointments.statInProgress')}</span>
             <span className="cap-stat-value">{metrics.inProgress}</span>
           </div>
         </div>
@@ -602,7 +886,7 @@ export default function CareAppointmentsPage() {
             <UserCheck size={22} />
           </div>
           <div>
-            <span className="cap-stat-label">Đã hoàn thành</span>
+            <span className="cap-stat-label">{t('careAppointments.statCompleted')}</span>
             <span className="cap-stat-value">{metrics.completed}</span>
           </div>
         </div>
@@ -618,7 +902,7 @@ export default function CareAppointmentsPage() {
                 <input
                   type="text"
                   className="cap-filter-input"
-                  placeholder="Tìm theo Resident ID..."
+                  placeholder={t('careAppointments.searchPlaceholder')}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
@@ -643,7 +927,7 @@ export default function CareAppointmentsPage() {
           <div className="cap-filter-row-secondary">
             <div className="cap-filter-date-group">
               <span className="cap-date-title">
-                <Calendar size={13} className="text-slate-400" /> Ngày hẹn khám:
+                <Calendar size={13} className="text-slate-400" /> {t('careAppointments.dateRangeLabel')}
               </span>
               <input
                 type="date"
@@ -651,7 +935,7 @@ export default function CareAppointmentsPage() {
                 value={from}
                 onChange={(e) => setFrom(e.target.value)}
               />
-              <span className="text-slate-400 text-xs font-semibold">đến</span>
+              <span className="text-slate-400 text-xs font-semibold">{t('careAppointments.dateRangeTo')}</span>
               <input
                 type="date"
                 className="cap-date-input"
@@ -662,10 +946,10 @@ export default function CareAppointmentsPage() {
 
             <div className="cap-filter-actions">
               <button type="button" onClick={handleResetFilters} className="cap-btn-clear">
-                Xóa Bộ Lọc
+                {t('careAppointments.clearFilters')}
               </button>
               <button type="submit" className="cap-btn-apply">
-                Áp Dụng
+                {t('careAppointments.applyFilters')}
               </button>
             </div>
           </div>
@@ -677,12 +961,12 @@ export default function CareAppointmentsPage() {
         {loading && data.length === 0 ? (
           <div className="p-16 flex flex-col items-center justify-center bg-white" style={{ minHeight: '300px' }}>
             <RefreshCw className="animate-spin text-emerald-sage mb-3" size={32} />
-            <p className="text-slate-500 text-sm">Đang tải lịch hẹn khám...</p>
+            <p className="text-slate-500 text-sm">{t('careAppointments.loadingList')}</p>
           </div>
         ) : error ? (
           <div className="p-10 flex flex-col items-center justify-center text-center bg-white" style={{ minHeight: '300px' }}>
             <AlertCircle className="text-red-500 mb-3" size={36} />
-            <p className="text-slate-800 font-bold mb-1">Đã có lỗi xảy ra</p>
+            <p className="text-slate-800 font-bold mb-1">{t('careAppointments.errorTitle')}</p>
             <p className="text-slate-500 text-sm max-w-md">{error}</p>
           </div>
         ) : data.length === 0 ? (
@@ -690,9 +974,9 @@ export default function CareAppointmentsPage() {
             <div className="bg-slate-50 p-4 rounded-full text-slate-400 mb-3" style={{ width: 'fit-content' }}>
               <Calendar size={30} />
             </div>
-            <p className="text-slate-700 font-bold mb-1">Không tìm thấy lịch hẹn nào</p>
+            <p className="text-slate-700 font-bold mb-1">{t('careAppointments.emptyTitle')}</p>
             <p className="text-slate-400 text-xs max-w-sm">
-              Bạn chưa có lịch hẹn khám nào được lên lịch hoặc khớp với bộ lọc tìm kiếm.
+              {t('careAppointments.emptyHint')}
             </p>
           </div>
         ) : (
@@ -700,13 +984,13 @@ export default function CareAppointmentsPage() {
             <table className="cap-table">
               <thead>
                 <tr>
-                  <th>Elderly Resident</th>
-                  <th>Thời gian khám</th>
-                  <th>Loại khám</th>
-                  <th>Bác sĩ phụ trách</th>
-                  <th>Y tá phụ trách</th>
-                  <th style={{ textAlign: 'center' }}>Trạng thái</th>
-                  <th style={{ textAlign: 'center' }}>Thao tác</th>
+                  <th>{t('careAppointments.colResident')}</th>
+                  <th>{t('careAppointments.colTime')}</th>
+                  <th>{t('careAppointments.colType')}</th>
+                  <th>{t('careAppointments.colDoctor')}</th>
+                  <th>{t('careAppointments.colNurse')}</th>
+                  <th style={{ textAlign: 'center' }}>{t('careAppointments.colStatus')}</th>
+                  <th style={{ textAlign: 'center' }}>{t('careAppointments.colActions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -714,7 +998,7 @@ export default function CareAppointmentsPage() {
                   <tr key={row._id} className="cap-table-row">
                     <td>
                       <div className="cap-resident-info">
-                        <span className="cap-resident-name">{row.residentId?.fullName || 'Người cao tuổi'}</span>
+                        <span className="cap-resident-name">{row.residentId?.fullName || t('careAppointments.unknownResident')}</span>
                         <span className="cap-resident-code">#{row.residentId?.residentCode || row.residentId?._id || 'N/A'}</span>
                       </div>
                     </td>
@@ -730,7 +1014,7 @@ export default function CareAppointmentsPage() {
                       {row.appointmentType}
                       {row.appointmentType === 'Khám lâm sàng đầu vào' && (
                         <div style={{ marginTop: '4px', fontSize: '11px', color: '#0f766e' }}>
-                          Khám lâm sàng + Đánh giá điều kiện nhập viện
+                          {t('careAppointments.clinicalExamNote')}
                         </div>
                       )}
                     </td>
@@ -741,7 +1025,7 @@ export default function CareAppointmentsPage() {
                           {row.doctorStaffId.userId?.fullName || row.doctorStaffId.fullName}
                         </div>
                       ) : (
-                        <div className="cap-staff-badge is-unassigned">Chưa chỉ định</div>
+                        <div className="cap-staff-badge is-unassigned">{t('careAppointments.unassigned')}</div>
                       )}
                     </td>
                     <td>
@@ -751,12 +1035,12 @@ export default function CareAppointmentsPage() {
                           {row.nurseStaffId.userId?.fullName || row.nurseStaffId.fullName}
                         </div>
                       ) : (
-                        <div className="cap-staff-badge is-unassigned">Chưa chỉ định</div>
+                        <div className="cap-staff-badge is-unassigned">{t('careAppointments.unassigned')}</div>
                       )}
                     </td>
                     <td style={{ textAlign: 'center' }}>
                       <span className={`cap-badge-status cap-status-${row.status.replace(/_/g, '-')}`}>
-                        {row.status}
+                        {STATUS_LABELS[row.status] || row.status}
                       </span>
                     </td>
                     <td style={{ textAlign: 'center' }}>
@@ -766,7 +1050,7 @@ export default function CareAppointmentsPage() {
                             <button
                               onClick={() => handleOpenAssign(row)}
                               className="cap-btn-action"
-                              title="Chỉ định Bác sĩ & Y tá"
+                              title={t('careAppointments.actionAssign')}
                               disabled={['completed', 'cancelled'].includes(row.status)}
                             >
                               <UserCheck size={14} />
@@ -774,10 +1058,18 @@ export default function CareAppointmentsPage() {
                             <button
                               onClick={() => handleOpenEdit(row)}
                               className="cap-btn-action"
-                              title="Chỉnh sửa thời gian"
+                              title={t('careAppointments.actionEdit')}
                               disabled={['completed', 'cancelled'].includes(row.status)}
                             >
                               <Edit size={14} />
+                            </button>
+                            <button
+                              onClick={() => handleOpenDelete(row)}
+                              className="cap-btn-action cap-btn-action--danger"
+                              title={t('careAppointments.actionDelete')}
+                              disabled={['completed', 'cancelled', 'in_progress'].includes(row.status)}
+                            >
+                              <Trash2 size={14} />
                             </button>
                           </>
                         )}
@@ -787,11 +1079,11 @@ export default function CareAppointmentsPage() {
                             className="cap-btn-action"
                             title={row.appointmentType === 'Khám lâm sàng đầu vào'
                               ? (row.status === 'completed'
-                                ? 'Xem kết quả khám lâm sàng và đánh giá điều kiện'
-                                : 'Mở wizard khám lâm sàng & đánh giá điều kiện')
+                                ? t('careAppointments.actionViewClinicalResult')
+                                : t('careAppointments.actionOpenWizard'))
                               : (row.status === 'completed'
-                                ? 'Xem kết quả thăm khám'
-                                : 'Cập nhật trạng thái')
+                                ? t('careAppointments.actionViewResult')
+                                : t('careAppointments.actionUpdateStatus'))
                             }
                             disabled={row.status === 'cancelled'}
                           >
@@ -811,9 +1103,11 @@ export default function CareAppointmentsPage() {
         {total > 0 && (
           <div className="cap-filter-row-secondary" style={{ padding: '16px 20px', borderTop: '1px solid #e2e8f0' }}>
             <div style={{ fontSize: '13px', color: '#64748b' }}>
-              Hiển thị <span>{(page - 1) * limit + 1}</span> đến{' '}
-              <span>{Math.min(page * limit, total)}</span> trong tổng số{' '}
-              <span>{total}</span> lịch hẹn
+              {t('careAppointments.paginationShowing', {
+                from: (page - 1) * limit + 1,
+                to: Math.min(page * limit, total),
+                total,
+              })}
             </div>
 
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -826,7 +1120,7 @@ export default function CareAppointmentsPage() {
                 <ChevronLeft size={14} />
               </button>
               <span style={{ fontSize: '13px', color: '#475569' }}>
-                Trang {page} / {totalPages}
+                {t('careAppointments.paginationPage', { page, totalPages })}
               </span>
               <button
                 disabled={page >= totalPages || loading}
@@ -845,10 +1139,9 @@ export default function CareAppointmentsPage() {
       {showAssignModal && selectedAppt && (
         <div className="cap-modal-backdrop" onClick={() => setShowAssignModal(false)}>
           <div className="cap-modal" onClick={(e) => e.stopPropagation()}>
-            <h4 className="cap-modal__title">Chỉ Định Bác Sĩ & Y Tá Phụ Trách</h4>
+            <h4 className="cap-modal__title">{t('careAppointments.assignTitle')}</h4>
             <p className="cap-modal__text">
-              Phân công nhân sự y tế thực hiện khám lâm sàng đầu vào cho người cao tuổi{' '}
-              <strong>{selectedAppt.residentId?.fullName}</strong>.
+              {t('careAppointments.assignText', { name: selectedAppt.residentId?.fullName })}
             </p>
 
             {assignmentError && (
@@ -860,7 +1153,7 @@ export default function CareAppointmentsPage() {
 
             <form onSubmit={handleSaveAssignment}>
               <div className="cap-form-group">
-                <label className="cap-form-label">Chọn Bác sĩ phụ trách *</label>
+                <label className="cap-form-label">{t('careAppointments.chooseDoctorLabel')}</label>
                 <select
                   className="cap-filter-select"
                   value={selectedDocId}
@@ -868,18 +1161,18 @@ export default function CareAppointmentsPage() {
                   disabled={loadingAvailableStaff}
                 >
                   {loadingAvailableStaff ? (
-                    <option value="">Đang tải danh sách Bác sĩ trực ca...</option>
+                    <option value="">{t('careAppointments.loadingDoctors')}</option>
                   ) : (
                     <>
-                      <option value="">-- Chưa chỉ định Bác sĩ --</option>
+                      <option value="">{t('careAppointments.noDoctorOption')}</option>
                       {availableDoctors.map((doc) => (
                         <option key={doc._id} value={doc._id}>
-                          {doc.fullName} ({doc.specialty || 'Đa khoa'})
+                          {doc.fullName} ({doc.specialty || t('careAppointments.generalPractice')})
                         </option>
                       ))}
                       {selectedAppt.doctorStaffId && !availableDoctors.some(d => d._id === (selectedAppt.doctorStaffId._id || selectedAppt.doctorStaffId)) && (
                         <option key={selectedAppt.doctorStaffId._id || selectedAppt.doctorStaffId} value={selectedAppt.doctorStaffId._id || selectedAppt.doctorStaffId}>
-                          {selectedAppt.doctorStaffId.userId?.fullName || selectedAppt.doctorStaffId.fullName || 'Bác sĩ hiện tại'} (Không trong ca trực)
+                          {selectedAppt.doctorStaffId.userId?.fullName || selectedAppt.doctorStaffId.fullName || t('careAppointments.currentDoctorFallback')} {t('careAppointments.notOnShift')}
                         </option>
                       )}
                     </>
@@ -888,7 +1181,7 @@ export default function CareAppointmentsPage() {
               </div>
 
               <div className="cap-form-group">
-                <label className="cap-form-label">Chọn Y tá phụ trách *</label>
+                <label className="cap-form-label">{t('careAppointments.chooseNurseLabel')}</label>
                 <select
                   className="cap-filter-select"
                   value={selectedNurId}
@@ -896,10 +1189,10 @@ export default function CareAppointmentsPage() {
                   disabled={loadingAvailableStaff}
                 >
                   {loadingAvailableStaff ? (
-                    <option value="">Đang tải danh sách Y tá trực ca...</option>
+                    <option value="">{t('careAppointments.loadingNurses')}</option>
                   ) : (
                     <>
-                      <option value="">-- Chưa chỉ định Y tá --</option>
+                      <option value="">{t('careAppointments.noNurseOption')}</option>
                       {availableNurses.map((nur) => (
                         <option key={nur._id} value={nur._id}>
                           {nur.fullName}
@@ -907,7 +1200,7 @@ export default function CareAppointmentsPage() {
                       ))}
                       {selectedAppt.nurseStaffId && !availableNurses.some(n => n._id === (selectedAppt.nurseStaffId._id || selectedAppt.nurseStaffId)) && (
                         <option key={selectedAppt.nurseStaffId._id || selectedAppt.nurseStaffId} value={selectedAppt.nurseStaffId._id || selectedAppt.nurseStaffId}>
-                          {selectedAppt.nurseStaffId.userId?.fullName || selectedAppt.nurseStaffId.fullName || 'Y tá hiện tại'} (Không trong ca trực)
+                          {selectedAppt.nurseStaffId.userId?.fullName || selectedAppt.nurseStaffId.fullName || t('careAppointments.currentNurseFallback')} {t('careAppointments.notOnShift')}
                         </option>
                       )}
                     </>
@@ -922,7 +1215,7 @@ export default function CareAppointmentsPage() {
                   className="cap-modal-btn-cancel"
                   disabled={savingAssignment}
                 >
-                  Hủy
+                  {t('careAppointments.cancel')}
                 </button>
                 <button
                   type="submit"
@@ -932,14 +1225,63 @@ export default function CareAppointmentsPage() {
                   {savingAssignment ? (
                     <>
                       <Loader2 className="animate-spin mr-1" size={13} />
-                      Đang phân công...
+                      {t('careAppointments.assigning')}
                     </>
                   ) : (
-                    'Xác nhận Phân Công'
+                    t('careAppointments.confirmAssign')
                   )}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 5: XÁC NHẬN XÓA LỊCH HẸN (DELETE CONFIRMATION) */}
+      {showDeleteModal && selectedAppt && (
+        <div className="cap-modal-backdrop" onClick={() => !deletingAppt && setShowDeleteModal(false)}>
+          <div className="cap-modal" onClick={(e) => e.stopPropagation()}>
+            <h4 className="cap-modal__title">{t('careAppointments.deleteTitle')}</h4>
+            <p className="cap-modal__text">
+              {t('careAppointments.deleteText', {
+                name: selectedAppt.residentId?.fullName,
+                date: formatEnglishDate(selectedAppt.scheduledStartAt),
+                time: formatTimeRange(selectedAppt.scheduledStartAt, selectedAppt.scheduledEndAt),
+              })}
+            </p>
+
+            {deleteError && (
+              <div className="cap-error-banner">
+                <AlertCircle size={16} />
+                <span>{deleteError}</span>
+              </div>
+            )}
+
+            <div className="cap-modal-footer">
+              <button
+                type="button"
+                onClick={() => setShowDeleteModal(false)}
+                className="cap-modal-btn-cancel"
+                disabled={deletingAppt}
+              >
+                {t('careAppointments.cancel')}
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                className="cap-modal-btn-submit cap-modal-btn-submit--danger"
+                disabled={deletingAppt}
+              >
+                {deletingAppt ? (
+                  <>
+                    <Loader2 className="animate-spin mr-1" size={13} />
+                    {t('careAppointments.deleting')}
+                  </>
+                ) : (
+                  t('careAppointments.confirmDelete')
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -949,10 +1291,10 @@ export default function CareAppointmentsPage() {
         <div className="cap-modal-backdrop" onClick={() => setShowCreateModal(false)}>
           <div className="cap-modal" onClick={(e) => e.stopPropagation()}>
             <h4 className="cap-modal__title">
-              {isEditMode ? 'Chỉnh Sửa Lịch Hẹn Khám' : 'Tạo Lịch Hẹn Khám Mới'}
+              {isEditMode ? t('careAppointments.editTitle') : t('careAppointments.createTitleModal')}
             </h4>
             <p className="cap-modal__text">
-              Điền các thông tin cần thiết để lên lịch khám lâm sàng hoặc khám bệnh cho cư dân.
+              {t('careAppointments.formSubtitle')}
             </p>
 
             {apptFormError && (
@@ -963,26 +1305,27 @@ export default function CareAppointmentsPage() {
             )}
 
             <form onSubmit={handleSaveAppointment}>
-              <div className="cap-form-group">
-                <label className="cap-form-label">Chọn Cư dân (Resident) *</label>
-                <select
-                  className="cap-filter-select"
-                  value={formValues.residentId}
-                  onChange={(e) => setFormValues(prev => ({ ...prev, residentId: e.target.value }))}
-                  required
-                  disabled={isEditMode}
-                >
-                  <option value="">-- Chọn Cư dân --</option>
-                  {residentsList.map((res) => (
-                    <option key={res._id} value={res._id}>
-                      {res.fullName} (#{res.residentCode})
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {!isEditMode && (
+                <div className="cap-form-group">
+                  <label className="cap-form-label">{t('careAppointments.chooseResidentLabel')}</label>
+                  <select
+                    className="cap-filter-select"
+                    value={formValues.residentId}
+                    onChange={(e) => setFormValues(prev => ({ ...prev, residentId: e.target.value }))}
+                    required
+                  >
+                    <option value="">{t('careAppointments.chooseResidentPlaceholder')}</option>
+                    {residentsList.map((res) => (
+                      <option key={res._id} value={res._id}>
+                        {res.fullName} (#{res.residentCode})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div className="cap-form-group">
-                <label className="cap-form-label">Loại cuộc hẹn *</label>
+                <label className="cap-form-label">{t('careAppointments.appointmentTypeLabel')}</label>
                 <select
                   className="cap-filter-select"
                   value={formValues.appointmentType}
@@ -998,33 +1341,45 @@ export default function CareAppointmentsPage() {
               </div>
 
               <div className="cap-form-group">
-                <label className="cap-form-label">Thời gian bắt đầu *</label>
+                <label className="cap-form-label">{t('careAppointments.startTimeLabel')}</label>
                 <input
                   type="datetime-local"
                   className="cap-form-input"
                   value={formValues.scheduledStartAt}
                   onChange={(e) => setFormValues(prev => ({ ...prev, scheduledStartAt: e.target.value }))}
+                  min={!isEditMode ? new Date().toISOString().slice(0, 16) : undefined}
                   required
                 />
+                {formValues.appointmentType === 'Khám lâm sàng đầu vào' && (
+                  <small style={{ color: '#64748b', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                    {t('adminAppointments.clinicalStartTimeNote')}
+                  </small>
+                )}
               </div>
 
               <div className="cap-form-group">
-                <label className="cap-form-label">Thời gian kết thúc *</label>
+                <label className="cap-form-label">{t('careAppointments.endTimeLabel')}</label>
                 <input
                   type="datetime-local"
                   className="cap-form-input"
                   value={formValues.scheduledEndAt}
                   onChange={(e) => setFormValues(prev => ({ ...prev, scheduledEndAt: e.target.value }))}
+                  min={formValues.scheduledStartAt || (!isEditMode ? new Date().toISOString().slice(0, 16) : undefined)}
                   required
                 />
+                {formValues.appointmentType === 'Khám lâm sàng đầu vào' && (
+                  <small style={{ color: '#64748b', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                    {t('adminAppointments.clinicalEndTimeNote')}
+                  </small>
+                )}
               </div>
 
               <div className="cap-form-group">
-                <label className="cap-form-label">Ghi chú (Notes)</label>
+                <label className="cap-form-label">{t('careAppointments.notesLabel')}</label>
                 <textarea
                   className="cap-form-input"
                   style={{ minHeight: '60px', fontFamily: 'inherit' }}
-                  placeholder="Ghi chú về triệu chứng bệnh hoặc phòng khám..."
+                  placeholder={t('careAppointments.notesPlaceholder')}
                   value={formValues.notes}
                   onChange={(e) => setFormValues(prev => ({ ...prev, notes: e.target.value }))}
                 />
@@ -1037,7 +1392,7 @@ export default function CareAppointmentsPage() {
                   className="cap-modal-btn-cancel"
                   disabled={savingAppt}
                 >
-                  Hủy
+                  {t('careAppointments.cancel')}
                 </button>
                 <button
                   type="submit"
@@ -1047,10 +1402,10 @@ export default function CareAppointmentsPage() {
                   {savingAppt ? (
                     <>
                       <Loader2 className="animate-spin mr-1" size={13} />
-                      Đang xử lý...
+                      {t('careAppointments.saving')}
                     </>
                   ) : (
-                    'Lưu Lịch Hẹn'
+                    t('careAppointments.saveAppointment')
                   )}
                 </button>
               </div>
@@ -1063,9 +1418,9 @@ export default function CareAppointmentsPage() {
       {showStatusModal && selectedAppt && (
         <div className="cap-modal-backdrop" onClick={() => setShowStatusModal(false)}>
           <div className="cap-modal" onClick={(e) => e.stopPropagation()}>
-            <h4 className="cap-modal__title">Cập Nhật Trạng Thái Khám</h4>
+            <h4 className="cap-modal__title">{t('careAppointments.statusModalTitle')}</h4>
             <p className="cap-modal__text">
-              Thay đổi trạng thái quá trình khám cho cư dân <strong>{selectedAppt.residentId?.fullName}</strong>.
+              {t('careAppointments.statusModalText', { name: selectedAppt.residentId?.fullName })}
             </p>
 
             {statusError && (
@@ -1077,18 +1432,31 @@ export default function CareAppointmentsPage() {
 
             <form onSubmit={handleUpdateStatus}>
               <div className="cap-form-group">
-                <label className="cap-form-label">Trạng thái hiện tại: {selectedAppt.status}</label>
-                <select
-                  className="cap-filter-select"
-                  value={targetApptStatus}
-                  onChange={(e) => setTargetApptStatus(e.target.value)}
-                  required
-                >
-                  <option value="scheduled">Scheduled (Đã lên lịch)</option>
-                  <option value="in_progress">In Progress (Đang khám)</option>
-                  <option value="completed">Completed (Đã khám xong)</option>
-                  <option value="cancelled">Cancelled (Hủy bỏ)</option>
-                </select>
+                <label className="cap-form-label">
+                  {t('careAppointments.currentStatusLabel', { status: STATUS_LABELS[selectedAppt.status] || selectedAppt.status })}
+                </label>
+                {(() => {
+                  const allowedNext = STATUS_TRANSITIONS[selectedAppt.status] || [];
+                  if (allowedNext.length === 0) {
+                    return (
+                      <p style={{ fontSize: '13px', color: '#94a3b8', fontStyle: 'italic', margin: 0 }}>
+                        {t('careAppointments.terminalStatusNote')}
+                      </p>
+                    );
+                  }
+                  return (
+                    <select
+                      className="cap-filter-select"
+                      value={targetApptStatus}
+                      onChange={(e) => setTargetApptStatus(e.target.value)}
+                      required
+                    >
+                      {allowedNext.map((s) => (
+                        <option key={s} value={s}>{STATUS_LABELS[s]}</option>
+                      ))}
+                    </select>
+                  );
+                })()}
               </div>
 
               <div className="cap-modal-footer">
@@ -1098,22 +1466,24 @@ export default function CareAppointmentsPage() {
                   className="cap-modal-btn-cancel"
                   disabled={updatingStatus}
                 >
-                  Hủy
+                  {t('careAppointments.cancel')}
                 </button>
-                <button
-                  type="submit"
-                  className="cap-modal-btn-submit"
-                  disabled={updatingStatus}
-                >
-                  {updatingStatus ? (
-                    <>
-                      <Loader2 className="animate-spin mr-1" size={13} />
-                      Đang cập nhật...
-                    </>
-                  ) : (
-                    'Cập nhật'
-                  )}
-                </button>
+                {(STATUS_TRANSITIONS[selectedAppt.status] || []).length > 0 && (
+                  <button
+                    type="submit"
+                    className="cap-modal-btn-submit"
+                    disabled={updatingStatus}
+                  >
+                    {updatingStatus ? (
+                      <>
+                        <Loader2 className="animate-spin mr-1" size={13} />
+                        {t('careAppointments.updating')}
+                      </>
+                    ) : (
+                      t('careAppointments.confirmUpdate')
+                    )}
+                  </button>
+                )}
               </div>
             </form>
           </div>
@@ -1127,10 +1497,10 @@ export default function CareAppointmentsPage() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <h4 className="cap-modal__title" style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
                 <Activity className="text-[#1b365d]" size={20} />
-                Thăm Khám Lâm Sàng Đầu Vào
+                {t('adminAppointments.wizardTitle')}
               </h4>
               <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 'bold' }}>
-                Bước {wizardStep} / 3
+                {t('adminAppointments.wizardStep', { step: wizardStep })}
               </span>
             </div>
 
@@ -1154,38 +1524,38 @@ export default function CareAppointmentsPage() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   <div style={{ backgroundColor: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                     <h5 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: '700', color: '#1b365d' }}>
-                      Hồ sơ sức khỏe người cao tuổi
+                      {t('adminAppointments.wizardStep1Title')}
                     </h5>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '13px' }}>
                       <div>
-                        <span style={{ color: '#64748b', display: 'block' }}>Họ và tên:</span>
+                        <span style={{ color: '#64748b', display: 'block' }}>{t('adminAppointments.wizardFullName')}</span>
                         <strong style={{ color: '#1e293b' }}>{selectedAppt.residentId?.fullName || activeAdmission?.applicant?.fullName}</strong>
                       </div>
                       <div>
-                        <span style={{ color: '#64748b', display: 'block' }}>Mã cư dân:</span>
+                        <span style={{ color: '#64748b', display: 'block' }}>{t('adminAppointments.wizardResidentCode')}</span>
                         <strong style={{ color: '#1e293b' }}>#{selectedAppt.residentId?.residentCode || 'N/A'}</strong>
                       </div>
                       <div>
-                        <span style={{ color: '#64748b', display: 'block' }}>Ngày sinh:</span>
+                        <span style={{ color: '#64748b', display: 'block' }}>{t('adminAppointments.wizardDob')}</span>
                         <strong style={{ color: '#1e293b' }}>
                           {activeAdmission?.applicant?.dateOfBirth
                             ? new Date(activeAdmission.applicant.dateOfBirth).toLocaleDateString('vi-VN')
-                            : 'Chưa cập nhật'}
+                            : t('adminAppointments.notUpdated')}
                         </strong>
                       </div>
                       <div>
-                        <span style={{ color: '#64748b', display: 'block' }}>Giới tính:</span>
+                        <span style={{ color: '#64748b', display: 'block' }}>{t('adminAppointments.wizardGender')}</span>
                         <strong style={{ color: '#1e293b' }}>
-                          {activeAdmission?.applicant?.gender === 'male' ? 'Nam'
-                            : activeAdmission?.applicant?.gender === 'female' ? 'Nữ' : 'N/A'}
+                          {activeAdmission?.applicant?.gender === 'male' ? t('adminAppointments.male')
+                            : activeAdmission?.applicant?.gender === 'female' ? t('adminAppointments.female') : 'N/A'}
                         </strong>
                       </div>
                       <div>
-                        <span style={{ color: '#64748b', display: 'block' }}>Nhóm máu:</span>
+                        <span style={{ color: '#64748b', display: 'block' }}>{t('adminAppointments.wizardBloodType')}</span>
                         <strong style={{ color: '#1e293b' }}>{activeAdmission?.applicant?.bloodType || 'N/A'}</strong>
                       </div>
                       <div>
-                        <span style={{ color: '#64748b', display: 'block' }}>Địa chỉ:</span>
+                        <span style={{ color: '#64748b', display: 'block' }}>{t('adminAppointments.wizardAddress')}</span>
                         <strong style={{ color: '#1e293b' }}>{activeAdmission?.applicant?.personalAddress || 'N/A'}</strong>
                       </div>
                     </div>
@@ -1194,7 +1564,7 @@ export default function CareAppointmentsPage() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     <div>
                       <span style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '6px' }}>
-                        Dị ứng (Allergies):
+                        {t('adminAppointments.wizardAllergies')}
                       </span>
                       {activeAdmission?.applicant?.allergies && activeAdmission.applicant.allergies.length > 0 ? (
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
@@ -1205,13 +1575,13 @@ export default function CareAppointmentsPage() {
                           ))}
                         </div>
                       ) : (
-                        <span style={{ fontSize: '13px', color: '#94a3b8', fontStyle: 'italic' }}>Không ghi nhận dị ứng</span>
+                        <span style={{ fontSize: '13px', color: '#94a3b8', fontStyle: 'italic' }}>{t('adminAppointments.noAllergies')}</span>
                       )}
                     </div>
 
                     <div>
                       <span style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '6px' }}>
-                        Bệnh lý nền (Chronic Conditions):
+                        {t('adminAppointments.wizardChronicConditions')}
                       </span>
                       {activeAdmission?.applicant?.chronicConditions && activeAdmission.applicant.chronicConditions.length > 0 ? (
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
@@ -1222,26 +1592,26 @@ export default function CareAppointmentsPage() {
                           ))}
                         </div>
                       ) : (
-                        <span style={{ fontSize: '13px', color: '#94a3b8', fontStyle: 'italic' }}>Không ghi nhận bệnh nền</span>
+                        <span style={{ fontSize: '13px', color: '#94a3b8', fontStyle: 'italic' }}>{t('adminAppointments.noChronicConditions')}</span>
                       )}
                     </div>
 
                     <div>
                       <span style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '6px' }}>
-                        Tình trạng sức khỏe ban đầu (do gia đình khai báo):
+                        {t('adminAppointments.wizardInitialHealth')}
                       </span>
                       <div style={{ backgroundColor: '#f1f5f9', padding: '10px 14px', borderRadius: '8px', borderLeft: '3px solid #64748b', fontSize: '13px', color: '#334155', fontStyle: 'italic', lineHeight: '1.4' }}>
-                        "{activeAdmission?.applicant?.initialHealthCondition || 'Chưa ghi nhận thông tin mô tả chi tiết'}"
+                        "{activeAdmission?.applicant?.initialHealthCondition || t('adminAppointments.noHealthInfo')}"
                       </div>
                     </div>
                   </div>
 
                   <div className="cap-modal-footer">
                     <button type="button" className="cap-modal-btn-cancel" onClick={() => setShowWizardModal(false)}>
-                      {selectedAppt?.status === 'completed' ? 'Đóng' : 'Hủy'}
+                      {selectedAppt?.status === 'completed' ? t('adminAppointments.close') : t('careAppointments.cancel')}
                     </button>
                     <button type="button" className="cap-modal-btn-submit" onClick={() => setWizardStep(2)}>
-                      Tiếp tục: Đo sinh hiệu
+                      {t('adminAppointments.wizardStep1Next')}
                     </button>
                   </div>
                 </div>
@@ -1250,112 +1620,209 @@ export default function CareAppointmentsPage() {
               {/* STEP 2: Record Vitals & Indicators */}
               {wizardStep === 2 && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    <div className="cap-form-group" style={{ marginBottom: 0 }}>
-                      <label className="cap-form-label">Chiều cao (cm) *</label>
-                      <input
-                        type="number"
-                        className="cap-form-input"
-                        placeholder="Ví dụ: 165"
-                        value={wizardValues.heightCm}
-                        onChange={(e) => setWizardValues(prev => ({ ...prev, heightCm: e.target.value }))}
-                        required
-                        min="0"
-                        disabled={selectedAppt?.status === 'completed'}
-                      />
+
+                  {/* Info banner: prefilled from old vitals */}
+                  {prefilledVitals && (
+                    <div style={{
+                      backgroundColor: '#eff6ff', border: '1px solid #bfdbfe',
+                      borderRadius: 8, padding: '10px 14px',
+                      fontSize: 12, color: '#1e40af', display: 'flex', gap: 8, alignItems: 'flex-start'
+                    }}>
+                      <span style={{ fontSize: 16, flexShrink: 0 }}>ℹ️</span>
+                      <span>
+                        {t('adminAppointments.prefilledNoteP1')}<strong>{t('adminAppointments.prefilledNoteP1Bold')}</strong>
+                        {t('adminAppointments.prefilledNoteP2')}<strong>{t('adminAppointments.prefilledNoteP2Bold')}</strong>
+                        {t('adminAppointments.prefilledNoteP3')}
+                      </span>
                     </div>
-                    <div className="cap-form-group" style={{ marginBottom: 0 }}>
-                      <label className="cap-form-label">Cân nặng (kg) *</label>
-                      <input
-                        type="number"
-                        className="cap-form-input"
-                        placeholder="Ví dụ: 60"
-                        value={wizardValues.weightKg}
-                        onChange={(e) => setWizardValues(prev => ({ ...prev, weightKg: e.target.value }))}
-                        required
-                        min="0"
-                        disabled={selectedAppt?.status === 'completed'}
-                      />
-                    </div>
-                    <div className="cap-form-group" style={{ marginBottom: 0 }}>
-                      <label className="cap-form-label">Huyết áp Systolic (Tối đa)</label>
-                      <input
-                        type="number"
-                        className="cap-form-input"
-                        placeholder="Ví dụ: 120"
-                        value={wizardValues.bloodPressureSystolic}
-                        onChange={(e) => setWizardValues(prev => ({ ...prev, bloodPressureSystolic: e.target.value }))}
-                        disabled={selectedAppt?.status === 'completed'}
-                      />
-                    </div>
-                    <div className="cap-form-group" style={{ marginBottom: 0 }}>
-                      <label className="cap-form-label">Huyết áp Diastolic (Tối thiểu)</label>
-                      <input
-                        type="number"
-                        className="cap-form-input"
-                        placeholder="Ví dụ: 80"
-                        value={wizardValues.bloodPressureDiastolic}
-                        onChange={(e) => setWizardValues(prev => ({ ...prev, bloodPressureDiastolic: e.target.value }))}
-                        disabled={selectedAppt?.status === 'completed'}
-                      />
-                    </div>
-                    <div className="cap-form-group" style={{ marginBottom: 0 }}>
-                      <label className="cap-form-label">Nhịp tim (lần/phút)</label>
-                      <input
-                        type="number"
-                        className="cap-form-input"
-                        placeholder="Ví dụ: 75"
-                        value={wizardValues.pulse}
-                        onChange={(e) => setWizardValues(prev => ({ ...prev, pulse: e.target.value }))}
-                        disabled={selectedAppt?.status === 'completed'}
-                      />
-                    </div>
-                    <div className="cap-form-group" style={{ marginBottom: 0 }}>
-                      <label className="cap-form-label">Nhiệt độ (°C) *</label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        className="cap-form-input"
-                        placeholder="Ví dụ: 36.5"
-                        value={wizardValues.temperatureCelsius}
-                        onChange={(e) => setWizardValues(prev => ({ ...prev, temperatureCelsius: e.target.value }))}
-                        required
-                        disabled={selectedAppt?.status === 'completed'}
-                      />
-                    </div>
-                    <div className="cap-form-group" style={{ marginBottom: 0 }}>
-                      <label className="cap-form-label">Nồng độ Oxy SPO2 (%)</label>
-                      <input
-                        type="number"
-                        className="cap-form-input"
-                        placeholder="Ví dụ: 98"
-                        value={wizardValues.oxygenSaturation}
-                        onChange={(e) => setWizardValues(prev => ({ ...prev, oxygenSaturation: e.target.value }))}
-                        disabled={selectedAppt?.status === 'completed'}
-                      />
-                    </div>
-                    <div className="cap-form-group" style={{ marginBottom: 0 }}>
-                      <label className="cap-form-label">Đường huyết (mg/dL)</label>
-                      <input
-                        type="number"
-                        className="cap-form-input"
-                        placeholder="Ví dụ: 100"
-                        value={wizardValues.bloodSugar}
-                        onChange={(e) => setWizardValues(prev => ({ ...prev, bloodSugar: e.target.value }))}
-                        disabled={selectedAppt?.status === 'completed'}
-                      />
-                    </div>
-                  </div>
+                  )}
+
+                  {/* Helper to render a single vitals input with realtime validation */}
+                  {(() => {
+                    const handleVitalsChange = (field, value) => {
+                      setWizardValues(prev => {
+                        const next = { ...prev, [field]: value };
+                        // Realtime validate this field (and cross-validate BP pair)
+                        const err = validateSingleField(field, value, next);
+                        const pairField = field === 'bloodPressureSystolic' ? 'bloodPressureDiastolic'
+                          : field === 'bloodPressureDiastolic' ? 'bloodPressureSystolic' : null;
+                        setStep2FieldErrors(prevErr => {
+                          const updated = { ...prevErr };
+                          if (err) updated[field] = err; else delete updated[field];
+                          // Re-validate paired BP field
+                          if (pairField) {
+                            const pairErr = validateSingleField(pairField, next[pairField], next);
+                            if (pairErr) updated[pairField] = pairErr; else delete updated[pairField];
+                          }
+                          return updated;
+                        });
+                        setStep2Touched(prev2 => ({ ...prev2, [field]: true }));
+                        return next;
+                      });
+                    };
+
+                    const inputStyle = (field) => ({
+                      borderColor: step2FieldErrors[field] ? '#ef4444' : undefined,
+                      boxShadow: step2FieldErrors[field] ? '0 0 0 2px rgba(239,68,68,0.15)' : undefined,
+                    });
+
+                    const oldHint = (field) => {
+                      if (!wizardValues[field] && prefilledVitals?.[field] != null) {
+                        return (
+                          <span style={{ fontSize: 11, color: '#64748b', fontStyle: 'italic' }}>
+                            {t('adminAppointments.oldValueHint')}<strong>{prefilledVitals[field]}</strong>
+                          </span>
+                        );
+                      }
+                      return null;
+                    };
+
+                    return (
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+
+                        {/* Chiều cao */}
+                        <div className="cap-form-group" style={{ marginBottom: 0 }}>
+                          <label className="cap-form-label">{t('adminAppointments.heightLabel')}</label>
+                          <input
+                            type="number" className="cap-form-input"
+                            placeholder={t('adminAppointments.heightPlaceholder')}
+                            value={wizardValues.heightCm}
+                            onChange={(e) => handleVitalsChange('heightCm', e.target.value)}
+                            min="0"
+                            disabled={selectedAppt?.status === 'completed'}
+                            style={inputStyle('heightCm')}
+                          />
+                          {step2FieldErrors.heightCm
+                            ? <span style={{ fontSize: 11, color: '#ef4444' }}>{step2FieldErrors.heightCm}</span>
+                            : oldHint('heightCm')}
+                        </div>
+
+                        {/* Cân nặng */}
+                        <div className="cap-form-group" style={{ marginBottom: 0 }}>
+                          <label className="cap-form-label">{t('adminAppointments.weightLabel')}</label>
+                          <input
+                            type="number" className="cap-form-input"
+                            placeholder={t('adminAppointments.weightPlaceholder')}
+                            value={wizardValues.weightKg}
+                            onChange={(e) => handleVitalsChange('weightKg', e.target.value)}
+                            min="0"
+                            disabled={selectedAppt?.status === 'completed'}
+                            style={inputStyle('weightKg')}
+                          />
+                          {step2FieldErrors.weightKg
+                            ? <span style={{ fontSize: 11, color: '#ef4444' }}>{step2FieldErrors.weightKg}</span>
+                            : oldHint('weightKg')}
+                        </div>
+
+                        {/* Huyết áp Systolic */}
+                        <div className="cap-form-group" style={{ marginBottom: 0 }}>
+                          <label className="cap-form-label">{t('adminAppointments.systolicLabel')}</label>
+                          <input
+                            type="number" className="cap-form-input"
+                            placeholder={t('adminAppointments.systolicPlaceholder')}
+                            value={wizardValues.bloodPressureSystolic}
+                            onChange={(e) => handleVitalsChange('bloodPressureSystolic', e.target.value)}
+                            disabled={selectedAppt?.status === 'completed'}
+                            style={inputStyle('bloodPressureSystolic')}
+                          />
+                          {step2FieldErrors.bloodPressureSystolic
+                            ? <span style={{ fontSize: 11, color: '#ef4444' }}>{step2FieldErrors.bloodPressureSystolic}</span>
+                            : oldHint('bloodPressureSystolic')}
+                        </div>
+
+                        {/* Huyết áp Diastolic */}
+                        <div className="cap-form-group" style={{ marginBottom: 0 }}>
+                          <label className="cap-form-label">{t('adminAppointments.diastolicLabel')}</label>
+                          <input
+                            type="number" className="cap-form-input"
+                            placeholder={t('adminAppointments.diastolicPlaceholder')}
+                            value={wizardValues.bloodPressureDiastolic}
+                            onChange={(e) => handleVitalsChange('bloodPressureDiastolic', e.target.value)}
+                            disabled={selectedAppt?.status === 'completed'}
+                            style={inputStyle('bloodPressureDiastolic')}
+                          />
+                          {step2FieldErrors.bloodPressureDiastolic
+                            ? <span style={{ fontSize: 11, color: '#ef4444' }}>{step2FieldErrors.bloodPressureDiastolic}</span>
+                            : oldHint('bloodPressureDiastolic')}
+                        </div>
+
+                        {/* Nhịp tim */}
+                        <div className="cap-form-group" style={{ marginBottom: 0 }}>
+                          <label className="cap-form-label">{t('adminAppointments.pulseLabel')}</label>
+                          <input
+                            type="number" className="cap-form-input"
+                            placeholder={t('adminAppointments.pulsePlaceholder')}
+                            value={wizardValues.pulse}
+                            onChange={(e) => handleVitalsChange('pulse', e.target.value)}
+                            disabled={selectedAppt?.status === 'completed'}
+                            style={inputStyle('pulse')}
+                          />
+                          {step2FieldErrors.pulse
+                            ? <span style={{ fontSize: 11, color: '#ef4444' }}>{step2FieldErrors.pulse}</span>
+                            : oldHint('pulse')}
+                        </div>
+
+                        {/* Nhiệt độ */}
+                        <div className="cap-form-group" style={{ marginBottom: 0 }}>
+                          <label className="cap-form-label">{t('adminAppointments.temperatureLabel')}</label>
+                          <input
+                            type="number" step="0.1" className="cap-form-input"
+                            placeholder={t('adminAppointments.temperaturePlaceholder')}
+                            value={wizardValues.temperatureCelsius}
+                            onChange={(e) => handleVitalsChange('temperatureCelsius', e.target.value)}
+                            disabled={selectedAppt?.status === 'completed'}
+                            style={inputStyle('temperatureCelsius')}
+                          />
+                          {step2FieldErrors.temperatureCelsius
+                            ? <span style={{ fontSize: 11, color: '#ef4444' }}>{step2FieldErrors.temperatureCelsius}</span>
+                            : oldHint('temperatureCelsius')}
+                        </div>
+
+                        {/* SpO2 */}
+                        <div className="cap-form-group" style={{ marginBottom: 0 }}>
+                          <label className="cap-form-label">{t('adminAppointments.oxygenLabel')}</label>
+                          <input
+                            type="number" className="cap-form-input"
+                            placeholder={t('adminAppointments.oxygenPlaceholder')}
+                            value={wizardValues.oxygenSaturation}
+                            onChange={(e) => handleVitalsChange('oxygenSaturation', e.target.value)}
+                            disabled={selectedAppt?.status === 'completed'}
+                            style={inputStyle('oxygenSaturation')}
+                          />
+                          {step2FieldErrors.oxygenSaturation
+                            ? <span style={{ fontSize: 11, color: '#ef4444' }}>{step2FieldErrors.oxygenSaturation}</span>
+                            : oldHint('oxygenSaturation')}
+                        </div>
+
+                        {/* Đường huyết */}
+                        <div className="cap-form-group" style={{ marginBottom: 0 }}>
+                          <label className="cap-form-label">{t('adminAppointments.bloodSugarLabel')}</label>
+                          <input
+                            type="number" className="cap-form-input"
+                            placeholder={t('adminAppointments.bloodSugarPlaceholder')}
+                            value={wizardValues.bloodSugar}
+                            onChange={(e) => handleVitalsChange('bloodSugar', e.target.value)}
+                            disabled={selectedAppt?.status === 'completed'}
+                            style={inputStyle('bloodSugar')}
+                          />
+                          {step2FieldErrors.bloodSugar
+                            ? <span style={{ fontSize: 11, color: '#ef4444' }}>{step2FieldErrors.bloodSugar}</span>
+                            : oldHint('bloodSugar')}
+                        </div>
+
+                      </div>
+                    );
+                  })()}
 
                   <div className="cap-form-group">
-                    <label className="cap-form-label">Nhóm máu</label>
+                    <label className="cap-form-label">{t('adminAppointments.bloodTypeLabel')}</label>
                     <select
                       className="cap-filter-select"
                       value={wizardValues.bloodType}
                       onChange={(e) => setWizardValues(prev => ({ ...prev, bloodType: e.target.value }))}
                       disabled={selectedAppt?.status === 'completed'}
                     >
-                      <option value="unknown">Chưa rõ (Unknown)</option>
+                      <option value="unknown">{t('adminAppointments.bloodTypeUnknown')}</option>
                       <option value="A+">A+</option>
                       <option value="A-">A-</option>
                       <option value="B+">B+</option>
@@ -1368,10 +1835,10 @@ export default function CareAppointmentsPage() {
                   </div>
 
                   <div className="cap-form-group">
-                    <label className="cap-form-label">Tóm tắt tình trạng/Kết luận lâm sàng ban đầu</label>
+                    <label className="cap-form-label">{t('adminAppointments.summaryLabel')}</label>
                     <textarea
                       className="cap-form-input"
-                      placeholder="Mô tả tóm tắt tình trạng sinh hiệu, chẩn đoán sơ bộ..."
+                      placeholder={t('adminAppointments.summaryPlaceholder')}
                       style={{ minHeight: '60px', fontFamily: 'inherit' }}
                       value={wizardValues.summary}
                       onChange={(e) => setWizardValues(prev => ({ ...prev, summary: e.target.value }))}
@@ -1381,10 +1848,25 @@ export default function CareAppointmentsPage() {
 
                   <div className="cap-modal-footer">
                     <button type="button" className="cap-modal-btn-cancel" onClick={() => setWizardStep(1)}>
-                      Quay lại
+                      {t('adminAppointments.back')}
                     </button>
-                    <button type="button" className="cap-modal-btn-submit" onClick={() => setWizardStep(3)}>
-                      Tiếp tục: Đánh giá nhập viện
+                    <button
+                      type="button"
+                      className="cap-modal-btn-submit"
+                      onClick={() => {
+                        // Validate tất cả field cùng lúc, hiện lỗi inline
+                        const allErrs = validateStep2All();
+                        setStep2FieldErrors(allErrs);
+                        if (Object.keys(allErrs).length > 0) {
+                          setStatusError(Object.values(allErrs)[0]);
+                        } else {
+                          setStatusError(null);
+                          setStep2FieldErrors({});
+                          setWizardStep(3);
+                        }
+                      }}
+                    >
+                      {t('adminAppointments.wizardStep2Next')}
                     </button>
                   </div>
                 </div>
@@ -1394,10 +1876,10 @@ export default function CareAppointmentsPage() {
               {wizardStep === 3 && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   <div className="cap-form-group">
-                    <label className="cap-form-label">Nội dung tư vấn trước nhập viện *</label>
+                    <label className="cap-form-label">{t('adminAppointments.consultationNotesLabel')}</label>
                     <textarea
                       className="cap-form-input"
-                      placeholder="Ghi chú nội dung tư vấn chăm sóc, chế độ hoạt động phù hợp..."
+                      placeholder={t('adminAppointments.consultationNotesPlaceholder')}
                       style={{ minHeight: '80px', fontFamily: 'inherit' }}
                       value={wizardValues.consultationNotes}
                       onChange={(e) => setWizardValues(prev => ({ ...prev, consultationNotes: e.target.value }))}
@@ -1407,10 +1889,10 @@ export default function CareAppointmentsPage() {
                   </div>
 
                   <div className="cap-form-group">
-                    <label className="cap-form-label">Kết quả đánh giá chi tiết *</label>
+                    <label className="cap-form-label">{t('adminAppointments.assessmentResultLabel')}</label>
                     <textarea
                       className="cap-form-input"
-                      placeholder="Kết luận kiểm tra thể trạng chi tiết trước khi xét điều kiện..."
+                      placeholder={t('adminAppointments.assessmentResultPlaceholder')}
                       style={{ minHeight: '80px', fontFamily: 'inherit' }}
                       value={wizardValues.assessmentResult}
                       onChange={(e) => setWizardValues(prev => ({ ...prev, assessmentResult: e.target.value }))}
@@ -1420,7 +1902,7 @@ export default function CareAppointmentsPage() {
                   </div>
 
                   <div className="cap-form-group">
-                    <label className="cap-form-label">Đánh giá điều kiện nhập viện *</label>
+                    <label className="cap-form-label">{t('adminAppointments.eligibilityLabel')}</label>
                     {userRole === 'doctor' ? (
                       <select
                         className="cap-filter-select"
@@ -1429,8 +1911,8 @@ export default function CareAppointmentsPage() {
                         required
                         disabled={selectedAppt?.status === 'completed'}
                       >
-                        <option value="eligible">Đủ điều kiện nhập viện (Eligible)</option>
-                        <option value="not_eligible">Không đủ điều kiện (Ineligible)</option>
+                        <option value="eligible">{t('adminAppointments.eligible')}</option>
+                        <option value="not_eligible">{t('adminAppointments.notEligible')}</option>
                       </select>
                     ) : (
                       <div>
@@ -1440,11 +1922,11 @@ export default function CareAppointmentsPage() {
                           disabled
                           style={{ backgroundColor: '#f1f5f9', cursor: 'not-allowed' }}
                         >
-                          <option value="eligible">Đủ điều kiện nhập viện (Eligible)</option>
-                          <option value="not_eligible">Không đủ điều kiện (Ineligible)</option>
+                          <option value="eligible">{t('adminAppointments.eligible')}</option>
+                          <option value="not_eligible">{t('adminAppointments.notEligible')}</option>
                         </select>
                         <p style={{ fontSize: '11px', color: '#b45309', marginTop: '6px', fontWeight: '500' }}>
-                          * Chỉ Bác sĩ mới được quyền đánh giá điều kiện nhập viện. Vai trò Điều dưỡng hiện tại bị hạn chế.
+                          {t('adminAppointments.eligibilityNurseNote')}
                         </p>
                       </div>
                     )}
@@ -1452,10 +1934,10 @@ export default function CareAppointmentsPage() {
 
                   {wizardValues.eligibilityStatus === 'not_eligible' && (
                     <div className="cap-form-group">
-                      <label className="cap-form-label">Lý do từ chối nhập viện *</label>
+                      <label className="cap-form-label">{t('adminAppointments.rejectionReasonLabel')}</label>
                       <textarea
                         className="cap-form-input"
-                        placeholder="Nêu rõ lý do người cao tuổi không đủ điều kiện gia nhập viện..."
+                        placeholder={t('adminAppointments.rejectionReasonPlaceholder')}
                         style={{ minHeight: '60px', fontFamily: 'inherit' }}
                         value={wizardValues.rejectionReason}
                         onChange={(e) => setWizardValues(prev => ({ ...prev, rejectionReason: e.target.value }))}
@@ -1467,21 +1949,21 @@ export default function CareAppointmentsPage() {
 
                   <div className="cap-modal-footer">
                     <button type="button" className="cap-modal-btn-cancel" onClick={() => setWizardStep(2)} disabled={updatingStatus}>
-                      Quay lại
+                      {t('adminAppointments.back')}
                     </button>
                     {selectedAppt?.status === 'completed' ? (
                       <button type="button" className="cap-modal-btn-submit" onClick={() => setShowWizardModal(false)}>
-                        Đóng
+                        {t('adminAppointments.close')}
                       </button>
                     ) : (
                       <button type="submit" className="cap-modal-btn-submit" disabled={updatingStatus}>
                         {updatingStatus ? (
                           <>
                             <Loader2 className="animate-spin mr-1" size={13} />
-                            Đang lưu hồ sơ...
+                            {t('adminAppointments.savingRecord')}
                           </>
                         ) : (
-                          'Hoàn Thành Thăm Khám'
+                          t('adminAppointments.completeExam')
                         )}
                       </button>
                     )}

@@ -1,10 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { CheckCircle, Filter, RefreshCw, BarChart3, Search } from 'lucide-react';
 import activityService from '../../services/activity.service';
 import residentService from '../../services/resident.service';
+import { useToast } from '../../hooks/useToast';
 import '../../styles/admin/AdminAdmissionRequestsPage.css';
 
 export default function ActivityParticipationResultsPage() {
+  const { t } = useTranslation();
+  const { showToast } = useToast();
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -18,13 +22,80 @@ export default function ActivityParticipationResultsPage() {
   const [appliedFilters, setAppliedFilters] = useState({ search: '', status: 'completed' });
 
   const [editingId, setEditingId] = useState(null);
+  const [editingOccurrenceDate, setEditingOccurrenceDate] = useState(null);
+  const [editingOccurrenceOptions, setEditingOccurrenceOptions] = useState([]);
   const [form, setForm] = useState({
-    participantResultNotes: '',
-    status: 'completed'
+    attendanceRecords: [],
+    participationRecords: [],
   });
   const [formError, setFormError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [residents, setResidents] = useState({});
+
+  const toDateKey = useCallback((value) => {
+    if (!value) return null;
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return null;
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }, []);
+
+  const toDateOnlyISOString = useCallback((value) => {
+    if (!value) return null;
+    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      const [year, month, day] = value.split('-').map(Number);
+      return new Date(Date.UTC(year, month - 1, day)).toISOString();
+    }
+
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return null;
+    return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())).toISOString();
+  }, []);
+
+  const buildAttendanceDraftFromActivity = useCallback((activity, targetOccurrenceDate = null) => {
+    if (!activity) {
+      return {
+        attendanceRecords: [],
+        participationRecords: [],
+      };
+    }
+
+    const targetKey = toDateKey(targetOccurrenceDate);
+
+    const findForResident = (records = [], residentId) => {
+      // prefer record matching target occurrenceDate, then undated
+      const byDate = (records || []).find((r) => r && r.residentId && String(r.residentId) === String(residentId) && r.occurrenceDate && toDateKey(r.occurrenceDate) === targetKey);
+      if (byDate) return byDate;
+      const noDate = (records || []).find((r) => r && r.residentId && String(r.residentId) === String(residentId) && !r.occurrenceDate);
+      return noDate || null;
+    };
+
+    const existingAttendance = activity.attendanceRecords || [];
+    const existingParticipation = activity.participationRecords || [];
+
+    const participantIds = activity.participantResidentIds || [];
+    return {
+      attendanceRecords: participantIds.map((residentId) => {
+        const rec = findForResident(existingAttendance, residentId);
+        return {
+          residentId,
+          status: rec?.status || 'present',
+          note: rec?.note || '',
+        };
+      }),
+      participationRecords: participantIds.map((residentId) => {
+        const rec = findForResident(existingParticipation, residentId);
+        return {
+          residentId,
+          participationLevel: rec?.participationLevel || 'active',
+          comment: rec?.comment || '',
+          incident: rec?.incident || '',
+        };
+      }),
+    };
+  }, []);
 
   const fetchActivities = useCallback(async () => {
     try {
@@ -61,7 +132,7 @@ export default function ActivityParticipationResultsPage() {
       }
     } catch (err) {
       console.error('Fetch activities failed:', err);
-      setError(err.response?.data?.message || 'Could not load activities.');
+      setError(err.response?.data?.message || t('activityParticipation.loadError'));
     } finally {
       setLoading(false);
     }
@@ -84,20 +155,51 @@ export default function ActivityParticipationResultsPage() {
     setAppliedFilters({ search: '', status: 'completed' });
   };
 
+  const updateAttendanceRecord = (residentId, field, value) => {
+    setForm((prev) => ({
+      ...prev,
+      attendanceRecords: prev.attendanceRecords.map((record) =>
+        record.residentId === residentId ? { ...record, [field]: value } : record,
+      ),
+    }));
+  };
+
+  const updateParticipationRecord = (residentId, field, value) => {
+    setForm((prev) => ({
+      ...prev,
+      participationRecords: prev.participationRecords.map((record) =>
+        record.residentId === residentId ? { ...record, [field]: value } : record,
+      ),
+    }));
+  };
+
   const handleEdit = (activity) => {
+    // choose latest occurrenceDate from activity records, fallback to scheduledAt
+    const occDates = [];
+    (activity.attendanceRecords || []).forEach((r) => { if (r?.occurrenceDate) occDates.push(new Date(r.occurrenceDate)); });
+    (activity.participationRecords || []).forEach((r) => { if (r?.occurrenceDate) occDates.push(new Date(r.occurrenceDate)); });
+    let chosen = null;
+    if (occDates.length > 0) {
+      const unique = [...new Set(occDates.map((d) => toDateKey(d)).filter(Boolean))];
+      setEditingOccurrenceOptions(unique);
+      const max = occDates.reduce((a, b) => (a > b ? a : b));
+      chosen = toDateKey(max);
+    } else if (activity.scheduledAt) {
+      chosen = toDateKey(activity.scheduledAt);
+    }
+
     setEditingId(activity._id);
-    setForm({
-      participantResultNotes: activity.participantResultNotes || '',
-      status: activity.status || 'completed'
-    });
+    setEditingOccurrenceDate(chosen);
+    setForm(buildAttendanceDraftFromActivity(activity, chosen));
     setFormError(null);
   };
 
   const handleCancel = () => {
     setEditingId(null);
+    setEditingOccurrenceDate(null);
     setForm({
-      participantResultNotes: '',
-      status: 'completed'
+      attendanceRecords: [],
+      participationRecords: [],
     });
     setFormError(null);
   };
@@ -106,24 +208,27 @@ export default function ActivityParticipationResultsPage() {
     if (e) e.preventDefault();
     setFormError(null);
 
-    if (!form.participantResultNotes.trim()) {
-      setFormError('Vui lòng nhập kết quả tham gia');
-      return;
-    }
-
     try {
       setSubmitting(true);
-      await activityService.recordParticipationResult(editingId, {
-        participantResultNotes: form.participantResultNotes.trim(),
-        status: form.status
-      });
-      
+      const payload = {
+        attendanceRecords: (form.attendanceRecords || []).map((r) => ({ ...r })),
+        participationRecords: (form.participationRecords || []).map((r) => ({ ...r })),
+      };
+      // attach occurrenceDate if we have one selected
+      if (editingOccurrenceDate) {
+        const occurrenceDateOnly = toDateOnlyISOString(editingOccurrenceDate);
+        payload.attendanceRecords = payload.attendanceRecords.map((r) => ({ ...r, occurrenceDate: occurrenceDateOnly }));
+        payload.participationRecords = payload.participationRecords.map((r) => ({ ...r, occurrenceDate: occurrenceDateOnly }));
+      }
+
+      await activityService.recordParticipationResult(editingId, payload);
+
       handleCancel();
       fetchActivities();
-      alert('Đã lưu kết quả tham gia thành công!');
+      showToast(t('activityParticipation.saveSuccess'), 'success');
     } catch (err) {
       console.error('Submit failed:', err);
-      setFormError(err.response?.data?.message || 'Có lỗi khi lưu kết quả.');
+      setFormError(err.response?.data?.message || t('activityParticipation.saveError'));
     } finally {
       setSubmitting(false);
     }
@@ -135,21 +240,21 @@ export default function ActivityParticipationResultsPage() {
         <div>
           <h1>
             <CheckCircle size={26} />
-            Kết quả tham gia hoạt động
+            {t('activityParticipation.title')}
           </h1>
-          <p>Ghi nhận và quản lý kết quả tham gia hoạt động của cư dân.</p>
+          <p>{t('activityParticipation.subtitle')}</p>
         </div>
       </div>
 
       <div className="adm-filter-panel">
         <form onSubmit={handleApplyFilters} className="adm-filter-grid">
           <div>
-            <label className="text-sm font-semibold">Tìm kiếm</label>
+            <label className="text-sm font-semibold">{t('activityParticipation.filter.search')}</label>
             <div className="adm-filter-input-wrapper">
               <Search className="adm-filter-input-icon" size={14} />
               <input
                 type="text"
-                placeholder="Tìm theo tiêu đề..."
+                placeholder={t('activityParticipation.filter.searchPlaceholder')}
                 className="adm-filter-input"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -158,25 +263,25 @@ export default function ActivityParticipationResultsPage() {
           </div>
 
           <div>
-            <label className="text-sm font-semibold">Trạng thái</label>
+            <label className="text-sm font-semibold">{t('activityParticipation.filter.status')}</label>
             <select
               className="adm-filter-select"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
             >
-              <option value="">Tất cả trạng thái</option>
-              <option value="completed">Đã hoàn thành</option>
-              <option value="ongoing">Đang diễn ra</option>
-              <option value="scheduled">Đã lên lịch</option>
+              <option value="">{t('activityParticipation.filter.allStatuses')}</option>
+              <option value="completed">{t('activityParticipation.filter.completed')}</option>
+              <option value="ongoing">{t('activityParticipation.filter.ongoing')}</option>
+              <option value="scheduled">{t('activityParticipation.filter.scheduled')}</option>
             </select>
           </div>
 
           <div className="flex items-end gap-3" style={{ alignSelf: 'end' }}>
             <button type="button" className="adm-btn-refresh" onClick={handleResetFilters}>
-              <RefreshCw size={14} /> Đặt lại
+              <RefreshCw size={14} /> {t('activityParticipation.filter.reset')}
             </button>
             <button type="submit" className="adm-btn-refresh">
-              <Filter size={14} /> Áp dụng
+              <Filter size={14} /> {t('activityParticipation.filter.apply')}
             </button>
           </div>
         </form>
@@ -187,39 +292,57 @@ export default function ActivityParticipationResultsPage() {
           <table className="adm-table">
             <thead>
               <tr>
-                <th>Tiêu đề hoạt động</th>
-                <th>Ngày diễn ra</th>
-                <th>Người tham gia</th>
-                <th>Kết quả</th>
-                <th>Trạng thái</th>
-                <th>Hành động</th>
+                <th>{t('activityParticipation.table.activityTitle')}</th>
+                <th>{t('activityParticipation.table.date')}</th>
+                <th>{t('activityParticipation.table.participants')}</th>
+                <th>{t('activityParticipation.table.attendance')}</th>
+                <th>{t('activityParticipation.table.status')}</th>
+                <th>{t('activityParticipation.table.action')}</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
                   <td colSpan="6" style={{ textAlign: 'center', padding: '24px' }}>
-                    Đang tải hoạt động...
+                    {t('activityParticipation.loading')}
                   </td>
                 </tr>
               ) : activities.length === 0 ? (
                 <tr>
                   <td colSpan="6" style={{ textAlign: 'center', padding: '24px' }}>
-                    Không tìm thấy hoạt động nào.
+                    {t('activityParticipation.noActivities')}
                   </td>
                 </tr>
               ) : (
                 activities.map((activity) => (
                   <tr key={activity._id} className="adm-table-row">
                     <td style={{ fontWeight: 500 }}>{activity.title}</td>
-                    <td>
-                      {activity.scheduledAt ? new Date(activity.scheduledAt).toLocaleString('vi-VN') : '-'}
-                    </td>
+                      <td>
+                        {(() => {
+                          // show latest occurrenceDate if any, otherwise scheduledAt
+                          const occs = (activity.attendanceRecords || []).map(r => r?.occurrenceDate).filter(Boolean)
+                            .concat((activity.participationRecords || []).map(r => r?.occurrenceDate).filter(Boolean));
+                          if (occs.length > 0) {
+                            const dates = occs.map(d => new Date(d));
+                            const max = dates.reduce((a,b) => (a > b ? a : b));
+                            return max.toLocaleDateString('vi-VN');
+                          }
+                          return activity.scheduledAt ? new Date(activity.scheduledAt).toLocaleDateString('vi-VN') : '-';
+                        })()}
+                      </td>
                     <td style={{ textAlign: 'center' }}>
                       {activity.participantResidentIds?.length || 0}
                     </td>
                     <td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {activity.participantResultNotes || '---'}
+                      {activity.attendanceRecords?.length > 0 ? (
+                        (() => {
+                          const presentCount = activity.attendanceRecords.filter((record) => record.status !== 'absent').length;
+                          const absentCount = activity.attendanceRecords.filter((record) => record.status === 'absent').length;
+                          return t('activityParticipation.attendanceDisplay', { present: presentCount, absent: absentCount });
+                        })()
+                      ) : (
+                        '---'
+                      )}
                     </td>
                     <td>
                       <span style={{
@@ -241,7 +364,7 @@ export default function ActivityParticipationResultsPage() {
                         onClick={() => handleEdit(activity)}
                         disabled={editingId === activity._id}
                       >
-                        <BarChart3 size={14} /> Ghi nhận
+                        <BarChart3 size={14} /> {t('activityParticipation.record')}
                       </button>
                     </td>
                   </tr>
@@ -253,79 +376,101 @@ export default function ActivityParticipationResultsPage() {
       </div>
 
       {editingId && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000
-        }}>
-          <div style={{
-            backgroundColor: 'white',
-            borderRadius: '12px',
-            padding: '24px',
-            maxWidth: '600px',
-            width: '90%',
-            boxShadow: '0 20px 25px rgba(0, 0, 0, 0.15)'
-          }}>
-            <h2 style={{ marginTop: 0 }}>Ghi nhận kết quả tham gia</h2>
-            
-            <form onSubmit={handleSubmit}>
-              <div style={{ marginBottom: '16px' }}>
-                <label className="text-sm font-semibold">Kết quả tham gia</label>
-                <textarea
-                  rows="6"
-                  className="adm-filter-input"
-                  style={{ resize: 'vertical' }}
-                  placeholder="Nhập kết quả tham gia (ví dụ: Hoạt động diễn ra tốt, cư dân rất vui vẻ...)"
-                  value={form.participantResultNotes}
-                  onChange={(e) => setForm({ ...form, participantResultNotes: e.target.value })}
-                />
-              </div>
+        <div className="adm-modal-overlay">
+          <div className="adm-modal">
+            <div className="adm-modal-header">
+              <h2>{t('activityParticipation.modal.title')}</h2>
+              <button type="button" className="adm-btn-refresh" onClick={handleCancel} style={{ whiteSpace: 'nowrap' }}>
+                {t('activityParticipation.modal.close')}
+              </button>
+            </div>
 
-              <div style={{ marginBottom: '16px' }}>
-                <label className="text-sm font-semibold">Trạng thái</label>
-                <select
-                  className="adm-filter-select"
-                  value={form.status}
-                  onChange={(e) => setForm({ ...form, status: e.target.value })}
-                >
-                  <option value="completed">Đã hoàn thành</option>
-                  <option value="ongoing">Đang diễn ra</option>
-                  <option value="cancelled">Đã huỷ</option>
-                </select>
-              </div>
+            <form onSubmit={handleSubmit} className="adm-modal-body">
+                    {editingOccurrenceOptions.length > 0 && (
+                      <div style={{ marginBottom: 12 }}>
+                        <label className="text-sm font-semibold">{t('activityParticipation.modal.selectDate')}</label>
+                        <select className="adm-filter-select" value={editingOccurrenceDate || ''} onChange={(e) => {
+                          const val = e.target.value || null;
+                          setEditingOccurrenceDate(val);
+                          const act = activities.find(a => a._id === editingId);
+                          setForm(buildAttendanceDraftFromActivity(act, val));
+                        }}>
+                          {editingOccurrenceOptions.map((opt) => {
+                            const rawDate = new Date(`${opt}T00:00:00`);
+                            return (
+                              <option key={opt} value={opt}>{rawDate.toLocaleDateString('vi-VN')}</option>
+                            );
+                          })}
+                        </select>
+                      </div>
+                    )}
+              {form.attendanceRecords.length > 0 && (
+                <div className="adm-modal-section">
+                  <label className="text-sm font-semibold">{t('activityParticipation.modal.perResident')}</label>
+                  <div className="adm-table-responsive">
+                    <table className="adm-table adm-participation-table">
+                      <thead>
+                        <tr>
+                          <th>{t('activityParticipation.modal.residentCol')}</th>
+                          <th>{t('activityParticipation.modal.attendanceCol')}</th>
+                          <th>{t('activityParticipation.modal.participationLevelCol')}</th>
+                          <th>{t('activityParticipation.modal.commentCol')}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {form.attendanceRecords.map((record) => {
+                          const resident = residents[record.residentId];
+                          const participation = form.participationRecords.find((item) => item.residentId === record.residentId) || { participationLevel: 'active', comment: '', incident: '' };
 
-              {formError && (
-                <div style={{ color: '#b91c1c', marginBottom: '16px' }}>
-                  {formError}
+                          return (
+                            <tr key={record.residentId}>
+                              <td>{resident?.fullName || record.residentId}</td>
+                              <td>
+                                <select
+                                  className="adm-filter-select"
+                                  value={record.status}
+                                  onChange={(e) => updateAttendanceRecord(record.residentId, 'status', e.target.value)}
+                                >
+                                  <option value="present">{t('activityParticipation.attendance.present')}</option>
+                                  <option value="absent">{t('activityParticipation.attendance.absent')}</option>
+                                  <option value="late">{t('activityParticipation.attendance.late')}</option>
+                                  <option value="left_early">{t('activityParticipation.attendance.leftEarly')}</option>
+                                </select>
+                              </td>
+                              <td>
+                                <select
+                                  className="adm-filter-select"
+                                  value={participation.participationLevel}
+                                  onChange={(e) => updateParticipationRecord(record.residentId, 'participationLevel', e.target.value)}
+                                >
+                                  <option value="passive">{t('activityParticipation.participation.passive')}</option>
+                                  <option value="partial">{t('activityParticipation.participation.partial')}</option>
+                                  <option value="active">{t('activityParticipation.participation.active')}</option>
+                                </select>
+                              </td>
+                              <td>
+                                <textarea
+                                  rows="2"
+                                  className="adm-filter-input"
+                                  value={participation.comment}
+                                  onChange={(e) => updateParticipationRecord(record.residentId, 'comment', e.target.value)}
+                                  placeholder={t('activityParticipation.modal.commentPlaceholder')}
+                                />
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
 
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <button
-                  type="button"
-                  className="adm-btn-refresh"
-                  onClick={handleCancel}
-                  disabled={submitting}
-                  style={{ flex: 1 }}
-                >
-                  Huỷ
-                </button>
-                <button
-                  type="submit"
-                  className="adm-btn-refresh"
-                  disabled={submitting}
-                  style={{ flex: 1 }}
-                >
-                  {submitting ? 'Đang lưu...' : 'Lưu kết quả'}
-                </button>
-              </div>
+              {formError && (
+                <div className="adm-form-message">
+                  {formError}
+                </div>
+              )}
             </form>
           </div>
         </div>
@@ -333,7 +478,7 @@ export default function ActivityParticipationResultsPage() {
 
       <div className="adm-header" style={{ marginTop: '18px', justifyContent: 'space-between' }}>
         <span>
-          Trang {page} / {totalPages} — {total} hoạt động
+          {t('activityParticipation.pagination.page', { page, totalPages, total })}
         </span>
         <div style={{ display: 'flex', gap: '10px' }}>
           <button
@@ -342,7 +487,7 @@ export default function ActivityParticipationResultsPage() {
             disabled={page <= 1}
             onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
           >
-            Trước
+            {t('activityParticipation.pagination.prev')}
           </button>
           <button
             type="button"
@@ -350,7 +495,7 @@ export default function ActivityParticipationResultsPage() {
             disabled={page >= totalPages}
             onClick={() => setPage((prev) => Math.min(prev + 1, totalPages))}
           >
-            Tiếp
+            {t('activityParticipation.pagination.next')}
           </button>
         </div>
       </div>

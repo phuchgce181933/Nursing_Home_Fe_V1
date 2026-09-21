@@ -1,13 +1,16 @@
-export const REHAB_SESSION_TYPE_LABELS = {
-  physical_therapy: 'Vật lý trị liệu',
-  occupational_therapy: 'Lao động trị liệu',
-  speech_therapy: 'Âm ngữ trị liệu',
-  mobility_training: 'Tập vận động / đi lại',
-  balance_training: 'Tập thăng bằng',
-  group_exercise: 'Tập thể dục nhóm',
-  other: 'Khác',
-};
+import i18n from '../i18n';
 
-export function rehabSessionTypeLabel(type) {
-  return REHAB_SESSION_TYPE_LABELS[type] || type || '—';
+const NS = 'caregiver.rehabSchedule.labels.sessionType';
+
+function resolveT(t) {
+  return t || ((key, opts) => i18n.t(key, opts));
 }
+
+export function rehabSessionTypeLabel(type, t) {
+  const tt = resolveT(t);
+  if (!type) return '—';
+  return tt(`${NS}.${type}`, { defaultValue: type });
+}
+
+/** @deprecated Use rehabSessionTypeLabel(type, t) */
+export const REHAB_SESSION_TYPE_LABELS = {};

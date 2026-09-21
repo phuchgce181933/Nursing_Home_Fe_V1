@@ -1,15 +1,20 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Search, RefreshCw, Users, Phone } from 'lucide-react';
 import residentService from '../../../../services/resident.service';
 import { formatLeaveDate } from '../../../../utils/leaveUtils';
+import { resolveApiError } from '../../../../utils/apiMessage';
+import { isValidStaffPhone } from '../../../../utils/staffPhoneValidation';
 import { FaEye } from 'react-icons/fa';
 import AdminPageShell from '../../../../components/admin/AdminPageShell';
+import ListPagination from '../../../../components/ui/ListPagination';
+import ConfirmDialog from '../../../../components/ui/ConfirmDialog';
+import { ADMIN_LIST_PAGE_SIZE } from '../../../../constants/adminListPage';
+import useDebouncedSearch from '../../../../hooks/useDebouncedSearch';
 import '../../../../styles/admin/residentActionIcons.css';
-import { GENDER_LABELS, RESIDENCY_LABELS } from '../_shared/residentLabels';
-
-const RELATIONSHIP_SUGGESTIONS = [
-  'Con trai', 'Con gái', 'Vợ/Chồng', 'Anh/Chị/Em', 'Cháu', 'Người giám hộ', 'Khác',
-];
+import '../../../../styles/admin/FamilyManagementPage.css';
+import { getGenderLabel, getResidencyLabel } from '../_shared/residentLabels';
+import { useToast } from '../../../../hooks/useToast';
 
 const emptyContact = () => ({
   fullName: '',
@@ -20,20 +25,40 @@ const emptyContact = () => ({
   isPrimary: false,
 });
 
-function formatRoom(room) {
+const contactPhoneKey = (contact) => String(contact?.phone || '').replace(/\D/g, '');
+
+const contactEmailKey = (contact) => {
+  const email = String(contact?.email || '').trim().toLowerCase();
+  return email || null;
+};
+
+const findDuplicateContact = (payload, existingContacts, excludeContactId) => {
+  const key = contactPhoneKey(payload);
+  return (existingContacts || []).find((c) => {
+    if (excludeContactId && c._id === excludeContactId) return false;
+    return contactPhoneKey(c) === key;
+  });
+};
+
+const findDuplicateContactByEmail = (payload, existingContacts, excludeContactId) => {
+  const key = contactEmailKey(payload);
+  if (!key) return null;
+  return (existingContacts || []).find((c) => {
+    if (excludeContactId && c._id === excludeContactId) return false;
+    return contactEmailKey(c) === key;
+  });
+};
+
+function formatRoom(room, t) {
   if (!room) return '—';
   const floor = room.floorId;
-  const floorPart = floor?.name || (floor?.floorNumber != null ? `Tầng ${floor.floorNumber}` : '');
-  return [floorPart, room.roomNumber ? `Phòng ${room.roomNumber}` : ''].filter(Boolean).join(' · ') || '—';
+  const floorPart = floor?.name || (floor?.floorNumber != null ? `${t('admin.residents.common.floor')} ${floor.floorNumber}` : '');
+  return [floorPart, room.roomNumber ? `${t('admin.residents.common.room')} ${room.roomNumber}` : ''].filter(Boolean).join(' · ') || '—';
 }
 
-function ContactFormModal({ mode, initial, saving, error, onSave, onClose }) {
-  const [form, setForm] = useState(initial || emptyContact());
+function ContactFormModal({ mode, initial, saving, error, onSave, onClose, relationshipSuggestions, t }) {
+  const [form, setForm] = useState(() => initial || emptyContact());
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
-
-  useEffect(() => {
-    setForm(initial || emptyContact());
-  }, [initial, mode]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -51,17 +76,17 @@ function ContactFormModal({ mode, initial, saving, error, onSave, onClose }) {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <h2 className="modal__title">
-          {mode === 'edit' ? 'Cập nhật liên hệ khẩn cấp' : 'Thêm liên hệ khẩn cấp'}
+          {mode === 'edit' ? t('admin.residents.family.editContact') : t('admin.residents.family.addContact')}
         </h2>
         {error && <p className="form-error">{error}</p>}
         <form onSubmit={handleSubmit}>
           <div className="form-grid">
             <div className="form-group form-grid--full">
-              <label>Họ tên *</label>
+              <label>{t('admin.residents.family.fullName')} *</label>
               <input value={form.fullName} onChange={(e) => set('fullName', e.target.value)} required />
             </div>
             <div className="form-group">
-              <label>Quan hệ *</label>
+              <label>{t('admin.residents.family.relationship')} *</label>
               <input
                 list="relationship-options"
                 value={form.relationship}
@@ -69,21 +94,21 @@ function ContactFormModal({ mode, initial, saving, error, onSave, onClose }) {
                 required
               />
               <datalist id="relationship-options">
-                {RELATIONSHIP_SUGGESTIONS.map((r) => (
+                {relationshipSuggestions.map((r) => (
                   <option key={r} value={r} />
                 ))}
               </datalist>
             </div>
             <div className="form-group">
-              <label>Số điện thoại *</label>
+              <label>{t('admin.residents.family.phone')} *</label>
               <input value={form.phone} onChange={(e) => set('phone', e.target.value)} required />
             </div>
             <div className="form-group form-grid--full">
-              <label>Email</label>
+              <label>{t('admin.residents.family.email')}</label>
               <input type="email" value={form.email} onChange={(e) => set('email', e.target.value)} />
             </div>
             <div className="form-group form-grid--full">
-              <label>Địa chỉ</label>
+              <label>{t('admin.residents.family.address')}</label>
               <textarea value={form.address} onChange={(e) => set('address', e.target.value)} />
             </div>
             <div className="form-group form-grid--full">
@@ -93,14 +118,14 @@ function ContactFormModal({ mode, initial, saving, error, onSave, onClose }) {
                   checked={form.isPrimary}
                   onChange={(e) => set('isPrimary', e.target.checked)}
                 />
-                Liên hệ chính (ưu tiên khi khẩn cấp)
+                {t('admin.residents.family.primaryContact')}
               </label>
             </div>
           </div>
           <div className="modal__actions">
-            <button type="button" className="btn-cancel" onClick={onClose}>Hủy</button>
+            <button type="button" className="btn-cancel" onClick={onClose}>{t('common.cancel')}</button>
             <button type="submit" className="btn-save" disabled={saving}>
-              {saving ? 'Đang lưu...' : 'Lưu'}
+              {saving ? t('common.saving') : t('common.save')}
             </button>
           </div>
         </form>
@@ -110,12 +135,28 @@ function ContactFormModal({ mode, initial, saving, error, onSave, onClose }) {
 }
 
 export default function FamilyManagementPage() {
+  const { t } = useTranslation();
+  const { showToast } = useToast();
+  const relationshipSuggestions = useMemo(
+    () => [
+      t('admin.residents.family.relationships.son'),
+      t('admin.residents.family.relationships.daughter'),
+      t('admin.residents.family.relationships.spouse'),
+      t('admin.residents.family.relationships.sibling'),
+      t('admin.residents.family.relationships.grandchild'),
+      t('admin.residents.family.relationships.guardian'),
+      t('admin.residents.family.relationships.other'),
+    ],
+    [t]
+  );
   const [residents, setResidents]       = useState([]);
   const [total, setTotal]               = useState(0);
-  const [page, setPage]                 = useState(1);
-  const [totalPages, setTotalPages]     = useState(1);
-  const [search, setSearch]             = useState('');
-  const [searchInput, setSearchInput]   = useState('');
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const resetPageOnSearch = useCallback(() => setPage(1), []);
+  const { search, setSearch, debouncedSearch } = useDebouncedSearch({
+    onDebouncedChange: resetPageOnSearch,
+  });
   const [statusFilter, setStatusFilter] = useState('admitted');
   const [listLoading, setListLoading]   = useState(false);
   const [listError, setListError]       = useState('');
@@ -131,6 +172,8 @@ export default function FamilyManagementPage() {
   const [contactError, setContactError] = useState('');
   const [detailContact, setDetailContact] = useState(null);
   const [residentDetailPopup, setResidentDetailPopup] = useState(null);
+  const [pendingDeleteContact, setPendingDeleteContact] = useState(null);
+  const [deleteContactSaving, setDeleteContactSaving] = useState(false);
 
   const loadList = useCallback(async ({ silent = false } = {}) => {
     if (!silent) setListLoading(true);
@@ -138,20 +181,20 @@ export default function FamilyManagementPage() {
     try {
       const res = await residentService.listForFamilyManagement({
         page,
-        limit: 15,
-        search: search || undefined,
+        limit: ADMIN_LIST_PAGE_SIZE,
+        search: debouncedSearch || undefined,
         status: statusFilter || undefined,
       });
       setResidents(Array.isArray(res.data) ? res.data : []);
       setTotal(res.total ?? 0);
       setTotalPages(res.totalPages ?? 1);
     } catch (e) {
-      setListError(e.response?.data?.message || 'Không thể tải danh sách cư dân');
+      setListError(e.response?.data?.message || t('admin.residents.common.loadListFailed'));
       setResidents([]);
     } finally {
       if (!silent) setListLoading(false);
     }
-  }, [page, search, statusFilter]);
+  }, [page, debouncedSearch, statusFilter, t]);
 
   const loadDetail = useCallback(async (residentId) => {
     if (!residentId) {
@@ -164,24 +207,18 @@ export default function FamilyManagementPage() {
       const data = await residentService.getFamilyInfo(residentId);
       setFamilyData(data);
     } catch (e) {
-      setDetailError(e.response?.data?.message || 'Không thể tải thông tin thân nhân');
+      setDetailError(e.response?.data?.message || t('admin.residents.family.loadFamilyFailed'));
       setFamilyData(null);
     } finally {
       setDetailLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => { loadList(); }, [loadList]);
 
   useEffect(() => {
     loadDetail(selectedId);
   }, [selectedId, loadDetail]);
-
-  const handleSearch = (e) => {
-    e.preventDefault();
-    setPage(1);
-    setSearch(searchInput.trim());
-  };
 
   const handleSelect = (r) => {
     setSelectedId(r._id);
@@ -198,6 +235,35 @@ export default function FamilyManagementPage() {
   const handleSaveContact = async (payload) => {
     setContactSaving(true);
     setContactError('');
+    if (!isValidStaffPhone(payload.phone)) {
+      setContactError(t('admin.residents.family.validation.phoneInvalid'));
+      setContactSaving(false);
+      return;
+    }
+    const excludeId =
+      contactModal?.mode === 'edit' && contactModal.contact?._id ? contactModal.contact._id : null;
+    const duplicate = findDuplicateContact(payload, contacts, excludeId);
+    if (duplicate) {
+      setContactError(
+        t('apiErrors.RESIDENT_EMERGENCY_CONTACT_DUPLICATE', {
+          fullName: duplicate.fullName,
+          phone: payload.phone,
+        })
+      );
+      setContactSaving(false);
+      return;
+    }
+    const duplicateEmail = findDuplicateContactByEmail(payload, contacts, excludeId);
+    if (duplicateEmail) {
+      setContactError(
+        t('apiErrors.RESIDENT_EMERGENCY_CONTACT_EMAIL_DUPLICATE', {
+          fullName: duplicateEmail.fullName,
+          email: payload.email,
+        })
+      );
+      setContactSaving(false);
+      return;
+    }
     try {
       if (contactModal?.mode === 'edit' && contactModal.contact?._id) {
         await residentService.updateEmergencyContact(
@@ -205,28 +271,40 @@ export default function FamilyManagementPage() {
           contactModal.contact._id,
           payload
         );
-        setPanelMsg('Đã cập nhật liên hệ khẩn cấp.');
+        setPanelMsg(t('admin.residents.family.contactUpdated'));
       } else {
         await residentService.addEmergencyContact(selectedId, payload);
-        setPanelMsg('Đã thêm liên hệ khẩn cấp.');
+        setPanelMsg(t('admin.residents.family.contactAdded'));
       }
       setContactModal(null);
       await refreshAfterContactChange();
     } catch (e) {
-      setContactError(e.response?.data?.message || 'Lưu thất bại');
+      setContactError(resolveApiError(e, t, 'admin.residents.common.saveFailed'));
     } finally {
       setContactSaving(false);
     }
   };
 
-  const handleDeleteContact = async (contact) => {
-    if (!window.confirm(`Xóa liên hệ "${contact.fullName}"?`)) return;
+  const handleDeleteContact = (contact) => {
+    if (contact.isPrimary) {
+      showToast(t('admin.residents.family.cannotDeletePrimary'), 'error');
+      return;
+    }
+    setPendingDeleteContact(contact);
+  };
+
+  const confirmDeleteContact = async () => {
+    if (!pendingDeleteContact) return;
+    setDeleteContactSaving(true);
     try {
-      await residentService.removeEmergencyContact(selectedId, contact._id);
-      setPanelMsg('Đã xóa liên hệ khẩn cấp.');
+      await residentService.removeEmergencyContact(selectedId, pendingDeleteContact._id);
+      setPanelMsg(t('admin.residents.family.contactDeleted'));
+      setPendingDeleteContact(null);
       await refreshAfterContactChange();
     } catch (e) {
-      alert(e.response?.data?.message || 'Xóa thất bại');
+      showToast(e.response?.data?.message || t('admin.residents.common.deleteFailed'), 'error');
+    } finally {
+      setDeleteContactSaving(false);
     }
   };
 
@@ -234,10 +312,10 @@ export default function FamilyManagementPage() {
     if (contact.isPrimary) return;
     try {
       await residentService.updateEmergencyContact(selectedId, contact._id, { isPrimary: true });
-      setPanelMsg(`Đã đặt "${contact.fullName}" làm liên hệ chính.`);
+      setPanelMsg(t('admin.residents.common.setPrimarySuccess', { name: contact.fullName }));
       await refreshAfterContactChange();
     } catch (e) {
-      alert(e.response?.data?.message || 'Cập nhật thất bại');
+      showToast(e.response?.data?.message || t('admin.residents.common.updateFailed'), 'error');
     }
   };
 
@@ -256,7 +334,7 @@ export default function FamilyManagementPage() {
     } catch (err) {
       setResidentDetailPopup({
         loading: false,
-        error: err.response?.data?.message || 'Không thể tải chi tiết cư dân',
+        error: err.response?.data?.message || t('admin.residents.common.loadDetailFailed'),
         resident: null,
         summary: r,
       });
@@ -275,8 +353,8 @@ export default function FamilyManagementPage() {
 
   return (
     <AdminPageShell
-      title="Quản lý thông tin thân nhân"
-      subtitle="Quản lý liên hệ khẩn cấp và thông tin gia đình của cư dân đang điều trị."
+      title={t('admin.residents.family.title')}
+      subtitle={t('admin.residents.family.subtitle')}
       actions={
         <button
           type="button"
@@ -285,41 +363,41 @@ export default function FamilyManagementPage() {
           disabled={listLoading}
         >
           <RefreshCw size={16} className={listLoading ? 'spin' : ''} />
-          Làm mới
+          {t('admin.residents.common.refresh')}
         </button>
       }
       stats={[
-        { label: 'Tổng cư dân', value: String(total).padStart(2, '0'), icon: <Users size={20} /> },
+        { label: t('admin.residents.family.statTotal'), value: String(total).padStart(2, '0'), icon: <Users size={20} /> },
         {
-          label: 'Đã có liên hệ',
+          label: t('admin.residents.family.statWithContacts'),
           value: String(stats.withContacts).padStart(2, '0'),
           icon: <Phone size={20} />,
           iconClass: 'resident-stat__icon--admitted',
         },
         {
-          label: 'Chưa có liên hệ',
+          label: t('admin.residents.family.statWithoutContacts'),
           value: String(stats.noContacts).padStart(2, '0'),
           icon: <Phone size={20} />,
           iconClass: 'resident-stat__icon--pending',
         },
       ]}
     >
-      <form className="resident-page__filters" onSubmit={handleSearch}>
+      <div className="resident-page__filters">
         <div className="resident-page__filter-row">
           <label className="resident-page__filter">
-            <span>Tìm kiếm</span>
+            <span>{t('admin.residents.common.search')}</span>
             <div className="resident-page__filter-input">
               <Search size={16} />
               <input
-                type="text"
-                placeholder="Tên hoặc mã cư dân..."
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
+                type="search"
+                placeholder={t('admin.residents.common.searchPlaceholder')}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
               />
             </div>
           </label>
           <label className="resident-page__filter">
-            <span>Trạng thái</span>
+            <span>{t('admin.residents.common.status')}</span>
             <select
               value={statusFilter}
               onChange={(e) => {
@@ -327,40 +405,35 @@ export default function FamilyManagementPage() {
                 setPage(1);
               }}
             >
-              <option value="admitted">Đang điều trị</option>
-              <option value="pending">Chờ nhập viện</option>
-              <option value="discharged">Đã xuất viện</option>
-              <option value="">Tất cả trạng thái</option>
+              <option value="admitted">{t('common.residency.admitted')}</option>
+              <option value="pending">{t('common.residency.pending')}</option>
+              <option value="discharged">{t('common.residency.discharged')}</option>
+              <option value="">{t('common.allStatuses')}</option>
             </select>
           </label>
-          <div className="resident-page__filter-actions">
-            <button type="submit" className="resident-page__button resident-page__button--primary">
-              Áp dụng
-            </button>
-          </div>
         </div>
-      </form>
+      </div>
 
       {listError && <div className="resident-page__error">{listError}</div>}
 
-      <div className="resident-page__split">
+      <div className="resident-page__split family-layout">
         <div>
           <div className="resident-page__table">
           <table className="resident-page__table-element">
             <thead>
               <tr className="resident-page__table-header">
-                <th>Mã</th>
-                <th>Họ tên</th>
-                <th>Số LH</th>
+                <th>{t('admin.residents.common.colCode')}</th>
+                <th>{t('admin.residents.common.colFullName')}</th>
+                <th>{t('admin.residents.family.colContactCount')}</th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
               {listLoading && (
-                <tr><td colSpan={4} className="resident-page__empty">Đang tải...</td></tr>
+                <tr><td colSpan={4} className="resident-page__empty">{t('common.loading')}</td></tr>
               )}
               {!listLoading && residents.length === 0 && (
-                <tr><td colSpan={4} className="resident-page__empty">Không có cư dân nào</td></tr>
+                <tr><td colSpan={4} className="resident-page__empty">{t('admin.residents.common.noResidents')}</td></tr>
               )}
               {!listLoading && residents.map((r) => (
                 <tr
@@ -376,7 +449,7 @@ export default function FamilyManagementPage() {
                     <button
                       type="button"
                       className="resident-icon-btn resident-icon-btn--view"
-                      title="Xem chi tiết cư dân"
+                      title={t('admin.residents.common.viewResidentDetail')}
                       onClick={(e) => openResidentDetail(r, e)}
                     >
                       <FaEye />
@@ -387,47 +460,32 @@ export default function FamilyManagementPage() {
             </tbody>
           </table>
           </div>
-          {!listLoading && totalPages > 1 && (
-            <div className="resident-page__pagination" style={{ marginTop: 12 }}>
-              <span>{total} cư dân · Trang {page}/{totalPages}</span>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button
-                  type="button"
-                  className="resident-page__page-btn"
-                  disabled={page <= 1}
-                  onClick={() => setPage((p) => p - 1)}
-                >
-                  ← Trước
-                </button>
-                <button
-                  type="button"
-                  className="resident-page__page-btn"
-                  disabled={page >= totalPages}
-                  onClick={() => setPage((p) => p + 1)}
-                >
-                  Sau →
-                </button>
-              </div>
-            </div>
+          {!listLoading && residents.length > 0 && (
+            <ListPagination
+              page={page}
+              totalPages={totalPages}
+              total={total}
+              onPageChange={setPage}
+            />
           )}
         </div>
 
         <div className="resident-page__panel">
           {!selectedId ? (
-            <div className="empty-state">Chọn cư dân để xem và quản lý liên hệ thân nhân</div>
+            <div className="empty-state">{t('admin.residents.family.selectHint')}</div>
           ) : detailLoading ? (
-            <div className="empty-state">Đang tải thông tin...</div>
+            <div className="empty-state">{t('admin.residents.common.loadingDetail')}</div>
           ) : detailError ? (
             <div className="empty-state">{detailError}</div>
           ) : (
             <>
-              <h2 className="resident-page__panel-title">Liên hệ khẩn cấp</h2>
+              <h2 className="resident-page__panel-title">{t('admin.residents.family.emergencyContacts')}</h2>
               <p className="resident-page__panel-subtitle">
                 {selectedSummary?.fullName || resident?.fullName}
                 {' · '}
                 {selectedSummary?.residentCode || resident?.residentCode}
                 {resident?.residencyStatus && (
-                  <> · {RESIDENCY_LABELS[resident.residencyStatus] || resident.residencyStatus}</>
+                  <> · {getResidencyLabel(t, resident.residencyStatus)}</>
                 )}
               </p>
               <div className="resident-summary">
@@ -435,17 +493,17 @@ export default function FamilyManagementPage() {
                   {selectedSummary?.fullName || resident?.fullName}
                 </div>
                 <div className="resident-summary__meta">
-                  Phòng: {formatRoom(resident?.roomId || selectedSummary?.roomId)}
+                  {t('admin.residents.common.roomLabel')}: {formatRoom(resident?.roomId || selectedSummary?.roomId, t)}
                   <br />
-                  {contacts.length} liên hệ khẩn cấp
+                  {t('admin.residents.common.contactCountShort', { count: contacts.length })}
                 </div>
               </div>
 
               {panelMsg && <p className="form-success">{panelMsg}</p>}
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569' }}>
-                  Danh sách liên hệ
+              <div className="family-contact-toolbar">
+                <span className="family-contact-toolbar__label">
+                  {t('admin.residents.family.emergencyContactList')}
                 </span>
                 <button
                   type="button"
@@ -455,13 +513,13 @@ export default function FamilyManagementPage() {
                     setContactModal({ mode: 'add' });
                   }}
                 >
-                  + Thêm liên hệ
+                  {t('admin.residents.family.addContactBtn')}
                 </button>
               </div>
 
               {contacts.length === 0 ? (
                 <div className="empty-state" style={{ padding: '24px 0' }}>
-                  Chưa có liên hệ khẩn cấp. Nhấn &quot;Thêm liên hệ&quot; để bổ sung.
+                  {t('admin.residents.family.noContactsYet')}
                 </div>
               ) : (
                 <div className="contact-list">
@@ -472,7 +530,7 @@ export default function FamilyManagementPage() {
                     >
                       <div className="contact-card__header">
                         <span className="contact-card__name">{c.fullName}</span>
-                        {c.isPrimary && <span className="contact-card__primary">Liên hệ chính</span>}
+                        {c.isPrimary && <span className="contact-card__primary">{t('admin.residents.family.primaryBadge')}</span>}
                       </div>
                       <div className="contact-card__row">{c.phone}</div>
                       <div className="contact-card__row">{c.relationship}</div>
@@ -482,7 +540,7 @@ export default function FamilyManagementPage() {
                           className="btn btn--sm btn--ghost"
                           onClick={() => setDetailContact(c)}
                         >
-                          Xem chi tiết
+                          {t('admin.residents.family.viewDetail')}
                         </button>
                         {!c.isPrimary && (
                           <button
@@ -490,7 +548,7 @@ export default function FamilyManagementPage() {
                             className="btn btn--sm btn--ghost"
                             onClick={() => handleSetPrimary(c)}
                           >
-                            Đặt làm chính
+                            {t('admin.residents.family.setPrimary')}
                           </button>
                         )}
                         <button
@@ -501,15 +559,17 @@ export default function FamilyManagementPage() {
                             setContactModal({ mode: 'edit', contact: c });
                           }}
                         >
-                          Sửa
+                          {t('admin.residents.common.edit')}
                         </button>
-                        <button
-                          type="button"
-                          className="btn btn--sm btn--delete"
-                          onClick={() => handleDeleteContact(c)}
-                        >
-                          Xóa
-                        </button>
+                        {!c.isPrimary && (
+                          <button
+                            type="button"
+                            className="btn btn--sm btn--delete"
+                            onClick={() => handleDeleteContact(c)}
+                          >
+                            {t('admin.residents.family.deleteContact')}
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -522,6 +582,7 @@ export default function FamilyManagementPage() {
 
       {contactModal && (
         <ContactFormModal
+          key={contactModal.mode === 'edit' ? contactModal.contact?._id : 'add'}
           mode={contactModal.mode}
           initial={
             contactModal.mode === 'edit' && contactModal.contact
@@ -539,24 +600,36 @@ export default function FamilyManagementPage() {
           error={contactError}
           onSave={handleSaveContact}
           onClose={() => setContactModal(null)}
+          relationshipSuggestions={relationshipSuggestions}
+          t={t}
         />
       )}
+
+      <ConfirmDialog
+        open={!!pendingDeleteContact}
+        title={t('admin.residents.common.confirmDeleteTitle', { defaultValue: t('common.confirmDeleteTitle') })}
+        message={pendingDeleteContact ? t('admin.residents.common.confirmDelete', { name: pendingDeleteContact.fullName }) : ''}
+        loading={deleteContactSaving}
+        onConfirm={confirmDeleteContact}
+        onCancel={() => setPendingDeleteContact(null)}
+      />
 
       {detailContact && (
         <div className="modal-overlay" onClick={() => setDetailContact(null)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h2 className="modal__title">Chi tiết liên hệ thân nhân</h2>
-            <div className="detail-row"><strong>Họ tên:</strong> {detailContact.fullName}</div>
-            <div className="detail-row"><strong>Số điện thoại:</strong> {detailContact.phone}</div>
-            <div className="detail-row"><strong>Quan hệ:</strong> {detailContact.relationship}</div>
-            <div className="detail-row"><strong>Email:</strong> {detailContact.email || '—'}</div>
-            <div className="detail-row"><strong>Địa chỉ:</strong> {detailContact.address || '—'}</div>
+            <h2 className="modal__title">{t('admin.residents.family.contactDetailTitle')}</h2>
+            <div className="detail-row"><strong>{t('admin.residents.family.fullName')}:</strong> {detailContact.fullName}</div>
+            <div className="detail-row"><strong>{t('admin.residents.family.phoneLabel')}:</strong> {detailContact.phone}</div>
+            <div className="detail-row"><strong>{t('admin.residents.family.relationshipLabel')}:</strong> {detailContact.relationship}</div>
+            <div className="detail-row"><strong>{t('admin.residents.family.email')}:</strong> {detailContact.email || '—'}</div>
+            <div className="detail-row"><strong>{t('admin.residents.family.addressLabel')}:</strong> {detailContact.address || '—'}</div>
             <div className="detail-row">
-              <strong>Loại liên hệ:</strong> {detailContact.isPrimary ? 'Liên hệ chính' : 'Liên hệ phụ'}
+              <strong>{t('admin.residents.family.contactType')}:</strong>{' '}
+              {detailContact.isPrimary ? t('admin.residents.family.primaryBadge') : t('admin.residents.family.secondaryContact')}
             </div>
             <div className="modal__actions">
               <button type="button" className="btn-cancel" onClick={() => setDetailContact(null)}>
-                Đóng
+                {t('admin.residents.common.close')}
               </button>
             </div>
           </div>
@@ -566,9 +639,9 @@ export default function FamilyManagementPage() {
       {residentDetailPopup && (
         <div className="modal-overlay" onClick={() => setResidentDetailPopup(null)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h2 className="modal__title">Chi tiết cư dân</h2>
+            <h2 className="modal__title">{t('admin.residents.family.residentDetailTitle')}</h2>
             {residentDetailPopup.loading && (
-              <p className="empty-state" style={{ padding: '16px 0' }}>Đang tải...</p>
+              <p className="empty-state" style={{ padding: '16px 0' }}>{t('common.loading')}</p>
             )}
             {!residentDetailPopup.loading && residentDetailPopup.error && (
               <p className="form-error">{residentDetailPopup.error}</p>
@@ -576,40 +649,36 @@ export default function FamilyManagementPage() {
             {!residentDetailPopup.loading && !residentDetailPopup.error && residentDetailPopup.resident && (
               <>
                 <div className="detail-row">
-                  <strong>Mã cư dân:</strong> {residentDetailPopup.resident.residentCode}
+                  <strong>{t('admin.residents.common.residentCode')}:</strong> {residentDetailPopup.resident.residentCode}
                 </div>
                 <div className="detail-row">
-                  <strong>Họ tên:</strong> {residentDetailPopup.resident.fullName}
+                  <strong>{t('admin.residents.common.colFullName')}:</strong> {residentDetailPopup.resident.fullName}
                 </div>
                 <div className="detail-row">
-                  <strong>Ngày sinh:</strong>{' '}
+                  <strong>{t('admin.residents.common.dateOfBirth')}:</strong>{' '}
                   {residentDetailPopup.resident.dateOfBirth
                     ? formatLeaveDate(residentDetailPopup.resident.dateOfBirth)
                     : '—'}
                 </div>
                 <div className="detail-row">
-                  <strong>Giới tính:</strong>{' '}
-                  {GENDER_LABELS[residentDetailPopup.resident.gender]
-                    || residentDetailPopup.resident.gender
-                    || '—'}
+                  <strong>{t('profile.gender')}:</strong>{' '}
+                  {getGenderLabel(t, residentDetailPopup.resident.gender)}
                 </div>
                 <div className="detail-row">
-                  <strong>Phòng:</strong> {formatRoom(residentDetailPopup.resident.roomId)}
+                  <strong>{t('admin.residents.common.roomLabel')}:</strong> {formatRoom(residentDetailPopup.resident.roomId, t)}
                 </div>
                 <div className="detail-row">
-                  <strong>Trạng thái:</strong>{' '}
-                  {RESIDENCY_LABELS[residentDetailPopup.resident.residencyStatus]
-                    || residentDetailPopup.resident.residencyStatus
-                    || '—'}
+                  <strong>{t('admin.residents.common.colStatus')}:</strong>{' '}
+                  {getResidencyLabel(t, residentDetailPopup.resident.residencyStatus)}
                 </div>
                 <div className="detail-row">
-                  <strong>Số liên hệ khẩn cấp:</strong> {residentDetailPopup.contactCount ?? 0}
+                  <strong>{t('admin.residents.common.contactCount')}:</strong> {residentDetailPopup.contactCount ?? 0}
                 </div>
               </>
             )}
             <div className="modal__actions">
               <button type="button" className="btn-cancel" onClick={() => setResidentDetailPopup(null)}>
-                Đóng
+                {t('admin.residents.common.close')}
               </button>
             </div>
           </div>

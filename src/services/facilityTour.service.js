@@ -115,6 +115,20 @@ const adminApproveTour = async (tourId, body = {}) => {
 };
 
 /**
+ * Complete Tour (Admin)
+ * Xác nhận đã hoàn tất tham quan → Status chuyển thành 'completed'.
+ *
+ * @param {string} tourId - ID của lịch tham quan
+ * @param {object} [body]
+ * @param {string} [body.adminNotes] - Ghi chú của Admin
+ * @returns {object} { message, tour }
+ */
+const adminCompleteTour = async (tourId, body = {}) => {
+  const response = await axiosClient.patch(`/admin/tours/${tourId}/complete`, body);
+  return response.data;
+};
+
+/**
  * Reject Tour Request (Admin)
  * Từ chối yêu cầu tham quan kèm lý do → Status chuyển thành 'cancelled'.
  *
@@ -137,5 +151,6 @@ export default {
   adminGetTourList,
   adminGetTourDetail,
   adminApproveTour,
+  adminCompleteTour,
   adminRejectTour,
 };

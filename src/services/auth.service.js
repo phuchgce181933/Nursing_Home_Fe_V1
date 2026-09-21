@@ -17,6 +17,25 @@ const updateProfile = async (payload) => {
   return response.data;
 };
 
+const requestEmailChangeOtp = async (payload) => {
+  const response = await axiosClient.post('/auth/profile/email-otp', payload);
+  return response.data;
+};
+
+const verifyEmailChangeOtp = async (payload) => {
+  const response = await axiosClient.post('/auth/profile/email-verify', payload);
+  return response.data;
+};
+
+const requestPhoneChangeOtp = async (payload) => {
+  const response = await axiosClient.post('/auth/profile/phone-otp', payload);
+  return response.data;
+};
+
+const verifyPhoneChangeOtp = async (payload) => {
+  const response = await axiosClient.post('/auth/profile/phone-verify', payload);
+  return response.data;
+};
 const changePassword = async (payload) => {
   const response = await axiosClient.put('/auth/change-password', payload);
   return response.data;
@@ -37,6 +56,11 @@ const getStaffAccounts = async (params = {}) => {
   return response.data;
 };
 
+const searchFamilyAccounts = async (params = {}) => {
+  const response = await axiosClient.get('/auth/family-accounts', { params });
+  return response.data;
+};
+
 const createStaffAccount = async (payload) => {
   let data = payload;
   const config = {};
@@ -51,6 +75,10 @@ const createStaffAccount = async (payload) => {
       }
       if (key === 'certificationFiles') {
         value.forEach((file) => formData.append('certificationFiles', file));
+        return;
+      }
+      if (key === 'certificationIssueDates') {
+        formData.append(key, JSON.stringify(value));
         return;
       }
       formData.append(key, value);
@@ -97,9 +125,14 @@ export default {
   forgotPassword,
   resetPassword,
   getStaffAccounts,
+  searchFamilyAccounts,
   createStaffAccount,
   toggleStaffActive,
   updateUserByAdmin,
   logout,
   getFirebaseToken,
+  requestEmailChangeOtp,
+  verifyEmailChangeOtp,
+  requestPhoneChangeOtp,
+  verifyPhoneChangeOtp,
 };

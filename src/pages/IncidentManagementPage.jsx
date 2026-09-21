@@ -1,10 +1,32 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Download, PlusCircle } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import {
+  Download,
+  PlusCircle,
+  Search,
+  Paperclip,
+  AlertTriangle,
+  ShieldAlert,
+  Eye,
+  CheckCircle2,
+  X,
+  MapPin,
+  Clock,
+  User,
+  FileWarning,
+  BarChart3,
+} from 'lucide-react';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import authService from '../services/auth.service';
 import residentService from '../services/resident.service';
+import facilityService from '../services/facility.service';
 import { useAuth } from '../hooks/useAuth';
 import incidentService from '../services/incident.service';
+import { resolveApiError } from '../utils/apiMessage';
+import clinicalServiceService from '../services/clinicalService.service';
+import staffService from '../services/staff.service';
+import { floorLabel } from '../utils/residentArea';
+import '../styles/shared/IncidentManagementPage.css';
 
 const initialForm = {
   incidentType: '',
@@ -12,24 +34,42 @@ const initialForm = {
   incidentAt: '',
   location: '',
   description: '',
-  residentId: '',
+  residentIds: [],
   assignedStaffIds: [],
 };
 
 const statusOptions = ['open', 'investigating', 'resolved', 'closed'];
 
-const STATUS_LABELS = {
-  open: 'Mở',
-  investigating: 'Đang điều tra',
-  resolved: 'Đã giải quyết',
-  closed: 'Đã đóng',
-};
+const getStatusDisplay = (t) => ({
+  open: t('incidents.status.open'),
+  investigating: t('incidents.status.investigating'),
+  resolved: t('incidents.status.resolved'),
+  closed: t('incidents.status.closed'),
+});
 
-const SEVERITY_LABELS = {
-  low: 'Thấp',
-  medium: 'Trung bình',
-  high: 'Cao',
-  critical: 'Nghiêm trọng',
+const getSeverityDisplay = (t) => ({
+  low: t('incidents.severity.low'),
+  medium: t('incidents.severity.medium'),
+  high: t('incidents.severity.high'),
+  critical: t('incidents.severity.critical'),
+});
+
+const getResolutionStatusLabel = (status, t) => {
+  const normalized = String(status || '').trim().toLowerCase().replace(/[-\s]+/g, '_');
+  const labels = t ? {
+    in_progress: t('incidentManagement.resolutionStatus.inProgress'),
+    pending: t('incidentManagement.resolutionStatus.pending'),
+    resolved: t('incidentManagement.resolutionStatus.resolved'),
+    completed: t('incidentManagement.resolutionStatus.completed'),
+    closed: t('incidentManagement.resolutionStatus.closed'),
+  } : {
+    in_progress: 'In Progress',
+    pending: 'Pending',
+    resolved: 'Resolved',
+    completed: 'Completed',
+    closed: 'Closed',
+  };
+  return labels[normalized] || status || '—';
 };
 
 function formatDate(value) {
@@ -44,149 +84,758 @@ function toIsoDatetime(value) {
   return date.toISOString();
 }
 
+function getMaxDatetimeLocal() {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+const MAX_TEXT_LENGTH = 500;
+const MAX_SHORT_TEXT_LENGTH = 200;
+
 function IncidentManagementPage() {
+  const { t } = useTranslation();
   const { user } = useAuth();
+  const STATUS_DISPLAY = useMemo(() => getStatusDisplay(t), [t]);
+  const SEVERITY_DISPLAY = useMemo(() => getSeverityDisplay(t), [t]);
   const [incidents, setIncidents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [optionsLoading, setOptionsLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [pageSize] = useState(10);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('success');
   const [form, setForm] = useState(initialForm);
+  const [fieldErrors, setFieldErrors] = useState({});
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [residents, setResidents] = useState([]);
   const [staffAccounts, setStaffAccounts] = useState([]);
+  const [staffSearch, setStaffSearch] = useState('');
+  const [areaFilter, setAreaFilter] = useState('');
+  const [residentAreaFilter, setResidentAreaFilter] = useState('');
+  const [residentSearch, setResidentSearch] = useState('');
+  const [floors, setFloors] = useState([]);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailIncident, setDetailIncident] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState(null);
+  const [assignHandlersOpen, setAssignHandlersOpen] = useState(false);
+  const [selectedHandlers, setSelectedHandlers] = useState([]);
+  const [assigningHandlers, setAssigningHandlers] = useState(false);
+  const [drawerJustOpened, setDrawerJustOpened] = useState(false);
+  const [resolutionForm, setResolutionForm] = useState(null);
+  const [resolutionFiles, setResolutionFiles] = useState([]);
+  const [resolutionFilePreviews, setResolutionFilePreviews] = useState([]);
+  const [savingResolution, setSavingResolution] = useState(false);
+  const [reopenForm, setReopenForm] = useState(null);
+  const attachmentInputRef = useRef(null);
 
-  const isAdmin = user?.role === 'admin';
+  const noResidentSelected = resolutionForm?.medical?.residentCondition === 'NoResident';
+  const [clinicalServices, setClinicalServices] = useState([]);
+  const [selectedClinicalServices, setSelectedClinicalServices] = useState({});
+  const [medSuggestions] = useState(["Paracetamol", "Amoxicillin", "Ibuprofen", "Metformin", "Aspirin", "Omeprazole"]);
+  const [medSuggestionOpenIndex, setMedSuggestionOpenIndex] = useState(-1);
+  const immediateActionOptions = [
+    { value: 'Lau sàn', i18nKey: 'incidents.immediateAction.cleanFloor' },
+    { value: 'Hỗ trợ cư dân', i18nKey: 'incidents.immediateAction.assistResident' },
+    { value: 'Gọi bác sĩ', i18nKey: 'incidents.immediateAction.callDoctor' },
+    { value: 'Liên hệ gia đình', i18nKey: 'incidents.immediateAction.contactFamily' },
+    { value: 'Chuyển viện', i18nKey: 'incidents.immediateAction.transferHospital' },
+    { value: 'Khác', i18nKey: 'incidents.immediateAction.other' },
+  ];
+  const [staffAvailabilityMap, setStaffAvailabilityMap] = useState({});
+  const [assignmentConflicts, setAssignmentConflicts] = useState({});
+
+  const isAdmin = String(user?.role || '').toLowerCase() === 'admin';
+  const isCaregiver = String(user?.role || '').toLowerCase() === 'caregiver';
+  const canAssignHandlers = isAdmin;
 
   const formatResidentLabel = (resident) => {
-    const baseName = resident?.fullName || 'Cư dân không tên';
+    const baseName = resident?.fullName || t('incidents.unnamedResident');
     const code = resident?.residentCode ? ` (${resident.residentCode})` : '';
     return `${baseName}${code}`;
   };
 
   const formatStaffLabel = (staff) => {
-    const name = staff?.fullName || staff?.email || 'Nhân viên không tên';
+    const name = staff?.fullName || staff?.email || t('incidents.unnamedStaff');
     const role = staff?.role ? ` — ${staff.role.toUpperCase()}` : '';
     const email = staff?.email ? ` • ${staff.email}` : '';
     return `${name}${role}${email}`;
   };
 
+  const getTodayLocalDateString = () => {
+    const now = new Date();
+    const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+    return local.toISOString().slice(0, 10);
+  };
+
+  useEffect(() => {
+    // generate object URLs for image previews for resolution files
+    let mounted = true;
+    if (!resolutionFiles || !resolutionFiles.length) {
+      setResolutionFilePreviews([]);
+      return () => { mounted = false; };
+    }
+    const previews = resolutionFiles.map((file) => {
+      try {
+        const url = URL.createObjectURL(file);
+        return { file, url };
+      } catch (e) {
+        return { file, url: null };
+      }
+    });
+    if (mounted) setResolutionFilePreviews(previews);
+    return () => {
+      mounted = false;
+      (previews || []).forEach((p) => { if (p && p.url) URL.revokeObjectURL(p.url); });
+    };
+  }, [resolutionFiles]);
+
+  const handleResolutionFilesChange = (filesArray) => {
+    // revoke previous previews
+    (resolutionFilePreviews || []).forEach((p) => { if (p && p.url) { try { URL.revokeObjectURL(p.url); } catch (e) {} } });
+    const previews = (filesArray || []).map((file) => {
+      try { return { file, url: URL.createObjectURL(file) }; }
+      catch (e) { return { file, url: null }; }
+    });
+    setResolutionFiles(filesArray || []);
+    setResolutionFilePreviews(previews);
+  };
+
+  const handleAttachmentButtonClick = () => {
+    attachmentInputRef.current?.click();
+  };
+
+  const removeResolutionFile = (index) => {
+    setResolutionFiles((prev) => {
+      const next = [...prev];
+      const removed = next.splice(index, 1);
+      return next;
+    });
+    setResolutionFilePreviews((prev) => {
+      const next = [...(prev || [])];
+      const removed = next.splice(index, 1);
+      if (removed && removed[0] && removed[0].url) {
+        try { URL.revokeObjectURL(removed[0].url); } catch (e) {}
+      }
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const res = await clinicalServiceService.listServices({ active: true, page: 1, limit: 500 });
+        const services = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+        if (mounted && services.length > 0) setClinicalServices(services);
+        else if (mounted && clinicalServices.length === 0) setClinicalServices([]);
+      } catch (err) {
+        if (mounted && clinicalServices.length === 0) setClinicalServices([]);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+
+  const getSelectedClinicalServiceFieldValue = (serviceId, fieldCode) => {
+    return selectedClinicalServices[serviceId]?.fieldValues?.[fieldCode] ?? '';
+  };
+  const setSelectedClinicalServiceFieldValue = (serviceId, fieldCode, value) => {
+    setSelectedClinicalServices((prev) => {
+      const svc = prev[serviceId];
+      if (!svc) return prev;
+      const nextFieldValues = { ...(svc.fieldValues || {}) };
+      nextFieldValues[fieldCode] = value;
+      return { ...prev, [serviceId]: { ...svc, fieldValues: nextFieldValues } };
+    });
+  };
+
+  const getStaffSelectionId = (staff) => {
+    if (!staff) return '';
+    return String(
+      staff?.staffProfile?._id
+      || staff?.staffProfile?.id
+      || staff?.userId?._id
+      || staff?.userId
+      || staff?.id
+      || staff?._id
+      || ''
+    );
+  };
+
+  const floorLabelMap = useMemo(
+    () => Object.fromEntries(floors.map((floor) => [String(floor._id), floorLabel(floor, t) || floor.name || floor.label || String(floor._id)])),
+    [floors, t]
+  );
+
+  const getAreaKey = (area) => {
+    if (!area) return '';
+    if (typeof area === 'object' && area !== null) {
+      return String(area._id || area.id || area.name || area.floorNumber || area.label || '');
+    }
+    return String(area);
+  };
+
+  const getAreaLabel = (area) => {
+    if (!area) return null;
+    const key = getAreaKey(area);
+    return floorLabelMap[key] || floorLabel(area, t) || area?.name || area?.label || String(key);
+  };
+
+  const areaOptions = useMemo(() => {
+    const map = new Map();
+    staffAccounts.forEach((staff) => {
+      const areas = staff?.staffProfile?.responsibleAreaIds ?? staff?.responsibleAreaIds;
+      if (!Array.isArray(areas)) return;
+      areas.forEach((area) => {
+        if (!area) return;
+        const key = getAreaKey(area);
+        const label = getAreaLabel(area);
+        if (key && label && !map.has(key)) {
+          map.set(key, label);
+        }
+      });
+    });
+    return Array.from(map, ([id, label]) => ({ id, label }));
+  }, [staffAccounts, floorLabelMap, t]);
+
+  const getResidentArea = (resident) => resident?.roomId?.floorId ?? resident?.area?.floor ?? resident?.floor;
+
+  const residentAreaOptions = useMemo(() => {
+    const map = new Map();
+    residents.forEach((resident) => {
+      const area = getResidentArea(resident);
+      if (!area) return;
+      const key = getAreaKey(area);
+      const label = getAreaLabel(area);
+      if (key && label && !map.has(key)) {
+        map.set(key, label);
+      }
+    });
+    return Array.from(map, ([id, label]) => ({ id, label })).sort((a, b) => a.label.localeCompare(b.label));
+  }, [residents, floorLabelMap, t]);
+
+  const filteredResidents = useMemo(() => {
+    let list = residents;
+    if (residentAreaFilter) {
+      list = list.filter((resident) => {
+        const area = getResidentArea(resident);
+        if (!area) return false;
+        const key = getAreaKey(area);
+        return key === residentAreaFilter;
+      });
+    }
+    const query = residentSearch.trim().toLowerCase();
+    if (!query) return list;
+    return list.filter((resident) => formatResidentLabel(resident).toLowerCase().includes(query));
+  }, [residents, residentAreaFilter, residentSearch, t]);
+
+  const filteredStaff = useMemo(() => {
+    let list = staffAccounts;
+    if (areaFilter) {
+      list = list.filter((staff) => {
+        const areas = staff?.staffProfile?.responsibleAreaIds ?? staff?.responsibleAreaIds;
+        if (!Array.isArray(areas)) return false;
+        return areas.some((area) => {
+          const key = typeof area === 'object' && area !== null
+            ? String(area._id || area.id || area.name || area.floorNumber || area.label || '')
+            : String(area);
+          return key === areaFilter;
+        });
+      });
+    }
+    const query = staffSearch.trim().toLowerCase();
+    if (!query) return list;
+    return list.filter((staff) => formatStaffLabel(staff).toLowerCase().includes(query));
+  }, [staffAccounts, staffSearch, areaFilter]);
+
+  const toggleResident = (residentId) => {
+    setForm((current) => {
+      const alreadySelected = current.residentIds.includes(residentId);
+      return {
+        ...current,
+        residentIds: alreadySelected
+          ? current.residentIds.filter((id) => id !== residentId)
+          : [...current.residentIds, residentId],
+      };
+    });
+  };
+
+  const toggleAssignedStaff = (staff) => {
+    const staffId = getStaffSelectionId(staff);
+    if (!staffId) return;
+
+    setForm((current) => {
+      const alreadyAssigned = current.assignedStaffIds.includes(staffId);
+      return {
+        ...current,
+        assignedStaffIds: alreadyAssigned
+          ? current.assignedStaffIds.filter((id) => id !== staffId)
+          : [...current.assignedStaffIds, staffId],
+      };
+    });
+  };
+
+  const getStaffAvailabilityKey = (staff) => {
+    if (!staff) return '';
+    return String(staff?.userId?._id || staff?.userId || staff?._id || staff?.id || '');
+  };
+
+  const getStaffAvailability = (staff) => {
+    const key = getStaffAvailabilityKey(staff);
+    return key ? staffAvailabilityMap[key] : null;
+  };
+
+  const getStaffIsOnDuty = (staff) => {
+    const availability = getStaffAvailability(staff);
+    if (!availability) return false;
+    return availability.isOnShift || availability.onShift || availability.availabilityStatus === 'On Duty';
+  };
+
+  const getStaffAvailabilityLabel = (staff) => {
+    const availability = getStaffAvailability(staff);
+    const staffId = getStaffSelectionId(staff);
+    const conflict = assignmentConflicts[staffId];
+
+    if (!availability) {
+      if (conflict && Array.isArray(conflict.reasons) && conflict.reasons.length) {
+        return `${conflict.reasons.join(' · ')}`;
+      }
+      return '—';
+    }
+
+    const status = availability.availabilityStatus || availability.readinessLabelVi || '—';
+    const isOnDuty = getStaffIsOnDuty(staff);
+    const baseLabel = isOnDuty ? `${t('incidents.availability.onDuty')} · ${status}` : `${t('incidents.availability.offDuty')} · ${status}`;
+
+    const formatConflictDetails = (conf) => {
+      if (!conf) return '';
+      const parts = [];
+      if (Array.isArray(conf.careTasksForDayTimes) && conf.careTasksForDayTimes.length) {
+        parts.push(t('incidents.availability.tasksForDay', { tasks: conf.careTasksForDayTimes.join(', ') }));
+      } else if (Array.isArray(conf.allCareTaskTimes) && conf.allCareTaskTimes.length) {
+        parts.push(t('incidents.availability.tasks', { tasks: conf.allCareTaskTimes.join(', ') }));
+      }
+
+      if (Array.isArray(conf.appointmentTimesForDay) && conf.appointmentTimesForDay.length) {
+        const formattedAppts = conf.appointmentTimesForDay.map((a) => {
+          try {
+            const d = new Date(a);
+            return d.toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+          } catch (e) {
+            return String(a);
+          }
+        });
+        parts.push(t('incidents.availability.appointmentsForDay', { appts: formattedAppts.join(', ') }));
+      }
+      if (parts.length === 0 && Array.isArray(conf.reasons) && conf.reasons.length) {
+        parts.push(conf.reasons.join(', '));
+      }
+      return parts.join(' · ');
+    };
+
+    const conflictDetails = formatConflictDetails(conflict);
+    if (conflictDetails) return `${baseLabel} · ${conflictDetails}`;
+
+    return baseLabel;
+  };
+
+  const getStaffConflictBadge = (staff) => {
+    const staffId = getStaffSelectionId(staff);
+    const conflict = assignmentConflicts[staffId];
+    if (!conflict) return null;
+    if (!conflict.canAssign) {
+      return <span className="ic-availability ic-availability--conflict">{t('incidents.availability.cannotAssign')} · {conflict.reasons.join(' · ')}</span>;
+    }
+    return null;
+  };
+
+  const isStaffConflicted = (staff) => {
+    const staffId = getStaffSelectionId(staff);
+    const conflict = assignmentConflicts[staffId];
+    if (!conflict) return false;
+    if (conflict.canAssign) return false;
+
+    // If incident time not set, treat as conflicted
+    if (!form.incidentAt) return true;
+
+    const incidentDate = new Date(form.incidentAt);
+    if (Number.isNaN(incidentDate.getTime())) return true;
+
+    const parseTaskTimeToDate = (timeStr) => {
+      if (!timeStr) return null;
+      // timeStr expected like '14:00' or '8:30'
+      const datePart = (form.incidentAt && form.incidentAt.split('T')[0]) || new Date().toISOString().slice(0, 10);
+      const normalized = timeStr.length === 5 ? timeStr : String(timeStr).slice(0,5);
+      const candidate = new Date(`${datePart}T${normalized}:00`);
+      return Number.isNaN(candidate.getTime()) ? null : candidate;
+    };
+
+    const times = [];
+    const careTimes = conflict.allCareTaskTimes || conflict.careTaskTimes || [];
+    careTimes.forEach((t) => {
+      const d = parseTaskTimeToDate(t);
+      if (d) times.push(d);
+    });
+    const apptTimes = conflict.allAppointmentTimes || conflict.appointmentTimes || [];
+    apptTimes.forEach((a) => {
+      try {
+        const d = new Date(a);
+        if (!Number.isNaN(d.getTime())) times.push(d);
+      } catch (e) {
+        // ignore
+      }
+    });
+
+    if (times.length === 0) return true;
+
+    // If ALL times are strictly before the incidentDate, then allow selection (not conflicted)
+    const allBefore = times.every((d) => d.getTime() < incidentDate.getTime());
+    return !allBefore;
+  };
+
+  const getReporterStaffSelectionId = (incident) => {
+    if (!incident || !staffAccounts.length) return null;
+
+    const reporterEmail = incident?.reporterEmail?.toLowerCase?.();
+    const reporterName = incident?.reporterName?.trim();
+    const reportedByUser = incident?.reportedByUserId;
+    const reportedByUserId = reportedByUser?._id || reportedByUser?.id || reportedByUser;
+
+    const matchedStaff = staffAccounts.find((staff) => {
+      const staffId = getStaffSelectionId(staff);
+      const staffUserId = getStaffSelectionId(staff);
+      const staffEmail = staff?.email?.toLowerCase?.() || staff?.userId?.email?.toLowerCase?.();
+      const staffName = staff?.fullName || staff?.userId?.fullName || '';
+
+      if (staffId && reportedByUserId && String(staffId) === String(reportedByUserId)) return true;
+      if (staffUserId && reportedByUserId && String(staffUserId) === String(reportedByUserId)) return true;
+      if (reporterEmail && staffEmail && reporterEmail === staffEmail) return true;
+      if (reporterName && staffName && reporterName.trim().toLowerCase() === staffName.trim().toLowerCase()) return true;
+      return false;
+    });
+
+    return matchedStaff ? getStaffSelectionId(matchedStaff) : null;
+  };
+
+  /* ── Data loading ──────────────────────────────────────────── */
   const loadIncidents = async () => {
     setLoading(true);
-
     try {
       const payload = {
-        page: 1,
-        limit: 20,
+        page,
+        limit: pageSize,
         ...(search ? { search } : {}),
         ...(statusFilter ? { status: statusFilter } : {}),
-        ...(isAdmin ? {} : { reporterRole: user?.role }),
       };
-
       const data = await incidentService.listIncidents(payload);
       setIncidents(data.items || []);
+      setTotalPages(data.totalPages || 1);
+      setTotalItems(data.total || 0);
       setMessage('');
     } catch (error) {
       setMessageType('error');
-      setMessage(error?.response?.data?.message || 'Không thể tải danh sách sự cố.');
+      setMessage(resolveApiError(error, t, 'incidents.error.loadFailed'));
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (!user) {
-      return;
-    }
+    // Auto-select current user as assigned staff when drawer opens and staff accounts are loaded
+    if (drawerJustOpened && staffAccounts.length > 0 && !optionsLoading) {
+      // Find current user's staff profile - try multiple match strategies
+      let currentUserStaff = staffAccounts.find((staff) => {
+        const staffUserId = staff.userId?._id || staff.userId;
+        const match = staffUserId === user?._id;
+        return match;
+      });
 
-    loadIncidents();
-  }, [user, search, statusFilter]);
+      // If not found, try matching by email
+      if (!currentUserStaff && user?.email) {
+        currentUserStaff = staffAccounts.find((staff) => staff.email === user.email || staff.userId?.email === user.email);
+      }
+
+      if (currentUserStaff) {
+        const staffId = getStaffSelectionId(currentUserStaff);
+        setForm((prev) => ({
+          ...prev,
+          assignedStaffIds: [staffId],
+        }));
+      }
+      
+      setDrawerJustOpened(false);
+    }
+  }, [drawerJustOpened, staffAccounts, optionsLoading, user]);
 
   useEffect(() => {
-    if (!user) {
+    if (!assignHandlersOpen || !detailIncident || !staffAccounts.length) return;
+
+    const preselectedReporterStaffId = getReporterStaffSelectionId(detailIncident);
+    if (!preselectedReporterStaffId) return;
+
+    setSelectedHandlers((current) => {
+      const next = current.includes(preselectedReporterStaffId)
+        ? current
+        : [...current, preselectedReporterStaffId];
+      return next;
+    });
+  }, [assignHandlersOpen, detailIncident, staffAccounts]);
+
+  useEffect(() => {
+    // Reset drawerJustOpened when drawer closes
+    if (!drawerOpen) {
+      setDrawerJustOpened(false);
+    }
+  }, [drawerOpen]);
+
+  useEffect(() => {
+    if (!user) return;
+    loadIncidents();
+  }, [user, search, statusFilter, page, pageSize, isAdmin, isCaregiver]);
+
+  useEffect(() => {
+    if (!isAdmin || !staffAccounts.length || !form.incidentAt) {
+      setAssignmentConflicts({});
       return;
     }
 
     let active = true;
-
-    const loadFormOptions = async () => {
-      setOptionsLoading(true);
-
+    const loadConflicts = async () => {
       try {
-        const [residentResponse, staffResponse] = await Promise.all([
-          residentService.getResidentList({ page: 1, limit: 200 }),
-          authService.getStaffAccounts({ page: 1, limit: 500 }),
-        ]);
-
-        if (!active) {
+        const staffProfileIds = staffAccounts
+          .map((staff) => getStaffSelectionId(staff))
+          .filter(Boolean);
+        if (!staffProfileIds.length) {
+          if (active) setAssignmentConflicts({});
           return;
         }
-
-        setResidents(residentResponse?.data || []);
-        setStaffAccounts(staffResponse?.data || []);
+        const response = await incidentService.getAssignmentConflicts({
+          incidentAt: form.incidentAt,
+          residentIds: form.residentIds,
+          staffProfileIds,
+        });
+        if (!active) return;
+        console.debug('[DEBUG] assignmentConflicts response', response);
+        setAssignmentConflicts(response?.conflicts || {});
       } catch (error) {
-        if (!active) {
-          return;
-        }
-
-        setMessageType('error');
-        setMessage(error?.response?.data?.message || 'Không thể tải tùy chọn cư dân và nhân viên.');
-      } finally {
-        if (active) {
-          setOptionsLoading(false);
-        }
+        if (active) setAssignmentConflicts({});
       }
     };
 
-    loadFormOptions();
+    loadConflicts();
+    return () => { active = false; };
+  }, [isAdmin, staffAccounts, form.incidentAt, form.residentIds]);
 
-    return () => {
-      active = false;
+  useEffect(() => {
+    if (!isAdmin || !staffAccounts.length) {
+      setStaffAvailabilityMap({});
+      return;
+    }
+
+    let active = true;
+    const loadAvailability = async () => {
+      try {
+        const today = getTodayLocalDateString();
+        const roles = ['nurse', 'doctor', 'caregiver', 'pharmacist'];
+        const availabilityResponses = await Promise.all(
+          roles.map((role) => staffService.getAvailability({ role, date: today }).catch(() => []))
+        );
+
+        if (!active) return;
+        const nextMap = {};
+        const rows = availabilityResponses.flatMap((response) =>
+          Array.isArray(response) ? response : response?.data || []
+        );
+        rows.forEach((row) => {
+          const key = String(row?._id || row?.userId?._id || row?.userId || '');
+          if (key) nextMap[key] = row;
+        });
+        setStaffAvailabilityMap(nextMap);
+      } catch (error) {
+        if (active) setStaffAvailabilityMap({});
+      }
     };
-  }, [user]);
+
+    loadAvailability();
+    return () => { active = false; };
+  }, [isAdmin, staffAccounts]);
+
+  useEffect(() => {
+    if (!user) return;
+    let active = true;
+    const loadFormOptions = async () => {
+      setOptionsLoading(true);
+      try {
+        const residentPromise = residentService.getResidentList({ page: 1, limit: 1000 });
+        const floorPromise = facilityService.listFloors({ activeOnly: true });
+        const staffPromise = isAdmin
+          ? authService.getStaffAccounts({ page: 1, limit: 500 })
+          : Promise.resolve([]);
+
+        const [residentResponse, staffResponse, floorResponse] = await Promise.all([
+          residentPromise,
+          staffPromise,
+          floorPromise,
+        ]);
+        if (!active) return;
+        setResidents(Array.isArray(residentResponse) ? residentResponse : residentResponse?.data || []);
+        setStaffAccounts(Array.isArray(staffResponse) ? staffResponse : staffResponse?.data || []);
+        setFloors(Array.isArray(floorResponse) ? floorResponse : []);
+      } catch (error) {
+        if (!active) return;
+        setMessageType('error');
+        setMessage(resolveApiError(error, t, 'incidents.error.loadOptionsFailed'));
+      } finally {
+        if (active) setOptionsLoading(false);
+      }
+    };
+    loadFormOptions();
+    return () => { active = false; };
+  }, [user, t]);
+
+  /* ── Handlers ──────────────────────────────────────────────── */
+  const validateForm = () => {
+    const errors = {};
+    if (!form.incidentType.trim()) errors.incidentType = t('incidents.form.errRequired', 'This field is required');
+    else if (form.incidentType.trim().length > MAX_SHORT_TEXT_LENGTH) errors.incidentType = t('incidents.form.errTooLong', { max: MAX_SHORT_TEXT_LENGTH, defaultValue: `Must not exceed ${MAX_SHORT_TEXT_LENGTH} characters` });
+    if (!form.incidentAt) errors.incidentAt = t('incidents.form.errRequired', 'This field is required');
+    else if (new Date(form.incidentAt).getTime() > Date.now() + 60000) errors.incidentAt = t('incidents.form.errFutureDate', 'Cannot be in the future');
+    if (form.location && form.location.length > MAX_SHORT_TEXT_LENGTH) errors.location = t('incidents.form.errTooLong', { max: MAX_SHORT_TEXT_LENGTH, defaultValue: `Must not exceed ${MAX_SHORT_TEXT_LENGTH} characters` });
+    if (!form.description.trim()) errors.description = t('incidents.form.errRequired', 'This field is required');
+    else if (form.description.trim().length > MAX_TEXT_LENGTH) errors.description = t('incidents.form.errTooLong', { max: MAX_TEXT_LENGTH, defaultValue: `Must not exceed ${MAX_TEXT_LENGTH} characters` });
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
 
   const handleCreate = async (event) => {
     event.preventDefault();
+    if (!validateForm()) return;
     setIsSaving(true);
     setMessage('');
-
+    // Validate that incident date is today (only time may be edited)
+    try {
+      const incidentAtVal = form.incidentAt;
+      if (!incidentAtVal) {
+        setMessageType('error');
+        setMessage(t('incidents.error.invalidIncidentAt'));
+        setIsSaving(false);
+        return;
+      }
+      const datePart = (incidentAtVal.split && incidentAtVal.split('T')[0]) || '';
+      const today = new Date().toISOString().slice(0, 10);
+      if (datePart !== today) {
+        setMessageType('error');
+        setMessage(t('incidents.error.incidentDateMustBeToday'));
+        setIsSaving(false);
+        return;
+      }
+    } catch (err) {
+      setMessageType('error');
+      setMessage(t('incidents.error.invalidIncidentAt'));
+      setIsSaving(false);
+      return;
+    }
     try {
       const payload = {
         ...form,
         incidentAt: toIsoDatetime(form.incidentAt),
-        residentId: form.residentId || undefined,
-        assignedStaffIds: form.assignedStaffIds.length ? form.assignedStaffIds : undefined,
+        residentIds: form.residentIds.length ? form.residentIds : undefined,
+        assignedStaffIds: canAssignHandlers && form.assignedStaffIds.length ? form.assignedStaffIds : undefined,
       };
-
       await incidentService.createIncident(payload);
       setMessageType('success');
-      setMessage('Tạo sự cố thành công.');
+      setMessage(t('incidents.success.created'));
       setForm(initialForm);
+      setFieldErrors({});
+      setDrawerOpen(false);
       await loadIncidents();
     } catch (error) {
       setMessageType('error');
-      setMessage(error?.response?.data?.message || 'Không thể tạo sự cố.');
+      setMessage(resolveApiError(error, t, 'incidents.error.createFailed'));
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleReopen = async (newAssignedStaffIds = []) => {
+    if (!detailIncident?._id) return;
+    setDetailLoading(true);
+    try {
+      const payload = {
+        assignedStaffIds: newAssignedStaffIds && newAssignedStaffIds.length > 0 ? newAssignedStaffIds : detailIncident.assignedStaffIds || [],
+      };
+      await incidentService.reopenIncident(detailIncident._id, payload);
+      setMessageType('success');
+      setMessage(t('incidents.reopen.success'));
+      setReopenForm(null);
+      await loadIncidents();
+      await handleViewDetail(detailIncident._id);
+    } catch (error) {
+      setMessageType('error');
+      setMessage(error?.response?.data?.message || t('incidents.reopen.failed'));
+    } finally {
+      setDetailLoading(false);
     }
   };
 
   const handleStatusUpdate = async (incidentId, status) => {
     setIsSaving(true);
     setMessage('');
-
     try {
       await incidentService.updateIncidentStatus(incidentId, { status });
       setMessageType('success');
-      setMessage('Cập nhật trạng thái sự cố thành công.');
+      setMessage(t('incidents.success.statusUpdated'));
       await loadIncidents();
     } catch (error) {
       setMessageType('error');
-      setMessage(error?.response?.data?.message || 'Không thể cập nhật trạng thái sự cố.');
+      setMessage(resolveApiError(error, t, 'incidents.error.updateStatusFailed'));
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleSearchChange = (event) => {
+    setSearch(event.target.value);
+    setPage(1);
+  };
+
+  const handleStatusFilterChange = (nextStatus) => {
+    setStatusFilter(nextStatus);
+    setPage(1);
+  };
+
+  const handleViewDetail = async (incidentId) => {
+    setDetailOpen(true);
+    setDetailLoading(true);
+    setDetailIncident(null);
+    setDetailError(null);
+    try {
+      const data = await incidentService.getIncident(incidentId);
+      setDetailIncident(data);
+      // Initialize resolution form from incident
+      setResolutionForm({
+        method: data?.resolution?.method || '',
+        rootCause: data?.resolution?.rootCause || '',
+        detailedCause: data?.resolution?.detailedCause || '',
+        immediateActions: data?.resolution?.immediateActions || [],
+        medical: data?.resolution?.medical || { medications: [], procedures: [], residentCondition: '', needFollowUp: false },
+        severityAssessment: data?.resolution?.severityAssessment || '',
+        escalationRequested: data?.resolution?.escalationRequested || false,
+        notes: data?.resolution?.notes || '',
+      });
+      setResolutionFiles([]);
+    } catch (error) {
+      const msg = error?.response?.data?.message || t('incidents.error.loadFailed');
+      setDetailError(msg);
+      setDetailIncident(null);
+    } finally {
+      setDetailLoading(false);
     }
   };
 
@@ -195,9 +844,7 @@ function IncidentManagementPage() {
       const csv = await incidentService.exportIncidents({
         ...(search ? { search } : {}),
         ...(statusFilter ? { status: statusFilter } : {}),
-        ...(isAdmin ? {} : { reporterRole: user?.role }),
       });
-
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -206,250 +853,1112 @@ function IncidentManagementPage() {
       link.click();
       URL.revokeObjectURL(url);
       setMessageType('success');
-      setMessage('Bắt đầu xuất dữ liệu sự cố.');
+      setMessage(t('incidents.success.exportStarted'));
     } catch (error) {
       setMessageType('error');
-      setMessage(error?.response?.data?.message || 'Không thể xuất dữ liệu sự cố.');
+      setMessage(resolveApiError(error, t, 'incidents.error.exportFailed'));
     }
   };
 
+  const handleAssignHandlers = async () => {
+    if (!detailIncident || !selectedHandlers.length) {
+      setMessage(t('incidents.error.selectHandlers'));
+      setMessageType('error');
+      return;
+    }
+    setAssigningHandlers(true);
+    try {
+      await incidentService.assignHandlers(detailIncident._id, { assignedStaffIds: selectedHandlers });
+      setMessageType('success');
+      setMessage(t('incidents.success.handlersAssigned'));
+      setAssignHandlersOpen(false);
+      setSelectedHandlers([]);
+      await loadIncidents();
+      // Reload the detail incident
+      if (detailIncident) {
+        await handleViewDetail(detailIncident._id);
+      }
+    } catch (error) {
+      setMessageType('error');
+      setMessage(error?.response?.data?.message || t('incidents.error.assignHandlersFailed'));
+    } finally {
+      setAssigningHandlers(false);
+    }
+  };
+
+  const handleOpenDrawer = () => {
+    // Pre-fill incidentAt with today's date and current time (local)
+    const now = new Date();
+    const today = now.toISOString().slice(0, 10);
+    const hh = String(now.getHours()).padStart(2, '0');
+    const mm = String(now.getMinutes()).padStart(2, '0');
+    const datetimeLocal = `${today}T${hh}:${mm}`;
+    setForm({ ...initialForm, incidentAt: datetimeLocal });
+    setDrawerJustOpened(true);
+    setDrawerOpen(true);
+  };
+
+  // Helper to extract time part (HH:MM) from form.incidentAt
+  const getIncidentTime = () => {
+    try {
+      if (!form.incidentAt) return '';
+      const parts = form.incidentAt.split('T');
+      return (parts[1] || '').slice(0, 5);
+    } catch (e) {
+      return '';
+    }
+  };
+
+  // Update form.incidentAt time portion while keeping date unchanged
+  const setIncidentTime = (timeStr) => {
+    try {
+      const datePart = (form.incidentAt && form.incidentAt.split('T')[0]) || new Date().toISOString().slice(0, 10);
+      const normalizedTime = timeStr && timeStr.length === 5 ? timeStr : '00:00';
+      setForm((c) => ({ ...c, incidentAt: `${datePart}T${normalizedTime}` }));
+    } catch (e) {
+      // fallback
+      const today = new Date().toISOString().slice(0, 10);
+      setForm((c) => ({ ...c, incidentAt: `${today}T00:00` }));
+    }
+  };
+
+  /* ── Computed ──────────────────────────────────────────────── */
   const stats = useMemo(() => ({
     total: incidents.length,
-    open: incidents.filter((incident) => incident.status === 'open').length,
-    investigating: incidents.filter((incident) => incident.status === 'investigating').length,
-    resolved: incidents.filter((incident) => incident.status === 'resolved').length,
+    open: incidents.filter((i) => i.status === 'open').length,
+    investigating: incidents.filter((i) => i.status === 'investigating').length,
+    resolved: incidents.filter((i) => i.status === 'resolved').length,
   }), [incidents]);
 
   if (!user) {
-    return <LoadingSpinner label="Đang tải trang sự cố..." />;
+    return <LoadingSpinner label={t('incidents.loadingPage')} />;
   }
 
   return (
-    <div className="profile-page">
-      <header className="profile-page__header">
-        <div>
-          <h1 className="profile-page__title">Quản lý sự cố</h1>
-          <p className="profile-page__subtitle">Quản lý sự cố cho quản trị viên, bác sĩ và điều dưỡng.</p>
+    <div className="ic-page">
+      {/* ── Header ─────────────────────────────────────────── */}
+      <header className="ic-header">
+        <div className="ic-header__info">
+          <h1 className="ic-header__title">{t('incidents.title')}</h1>
+          <p className="ic-header__subtitle">{t('incidents.subtitle')}</p>
         </div>
-        <button type="button" className="button button--primary" onClick={handleExport}>
-          <Download size={16} />
-          Xuất CSV
-        </button>
+        <div className="ic-header__actions">
+          <button type="button" className="ic-btn ic-btn--secondary" onClick={handleExport}>
+            <Download size={16} />
+            {t('incidents.exportCsv')}
+          </button>
+          <button type="button" className="ic-btn ic-btn--primary" onClick={handleOpenDrawer}>
+            <PlusCircle size={16} />
+            {t('incidents.createIncident')}
+          </button>
+        </div>
       </header>
 
+      {/* ── Toast ──────────────────────────────────────────── */}
       {message && (
-        <div className={`message ${messageType === 'success' ? 'message--success' : 'message--error'}`}>
+        <div className={`ic-toast ic-toast--${messageType}${drawerOpen || detailOpen ? ' ic-toast--floating' : ''}`}>
+          {messageType === 'success' ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
           {message}
         </div>
       )}
 
-      <section className="profile-card">
-        <h2 className="profile-card__heading">Tạo sự cố</h2>
-        <form className="profile-form" onSubmit={handleCreate}>
-          <div
-            className="profile-form__grid"
-            style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}
+      {/* ── Stats ──────────────────────────────────────────── */}
+      <div className="ic-stats">
+        <div className="ic-stat-card">
+          <div className="ic-stat-card__icon ic-stat-card__icon--total">
+            <BarChart3 size={22} />
+          </div>
+          <div>
+            <div className="ic-stat-card__value">{stats.total}</div>
+            <div className="ic-stat-card__label">{t('incidents.stat.total')}</div>
+          </div>
+        </div>
+        <div className="ic-stat-card">
+          <div className="ic-stat-card__icon ic-stat-card__icon--open">
+            <FileWarning size={22} />
+          </div>
+          <div>
+            <div className="ic-stat-card__value">{stats.open}</div>
+            <div className="ic-stat-card__label">{t('incidents.stat.open')}</div>
+          </div>
+        </div>
+        <div className="ic-stat-card">
+          <div className="ic-stat-card__icon ic-stat-card__icon--invest">
+            <Eye size={22} />
+          </div>
+          <div>
+            <div className="ic-stat-card__value">{stats.investigating}</div>
+            <div className="ic-stat-card__label">{t('incidents.stat.investigating')}</div>
+          </div>
+        </div>
+        <div className="ic-stat-card">
+          <div className="ic-stat-card__icon ic-stat-card__icon--resolve">
+            <CheckCircle2 size={22} />
+          </div>
+          <div>
+            <div className="ic-stat-card__value">{stats.resolved}</div>
+            <div className="ic-stat-card__label">{t('incidents.stat.resolved')}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Filters ────────────────────────────────────────── */}
+      <div className="ic-filters">
+        <div className="ic-search">
+          <Search size={16} className="ic-search__icon" />
+          <input
+            className="ic-search__input"
+            value={search}
+            onChange={handleSearchChange}
+            placeholder={t('incidents.searchPlaceholder')}
+          />
+        </div>
+        <div className="ic-status-pills">
+          <button
+            type="button"
+            className={`ic-pill ${statusFilter === '' ? 'ic-pill--active' : ''}`}
+            onClick={() => handleStatusFilterChange('')}
           >
-              <label className="profile-form__field">
-                <span className="profile-form__label">Loại sự cố</span>
-                <input
-                  className="profile-form__input"
-                  value={form.incidentType}
-                  onChange={(event) => setForm((current) => ({ ...current, incidentType: event.target.value }))}
-                  required
-                />
-              </label>
-
-              <label className="profile-form__field">
-                <span className="profile-form__label">Mức độ nghiêm trọng</span>
-                <select
-                  className="profile-form__input"
-                  value={form.severity}
-                  onChange={(event) => setForm((current) => ({ ...current, severity: event.target.value }))}
-                >
-                  <option value="low">Thấp</option>
-                  <option value="medium">Trung bình</option>
-                  <option value="high">Cao</option>
-                  <option value="critical">Nghiêm trọng</option>
-                </select>
-              </label>
-
-              <label className="profile-form__field">
-                <span className="profile-form__label">Thời gian xảy ra</span>
-                <input
-                  className="profile-form__input"
-                  type="datetime-local"
-                  value={form.incidentAt}
-                  onChange={(event) => setForm((current) => ({ ...current, incidentAt: event.target.value }))}
-                  required
-                />
-              </label>
-
-              <label className="profile-form__field">
-                <span className="profile-form__label">Địa điểm</span>
-                <input
-                  className="profile-form__input"
-                  value={form.location}
-                  onChange={(event) => setForm((current) => ({ ...current, location: event.target.value }))}
-                />
-              </label>
-
-              <label className="profile-form__field">
-                <span className="profile-form__label">Cư dân</span>
-                <select
-                  className="profile-form__input"
-                  value={form.residentId}
-                  onChange={(event) => setForm((current) => ({ ...current, residentId: event.target.value }))}
-                  disabled={optionsLoading}
-                >
-                  <option value="">Không chọn cư dân</option>
-                  {residents.map((resident) => (
-                    <option key={resident._id} value={resident._id}>
-                      {formatResidentLabel(resident)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="profile-form__field">
-                <span className="profile-form__label">Nhân viên phụ trách</span>
-                <select
-                  className="profile-form__input"
-                  multiple
-                  size={5}
-                  value={form.assignedStaffIds}
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      assignedStaffIds: Array.from(event.target.selectedOptions, (option) => option.value),
-                    }))
-                  }
-                  disabled={optionsLoading}
-                >
-                  <option value="">Không chọn nhân viên</option>
-                  {staffAccounts.map((staff) => (
-                    <option key={staff._id} value={staff._id}>
-                      {formatStaffLabel(staff)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="profile-form__field" style={{ gridColumn: '1 / -1' }}>
-                <span className="profile-form__label">Mô tả</span>
-                <textarea
-                  className="profile-form__input"
-                  rows={4}
-                  value={form.description}
-                  onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
-                  required
-                />
-              </label>
-            </div>
-
-          <div className="profile-page__actions">
-            <button type="submit" className="button button--primary" disabled={isSaving}>
-              <PlusCircle size={16} />
-              {isSaving ? 'Đang lưu...' : 'Tạo sự cố'}
+            {t('incidents.filter.all')}
+          </button>
+          {statusOptions.map((s) => (
+            <button
+              key={s}
+              type="button"
+              className={`ic-pill ${statusFilter === s ? 'ic-pill--active' : ''}`}
+              onClick={() => handleStatusFilterChange(s)}
+            >
+              {STATUS_DISPLAY[s]}
             </button>
-          </div>
-        </form>
-      </section>
-      
-      <section className="profile-card profile-card--accent" style={{ marginTop: '1.5rem' }}>
-        <h2 className="profile-card__heading">Tổng quan</h2>
-        <div className="profile-form__grid">
-          <div>
-            <p className="profile-card__empty">Tổng sự cố</p>
-            <strong>{stats.total}</strong>
-          </div>
-          <div>
-            <p className="profile-card__empty">Đang mở</p>
-            <strong>{stats.open}</strong>
-          </div>
-          <div>
-            <p className="profile-card__empty">Đang điều tra</p>
-            <strong>{stats.investigating}</strong>
-          </div>
-          <div>
-            <p className="profile-card__empty">Đã giải quyết</p>
-            <strong>{stats.resolved}</strong>
-          </div>
+          ))}
         </div>
-      </section>
+      </div>
 
-      <section className="profile-card" style={{ marginTop: '1.5rem' }}>
-        <div className="profile-page__header">
-          <div>
-            <h2 className="profile-card__heading">Danh sách sự cố</h2>
-            <p className="profile-card__empty">Lọc và xem xét các sự cố hiện tại.</p>
-          </div>
-          <div className="profile-form__grid" style={{ width: '100%', maxWidth: 720 }}>
-            <label className="profile-form__field">
-              <span className="profile-form__label">Tìm kiếm</span>
-              <input
-                className="profile-form__input"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Tìm sự cố, địa điểm, người báo cáo"
-              />
-            </label>
-            <label className="profile-form__field">
-              <span className="profile-form__label">Trạng thái</span>
-              <select
-                className="profile-form__input"
-                value={statusFilter}
-                onChange={(event) => setStatusFilter(event.target.value)}
-              >
-                <option value="">Tất cả</option>
-                {statusOptions.map((option) => (
-                  <option key={option} value={option}>{STATUS_LABELS[option] || option}</option>
-                ))}
-              </select>
-            </label>
-          </div>
+      {/* ── Incident table ─────────────────────────────── */}
+      {loading ? (
+        <LoadingSpinner label={t('incidents.loading')} />
+      ) : incidents.length === 0 ? (
+        <div className="ic-empty">
+          <div className="ic-empty__icon"><ShieldAlert size={42} /></div>
+          <p>{t('incidents.noIncidents')}</p>
         </div>
+      ) : (
+        <>
+          <div className="ic-table-wrapper">
+            <table className="ic-table">
+              <thead>
+                <tr>
+                  <th>{t('incidents.table.incidentType')}</th>
+                  <th>{t('incidents.table.resident')}</th>
+                  <th>{t('incidents.table.severity')}</th>
+                  <th>{t('incidents.table.status')}</th>
+                  <th>{t('incidents.table.assignedStaff')}</th>
+                  <th>{t('incidents.table.time')}</th>
+                  <th>{t('incidents.table.actions')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {incidents.map((incident) => {
+                  const assignedStaffList = Array.isArray(incident.assignedStaffIds) ? incident.assignedStaffIds : [];
+                  return (
+                    <tr key={incident._id}>
+                      <td>
+                        <div className="ic-table-title">
+                          {incident.incidentType}
+                          {incident.resolution?.escalationRequested && (
+                            <span style={{ marginLeft: 8, display: 'inline-block', background: '#fee2e2', color: '#dc2626', padding: '2px 8px', borderRadius: 4, fontSize: '0.7rem', fontWeight: 600 }}>🔴 {t('incidents.resolution.escalationBadge')}</span>
+                          )}
+                        </div>
+                        <div className="ic-table-subtext">{incident.location || '—'}</div>
+                      </td>
+                      <td>
+                        <div className="ic-table-title" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          {Array.isArray(incident.residentIds) && incident.residentIds.length > 0
+                            ? (
+                                <>
+                                  {incident.residentIds.slice(0, 2).map((resident) => (
+                                    <div key={resident?._id || resident} style={{ fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                      {resident?.fullName || resident}
+                                    </div>
+                                  ))}
+                                  {incident.residentIds.length > 2 && (
+                                    <div style={{ fontSize: '0.9rem', color: '#64748b', fontStyle: 'italic' }}>... +{incident.residentIds.length - 2}</div>
+                                  )}
+                                </>
+                              )
+                            : incident.residentId?.fullName || incident.residentId || t('incidents.unknownResident')}
+                        </div>
+                        <div className="ic-table-subtext">{incident.reporterName || incident.reporterEmail || t('incidents.unknown')}</div>
+                      </td>
+                      <td>
+                        <span className={`ic-severity ic-severity--${incident.severity}`}>
+                          {SEVERITY_DISPLAY[incident.severity] || incident.severity}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={`ic-badge ic-badge--${incident.status}`}>
+                          {STATUS_DISPLAY[incident.status] || incident.status}
+                        </span>
+                      </td>
+                      <td>
+                        {assignedStaffList.length > 0 ? (
+                          <div className="ic-assigned-list">
+                            {assignedStaffList.map((staff) => {
+                              const availabilityLabel = getStaffAvailabilityLabel(staff);
+                              return (
+                                <div key={staff?._id || staff?.id || staff?.userId?._id || staff?.userId} className="ic-assigned-item">
+                                  <span>{staff?.userId?.fullName || staff?.fullName || staff?.userId?.email || staff?.email || '—'}</span>
+                                  <small className={getStaffIsOnDuty(staff) ? 'ic-availability ic-availability--on' : 'ic-availability ic-availability--off'}>{availabilityLabel}</small>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <span className="ic-muted">{t('incidents.notAssigned')}</span>
+                        )}
+                      </td>
+                      <td>
+                        <div className="ic-table-title">{formatDate(incident.incidentAt)}</div>
+                        <div className="ic-table-subtext">{incident.description || '—'}</div>
+                      </td>
+                      <td>
+                        <div className="ic-table-actions">
+                          <button
+                            type="button"
+                            className="ic-btn ic-btn--small ic-btn--secondary"
+                            onClick={() => handleViewDetail(incident._id)}
+                          >
+                            <Eye size={14} />
+                            {t('incidents.viewDetail')}
+                          </button>
+                          <div className="ic-status-actions">
+                            {statusOptions.map((status, idx) => {
+                              const orderIndex = statusOptions.indexOf(incident.status);
+                              const disabled = isSaving || status === incident.status || idx < orderIndex;
+                              return (
+                                <button
+                                  key={status}
+                                  type="button"
+                                  className={`ic-btn ic-btn--small ${status === incident.status ? 'ic-btn--primary' : 'ic-btn--secondary'}`}
+                                  onClick={() => handleStatusUpdate(incident._id, status)}
+                                  disabled={disabled}
+                                >
+                                  {STATUS_DISPLAY[status]}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
 
-        {loading ? (
-          <LoadingSpinner label="Đang tải sự cố..." />
-        ) : incidents.length === 0 ? (
-          <p className="profile-card__empty">Không tìm thấy sự cố nào.</p>
-        ) : (
-          <div className="profile-form__grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))' }}>
-            {incidents.map((incident) => (
-              <div key={incident._id} className="profile-card" style={{ margin: 0 }}>
-                <div className="profile-page__header" style={{ alignItems: 'flex-start' }}>
-                  <div>
-                    <p className="profile-card__role">{incident.incidentType}</p>
-                    <h3>{incident.residentId?.fullName || incident.residentId || 'Chưa xác định cư dân'}</h3>
+          <div className="ic-pagination">
+            <span className="ic-pagination__summary">{t('incidents.pagination.showing', { count: incidents.length, total: totalItems })}</span>
+            <div className="ic-pagination__controls">
+              <button type="button" className="ic-btn ic-btn--secondary" disabled={page <= 1 || loading} onClick={() => setPage((prev) => Math.max(prev - 1, 1))}>
+                {t('incidents.pagination.prev')}
+              </button>
+              <span className="ic-pagination__page">{t('incidents.pagination.page', { page, totalPages })}</span>
+              <button type="button" className="ic-btn ic-btn--secondary" disabled={page >= totalPages || loading} onClick={() => setPage((prev) => Math.min(prev + 1, totalPages))}>
+                {t('incidents.pagination.next')}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ── Detail drawer ─────────────────────────────────── */}
+      {detailOpen && (
+        <>
+          <div className="ic-drawer-overlay" onClick={() => { setDetailOpen(false); setDetailIncident(null); setDetailError(null); }} />
+          <div className="ic-drawer">
+            <div className="ic-drawer__header">
+              <h2 className="ic-drawer__title">{t('incidents.detail.title')}</h2>
+              <button type="button" className="ic-drawer__close" onClick={() => { setDetailOpen(false); setDetailIncident(null); setDetailError(null); }}>
+                <X size={20} />
+              </button>
+            </div>
+            <div className="ic-drawer__body">
+              {detailLoading ? (
+                <LoadingSpinner label={t('incidents.loading')} />
+              ) : detailError ? (
+                <div style={{ padding: 12, border: '1px solid #ffdddd', background: '#fff6f6', color: '#b00020', borderRadius: 6 }}>
+                  <strong>{t('incidents.errorLabel')}:</strong> {detailError}
+                </div>
+              ) : reopenForm ? (
+                <div>
+                  <h3 style={{ marginBottom: 16 }}>{t('incidents.reopen.title')}</h3>
+                  <div className="ic-field ic-form-full" style={{ marginBottom: 16 }}>
+                    <label className="ic-field__label">{t('incidents.reopen.staffLabel')}</label>
+                    <div className="ic-field--multi-select">
+                      <div className="ic-multi-select-filters" style={{ marginBottom: 10 }}>
+                        <input
+                          type="text"
+                          className="ic-multi-select-search"
+                          placeholder={t('incidents.reopen.searchPlaceholder')}
+                          onChange={(e) => {
+                            const query = e.target.value.toLowerCase();
+                            const filtered = staffAccounts.filter(
+                              (staff) => !reopenForm.selectedStaffIds?.includes(getStaffSelectionId(staff)) &&
+                                formatStaffLabel(staff).toLowerCase().includes(query)
+                            );
+                            setReopenForm((s) => ({ ...s, filteredStaff: filtered }));
+                          }}
+                        />
+                      </div>
+                      <div className="ic-multi-select-list">
+                        {(reopenForm.filteredStaff || staffAccounts).map((staff) => {
+                          const staffId = getStaffSelectionId(staff);
+                          const availabilityLabel = getStaffAvailabilityLabel(staff);
+                          return (
+                            <label key={staffId || staff._id} className="ic-multi-select-item">
+                              <input
+                                type="checkbox"
+                                checked={(reopenForm.selectedStaffIds || []).includes(staffId)}
+                                onChange={(e) => {
+                                  const next = e.target.checked
+                                    ? [...(reopenForm.selectedStaffIds || []), staffId]
+                                    : (reopenForm.selectedStaffIds || []).filter((id) => id !== staffId);
+                                  setReopenForm((s) => ({ ...s, selectedStaffIds: next }));
+                                }}
+                              />
+                              <div className="ic-multi-select-item__label">
+                                <span className="ic-multi-select-item__name">{formatStaffLabel(staff)}</span>
+                                <span className={getStaffIsOnDuty(staff) ? 'ic-availability ic-availability--on' : 'ic-availability ic-availability--off'}>{availabilityLabel}</span>
+                              </div>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
-                  <span className="profile-card__role">{STATUS_LABELS[incident.status] || incident.status}</span>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button type="button" className="ic-btn ic-btn--secondary" onClick={() => setReopenForm(null)}>{t('incidents.reopen.cancel')}</button>
+                    <button type="button" className="ic-btn ic-btn--primary" onClick={() => handleReopen(reopenForm.selectedStaffIds)}>
+                      {t('incidents.reopen.confirm')}
+                    </button>
+                  </div>
+                </div>
+              ) : detailIncident ? (
+                <>
+                  <div className="ic-form-grid">
+                    <div className="ic-field">
+                      <label className="ic-field__label">{t('incidents.form.incidentType')}</label>
+                      <div className="ic-field__input ic-field__input--display">{detailIncident.incidentType}</div>
+                    </div>
+                    <div className="ic-field">
+                      <label className="ic-field__label">{t('incidents.form.severity')}</label>
+                      <div className="ic-field__input ic-field__input--display">
+                        <span className={`ic-severity ic-severity--${detailIncident.severity}`}>{SEVERITY_DISPLAY[detailIncident.severity] || detailIncident.severity}</span>
+                      </div>
+                    </div>
+                    <div className="ic-field">
+                      <label className="ic-field__label">{t('incidents.form.status')}</label>
+                      <div className="ic-field__input ic-field__input--display">
+                        <span className={`ic-badge ic-badge--${detailIncident.status}`}>{STATUS_DISPLAY[detailIncident.status] || detailIncident.status}</span>
+                      </div>
+                    </div>
+                    <div className="ic-field">
+                      <label className="ic-field__label">{t('incidents.form.incidentAt')}</label>
+                      <div className="ic-field__input ic-field__input--display">{formatDate(detailIncident.incidentAt)}</div>
+                    </div>
+                    <div className="ic-field">
+                      <label className="ic-field__label">{t('incidents.form.location')}</label>
+                      <div className="ic-field__input ic-field__input--display">{detailIncident.location || '—'}</div>
+                    </div>
+                    <div className="ic-field">
+                      <label className="ic-field__label">{t('incidents.form.resident')}</label>
+                      <div className="ic-field__input ic-field__input--display">
+                        {Array.isArray(detailIncident.residentIds) && detailIncident.residentIds.length > 0
+                          ? (
+                              <>
+                                {detailIncident.residentIds.slice(0, 3).map((resident) => (
+                                  <div key={resident?._id || resident} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>
+                                    {resident?.fullName || resident}
+                                  </div>
+                                ))}
+                                {detailIncident.residentIds.length > 3 && (
+                                  <div style={{ color: '#64748b', fontStyle: 'italic' }}>{t('incidents.moreResidents', { count: detailIncident.residentIds.length - 3 })}</div>
+                                )}
+                              </>
+                            )
+                          : detailIncident.residentId?.fullName || detailIncident.residentId || t('incidents.unknownResident')}
+                      </div>
+                    </div>
+                    <div className="ic-field">
+                      <label className="ic-field__label">{t('incidents.form.assignedStaff')}</label>
+                      <div className="ic-field__input ic-field__input--display">
+                        {Array.isArray(detailIncident.assignedStaffIds) && detailIncident.assignedStaffIds.length > 0
+                          ? (
+                              <>
+                                {detailIncident.assignedStaffIds.slice(0, 3).map((staff) => (
+                                  <div key={staff?._id || staff?.userId?._id || staff?.userId} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>
+                                    {staff?.userId?.fullName || staff?.fullName || staff?.userId?.email || staff?.email || '—'}
+                                  </div>
+                                ))}
+                                {detailIncident.assignedStaffIds.length > 3 && (
+                                  <div style={{ color: '#64748b', fontStyle: 'italic' }}>{t('incidents.moreStaff', { count: detailIncident.assignedStaffIds.length - 3 })}</div>
+                                )}
+                              </>
+                            )
+                          : '—'}
+                      </div>
+                    </div>
+                    <div className="ic-field ic-form-full">
+                      <label className="ic-field__label">{t('incidents.form.description')}</label>
+                      <div className="ic-field__textarea ic-field__textarea--display" style={{ minHeight: 100, whiteSpace: 'pre-wrap' }}>{detailIncident.description || '—'}</div>
+                    </div>
+                    <div className="ic-field">
+                      <label className="ic-field__label">{t('incidents.reporter')}</label>
+                      <div className="ic-field__input ic-field__input--display">{detailIncident.reporterName || detailIncident.reporterEmail || t('incidents.unknown')}</div>
+                    </div>
+                    <div className="ic-field">
+                      <label className="ic-field__label">{t('incidents.reporterRole')}</label>
+                      <div className="ic-field__input ic-field__input--display">{detailIncident.reporterRole || '—'}</div>
+                    </div>
+                  </div>
+                  {/* Assign Handlers Button for Admins */}
+                  {isAdmin && (!detailIncident.assignedStaffIds || detailIncident.assignedStaffIds.length === 0) && (
+                    <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px solid #e0e0e0' }}>
+                      <button
+                        type="button"
+                        className="ic-btn ic-btn--primary"
+                        onClick={() => {
+                          setSelectedHandlers([]);
+                          setAssignHandlersOpen(true);
+                        }}
+                      >
+                        {t('incidents.assignHandlers')}
+                      </button>
+                    </div>
+                  )}
+                  {/* Thông tin giải quyết (chỉ nhập khi đang xác minh) */}
+                  <div style={{ marginTop: 20, paddingTop: 20, borderTop: '1px solid #e0e0e0' }}>
+                    <h3 style={{ marginBottom: 8 }}>{t('incidents.resolution.title')}</h3>
+                    {detailIncident.status === 'investigating' ? (
+                      resolutionForm ? (
+                        <div>
+                          <div className="ic-field">
+                            <label className="ic-field__label">{t('incidents.resolution.method')} *</label>
+                            <input className="ic-field__input" value={resolutionForm.method} onChange={(e) => setResolutionForm((s) => ({ ...s, method: e.target.value }))} />
+                          </div>
+
+                          <div className="ic-field">
+                            <label className="ic-field__label">{t('incidents.resolution.residentCondition')}</label>
+                            <select className="ic-field__select" value={resolutionForm.medical?.residentCondition || ''} onChange={(e) => {
+                              const val = e.target.value;
+                              setResolutionForm((s) => ({ ...s, medical: { ...s.medical, residentCondition: val, procedures: val === 'NoResident' ? [] : (s.medical?.procedures || []), medications: val === 'NoResident' ? [] : (s.medical?.medications || []) } }));
+                            }}>
+                              <option value="">{t('incidents.resolution.conditionSelect')}</option>
+                              <option value="Stable">{t('incidents.resolution.conditionStable')}</option>
+                              <option value="Improving">{t('incidents.resolution.conditionImproving')}</option>
+                              <option value="Critical">{t('incidents.resolution.conditionCritical')}</option>
+                              <option value="Hospitalized">{t('incidents.resolution.conditionHospitalized')}</option>
+                              <option value="NoResident">{t('incidents.resolution.conditionNoResident')}</option>
+                              <option value="UnknownResident">{t('incidents.resolution.conditionUnknownResident')}</option>
+                            </select>
+                          </div>
+
+                          <div className="ic-field">
+                            <label className="ic-field__label">{t('incidents.resolution.rootCause')} *</label>
+                            <select className="ic-field__select" value={resolutionForm.rootCause} onChange={(e) => setResolutionForm((s) => ({ ...s, rootCause: e.target.value }))}>
+                              <option value="Wet Floor">{t('incidents.resolution.causeWetFloor')}</option>
+                              <option value="Resident Lost Balance">{t('incidents.resolution.causeResidentBalance')}</option>
+                              <option value="Equipment Failure">{t('incidents.resolution.causeEquipmentFailure')}</option>
+                              <option value="Staff Error">{t('incidents.resolution.causeStaffError')}</option>
+                              <option value="Unknown">{t('incidents.resolution.causeUnknown')}</option>
+                              <option value="Other">{t('incidents.resolution.causeOther')}</option>
+                            </select>
+                            {resolutionForm.rootCause === 'Other' && (
+                              <input className="ic-field__input" placeholder={t('incidents.resolution.causeOtherPlaceholder')} value={resolutionForm.rootCauseOther || ''} onChange={(e) => setResolutionForm((s) => ({ ...s, rootCauseOther: e.target.value }))} style={{ marginTop: 8 }} />
+                            )}
+                          </div>
+
+                          <div className="ic-field ic-form-full">
+                            <label className="ic-field__label">{t('incidents.resolution.rootCauseDetail')}</label>
+                            <textarea className="ic-field__textarea" rows={3} value={resolutionForm.detailedCause} onChange={(e) => setResolutionForm((s) => ({ ...s, detailedCause: e.target.value }))} />
+                          </div>
+
+                          <div className="ic-field ic-form-full">
+                            <label className="ic-field__label">{t('incidents.resolution.immediateActions')}</label>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                              {immediateActionOptions
+                                .filter((act) => {
+                                  const noResident = resolutionForm.medical?.residentCondition === 'NoResident';
+                                  if (!noResident) return true;
+                                  const lower = String(act.value).toLowerCase();
+                                  return !(lower.includes('cư dân') || lower.includes('hỗ trợ') || lower.includes('khám') || lower.includes('resident'));
+                                })
+                                .map((act) => (
+                                  <label key={act.value} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <input type="checkbox" checked={(resolutionForm.immediateActions || []).includes(act.value)} onChange={(e) => {
+                                      const prev = resolutionForm.immediateActions || [];
+                                      if (e.target.checked) setResolutionForm((s) => ({ ...s, immediateActions: [...prev, act.value] }));
+                                      else setResolutionForm((s) => ({ ...s, immediateActions: prev.filter((i) => i !== act.value) }));
+                                    }} />
+                                    <span>{t(act.i18nKey)}</span>
+                                  </label>
+                                ))}
+                              {(resolutionForm.immediateActions || []).includes('Khác') && (
+                                <input className="ic-field__input" placeholder={t('incidents.resolution.actionOtherPlaceholder')} value={resolutionForm.immediateOther || ''} onChange={(e) => setResolutionForm((s) => ({ ...s, immediateOther: e.target.value }))} />
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="ic-field ic-form-full">
+                            <label className="ic-field__label">{t('incidents.resolution.severityAssessment')} *</label>
+                            <select className="ic-field__select" value={resolutionForm.severityAssessment} onChange={(e) => setResolutionForm((s) => ({ ...s, severityAssessment: e.target.value }))}>
+                              <option value="">{t('incidents.resolution.severitySelectPlaceholder')}</option>
+                              <option value="Thấp">{t('incidents.resolution.severityLow')}</option>
+                              <option value="Trung bình">{t('incidents.resolution.severityMedium')}</option>
+                              <option value="Cao">{t('incidents.resolution.severityHigh')}</option>
+                              <option value="Khẩn cấp">{t('incidents.resolution.severityUrgent')}</option>
+                            </select>
+                            {resolutionForm.severityAssessment && (
+                              <div className="ic-severity-description">
+                                {resolutionForm.severityAssessment === 'Thấp' && t('incidents.resolution.severityDescLow')}
+                                {resolutionForm.severityAssessment === 'Trung bình' && t('incidents.resolution.severityDescMedium')}
+                                {resolutionForm.severityAssessment === 'Cao' && t('incidents.resolution.severityDescHigh')}
+                                {resolutionForm.severityAssessment === 'Khẩn cấp' && t('incidents.resolution.severityDescUrgent')}
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="ic-field">
+                            <label style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer' }}>
+                              <input type="checkbox" checked={resolutionForm.escalationRequested || false} onChange={(e) => setResolutionForm((s) => ({ ...s, escalationRequested: e.target.checked }))} />
+                              <span>{t('incidents.resolution.escalationRequest')}</span>
+                            </label>
+                          </div>
+
+                          <div className="ic-field">
+                            <label className="ic-field__label">{t('incidents.resolution.attachments')}</label>
+                            <div className="ic-attachment-picker">
+                              <button type="button" className="ic-btn ic-btn--secondary ic-btn--upload" onClick={handleAttachmentButtonClick}>
+                                <Paperclip size={16} />
+                                {resolutionFiles.length > 0 ? t('incidents.resolution.filesSelected', { count: resolutionFiles.length }) : t('incidents.resolution.selectFiles')}
+                              </button>
+                              <input
+                                ref={attachmentInputRef}
+                                type="file"
+                                multiple
+                                className="ic-attachment-input"
+                                onChange={(e) => handleResolutionFilesChange(Array.from(e.target.files || []))}
+                              />
+                            </div>
+                            {resolutionFilePreviews && resolutionFilePreviews.length > 0 && (
+                              <div className="ic-attachments">
+                                {resolutionFilePreviews.map((p, idx) => (
+                                  <div key={idx} className="ic-attachment">
+                                    <div className="ic-attachment__thumb">
+                                      {p && p.url && p.file && p.file.type && p.file.type.startsWith('image/') ? (
+                                        <img src={p.url} alt={p.file.name} className="ic-attachment__img" />
+                                      ) : (
+                                        <div className="ic-attachment__placeholder">{p.file?.name || '—'}</div>
+                                      )}
+                                      <button type="button" className="ic-attachment__remove" onClick={() => removeResolutionFile(idx)} title={t('incidents.resolution.removeFile')}>✕</button>
+                                    </div>
+                                    <div className="ic-attachment__name" title={p.file?.name}>{p.file?.name}</div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="ic-field ic-form-full">
+                            <label className="ic-field__label">{t('incidents.resolution.notes')}</label>
+                            <textarea className="ic-field__textarea" rows={2} value={resolutionForm.notes} onChange={(e) => setResolutionForm((s) => ({ ...s, notes: e.target.value }))} />
+                          </div>
+
+                          <div className="ic-resolution-actions">
+                            <button type="button" className="ic-btn ic-btn--secondary" onClick={() => { setResolutionForm(null); setResolutionFiles([]); setSelectedClinicalServices({}); }}>{t('incidents.form.cancel')}</button>
+                            <button type="button" className="ic-btn ic-btn--secondary ic-btn--action" disabled={savingResolution} onClick={async () => {
+                              // Save draft
+                              setSavingResolution(true);
+                              try {
+                                const payload = { ...resolutionForm, action: 'saveDraft' };
+                                if (payload.rootCause === 'Other') payload.rootCause = payload.rootCauseOther || '';
+                                if (payload.immediateOther) payload.immediateActions = [...(payload.immediateActions || []), payload.immediateOther];
+                                // include medical.proceduresOther if present
+                                if (payload.medical?.proceduresOther) payload.medical.procedures = [...(payload.medical.procedures || []), payload.medical.proceduresOther];
+                                // if no resident involved, remove medications
+                                if (payload.medical?.residentCondition === 'NoResident') {
+                                  if (payload.medical && payload.medical.medications) delete payload.medical.medications;
+                                }
+                                await incidentService.updateIncidentResolution(detailIncident._id, payload, resolutionFiles);
+                                setMessageType('success'); setMessage(t('incidents.resolution.saveDraftSuccess'));
+                                await loadIncidents();
+                                await handleViewDetail(detailIncident._id);
+                              } catch (err) {
+                                setMessageType('error'); setMessage(err?.response?.data?.message || t('incidents.resolution.saveDraftFailed'));
+                              } finally { setSavingResolution(false); }
+                            }}>{t('incidents.form.saveDraft')}</button>
+                            <button type="button" className="ic-btn ic-btn--primary ic-btn--action" disabled={savingResolution} onClick={async () => {
+                              // Mark as resolved
+                              if (!resolutionForm.severityAssessment || !resolutionForm.method || !resolutionForm.rootCause) {
+                                setMessageType('error'); setMessage(t('incidents.resolution.validationRequired'));
+                                return;
+                              }
+                              setSavingResolution(true);
+                              try {
+                                const payload = { ...resolutionForm, action: 'markResolved' };
+                                if (payload.rootCause === 'Other') payload.rootCause = payload.rootCauseOther || '';
+                                if (payload.immediateOther) payload.immediateActions = [...(payload.immediateActions || []), payload.immediateOther];
+                                if (payload.medical?.proceduresOther) payload.medical.procedures = [...(payload.medical.procedures || []), payload.medical.proceduresOther];
+                                if (payload.medical?.residentCondition === 'NoResident') {
+                                  if (payload.medical && payload.medical.medications) delete payload.medical.medications;
+                                }
+                                await incidentService.updateIncidentResolution(detailIncident._id, payload, resolutionFiles);
+                                setMessageType('success'); setMessage(t('incidents.resolution.markResolvedSuccess'));
+                                await loadIncidents();
+                                setDetailOpen(false); setDetailIncident(null);
+                              } catch (err) {
+                                setMessageType('error'); setMessage(err?.response?.data?.message || t('incidents.resolution.markResolvedFailed'));
+                              } finally { setSavingResolution(false); }
+                            }}>{t('incidents.form.markResolved')}</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ color: '#666' }}>{t('incidents.resolution.loadingResolution')}</div>
+                      )
+                    ) : (
+                      <div>
+                        {detailIncident.resolution ? (
+                          <div>
+                            {detailIncident.resolution.escalationRequested && (
+                              <div style={{ marginBottom: 16, padding: 12, background: '#fee2e2', border: '2px solid #dc2626', borderRadius: 6, color: '#7f1d1d' }}>
+                                <div style={{ fontWeight: 600, marginBottom: 4 }}>🔴 {t('incidents.resolution.escalationTitle')}</div>
+                                <div style={{ fontSize: '0.9rem' }}>{t('incidents.resolution.escalationSubtitle')}</div>
+                              </div>
+                            )}
+                            <div style={{ marginBottom: 12, padding: 12, background: '#f3f4f6', borderRadius: 6 }}>
+                              <div style={{ marginBottom: 8 }}>
+                                <strong>{t('incidents.resolution.method')}:</strong>
+                                <span style={{ marginLeft: 8, color: detailIncident.resolution.method ? '#333' : '#ef4444', fontWeight: detailIncident.resolution.method ? '400' : '600' }}>
+                                  {detailIncident.resolution.method || t('incidents.resolution.methodUnknown')}
+                                </span>
+                              </div>
+                              <div style={{ marginBottom: 8 }}>
+                                <strong>{t('incidents.resolution.rootCause')}:</strong>
+                                <span style={{ marginLeft: 8, color: detailIncident.resolution.rootCause ? '#333' : '#ef4444', fontWeight: detailIncident.resolution.rootCause ? '400' : '600' }}>
+                                  {detailIncident.resolution.rootCause || 'Unknown'}
+                                </span>
+                              </div>
+                              <div style={{ marginBottom: 8 }}>
+                                <strong>{t('incidents.resolution.immediateActions')}:</strong>
+                                <span style={{ marginLeft: 8, color: (detailIncident.resolution.immediateActions || []).length > 0 ? '#333' : '#9ca3af' }}>
+                                  {(detailIncident.resolution.immediateActions || []).length > 0 
+                                    ? (detailIncident.resolution.immediateActions || []).map((action, idx) => (
+                                        <span key={idx} style={{ display: 'inline-block', background: '#dbeafe', color: '#1e40af', padding: '2px 8px', borderRadius: 4, marginRight: 4, marginBottom: 4 }}>
+                                          {action}
+                                        </span>
+                                      ))
+                                    : '—'
+                                  }
+                                </span>
+                              </div>
+                              <div>
+                                <strong>{t('incidents.resolution.severityAssessment')}:</strong>
+                                <span style={{ marginLeft: 8 }}>
+                                  {detailIncident.resolution.severityAssessment ? (
+                                    <span style={{ 
+                                      display: 'inline-block',
+                                      padding: '4px 8px',
+                                      borderRadius: 4,
+                                      background: detailIncident.resolution.severityAssessment === 'Thấp' 
+                                        ? '#dbeafe' 
+                                        : detailIncident.resolution.severityAssessment === 'Trung bình'
+                                        ? '#fed7aa'
+                                        : detailIncident.resolution.severityAssessment === 'Cao'
+                                        ? '#fecaca'
+                                        : '#fca5a5',
+                                      color: detailIncident.resolution.severityAssessment === 'Thấp'
+                                        ? '#1e40af'
+                                        : detailIncident.resolution.severityAssessment === 'Trung bình'
+                                        ? '#9a3412'
+                                        : detailIncident.resolution.severityAssessment === 'Cao'
+                                        ? '#991b1b'
+                                        : '#7f1d1d',
+                                      fontWeight: 600
+                                    }}>
+                                      {detailIncident.resolution.severityAssessment}
+                                      {detailIncident.resolution.severityAssessment === 'Thấp'
+                                        ? ` - ${t('incidents.resolution.severityDescLow')}`
+                                        : detailIncident.resolution.severityAssessment === 'Trung bình'
+                                        ? ` - ${t('incidents.resolution.severityDescMedium')}`
+                                        : detailIncident.resolution.severityAssessment === 'Cao'
+                                        ? ` - ${t('incidents.resolution.severityDescHigh')}`
+                                        : ` - ${t('incidents.resolution.severityDescUrgent')}`}
+                                    </span>
+                                  ) : '—'}
+                                </span>
+                              </div>
+                            </div>
+                            {detailIncident.resolution.escalationRequested && detailIncident.status === 'resolved' && (
+                              <div style={{ marginBottom: 16 }}>
+                                <button type="button" className="ic-btn ic-btn--primary" onClick={() => setReopenForm({ selectedStaffIds: [], filteredStaff: staffAccounts })}>
+                                  ↻ {t('incidents.resolution.reopenAndAssign')}
+                                </button>
+                              </div>
+                            )}
+                            <div><strong>{t('incidents.resolution.notes')}:</strong> {detailIncident.resolution.notes || '—'}</div>
+                            <div><strong>{t('incidents.resolution.completedAt')}:</strong> {detailIncident.resolution.completedAt ? new Date(detailIncident.resolution.completedAt).toLocaleString('vi-VN') : '—'}</div>
+                            <div style={{ marginTop: 8 }}>
+                              <strong>{t('incidents.resolution.fileAttachments')}:</strong>
+                              <div className="ic-detail-attachments">
+                                {(detailIncident.resolution.attachments || []).map((att) => {
+                                  const isImage = att.mimeType ? String(att.mimeType).startsWith('image/') : String(att.fileUrl || '').match(/\.(jpg|jpeg|png|webp|gif)(\?|$)/i);
+                                  return (
+                                    <div key={att.fileUrl} className="ic-detail-attachment">
+                                      {isImage ? (
+                                        <a href={att.fileUrl} target="_blank" rel="noreferrer">
+                                          <img src={att.fileUrl} alt={att.fileName || 'attachment'} className="ic-detail-attachment__img" />
+                                        </a>
+                                      ) : (
+                                        <div><a href={att.fileUrl} target="_blank" rel="noreferrer">{att.fileName || att.fileUrl}</a></div>
+                                      )}
+                                      <div className="ic-detail-attachment__name">{att.fileName || att.fileUrl}</div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div>{t('incidents.resolution.noResolution')}</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div className="ic-empty">
+                  <p>{t('incidents.error.loadFailed')}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ── Create drawer ──────────────────────────────────── */}
+      {drawerOpen && (
+        <>
+          <div className="ic-drawer-overlay" onClick={() => setDrawerOpen(false)} />
+          <div className="ic-drawer">
+            <div className="ic-drawer__header">
+              <h2 className="ic-drawer__title">{t('incidents.drawer.title')}</h2>
+              <button type="button" className="ic-drawer__close" onClick={() => setDrawerOpen(false)}>
+                <X size={20} />
+              </button>
+            </div>
+            <form onSubmit={handleCreate} className="ic-drawer__body">
+              <div className="ic-form-grid">
+                <div className="ic-field">
+                  <label className="ic-field__label">{t('incidents.form.incidentType')} *</label>
+                  <input
+                    className="ic-field__input"
+                    value={form.incidentType}
+                    onChange={(e) => { setForm((c) => ({ ...c, incidentType: e.target.value })); setFieldErrors((p) => ({ ...p, incidentType: undefined })); }}
+                    maxLength={MAX_SHORT_TEXT_LENGTH}
+                    required
+                  />
+                  {fieldErrors.incidentType && <span className="ic-field__error">{fieldErrors.incidentType}</span>}
                 </div>
 
-                <p className="profile-card__empty">{incident.description}</p>
-                <p className="profile-card__empty">Địa điểm: {incident.location || '—'}</p>
-                <p className="profile-card__empty">Mức độ: {SEVERITY_LABELS[incident.severity] || incident.severity}</p>
-                <p className="profile-card__empty">Báo cáo bởi: {incident.reporterName || incident.reporterEmail || 'Không xác định'}</p>
-                <p className="profile-card__empty">Thời gian: {formatDate(incident.incidentAt)}</p>
+                <div className="ic-field">
+                  <label className="ic-field__label">{t('incidents.form.severity')}</label>
+                  <select
+                    className="ic-field__select"
+                    value={form.severity}
+                    onChange={(e) => setForm((c) => ({ ...c, severity: e.target.value }))}
+                  >
+                    <option value="low">{t('incidents.severity.low')}</option>
+                    <option value="medium">{t('incidents.severity.medium')}</option>
+                    <option value="high">{t('incidents.severity.high')}</option>
+                    <option value="critical">{t('incidents.severity.critical')}</option>
+                  </select>
+                </div>
 
-                <div className="profile-page__actions">
-                  {statusOptions.map((status) => (
-                    <button
-                      key={status}
-                      type="button"
-                      className={status === incident.status ? 'button button--primary' : 'button button--secondary'}
-                      onClick={() => handleStatusUpdate(incident._id, status)}
-                      disabled={isSaving || status === incident.status}
+                <div className="ic-field ic-field--horizontal">
+                  <label className="ic-field__label">{t('incidents.form.incidentAt')} *</label>
+                  <input
+                    className="ic-field__input"
+                    type="datetime-local"
+                    value={form.incidentAt}
+                    max={getMaxDatetimeLocal()}
+                    onChange={(e) => { setForm((c) => ({ ...c, incidentAt: e.target.value })); setFieldErrors((p) => ({ ...p, incidentAt: undefined })); }}
+                    required
+                  />
+                  {fieldErrors.incidentAt && <span className="ic-field__error">{fieldErrors.incidentAt}</span>}
+                </div>
+
+                <div className="ic-field">
+                  <label className="ic-field__label">{t('incidents.form.location')}</label>
+                  <input
+                    className="ic-field__input"
+                    value={form.location}
+                    maxLength={MAX_SHORT_TEXT_LENGTH}
+                    onChange={(e) => { setForm((c) => ({ ...c, location: e.target.value })); setFieldErrors((p) => ({ ...p, location: undefined })); }}
+                  />
+                  {fieldErrors.location && <span className="ic-field__error">{fieldErrors.location}</span>}
+                </div>
+
+                <div className="ic-field ic-field--multi-select">
+                  <label className="ic-field__label">{t('incidents.form.resident')}</label>
+                  
+                  {/* Display selected residents as tags */}
+                  {form.residentIds.length > 0 && (
+                    <div className="ic-selected-tags">
+                      {form.residentIds.map((residentId) => {
+                        const resident = residents.find((r) => r._id === residentId);
+                        if (!resident) return null;
+                        return (
+                          <div key={residentId} className="ic-tag">
+                            <span className="ic-tag__name" title={formatResidentLabel(resident)}>
+                              {formatResidentLabel(resident)}
+                            </span>
+                            <button
+                              type="button"
+                              className="ic-tag__remove"
+                              onClick={() => toggleResident(residentId)}
+                              title={t('incidents.form.removeResident')}
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  
+                  <div className="ic-multi-select-filters">
+                    <select
+                      className="ic-field__select"
+                      value={residentAreaFilter}
+                      onChange={(e) => setResidentAreaFilter(e.target.value)}
+                      disabled={optionsLoading}
                     >
-                      {STATUS_LABELS[status] || status}
-                    </button>
-                  ))}
+                      <option value="">{t('incidents.form.filterResidentAreaAll')}</option>
+                      {residentAreaOptions.map((area) => (
+                        <option key={area.id} value={area.id}>{area.label}</option>
+                      ))}
+                    </select>
+                    <input
+                      type="search"
+                      className="ic-multi-select-search"
+                      placeholder={t('incidents.form.searchResident')}
+                      value={residentSearch}
+                      onChange={(e) => setResidentSearch(e.target.value)}
+                      disabled={optionsLoading}
+                    />
+                  </div>
+                  <div className="ic-multi-select-list">
+                    {filteredResidents.length === 0 ? (
+                      <div className="ic-multi-select-empty">{t('incidents.form.noResidents')}</div>
+                    ) : (
+                      filteredResidents.map((resident) => {
+                        const isSelected = form.residentIds.includes(resident._id);
+                        return (
+                          <label key={resident._id} className="ic-multi-select-item">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleResident(resident._id)}
+                              disabled={optionsLoading}
+                            />
+                            <div className="ic-multi-select-item__label">
+                              <span className="ic-multi-select-item__name">{formatResidentLabel(resident)}</span>
+                            </div>
+                          </label>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+
+                {canAssignHandlers && (
+                  <div className="ic-field ic-field--multi-select">
+                    <label className="ic-field__label">{t('incidents.form.assignedStaff')}</label>
+                    
+                    {/* Display selected staff as tags */}
+                    {form.assignedStaffIds.length > 0 && (
+                      <div className="ic-selected-tags">
+                        {form.assignedStaffIds.map((staffId) => {
+                          const staff = staffAccounts.find((s) => getStaffSelectionId(s) === staffId);
+                          if (!staff) return null;
+                          return (
+                            <div key={staffId} className="ic-tag">
+                              <span className="ic-tag__name" title={formatStaffLabel(staff)}>
+                                {formatStaffLabel(staff)}
+                              </span>
+                              <button
+                                type="button"
+                                className="ic-tag__remove"
+                                onClick={() => toggleAssignedStaff(staff)}
+                                title={t('incidents.form.removeStaff')}
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    
+                    <div className="ic-multi-select-filters">
+                      <select
+                        className="ic-field__select"
+                        value={areaFilter}
+                        onChange={(e) => setAreaFilter(e.target.value)}
+                        disabled={optionsLoading}
+                      >
+                        <option value="">{t('incidents.form.filterAreaAll')}</option>
+                        {areaOptions.map((area) => (
+                          <option key={area.id} value={area.id}>{area.label}</option>
+                        ))}
+                      </select>
+                      <input
+                        type="search"
+                        className="ic-multi-select-search"
+                        placeholder={t('incidents.form.searchStaff')}
+                        value={staffSearch}
+                        onChange={(e) => setStaffSearch(e.target.value)}
+                        disabled={optionsLoading}
+                      />
+                    </div>
+                    <div className="ic-multi-select-list">
+                      {filteredStaff.length === 0 ? (
+                        <div className="ic-multi-select-empty">{t('incidents.form.noStaff')}</div>
+                      ) : (
+                        filteredStaff.map((staff) => {
+                          const staffId = getStaffSelectionId(staff);
+                          const isChecked = form.assignedStaffIds.includes(staffId);
+                          const availabilityLabel = getStaffAvailabilityLabel(staff);
+                          const conflictBadge = getStaffConflictBadge(staff);
+                          const conflicted = isStaffConflicted(staff);
+                          const itemClassName = `ic-multi-select-item${conflicted ? ' ic-multi-select-item--disabled' : ''}`;
+                          return (
+                            <label key={staff._id} className={itemClassName}>
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => toggleAssignedStaff(staff)}
+                                disabled={optionsLoading || conflicted}
+                              />
+                              <div className="ic-multi-select-item__label">
+                                <span className="ic-multi-select-item__name">{formatStaffLabel(staff)}</span>
+                                <span className={getStaffIsOnDuty(staff) ? 'ic-availability ic-availability--on' : 'ic-availability ic-availability--off'}>{availabilityLabel}</span>
+                                {conflictBadge}
+                              </div>
+                            </label>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                <div className="ic-field ic-form-full">
+                  <label className="ic-field__label">{t('incidents.form.description')} *</label>
+                  <textarea
+                    className="ic-field__textarea"
+                    rows={4}
+                    value={form.description}
+                    maxLength={MAX_TEXT_LENGTH}
+                    onChange={(e) => { setForm((c) => ({ ...c, description: e.target.value })); setFieldErrors((p) => ({ ...p, description: undefined })); }}
+                    required
+                  />
+                  <span className="ic-field__char-count">{form.description.length}/{MAX_TEXT_LENGTH}</span>
+                  {fieldErrors.description && <span className="ic-field__error">{fieldErrors.description}</span>}
                 </div>
               </div>
-            ))}
+
+              <div className="ic-drawer__footer" style={{ padding: 0, border: 'none', marginTop: 20 }}>
+                <button type="button" className="ic-btn ic-btn--secondary" onClick={() => setDrawerOpen(false)}>
+                  {t('incidents.form.cancel')}
+                </button>
+                <button type="submit" className="ic-btn ic-btn--primary" disabled={isSaving}>
+                  <PlusCircle size={16} />
+                  {isSaving ? t('incidents.form.saving') : t('incidents.createIncident')}
+                </button>
+              </div>
+            </form>
           </div>
-        )}
-      </section>
+        </>
+      )}
+
+      {/* ── Assign Handlers Modal ─────────────────────────────── */}
+      {assignHandlersOpen && (
+        <>
+          <div className="ic-drawer-overlay" onClick={() => { setAssignHandlersOpen(false); setSelectedHandlers([]); }} />
+          <div className="ic-drawer">
+            <div className="ic-drawer__header">
+              <h2 className="ic-drawer__title">{t('incidents.assignHandlers')}</h2>
+              <button type="button" className="ic-drawer__close" onClick={() => { setAssignHandlersOpen(false); setSelectedHandlers([]); }}>
+                <X size={20} />
+              </button>
+            </div>
+            <div className="ic-drawer__body">
+              <div className="ic-form-grid">
+                <div className="ic-field ic-form-full">
+                  <label className="ic-field__label">{t('incidents.form.assignedStaff')} *</label>
+                  <div className="ic-multi-select">
+                    {staffAccounts.length > 0 ? (
+                      staffAccounts.map((staff) => {
+                        const availabilityLabel = getStaffAvailabilityLabel(staff);
+                        const staffId = getStaffSelectionId(staff);
+                        const conflicted = isStaffConflicted(staff);
+                        const itemClassName = `ic-multi-select-item${conflicted ? ' ic-multi-select-item--disabled' : ''}`;
+                        return (
+                          <label key={staffId || staff._id || staff.id} className={itemClassName}>
+                            <input
+                              type="checkbox"
+                              checked={selectedHandlers.includes(staffId)}
+                              disabled={conflicted}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedHandlers([...selectedHandlers, staffId]);
+                                } else {
+                                  setSelectedHandlers(selectedHandlers.filter((s) => s !== staffId));
+                                }
+                              }}
+                            />
+                            <div className="ic-multi-select-item__label">
+                              <span className="ic-multi-select-item__name">{formatStaffLabel(staff)}</span>
+                              <span className={getStaffIsOnDuty(staff) ? 'ic-availability ic-availability--on' : 'ic-availability ic-availability--off'}>{availabilityLabel}</span>
+                            </div>
+                          </label>
+                        );
+                      })
+                    ) : (
+                      <p style={{ color: '#666', padding: '10px' }}>{t('incidents.noStaff')}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="ic-drawer__footer" style={{ padding: 0, border: 'none', marginTop: 20 }}>
+              <button type="button" className="ic-btn ic-btn--secondary" onClick={() => { setAssignHandlersOpen(false); setSelectedHandlers([]); }}>
+                {t('incidents.form.cancel')}
+              </button>
+              <button
+                type="button"
+                className="ic-btn ic-btn--primary"
+                disabled={assigningHandlers || selectedHandlers.length === 0}
+                onClick={handleAssignHandlers}
+              >
+                {assigningHandlers ? t('incidents.form.saving') : t('incidents.assignHandlers')}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

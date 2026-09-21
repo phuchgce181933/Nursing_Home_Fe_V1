@@ -38,12 +38,12 @@
 }
 
 .med-tab:hover {
-  color: #2563eb;
+  color: var(--nh-primary);
 }
 
 .med-tab--active {
-  color: #2563eb;
-  border-bottom-color: #2563eb;
+  color: var(--nh-primary);
+  border-bottom-color: var(--nh-primary);
 }
 
 .med-tab-content {
@@ -76,7 +76,7 @@
 }
 
 .med-date-nav__btn:hover {
-  color: #2563eb;
+  color: var(--nh-primary);
 }
 
 .med-date-nav__label {
@@ -155,7 +155,7 @@
 
 .med-filter__search:focus {
   outline: none;
-  border-color: #2563eb;
+  border-color: var(--nh-primary);
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
 }
 
@@ -172,7 +172,7 @@
 
 .med-filter__select:focus {
   outline: none;
-  border-color: #2563eb;
+  border-color: var(--nh-primary);
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
 }
 
@@ -181,7 +181,8 @@
   background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 14px;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
 }
 
@@ -213,6 +214,22 @@
 }
 
 .med-table tbody tr:hover {
+  background: #eff6ff;
+}
+
+.med-table th:last-child,
+.med-table td:last-child {
+  position: sticky;
+  right: 0;
+  z-index: 2;
+}
+.med-table th:last-child {
+  background: #0f172a;
+}
+.med-table td:last-child {
+  background: #fff;
+}
+.med-table tbody tr:hover td:last-child {
   background: #eff6ff;
 }
 

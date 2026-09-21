@@ -1,20 +1,41 @@
+import i18n from '../i18n';
+
 /** Aligns with backend CONFLICT_TYPES / CONFLICT_SEVERITIES. */
 export const CONFLICT_SEVERITIES = ['ERROR', 'WARNING', 'INFO'];
 
-export const CONFLICT_LABEL = {
-  INVALID_TIME: 'Giờ ca không hợp lệ',
-  OVERLAP: 'Trùng ca',
-  LEAVE_CONFLICT: 'Trùng ngày nghỉ',
-  MAX_DAILY_HOURS: 'Vượt 12h/ngày',
-  MULTIPLE_AREAS: 'Trùng giờ khác khu vực',
-  ROLE_MISMATCH: 'Vai trò không phù hợp',
-  STAFF_NOT_ASSIGNABLE: 'Không phân công ca (Admin/Quản lý)',
-  PAST_DATE: 'Ngày trong quá khứ',
-  ROOM_FLOOR_MISMATCH: 'Phòng không thuộc tầng',
-  OVERTIME: 'Vượt 48h/tuần',
-  REST_VIOLATION: 'Thiếu nghỉ giữa ca',
-  UNDERSTAFFED: 'Thiếu nhân viên',
-};
+const CONFLICT_TYPES = [
+  'INVALID_TIME',
+  'OVERLAP',
+  'LEAVE_CONFLICT',
+  'MAX_DAILY_HOURS',
+  'MULTIPLE_AREAS',
+  'ROLE_MISMATCH',
+  'STAFF_NOT_ASSIGNABLE',
+  'STAFF_ACCOUNT_LOCKED',
+  'STAFF_ACCOUNT_INACTIVE',
+  'PAST_DATE',
+  'ROOM_FLOOR_MISMATCH',
+  'OVERTIME',
+  'REST_VIOLATION',
+  'UNDERSTAFFED',
+  'SPLIT_DAILY_LIMIT',
+  'SPLIT_DAILY_RATIO',
+  'SPLIT_WEEKLY_LIMIT',
+];
+
+function resolveT(t) {
+  return t || ((key, opts) => i18n.t(key, opts));
+}
+
+export function getConflictLabel(type, t) {
+  const tt = resolveT(t);
+  return tt(`admin.staff.shifts.conflicts.${type}`, { defaultValue: type });
+}
+
+/** @deprecated Use getConflictLabel(type, t) */
+export const CONFLICT_LABEL = Object.fromEntries(
+  CONFLICT_TYPES.map((type) => [type, getConflictLabel(type)])
+);
 
 export const CONFLICT_ICON = { ERROR: '🔴', WARNING: '🟠', INFO: '🟡' };
 

@@ -1,760 +1,48 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import { resolveApiError, resolveApiSuccess } from '../../../../utils/apiMessage';
 import staffService from '../../../../services/staff.service';
 import careTaskService from '../../../../services/careTask.service';
-import facilityService from '../../../../services/facility.service';
-import { floorLabel, roomLabel } from '../../../../components/facility/FloorRoomSelect';
-import { canAssignAreas, canAssignResidents, NON_ASSIGNABLE_ROLES } from '../../../../utils/staffAssignable';
+import ListPagination from '../../../../components/ui/ListPagination';
+import useDebouncedSearch from '../../../../hooks/useDebouncedSearch';
+import useClientPagination from '../../../../hooks/useClientPagination';
+import { canReceiveCareTask } from '../../../../utils/staffAssignable';
 import { isStaffOnLeaveForAssignment } from '../../../../utils/leaveUtils';
-import { getApiErrorPayload, blockingCareTasksMessage } from '../../../../utils/blockingCareTasks';
-import BlockingCareTasksAlert from '../../../../components/staff/BlockingCareTasksAlert';
 import AdminPageShell from '../../../../components/admin/AdminPageShell';
-import { getLocalDateString } from '../../../../utils/dateUtils';
+import { useAuth } from '../../../../hooks/useAuth';
+import { useToast } from '../../../../hooks/useToast';
+import { todayVN } from '../../../../utils/dateUtils';
+import { findStaffDutyGapConflict } from '../../../../utils/careTaskValidation';
+import {
+  ASSIGNMENT_TABS,
+  TASK_TYPE_VALUES,
+  CARE_LEVEL_VALUES,
+  buildShiftTimeLabel,
+  careLevelLabel,
+  filterAssignableStaff,
+  filterEligibleShifts,
+  formatAssignmentDate,
+  getAssignmentBasePath,
+  isStaffVisibleForAreaResidentTabs,
+  residentPickerLabel,
+  roleLabel,
+  shiftStatusLabel,
+  taskTypeLabel,
+} from './assignmentHelpers';
+import { Alert, AssignmentDeleteIconButton, AssignmentSkipIconButton, useMinuteNow } from './assignmentShared';
 import '../../../../styles/admin/StaffAssignmentPage.css';
+import { AreaTab, ResidentTab } from './AssignmentListTabs';
 
-const CARE_TASK_TAB_HINT =
-  'Vào tab «Nhiệm vụ chăm sóc» để hoàn thành, bỏ qua hoặc xóa các nhiệm vụ trước khi thử lại.';
-
-const ROLE_LABELS = { doctor: 'Bác sĩ', nurse: 'Y tá', staff: 'Chăm sóc viên', manager: 'Quản lý', admin: 'Admin' };
-
-const TASK_TYPES = [
-  { value: 'morning_care',      label: 'Chăm sóc buổi sáng' },
-  { value: 'medication',        label: 'Dùng thuốc' },
-  { value: 'physical_therapy',  label: 'Vật lý trị liệu' },
-  { value: 'meal_assistance',   label: 'Hỗ trợ bữa ăn' },
-  { value: 'evening_check',     label: 'Kiểm tra buổi tối' },
-  { value: 'emergency_response', label: 'Phản ứng khẩn cấp' },
-];
-const CARE_LEVELS = [
-  { value: 'low',    label: '🟢 Thấp' },
-  { value: 'medium', label: '🟠 Trung bình' },
-  { value: 'high',   label: '🔴 Cao' },
-];
-const today = () => getLocalDateString();
-
-const filterAssignableStaff = (list) =>
-  (list || []).filter(
-    (s) => !NON_ASSIGNABLE_ROLES.includes(String(s.role || '').toLowerCase())
-  );
-
-const SHIFT_STATUS_VI = { published: 'Đã đăng', confirmed: 'Đã xác nhận' };
-/** Ca đủ điều kiện gán nhiệm vụ — khớp backend findShiftsByStaffIdsOnDate / findActiveShiftsForStaffOnDate */
-const ELIGIBLE_SHIFT_STATUSES = ['published', 'confirmed'];
-
-const filterEligibleShifts = (shifts) =>
-  (shifts || []).filter((s) => ELIGIBLE_SHIFT_STATUSES.includes(s.status));
-
-const buildShiftTimeLabel = (shifts) =>
-  shifts.length ? shifts.map((s) => `${s.startTime} – ${s.endTime}`).join(', ') : '';
-
-function formatDateVi(iso) {
-  if (!iso) return '';
-  const d = new Date(`${iso}T00:00:00`);
-  return d.toLocaleDateString('vi-VN', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
-}
-
-function NonAssignableBadge() {
-  return <span className="shift-badge shift-badge--muted">Không phân công</span>;
-}
-
-/** Badge ca trong ngày (từ shiftSummary trên GET /api/staff?assignmentDate=) */
-function ShiftSummaryBadge({ summary, assignable = true }) {
-  if (!assignable) return <NonAssignableBadge />;
-  if (!summary) return <span className="shift-badge shift-badge--muted">—</span>;
-  if (summary.onLeave) return <span className="shift-badge shift-badge--leave">Nghỉ phép</span>;
-  if (summary.hasShiftOnDate) {
-    return (
-      <span className="shift-badge shift-badge--on" title={summary.shiftTimeLabel}>
-        {summary.shiftTimeLabel || 'Có ca'}
-      </span>
-    );
-  }
-  return <span className="shift-badge shift-badge--off">Không có ca</span>;
-}
-
-/** Chi tiết ca trong panel phải — dùng shiftSummary.shiftsOnDate */
-function ShiftDetailPanel({ summary, assignmentDate }) {
-  if (!summary) return null;
-  const dateLabel = assignmentDate || summary.assignmentDate;
-  return (
-    <div className="shift-detail-panel">
-      <div className="shift-detail-panel__title">Ca làm việc — {formatDateVi(dateLabel)}</div>
-      {summary.onLeave && (
-        <p className="shift-detail-panel__hint shift-detail-panel__hint--warn">
-          Nhân viên có đơn nghỉ phép đã duyệt trong ngày này.
-        </p>
-      )}
-      {!summary.onLeave && summary.shiftsOnDate?.length > 0 ? (
-        <ul className="shift-detail-panel__list">
-          {summary.shiftsOnDate.map((sh) => (
-            <li key={sh._id} className="shift-detail-panel__item">
-              <span className="shift-detail-panel__name">{sh.name}</span>
-              <span className="shift-detail-panel__time">{sh.startTime} – {sh.endTime}</span>
-              <span className={`shift-status-tag shift-status-tag--${sh.status}`}>
-                {SHIFT_STATUS_VI[sh.status] || sh.status}
-              </span>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        !summary.onLeave && (
-          <p className="shift-detail-panel__hint">Chưa có ca đã đăng hoặc đã xác nhận trong ngày này.</p>
-        )
-      )}
-    </div>
-  );
-}
-
-// ── Alert helper ──────────────────────────────────────────────────────────────
-function Alert({ type, msg }) {
-  if (!msg) return null;
-  const styles = {
-    success: { background: '#dcfce7', border: '1px solid #86efac', color: '#15803d' },
-    error:   { background: '#fef2f2', border: '1px solid #fca5a5', color: '#dc2626' },
-    warning: { background: '#fffbeb', border: '1px solid #fde68a', color: '#92400e' },
-  };
-  return (
-    <div style={{ ...styles[type], borderRadius: 8, padding: '8px 14px', marginBottom: 10, fontSize: '0.875rem' }}>
-      {msg}
-    </div>
-  );
-}
-
-// ── Tab 1: Area Assignment ────────────────────────────────────────────────────
-function AreaTab({ staff, loading, assignmentDate, onStaffUpdated }) {
-  const [selected, setSelected]         = useState(null);
-  const [selectedFloorIds, setSelectedFloorIds] = useState([]);
-  const [selectedRoomIds, setSelectedRoomIds]   = useState([]);
-  const [floors, setFloors]             = useState([]);
-  const [rooms, setRooms]               = useState([]);
-  const [loadingFloors, setLoadingFloors] = useState(true);
-  const [loadingRooms, setLoadingRooms]   = useState(false);
-  const [saving, setSaving]               = useState(false);
-  const [success, setSuccess]           = useState('');
-  const [error, setError]               = useState('');
-  const [blockingTasks, setBlockingTasks] = useState([]);
-  const [infos, setInfos]               = useState([]);
-
-  const floorLabelMap = useMemo(
-    () => Object.fromEntries(floors.map((f) => [f._id, floorLabel(f)])),
-    [floors]
-  );
-
-  useEffect(() => {
-    facilityService
-      .listFloors({ activeOnly: true })
-      .then((data) => setFloors(Array.isArray(data) ? data : []))
-      .catch(() => setFloors([]))
-      .finally(() => setLoadingFloors(false));
-  }, []);
-
-  useEffect(() => {
-    if (!selectedFloorIds.length) {
-      setRooms([]);
-      return undefined;
-    }
-    let cancelled = false;
-    setLoadingRooms(true);
-    Promise.all(selectedFloorIds.map((id) => facilityService.listRoomsByFloor(id)))
-      .then((results) => {
-        if (cancelled) return;
-        setRooms(results.flat());
-      })
-      .catch(() => {
-        if (!cancelled) setRooms([]);
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingRooms(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedFloorIds]);
-
-  const resolveAreaLabel = (area) => {
-    if (typeof area === 'object' && area !== null) {
-      return floorLabel(area);
-    }
-    return floorLabelMap[area] || area;
-  };
-
-  const toggleFloor = (id) => {
-    setSelectedFloorIds((prev) => {
-      const removing = prev.includes(id);
-      const next = removing ? prev.filter((x) => x !== id) : [...prev, id];
-      if (removing) {
-        setSelectedRoomIds((roomPrev) =>
-          roomPrev.filter((rid) => {
-            const room = rooms.find((r) => r._id === rid);
-            return !room || String(room.floorId) !== String(id);
-          })
-        );
-      }
-      return next;
-    });
-  };
-
-  const toggleRoom = (id) => {
-    setSelectedRoomIds((prev) =>
-      (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id])
-    );
-  };
-
-  useEffect(() => {
-    setSelected(null);
-  }, [assignmentDate]);
-
-  const handleSelect = (s) => {
-    if (!canAssignAreas(s) || isStaffOnLeaveForAssignment(s)) return;
-    setSelected(s);
-    setSuccess('');
-    setError('');
-    setBlockingTasks([]);
-    setInfos([]);
-    const { floorIds, roomIds } = areaIdsFromProfile(s.staffProfile);
-    setSelectedFloorIds(floorIds);
-    setSelectedRoomIds(roomIds);
-  };
-
-  const handleSave = async () => {
-    if (!selected) return;
-    setSaving(true);
-    setError('');
-    setBlockingTasks([]);
-    setSuccess('');
-    setInfos([]);
-    try {
-      const res = await staffService.assignAreas(selected._id, {
-        floorIds: selectedFloorIds,
-        roomIds: selectedRoomIds,
-      });
-      setSuccess('Đã cập nhật khu vực phụ trách (master data)!');
-      const hints = res.info || res.warnings || [];
-      if (hints.length) setInfos(hints);
-
-      if (res.staffProfile) {
-        const { floorIds, roomIds } = areaIdsFromProfile(res.staffProfile);
-        setSelected((prev) =>
-          prev ? { ...prev, staffProfile: res.staffProfile } : prev
-        );
-        setSelectedFloorIds(floorIds);
-        setSelectedRoomIds(roomIds);
-      }
-
-      const pruned = res.residentsPruned;
-      if (pruned?.count > 0) {
-        const names = (pruned.removed || [])
-          .map((r) => {
-            const room = r.roomNumber ? `P.${r.roomNumber}` : '';
-            const label = r.fullName || r.residentCode || '';
-            return [label, room].filter(Boolean).join(' · ');
-          })
-          .filter(Boolean)
-          .join(', ');
-        setInfos((prev) => [
-          ...prev,
-          `Đã tự động gỡ ${pruned.count} cư dân không còn thuộc khu vực phụ trách${names ? `: ${names}` : ''}.`,
-        ]);
-      }
-
-      await onStaffUpdated?.();
-    } catch (e) {
-      const { message, blockingTasks: blocked } = getApiErrorPayload(e, 'Lưu thất bại');
-      setBlockingTasks(blocked);
-      setError(blocked.length ? blockingCareTasksMessage(message) : message);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
-      {/* Staff list */}
-      <div className="data-table-wrap">
-        <table className="data-table">
-          <thead><tr><th>Nhân viên</th><th>Vai trò</th><th>Ca trong ngày</th><th>Tầng phụ trách</th><th></th></tr></thead>
-          <tbody>
-            {loading && <tr><td colSpan={5} className="empty-state">Đang tải...</td></tr>}
-            {!loading && staff.length === 0 && <tr><td colSpan={5} className="empty-state">Không có nhân viên</td></tr>}
-            {!loading && staff.map((s) => {
-              const areas = s.staffProfile?.responsibleAreaIds || [];
-              return (
-                <tr key={s._id} style={{ background: selected?._id === s._id ? '#eff6ff' : undefined }}>
-                  <td style={{ fontWeight: 600 }}>{s.fullName}</td>
-                  <td>{ROLE_LABELS[s.role] || s.role}</td>
-                  <td>
-                    <ShiftSummaryBadge summary={s.shiftSummary} assignable={canAssignAreas(s)} />
-                  </td>
-                  <td>
-                    {areas.length
-                      ? areas.map((a) => (
-                          <span key={typeof a === 'object' ? a._id : a} className="area-badge" style={{ marginRight: 4 }}>
-                            {resolveAreaLabel(a)}
-                          </span>
-                        ))
-                      : <span style={{ color: '#94a3b8', fontSize: '0.8rem' }}>Chưa phân công</span>}
-                  </td>
-                  <td>
-                    {canAssignAreas(s) ? (
-                      isStaffOnLeaveForAssignment(s) ? (
-                        <span className="shift-badge shift-badge--leave">Nghỉ phép</span>
-                      ) : (
-                        <button
-                          className="btn btn--sm btn--edit"
-                          onClick={() => handleSelect(s)}
-                          disabled={!s.staffProfile}
-                          title={!s.staffProfile ? 'Chưa có hồ sơ nhân viên' : undefined}
-                        >
-                          Chọn
-                        </button>
-                      )
-                    ) : (
-                      <NonAssignableBadge />
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Edit panel */}
-      <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 20 }}>
-        {!selected ? (
-          <div className="empty-state">Chọn nhân viên để phân công khu vực</div>
-        ) : !canAssignAreas(selected) ? (
-          <div className="empty-state empty-state--warn">
-            Tài khoản Admin hoặc Quản lý không được phân công khu vực, ca làm hoặc nhiệm vụ chăm sóc.
-          </div>
-        ) : !selected.staffProfile ? (
-          <div className="empty-state empty-state--warn">Nhân viên chưa có hồ sơ — không thể phân công khu vực.</div>
-        ) : isStaffOnLeaveForAssignment(selected) ? (
-          <div className="empty-state empty-state--warn">
-            Nhân viên có đơn nghỉ phép đã duyệt trong ngày phân công — không thể phân công khu vực.
-          </div>
-        ) : (
-          <>
-            <div style={{ fontWeight: 600, fontSize: '1rem', marginBottom: 14 }}>
-              Phân công khu vực — <span style={{ color: '#3b82f6' }}>{selected.fullName}</span>
-            </div>
-            <Alert type="success" msg={success} />
-            {blockingTasks.length > 0 ? (
-              <BlockingCareTasksAlert
-                message={error}
-                tasks={blockingTasks}
-                hint={CARE_TASK_TAB_HINT}
-              />
-            ) : (
-              <Alert type="error" msg={error} />
-            )}
-            {infos.map((msg, i) => <Alert key={i} type="warning" msg={`ℹ️ ${msg}`} />)}
-
-            <ShiftDetailPanel summary={selected.shiftSummary} assignmentDate={assignmentDate} />
-
-            <p style={{ fontSize: '0.78rem', color: '#64748b', marginBottom: 12, lineHeight: 1.45 }}>
-              Tầng/phòng lưu cố định trên hồ sơ nhân viên (master data). Ca làm việc theo ngày xem ở trên — phân công ca tại mục Quản lý ca làm việc.
-            </p>
-
-            <div className="form-group" style={{ marginBottom: 14 }}>
-              <label>Tầng / Khu vực phụ trách</label>
-              {loadingFloors ? (
-                <p className="field-hint">Đang tải danh sách tầng...</p>
-              ) : (
-                <div className="area-multi-select">
-                  {floors.length === 0 && <p className="field-hint">Chưa có tầng trong hệ thống</p>}
-                  {floors.map((f) => (
-                    <label key={f._id} className="area-multi-select__item">
-                      <input
-                        type="checkbox"
-                        checked={selectedFloorIds.includes(f._id)}
-                        onChange={() => toggleFloor(f._id)}
-                      />
-                      <span>{floorLabel(f)}</span>
-                    </label>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="form-group" style={{ marginBottom: 20 }}>
-              <label>Phòng phụ trách (tùy chọn)</label>
-              {!selectedFloorIds.length ? (
-                <p className="field-hint">Chọn ít nhất một tầng để xem phòng</p>
-              ) : loadingRooms ? (
-                <p className="field-hint">Đang tải phòng...</p>
-              ) : (
-                <div className="area-multi-select">
-                  {rooms.length === 0 && <p className="field-hint">Không có phòng trên các tầng đã chọn</p>}
-                  {rooms.map((r) => (
-                    <label key={r._id} className="area-multi-select__item">
-                      <input
-                        type="checkbox"
-                        checked={selectedRoomIds.includes(r._id)}
-                        onChange={() => toggleRoom(r._id)}
-                      />
-                      <span>{roomLabel(r)}</span>
-                    </label>
-                  ))}
-                </div>
-              )}
-            </div>
-            <button className="btn btn--primary" onClick={handleSave} disabled={saving}>
-              {saving ? 'Đang lưu...' : 'Lưu phân công khu vực'}
-            </button>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function assignedResidentIdsFromProfile(profile) {
-  return (profile?.assignedResidentIds || []).map((r) =>
-    String(typeof r === 'object' ? r._id : r)
-  );
-}
-
-function areaIdsFromProfile(profile) {
-  const floorIds = (profile?.responsibleAreaIds || []).map((f) =>
-    String(typeof f === 'object' ? f._id : f)
-  );
-  const roomIds = (profile?.responsibleRoomIds || []).map((r) =>
-    String(typeof r === 'object' ? r._id : r)
-  );
-  return { floorIds, roomIds };
-}
-
-function residentPickerLabel(r) {
-  const room = r.roomId;
-  const roomNum = typeof room === 'object' ? room?.roomNumber : '';
-  const code = r.residentCode ? ` (${r.residentCode})` : '';
-  return `${r.fullName || 'Cư dân'}${code}${roomNum ? ` · P.${roomNum}` : ''}`;
-}
-
-// ── Tab 2: Resident Assignment ────────────────────────────────────────────────
-function ResidentTab({ staff, loading, assignmentDate, onStaffUpdated }) {
-  const [selected, setSelected]           = useState(null);
-  const [selectedResidentIds, setSelectedResidentIds] = useState([]);
-  const [residentOptions, setResidentOptions] = useState([]);
-  const [loadingResidents, setLoadingResidents] = useState(false);
-  const [residentHint, setResidentHint]   = useState('');
-  const [residentFilterMode, setResidentFilterMode] = useState(null);
-  const [residentSearch, setResidentSearch] = useState('');
-  const [saving, setSaving]               = useState(false);
-  const [success, setSuccess]             = useState('');
-  const [error, setError]                 = useState('');
-  const [blockingTasks, setBlockingTasks] = useState([]);
-
-  useEffect(() => {
-    setSelected(null);
-    setResidentOptions([]);
-    setSelectedResidentIds([]);
-    setBlockingTasks([]);
-  }, [assignmentDate]);
-
-  const areaScopeKey = useMemo(() => {
-    if (!selected?._id) return '';
-    const p = staff.find((s) => s._id === selected._id)?.staffProfile || selected.staffProfile;
-    if (!p) return '';
-    const rooms = (p.responsibleRoomIds || []).map((r) => String(r._id || r)).sort().join(',');
-    const floors = (p.responsibleAreaIds || []).map((f) => String(f._id || f)).sort().join(',');
-    if (!rooms && !floors) return '_none_';
-    return `${rooms}|${floors}`;
-  }, [selected?._id, staff]);
-
-  const loadResidentsForStaff = async (member) => {
-    if (!member?._id) return;
-    if (!member.staffProfile) {
-      setResidentOptions([]);
-      setResidentFilterMode(null);
-      setResidentHint('Nhân viên chưa có hồ sơ — không thể phân công cư dân.');
-      return;
-    }
-
-    setLoadingResidents(true);
-    setResidentHint('');
-    setResidentFilterMode(null);
-    try {
-      const res = await staffService.listResidentsAvailable(member._id, {
-        status: 'admitted',
-      });
-      const list = Array.isArray(res.data) ? res.data : [];
-      setResidentFilterMode(res.filterMode || null);
-      setResidentOptions(
-        [...list].sort((a, b) => (a.fullName || '').localeCompare(b.fullName || '', 'vi'))
-      );
-      if (res.message) {
-        setResidentHint(res.message);
-      } else if (!list.length) {
-        setResidentHint(
-          res.filterMode === 'rooms'
-            ? 'Không có cư dân trong các phòng phụ trách đã chọn.'
-            : 'Không có cư dân trên tầng phụ trách.'
-        );
-      }
-    } catch (e) {
-      setResidentOptions([]);
-      setResidentFilterMode(null);
-      setResidentHint(e.response?.data?.message || 'Không tải được danh sách cư dân');
-    } finally {
-      setLoadingResidents(false);
-    }
-  };
-
-  const handleSelect = (s) => {
-    if (!canAssignResidents(s) || isStaffOnLeaveForAssignment(s)) return;
-    setSelected(s);
-    setSuccess('');
-    setError('');
-    setBlockingTasks([]);
-    setSelectedResidentIds(assignedResidentIdsFromProfile(s.staffProfile));
-    setResidentSearch('');
-  };
-
-  const syncAssignedResidents = async (member) => {
-    try {
-      const res = await staffService.listAssignedResidents(member._id);
-      const assigned = Array.isArray(res.data) ? res.data : [];
-      const ids = assigned.map((r) => String(r._id));
-      setSelectedResidentIds(ids);
-      setSelected((prev) =>
-        prev?._id === member._id
-          ? {
-              ...prev,
-              staffProfile: {
-                ...prev.staffProfile,
-                assignedResidentIds: assigned,
-              },
-            }
-          : prev
-      );
-      return assigned;
-    } catch {
-      const ids = assignedResidentIdsFromProfile(member.staffProfile);
-      setSelectedResidentIds(ids);
-      return null;
-    }
-  };
-
-  useEffect(() => {
-    if (!selected?._id) return undefined;
-    let cancelled = false;
-    const fresh = staff.find((s) => s._id === selected._id) || selected;
-
-    (async () => {
-      setSelected((prev) => (prev?._id === fresh._id ? { ...fresh } : prev));
-      await syncAssignedResidents(fresh);
-      if (!cancelled) await loadResidentsForStaff(fresh);
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [selected?._id, areaScopeKey]);
-
-  const toggleResident = (id) => {
-    const sid = String(id);
-    setSelectedResidentIds((prev) =>
-      prev.includes(sid) ? prev.filter((x) => x !== sid) : [...prev, sid]
-    );
-  };
-
-  const filteredResidents = useMemo(() => {
-    const q = residentSearch.trim().toLowerCase();
-    if (!q) return residentOptions;
-    return residentOptions.filter((r) => {
-      const name = (r.fullName || '').toLowerCase();
-      const code = (r.residentCode || '').toLowerCase();
-      const room = r.roomId?.roomNumber?.toLowerCase?.() || '';
-      return name.includes(q) || code.includes(q) || room.includes(q);
-    });
-  }, [residentOptions, residentSearch]);
-
-  const handleSave = async () => {
-    if (!selected) return;
-    if (!selected.staffProfile) {
-      setError('Nhân viên chưa có hồ sơ — không thể phân công cư dân.');
-      return;
-    }
-    setSaving(true);
-    setError('');
-    setBlockingTasks([]);
-    setSuccess('');
-    try {
-      const res = await staffService.assignResidents(selected._id, {
-        residentIds: selectedResidentIds,
-      });
-      setSuccess('Đã cập nhật danh sách cư dân phụ trách!');
-      if (res.staffProfile) {
-        setSelected((prev) =>
-          prev ? { ...prev, staffProfile: res.staffProfile } : prev
-        );
-        setSelectedResidentIds(assignedResidentIdsFromProfile(res.staffProfile));
-      }
-      await onStaffUpdated?.();
-    } catch (e) {
-      const { message, blockingTasks: blocked } = getApiErrorPayload(e, 'Lưu thất bại');
-      setBlockingTasks(blocked);
-      setError(blocked.length ? blockingCareTasksMessage(message) : message);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
-      <div className="data-table-wrap">
-        <table className="data-table">
-          <thead><tr><th>Nhân viên</th><th>Vai trò</th><th>Ca trong ngày</th><th>Cư dân đang chăm sóc</th><th></th></tr></thead>
-          <tbody>
-            {loading && <tr><td colSpan={5} className="empty-state">Đang tải...</td></tr>}
-            {!loading && staff.length === 0 && (
-              <tr><td colSpan={5} className="empty-state">Không có nhân viên</td></tr>
-            )}
-            {!loading && staff.map((s) => {
-              const residents = s.staffProfile?.assignedResidentIds || [];
-              return (
-                <tr key={s._id} style={{ background: selected?._id === s._id ? '#eff6ff' : undefined }}>
-                  <td style={{ fontWeight: 600 }}>{s.fullName}</td>
-                  <td>{ROLE_LABELS[s.role] || s.role}</td>
-                  <td>
-                    <ShiftSummaryBadge summary={s.shiftSummary} assignable={canAssignResidents(s)} />
-                  </td>
-                  <td>
-                    {residents.length
-                      ? <span style={{ color: '#1d4ed8', fontWeight: 600 }}>{residents.length} cư dân</span>
-                      : <span style={{ color: '#94a3b8', fontSize: '0.8rem' }}>Chưa giao</span>}
-                  </td>
-                  <td>
-                    {canAssignResidents(s) ? (
-                      isStaffOnLeaveForAssignment(s) ? (
-                        <span className="shift-badge shift-badge--leave">Nghỉ phép</span>
-                      ) : (
-                        <button
-                          className="btn btn--sm btn--edit"
-                          onClick={() => handleSelect(s)}
-                          disabled={!s.staffProfile}
-                          title={!s.staffProfile ? 'Chưa có hồ sơ nhân viên' : undefined}
-                        >
-                          Chọn
-                        </button>
-                      )
-                    ) : (
-                      <NonAssignableBadge />
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 20 }}>
-        {!selected ? (
-          <div className="empty-state">Chọn nhân viên để phân công cư dân phụ trách</div>
-        ) : !canAssignResidents(selected) ? (
-          <div className="empty-state empty-state--warn">
-            Tài khoản Admin hoặc Quản lý không được phân công cư dân.
-          </div>
-        ) : !selected.staffProfile ? (
-          <div className="empty-state empty-state--warn">Nhân viên chưa có hồ sơ — không thể phân công cư dân.</div>
-        ) : isStaffOnLeaveForAssignment(selected) ? (
-          <div className="empty-state empty-state--warn">
-            Nhân viên có đơn nghỉ phép đã duyệt trong ngày phân công — không thể phân công cư dân.
-          </div>
-        ) : (
-          <>
-            <div style={{ fontWeight: 600, fontSize: '1rem', marginBottom: 14 }}>
-              Cư dân phụ trách — <span style={{ color: '#3b82f6' }}>{selected.fullName}</span>
-            </div>
-            <Alert type="success" msg={success} />
-            {blockingTasks.length > 0 ? (
-              <BlockingCareTasksAlert
-                message={error}
-                tasks={blockingTasks}
-                hint={CARE_TASK_TAB_HINT}
-              />
-            ) : (
-              <Alert type="error" msg={error} />
-            )}
-            <ShiftDetailPanel summary={selected.shiftSummary} assignmentDate={assignmentDate} />
-
-            <p style={{ fontSize: '0.78rem', color: '#64748b', marginBottom: 12, lineHeight: 1.45 }}>
-              {residentFilterMode === 'rooms'
-                ? 'Chỉ hiển thị cư dân trong các phòng phụ trách đã chọn (không lấy cả tầng).'
-                : residentFilterMode === 'floors'
-                  ? 'Hiển thị cư dân trên tầng phụ trách (chưa chọn phòng cụ thể).'
-                  : 'Phân công khu vực/phòng trước khi giao cư dân.'}
-              {' '}Bỏ chọn tất cả và lưu để xóa phân công.
-            </p>
-
-            {residentHint && (
-              <p className="field-hint field-hint--warn" style={{ marginBottom: 10 }}>{residentHint}</p>
-            )}
-
-            <div className="form-group" style={{ marginBottom: 12 }}>
-              <label>Tìm cư dân</label>
-              <input
-                type="search"
-                value={residentSearch}
-                onChange={(e) => setResidentSearch(e.target.value)}
-                placeholder="Tên, mã hoặc số phòng..."
-                disabled={loadingResidents || !residentOptions.length}
-              />
-            </div>
-
-            <div className="form-group" style={{ marginBottom: 16 }}>
-              <label>
-                Chọn cư dân ({selectedResidentIds.length} đã chọn)
-              </label>
-              {loadingResidents ? (
-                <p className="field-hint">Đang tải danh sách cư dân...</p>
-              ) : (
-                <div className="area-multi-select resident-picker">
-                  {filteredResidents.length === 0 && !residentHint && (
-                    <p className="field-hint">Không có cư dân phù hợp</p>
-                  )}
-                  {filteredResidents.map((r) => (
-                    <label key={r._id} className="area-multi-select__item">
-                      <input
-                        type="checkbox"
-                        checked={selectedResidentIds.includes(String(r._id))}
-                        onChange={() => toggleResident(r._id)}
-                      />
-                      <span>{residentPickerLabel(r)}</span>
-                    </label>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <button
-              className="btn btn--primary"
-              onClick={handleSave}
-              disabled={saving || loadingResidents}
-            >
-              {saving ? 'Đang lưu...' : 'Lưu danh sách cư dân'}
-            </button>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ── Tab 3: Care Tasks (bước 3 — sau khu vực + cư dân) ───────────────────────
-const TASK_STATUS_LABELS = {
-  pending: 'Chờ',
-  in_progress: 'Đang làm',
-  completed: 'Hoàn thành',
-  skipped: 'Bỏ qua',
-  missed: 'Bỏ lỡ',
+// ── Tab 3: Care Tasks ───────────────────────────────────────────────────────
+/** Admin/manager may only skip (not in_progress/completed) */
+const TASK_STATUS_ADMIN_NEXT = {
+  pending: ['skipped'],
+  in_progress: ['skipped'],
 };
-const TASK_STATUS_NEXT = {
-  pending: ['in_progress', 'skipped'],
-  in_progress: ['completed', 'skipped'],
-};
+
+const taskStatusLabel = (t, status) =>
+  t(`common.careTaskStatus.${status}`, { defaultValue: status });
 
 const toMinutes = (hhmm) => {
   if (!hhmm || typeof hhmm !== 'string') return null;
@@ -783,17 +71,17 @@ const emptyTaskForm = (workDate) => ({
   notes: '',
 });
 
-const buildAssignmentContextFallback = (staffList) => ({
-  taskTypes: TASK_TYPES.map((t) => ({ value: t.value, labelVi: t.label })),
-  careLevels: CARE_LEVELS.map((l) => ({
-    value: l.value,
-    labelVi: l.label.replace(/^[^\s]+\s/, ''),
+const buildAssignmentContextFallback = (staffList, t) => ({
+  taskTypes: TASK_TYPE_VALUES.map((value) => ({ value, labelVi: taskTypeLabel(t, value) })),
+  careLevels: CARE_LEVEL_VALUES.map((value) => ({
+    value,
+    labelVi: t(`common.careLevel.${value}`, { defaultValue: value }),
   })),
   staffWithShifts: (staffList || [])
     .map((s) => {
       const shiftsOnDate = filterEligibleShifts(s.shiftSummary?.shiftsOnDate);
       if (!shiftsOnDate.length || !s.staffProfile?._id) return null;
-      if (NON_ASSIGNABLE_ROLES.includes(String(s.role || '').toLowerCase())) return null;
+      if (!canReceiveCareTask(s)) return null;
       return {
         staffProfileId: s.staffProfile._id,
         userId: s._id,
@@ -806,17 +94,36 @@ const buildAssignmentContextFallback = (staffList) => ({
     .filter(Boolean),
 });
 
-function careResidentOptionLabel(r) {
-  return residentPickerLabel(r);
+function careResidentOptionLabel(r, t) {
+  return residentPickerLabel(r, t);
 }
 
-function CareTaskTab({ assignmentDate, staff }) {
+function CareTaskTab({ staff }) {
+  const { t } = useTranslation();
+  const { showToast } = useToast();
   const [tasks, setTasks]               = useState([]);
   const [loading, setLoading]           = useState(false);
   const [error, setError]               = useState('');
-  const [filterDate, setFilterDate]     = useState(assignmentDate);
+  const { search: taskSearch, setSearch: setTaskSearch, debouncedSearch: debouncedTaskSearch } = useDebouncedSearch();
+  const filteredTasks = useMemo(() => {
+    const q = debouncedTaskSearch.trim().toLowerCase();
+    if (!q) return tasks;
+    return tasks.filter((task) => {
+      const staffName = task.staffProfileId?.userId?.fullName || task.staffProfileId?.staffCode || '';
+      const resident = task.residentId?.fullName || task.residentId?.residentCode || '';
+      return staffName.toLowerCase().includes(q) || resident.toLowerCase().includes(q);
+    });
+  }, [tasks, debouncedTaskSearch]);
+  const {
+    paginatedItems: paginatedTasks,
+    page: taskPage,
+    setPage: setTaskPage,
+    totalPages: taskTotalPages,
+    total: taskTotal,
+  } = useClientPagination(filteredTasks);
+  const [filterDate, setFilterDate]     = useState(() => todayVN());
   const [showForm, setShowForm]         = useState(false);
-  const [form, setForm]                 = useState(emptyTaskForm(assignmentDate));
+  const [form, setForm]                 = useState(() => emptyTaskForm(todayVN()));
   const [saveError, setSaveErr]         = useState('');
   const [saving, setSaving]             = useState(false);
   const [ctx, setCtx]                   = useState(null);
@@ -825,19 +132,14 @@ function CareTaskTab({ assignmentDate, staff }) {
   const [residentsLoading, setResidentsLoading] = useState(false);
   const [residentHint, setResidentHint] = useState('');
 
-  useEffect(() => {
-    setFilterDate(assignmentDate);
-    setForm((prev) => ({ ...prev, workDate: assignmentDate }));
-  }, [assignmentDate]);
-
   const taskTypeOptions = ctx?.taskTypes?.length
     ? ctx.taskTypes
-    : TASK_TYPES.map((t) => ({ value: t.value, labelVi: t.label }));
+    : TASK_TYPE_VALUES.map((value) => ({ value, labelVi: taskTypeLabel(t, value) }));
   const careLevelOptions = ctx?.careLevels?.length
     ? ctx.careLevels
-    : CARE_LEVELS.map((l) => ({
-        value: l.value,
-        labelVi: l.label.replace(/^[^\s]+\s/, ''),
+    : CARE_LEVEL_VALUES.map((value) => ({
+        value,
+        labelVi: t(`common.careLevel.${value}`, { defaultValue: value }),
       }));
 
   const staffWithShifts = ctx?.staffWithShifts ?? [];
@@ -852,7 +154,7 @@ function CareTaskTab({ assignmentDate, staff }) {
       staffWithShifts.filter(
         (s) =>
           !onLeaveByUserId[String(s.userId)]
-          && !NON_ASSIGNABLE_ROLES.includes(String(s.role || '').toLowerCase())
+          && canReceiveCareTask(s)
       ),
     [staffWithShifts, onLeaveByUserId]
   );
@@ -874,15 +176,11 @@ function CareTaskTab({ assignmentDate, staff }) {
     || shiftOptions[0]
     || null;
 
-  const taskTypeLabel = (value) =>
-    taskTypeOptions.find((t) => t.value === value)?.labelVi
-    || TASK_TYPES.find((t) => t.value === value)?.label
-    || value;
+  const resolveTaskTypeLabel = (value) =>
+    taskTypeOptions.find((opt) => opt.value === value)?.labelVi
+    || taskTypeLabel(t, value);
 
-  const careLevelLabel = (value) =>
-    careLevelOptions.find((l) => l.value === value)?.labelVi
-    || CARE_LEVELS.find((l) => l.value === value)?.label
-    || value;
+  const resolveCareLevelLabel = (value) => careLevelLabel(t, value);
 
   const loadContext = async (workDate) => {
     setCtxLoading(true);
@@ -893,12 +191,12 @@ function CareTaskTab({ assignmentDate, staff }) {
       return data;
     } catch (e) {
       if (e.response?.status === 404) {
-        const fallback = buildAssignmentContextFallback(staff);
+        const fallback = buildAssignmentContextFallback(staff, t);
         setCtx(fallback);
         return fallback;
       }
-      setCtx(buildAssignmentContextFallback(staff));
-      setSaveErr(e.response?.data?.message || 'Không tải được dữ liệu form');
+      setCtx(buildAssignmentContextFallback(staff, t));
+      setSaveErr(resolveApiError(e, t, 'admin.staff.assignments.tasks.loadFormFailed'));
       return null;
     } finally {
       setCtxLoading(false);
@@ -918,13 +216,13 @@ function CareTaskTab({ assignmentDate, staff }) {
       const list = Array.isArray(res.data) ? res.data : [];
       setAssignedResidents(list);
       if (res.message) {
-        setResidentHint(res.message);
+        setResidentHint(resolveApiSuccess(res, t));
       } else if (!list.length) {
-        setResidentHint('Chưa có cư dân phụ trách — hoàn thành bước 2 trước.');
+        setResidentHint(t('admin.staff.assignments.tasks.noAssignedResidents'));
       }
     } catch (e) {
       setAssignedResidents([]);
-      setResidentHint(e.response?.data?.message || 'Không tải được danh sách cư dân');
+      setResidentHint(resolveApiError(e, t, 'admin.staff.assignments.tasks.loadAssignedFailed'));
     } finally {
       setResidentsLoading(false);
     }
@@ -941,7 +239,7 @@ function CareTaskTab({ assignmentDate, staff }) {
         setTasks([]);
         setError('');
       } else {
-        setError(e.response?.data?.message || 'Tải thất bại');
+        setError(resolveApiError(e, t, 'common.loadFailed'));
       }
     } finally {
       setLoading(false);
@@ -953,17 +251,31 @@ function CareTaskTab({ assignmentDate, staff }) {
   }, [filterDate]);
 
   useEffect(() => {
-    if (showForm && form.workDate === assignmentDate) {
-      loadContext(assignmentDate);
-    }
-  }, [showForm, assignmentDate]);
+    if (!showForm || !form.workDate) return;
+    if (form.workDate < todayVN()) return;
+    loadContext(form.workDate);
+  }, [showForm, form.workDate]);
 
   const handleOpenForm = () => {
-    setForm(emptyTaskForm(assignmentDate));
+    const defaultWorkDate = filterDate >= todayVN() ? filterDate : todayVN();
+    setForm(emptyTaskForm(defaultWorkDate));
     setSaveErr('');
     setAssignedResidents([]);
     setResidentHint('');
     setShowForm(true);
+  };
+
+  const handleWorkDateChange = (newDate) => {
+    if (!newDate || newDate < todayVN()) return;
+    setForm((prev) => ({
+      ...prev,
+      workDate: newDate,
+      staffProfileId: '',
+      shiftId: '',
+      residentId: '',
+    }));
+    setAssignedResidents([]);
+    setResidentHint('');
   };
 
   const handleStaffChange = (profileId) => {
@@ -979,30 +291,44 @@ function CareTaskTab({ assignmentDate, staff }) {
   };
 
   const minScheduledTime =
-    form.workDate === (ctx?.todayVN || today()) ? (ctx?.minScheduledTime || '') : '';
+    form.workDate === (ctx?.todayVN || todayVN()) ? (ctx?.minScheduledTime || '') : '';
 
   const handleCreate = async () => {
     setSaveErr('');
     if (selectedStaffEntry && onLeaveByUserId[String(selectedStaffEntry.userId)]) {
-      setSaveErr('Nhân viên đang nghỉ phép trong ngày này — không thể giao nhiệm vụ.');
+      setSaveErr(t('admin.staff.assignments.tasks.onLeaveError'));
       return;
     }
     if (!form.shiftId || !selectedShift) {
-      setSaveErr('Vui lòng chọn ca làm việc.');
+      setSaveErr(t('admin.staff.assignments.tasks.selectShiftError'));
       return;
     }
     const scheduledTimeTrimmed = form.scheduledTime?.trim();
     if (!scheduledTimeTrimmed) {
-      setSaveErr('Vui lòng chọn giờ dự kiến.');
+      setSaveErr(t('admin.staff.assignments.tasks.selectTimeError'));
       return;
     }
     if (minScheduledTime && scheduledTimeTrimmed < minScheduledTime) {
-      setSaveErr(`Giờ dự kiến phải từ ${minScheduledTime} trở đi (theo giờ hiện tại).`);
+      setSaveErr(t('admin.staff.assignments.tasks.minTimeError', { time: minScheduledTime }));
       return;
     }
     if (selectedShift && !isTimeWithinShift(scheduledTimeTrimmed, selectedShift)) {
       setSaveErr(
-        `Giờ dự kiến phải nằm trong khung ca ${selectedShift.startTime} - ${selectedShift.endTime}.`
+        t('admin.staff.assignments.tasks.withinShiftError', {
+          start: selectedShift.startTime,
+          end: selectedShift.endTime,
+        })
+      );
+      return;
+    }
+    const gapConflictTime = findStaffDutyGapConflict(
+      scheduledTimeTrimmed,
+      tasks,
+      form.staffProfileId
+    );
+    if (gapConflictTime) {
+      setSaveErr(
+        t('admin.staff.assignments.tasks.dutyGapTooSmallError', { conflictTime: gapConflictTime })
       );
       return;
     }
@@ -1022,7 +348,7 @@ function CareTaskTab({ assignmentDate, staff }) {
       setShowForm(false);
       loadTasks();
     } catch (e) {
-      setSaveErr(e.response?.data?.message || 'Lưu thất bại');
+      setSaveErr(resolveApiError(e, t, 'common.saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -1033,83 +359,91 @@ function CareTaskTab({ assignmentDate, staff }) {
       await careTaskService.updateCareTaskStatus(id, status);
       loadTasks();
     } catch (e) {
-      alert(e.response?.data?.message || 'Thất bại');
+      showToast(e.response?.data?.message || t('admin.staff.assignments.tasks.actionFailed'), 'error');
     }
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Xóa nhiệm vụ này?')) return;
+    if (!confirm(t('admin.staff.assignments.tasks.confirmDelete'))) return;
     try {
       await careTaskService.deleteCareTask(id);
       loadTasks();
     } catch (e) {
-      alert(e.response?.data?.message || 'Thất bại');
+      showToast(e.response?.data?.message || t('admin.staff.assignments.tasks.actionFailed'), 'error');
     }
   };
 
   const staffOnShiftHint =
-    form.workDate !== assignmentDate
-      ? 'Đổi ngày phân công ở thanh trên để giao nhiệm vụ.'
-      : ctxLoading
+    ctxLoading
+      ? ''
+      : !showForm
         ? ''
-        : !showForm
-          ? ''
-          : staffWithShiftsAvailable.length === 0
-            ? staffWithShifts.length > 0
-              ? 'Tất cả nhân viên có ca trong ngày đều đang nghỉ phép — không thể giao nhiệm vụ.'
-              : 'Không có nhân viên có ca đã đăng/xác nhận trong ngày này. Phân công ca trước.'
-            : '';
+        : staffWithShiftsAvailable.length === 0
+          ? staffWithShifts.length > 0
+            ? t('admin.staff.assignments.tasks.allOnLeave')
+            : t('admin.staff.assignments.tasks.noStaffWithShift')
+          : '';
 
   return (
     <div>
-      <p className="assignment-steps-hint">
-        Quy trình 3 bước: <strong>1. Khu vực phụ trách</strong> →{' '}
-        <strong>2. Cư dân phụ trách</strong> → <strong>3. Nhiệm vụ chăm sóc</strong> (tab này).
-      </p>
+      <p
+        className="assignment-steps-hint"
+        dangerouslySetInnerHTML={{ __html: t('admin.staff.assignments.tasks.stepsHint') }}
+      />
 
       <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
-        <label style={{ fontSize: '0.8rem', color: '#64748b' }}>Xem ngày:</label>
+        <label style={{ fontSize: '0.8rem', color: '#64748b' }}>{t('admin.staff.assignments.tasks.viewDate')}</label>
         <input
           type="date"
           value={filterDate}
           onChange={(e) => setFilterDate(e.target.value)}
           style={{ padding: '7px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: '0.875rem', outline: 'none' }}
         />
-        <button className="btn btn--primary" onClick={handleOpenForm}>+ Giao nhiệm vụ</button>
+        <input
+          type="search"
+          placeholder={t('admin.staff.assignments.tasks.searchPlaceholder')}
+          value={taskSearch}
+          onChange={(e) => setTaskSearch(e.target.value)}
+          style={{ padding: '7px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: '0.875rem', outline: 'none', minWidth: 220 }}
+        />
+        <button className="btn btn--primary" onClick={handleOpenForm}>{t('admin.staff.assignments.tasks.assignTask')}</button>
       </div>
 
       {error && <Alert type="error" msg={error} />}
 
       {showForm && (
         <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: 20, marginBottom: 16 }}>
-          <div style={{ fontWeight: 600, marginBottom: 4 }}>Giao nhiệm vụ chăm sóc mới</div>
+          <div style={{ fontWeight: 600, marginBottom: 4 }}>{t('admin.staff.assignments.tasks.formTitle')}</div>
           <p style={{ fontSize: '0.78rem', color: '#64748b', marginBottom: 12 }}>
-            Nhân viên phải có ca đã đăng/xác nhận (chưa kết thúc), cư dân đã giao ở bước 2, và giờ dự kiến
-            từ thời điểm hiện tại trở đi. Nhiệm vụ chưa hoàn thành sẽ tự chuyển «Bỏ lỡ» khi hết ca
-            (khác «Bỏ qua» do quản lý chủ động chọn).
+            {t('admin.staff.assignments.tasks.formHint')}
           </p>
           {saveError && <Alert type="error" msg={saveError} />}
           <div className="form-grid">
             <div className="form-group">
-              <label>Ngày thực hiện *</label>
-              <input type="date" value={form.workDate} readOnly />
-              <small className="field-hint">Theo ngày phân công ở thanh trên.</small>
+              <label>{t('admin.staff.assignments.tasks.workDate')}</label>
+              <input
+                type="date"
+                min={todayVN()}
+                value={form.workDate}
+                onChange={(e) => handleWorkDateChange(e.target.value)}
+              />
+              <small className="field-hint">{t('admin.staff.assignments.tasks.workDateHint')}</small>
             </div>
 
             <div className="form-group">
-              <label>Nhân viên có ca *</label>
+              <label>{t('admin.staff.assignments.tasks.staffOnShift')}</label>
               {ctxLoading ? (
-                <p className="field-hint">Đang tải danh sách nhân viên...</p>
+                <p className="field-hint">{t('admin.staff.assignments.tasks.loadingStaff')}</p>
               ) : (
                 <select
                   value={form.staffProfileId}
                   onChange={(e) => handleStaffChange(e.target.value)}
                   disabled={staffWithShiftsAvailable.length === 0}
                 >
-                  <option value="">— Chọn nhân viên —</option>
+                  <option value="">{t('admin.staff.assignments.tasks.selectStaff')}</option>
                   {staffWithShiftsAvailable.map((s) => (
                     <option key={s.staffProfileId} value={s.staffProfileId}>
-                      {s.fullName} ({ROLE_LABELS[s.role] || s.role}) · {s.shiftTimeLabel}
+                      {s.fullName} ({roleLabel(t, s.role)}) · {s.shiftTimeLabel}
                     </option>
                   ))}
                 </select>
@@ -1121,7 +455,7 @@ function CareTaskTab({ assignmentDate, staff }) {
 
             {shiftOptions.length > 0 && (
               <div className="form-group">
-                <label>Ca làm việc *</label>
+                <label>{t('admin.staff.assignments.tasks.selectShift')}</label>
                 <select
                   value={form.shiftId}
                   onChange={(e) => setForm((p) => ({ ...p, shiftId: e.target.value }))}
@@ -1129,7 +463,7 @@ function CareTaskTab({ assignmentDate, staff }) {
                 >
                   {shiftOptions.map((sh) => (
                     <option key={sh._id} value={sh._id}>
-                      {sh.name} · {sh.startTime} – {sh.endTime} ({SHIFT_STATUS_VI[sh.status] || sh.status})
+                      {sh.name} · {sh.startTime} – {sh.endTime} ({shiftStatusLabel(t, sh.status)})
                     </option>
                   ))}
                 </select>
@@ -1137,19 +471,19 @@ function CareTaskTab({ assignmentDate, staff }) {
             )}
 
             <div className="form-group">
-              <label>Cư dân phụ trách *</label>
+              <label>{t('admin.staff.assignments.tasks.assignedResident')}</label>
               {residentsLoading ? (
-                <p className="field-hint">Đang tải cư dân đã giao...</p>
+                <p className="field-hint">{t('admin.staff.assignments.tasks.loadingAssignedResidents')}</p>
               ) : (
                 <select
                   value={form.residentId}
                   onChange={(e) => setForm((p) => ({ ...p, residentId: e.target.value }))}
                   disabled={!form.staffProfileId || assignedResidents.length === 0}
                 >
-                  <option value="">— Chọn cư dân —</option>
+                  <option value="">{t('admin.staff.assignments.tasks.selectResident')}</option>
                   {assignedResidents.map((r) => (
                     <option key={r._id} value={r._id}>
-                      {careResidentOptionLabel(r)}
+                      {careResidentOptionLabel(r, t)}
                     </option>
                   ))}
                 </select>
@@ -1160,31 +494,31 @@ function CareTaskTab({ assignmentDate, staff }) {
             </div>
 
             <div className="form-group">
-              <label>Loại nhiệm vụ *</label>
+              <label>{t('admin.staff.assignments.tasks.taskType')}</label>
               <select
                 value={form.taskType}
                 onChange={(e) => setForm((p) => ({ ...p, taskType: e.target.value }))}
               >
-                {taskTypeOptions.map((t) => (
-                  <option key={t.value} value={t.value}>{t.labelVi}</option>
+                {taskTypeOptions.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.labelVi}</option>
                 ))}
               </select>
             </div>
 
             <div className="form-group">
-              <label>Mức độ chăm sóc *</label>
+              <label>{t('admin.staff.assignments.tasks.careLevel')}</label>
               <select
                 value={form.careLevel}
                 onChange={(e) => setForm((p) => ({ ...p, careLevel: e.target.value }))}
               >
                 {careLevelOptions.map((l) => (
-                  <option key={l.value} value={l.value}>{l.labelVi}</option>
+                  <option key={l.value} value={l.value}>{careLevelLabel(t, l.value)}</option>
                 ))}
               </select>
             </div>
 
             <div className="form-group">
-              <label>Giờ dự kiến *</label>
+              <label>{t('admin.staff.assignments.tasks.scheduledTime')}</label>
               <input
                 type="time"
                 required
@@ -1194,14 +528,17 @@ function CareTaskTab({ assignmentDate, staff }) {
               />
               {selectedShift && (
                 <small className="field-hint">
-                  Khung hợp lệ: {selectedShift.startTime} - {selectedShift.endTime}
-                  {minScheduledTime ? ` · Từ ${minScheduledTime} trở đi` : ''}
+                  {t('admin.staff.assignments.tasks.validTimeRange', {
+                    start: selectedShift.startTime,
+                    end: selectedShift.endTime,
+                  })}
+                  {minScheduledTime ? ` ${t('admin.staff.assignments.tasks.fromTime', { time: minScheduledTime })}` : ''}
                 </small>
               )}
             </div>
 
             <div className="form-group form-grid--full">
-              <label>Ghi chú</label>
+              <label>{t('admin.staff.assignments.tasks.notes')}</label>
               <input value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} />
             </div>
           </div>
@@ -1217,107 +554,193 @@ function CareTaskTab({ assignmentDate, staff }) {
                 || !form.scheduledTime?.trim()
               }
             >
-              {saving ? 'Đang lưu...' : 'Lưu nhiệm vụ'}
+              {saving ? t('common.saving') : t('admin.staff.assignments.tasks.saveTask')}
             </button>
             <button
               className="btn"
               style={{ background: '#f1f5f9', color: '#475569', padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer' }}
               onClick={() => setShowForm(false)}
             >
-              Hủy
+              {t('common.cancel')}
             </button>
           </div>
         </div>
       )}
 
       {loading ? (
-        <p style={{ color: '#94a3b8', textAlign: 'center', padding: 32 }}>Đang tải...</p>
+        <p style={{ color: '#94a3b8', textAlign: 'center', padding: 32 }}>{t('common.loading')}</p>
       ) : (
-        <table className="data-table">
+        <div className="data-table-wrap assignment-table-wrap">
+        <table className="data-table assignment-table assignment-table--tasks">
           <thead>
             <tr>
-              <th>Nhân viên</th><th>Cư dân</th><th>Ca</th><th>Loại nhiệm vụ</th><th>Mức độ</th>
-              <th>Giờ</th><th>Trạng thái</th><th>Thao tác</th>
+              <th>{t('admin.staff.assignments.tasks.colStaff')}</th>
+              <th>{t('admin.staff.assignments.tasks.colResident')}</th>
+              <th>{t('admin.staff.assignments.tasks.colShift')}</th>
+              <th>{t('admin.staff.assignments.tasks.colTaskType')}</th>
+              <th>{t('admin.staff.assignments.tasks.colCareLevel')}</th>
+              <th>{t('admin.staff.assignments.tasks.colTime')}</th>
+              <th>{t('admin.staff.assignments.tasks.colStatus')}</th>
+              <th>{t('admin.staff.assignments.tasks.colActions')}</th>
             </tr>
           </thead>
           <tbody>
-            {tasks.length === 0 && (
-              <tr><td colSpan={8} className="empty-state">Không có nhiệm vụ nào ngày này</td></tr>
+            {paginatedTasks.length === 0 && (
+              <tr><td colSpan={8} className="empty-state">{t('admin.staff.assignments.tasks.emptyList')}</td></tr>
             )}
-            {tasks.map((t) => {
-              const staffName = t.staffProfileId?.userId?.fullName || t.staffProfileId?.staffCode || '—';
-              const resident = t.residentId?.fullName || t.residentId?.residentCode || '—';
-              const shift = t.shiftId;
+            {paginatedTasks.map((task) => {
+              const staffName = task.staffProfileId?.userId?.fullName || task.staffProfileId?.staffCode || '—';
+              const resident = task.residentId?.fullName || task.residentId?.residentCode || '—';
+              const shift = task.shiftId;
               const shiftLabel = shift
-                ? `${shift.name || 'Ca'} · ${shift.startTime}–${shift.endTime}`
+                ? `${shift.name || t('admin.staff.assignments.tasks.shiftFallback')} · ${shift.startTime}–${shift.endTime}`
                 : '—';
-              const next = TASK_STATUS_NEXT[t.status] || [];
+              const next = TASK_STATUS_ADMIN_NEXT[task.status] || [];
               return (
-                <tr key={t._id}>
+                <tr key={task._id}>
                   <td>{staffName}</td>
                   <td>{resident}</td>
                   <td><small>{shiftLabel}</small></td>
-                  <td>{taskTypeLabel(t.taskType)}</td>
-                  <td>{careLevelLabel(t.careLevel)}</td>
-                  <td>{t.scheduledTime || '—'}</td>
+                  <td>{resolveTaskTypeLabel(task.taskType)}</td>
+                  <td>{resolveCareLevelLabel(task.careLevel)}</td>
+                  <td>{task.scheduledTime || '—'}</td>
                   <td>
-                    <span className={`task-status task-status--${t.status}`}>
-                      {TASK_STATUS_LABELS[t.status] || t.status}
+                    <span className={`task-status task-status--${task.status}`}>
+                      {taskStatusLabel(t, task.status)}
                     </span>
-                    {t.status === 'missed' && (
-                      <small className="field-hint" style={{ display: 'block' }}>Hết ca</small>
+                    {task.status === 'missed' && (
+                      <small className="field-hint" style={{ display: 'block' }}>{t('admin.staff.assignments.tasks.shiftMissed')}</small>
                     )}
                   </td>
-                  <td>
+                  <td className="assignment-table__cell--actions resident-action-cell">
+                    <div className="resident-action-group assignment-action-group">
                     {next.map((s) => (
-                      <button
+                      <AssignmentSkipIconButton
                         key={s}
-                        className="btn btn--sm btn--edit"
-                        style={{ marginRight: 4 }}
-                        onClick={() => handleStatus(t._id, s)}
-                      >
-                        {TASK_STATUS_LABELS[s]}
-                      </button>
+                        title={taskStatusLabel(t, s)}
+                        onClick={() => handleStatus(task._id, s)}
+                      />
                     ))}
-                    {t.status === 'pending' && (
-                      <button className="btn btn--sm btn--delete" onClick={() => handleDelete(t._id)}>Xóa</button>
+                    {task.status === 'pending' && (
+                      <AssignmentDeleteIconButton
+                        title={t('common.delete')}
+                        onClick={() => handleDelete(task._id)}
+                      />
                     )}
+                    </div>
                   </td>
                 </tr>
               );
             })}
           </tbody>
         </table>
+        {!loading && paginatedTasks.length > 0 && (
+          <ListPagination
+            page={taskPage}
+            totalPages={taskTotalPages}
+            total={taskTotal}
+            onPageChange={setTaskPage}
+          />
+        )}
+        </div>
       )}
     </div>
   );
 }
 
 // ── Main page ─────────────────────────────────────────────────────────────────
-const TABS = [
-  { key: 'area',      label: '🏢 Khu vực phụ trách' },
-  { key: 'residents', label: '👴 Cư dân phụ trách' },
-  { key: 'tasks',     label: '📋 Nhiệm vụ chăm sóc' },
+const TABS = (t) => [
+  { key: 'area', label: `🏢 ${t('admin.staff.assignments.tabArea')}` },
+  { key: 'residents', label: `👴 ${t('admin.staff.assignments.tabResidents')}` },
+  { key: 'tasks', label: `📋 ${t('admin.staff.assignments.tabTasks')}` },
 ];
 
 export default function StaffAssignmentPage() {
-  const [activeTab, setActiveTab] = useState('area');
-  const [assignmentDate, setAssignmentDate] = useState(today());
-  const [staff, setStaff]         = useState([]);
-  const [loading, setLoading]     = useState(false);
+  const { t, i18n } = useTranslation();
+  const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabs = TABS(t);
+  const basePath = getAssignmentBasePath(user?.role);
+
+  const tabFromUrl = searchParams.get('tab');
+  const activeTab = ASSIGNMENT_TABS.includes(tabFromUrl) ? tabFromUrl : 'area';
+
+  const dateFromUrl = searchParams.get('date');
+  const assignmentDate = dateFromUrl && dateFromUrl >= todayVN() ? dateFromUrl : todayVN();
+
+  const [allStaff, setAllStaff] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const { search: staffSearch, setSearch: setStaffSearch, debouncedSearch: debouncedStaffSearch } = useDebouncedSearch();
+  const displayNow = useMinuteNow(assignmentDate === todayVN());
+
+  const updateSearchParams = useCallback(
+    (updates) => {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        Object.entries(updates).forEach(([key, value]) => {
+          if (value == null || value === '') next.delete(key);
+          else next.set(key, value);
+        });
+        return next;
+      }, { replace: true });
+    },
+    [setSearchParams]
+  );
 
   useEffect(() => {
-    const minDate = today();
-    if (assignmentDate < minDate) setAssignmentDate(minDate);
-  }, [assignmentDate]);
+    const minDate = todayVN();
+    const normalizedDate = assignmentDate < minDate ? minDate : assignmentDate;
+    const normalizedTab = ASSIGNMENT_TABS.includes(tabFromUrl) ? tabFromUrl : 'area';
+    if (normalizedDate !== dateFromUrl || normalizedTab !== tabFromUrl) {
+      updateSearchParams({ tab: normalizedTab, date: normalizedDate });
+    }
+  }, [assignmentDate, dateFromUrl, tabFromUrl, updateSearchParams]);
+
+  const setActiveTab = (tab) => {
+    updateSearchParams({ tab, date: assignmentDate });
+  };
+
+  const setAssignmentDate = (date) => {
+    const minDate = todayVN();
+    const nextDate = date < minDate ? minDate : date;
+    updateSearchParams({ tab: activeTab, date: nextDate });
+  };
+
+  const filteredStaff = useMemo(() => {
+    const visible = allStaff.filter((s) =>
+      isStaffVisibleForAreaResidentTabs(s, assignmentDate, displayNow)
+    );
+    const q = debouncedStaffSearch.trim().toLowerCase();
+    if (!q) return visible;
+    return visible.filter(
+      (s) =>
+        (s.fullName || '').toLowerCase().includes(q)
+        || (s.staffProfile?.staffCode || '').toLowerCase().includes(q)
+    );
+  }, [allStaff, debouncedStaffSearch, assignmentDate, displayNow]);
+
+  const {
+    paginatedItems: paginatedStaff,
+    page: staffPage,
+    setPage: setStaffPage,
+    totalPages: staffTotalPages,
+    total: staffTotal,
+  } = useClientPagination(filteredStaff);
+
+  const staffPagination = {
+    page: staffPage,
+    totalPages: staffTotalPages,
+    total: staffTotal,
+    onPageChange: setStaffPage,
+  };
 
   const loadStaff = useCallback(async () => {
     setLoading(true);
     try {
       const res = await staffService.getAll({ limit: 100, assignmentDate });
-      setStaff(filterAssignableStaff(res.data));
+      setAllStaff(filterAssignableStaff(res.data || res));
     } catch {
-      setStaff([]);
+      setAllStaff([]);
     } finally {
       setLoading(false);
     }
@@ -1329,58 +752,70 @@ export default function StaffAssignmentPage() {
 
   return (
     <AdminPageShell
-      title="Phân công nhân viên"
-      subtitle="Khu vực phụ trách, cư dân chăm sóc và nhiệm vụ theo ca"
+      title={t('admin.staff.assignments.title')}
+      subtitle={t('admin.staff.assignments.subtitle')}
     >
       <div className="assignment-toolbar">
         <label className="assignment-toolbar__label" htmlFor="assignment-date">
-          Ngày phân công
+          {t('admin.staff.assignments.assignmentDate')}
         </label>
         <input
           id="assignment-date"
           type="date"
           className="assignment-toolbar__date"
-          min={today()}
+          min={todayVN()}
           value={assignmentDate}
           onChange={(e) => setAssignmentDate(e.target.value)}
         />
-        <span className="assignment-toolbar__hint">{formatDateVi(assignmentDate)}</span>
+        <span className="assignment-toolbar__hint">{formatAssignmentDate(assignmentDate, i18n.language)}</span>
         <span className="assignment-toolbar__note">
-          Ca hiển thị: đã đăng / đã xác nhận · Tầng/phòng lưu cố định trên hồ sơ
+          {t('admin.staff.assignments.shiftHint')}
         </span>
+        <input
+          type="search"
+          className="assignment-toolbar__search"
+          placeholder={t('admin.staff.assignments.searchStaff')}
+          value={staffSearch}
+          onChange={(e) => setStaffSearch(e.target.value)}
+          style={{ marginLeft: 'auto', padding: '7px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: '0.875rem' }}
+        />
       </div>
 
       <div className="tabs">
-        {TABS.map((t) => (
+        {tabs.map((tabItem) => (
           <button
-            key={t.key}
-            className={`tab-btn ${activeTab === t.key ? 'tab-btn--active' : ''}`}
-            onClick={() => setActiveTab(t.key)}
+            key={tabItem.key}
+            className={`tab-btn ${activeTab === tabItem.key ? 'tab-btn--active' : ''}`}
+            onClick={() => setActiveTab(tabItem.key)}
           >
-            {t.label}
+            {tabItem.label}
           </button>
         ))}
       </div>
 
       <div className="tab-content">
-        {activeTab === 'area'      && (
+        {activeTab === 'area' && (
           <AreaTab
-            staff={staff}
+            staff={paginatedStaff}
             loading={loading}
             assignmentDate={assignmentDate}
-            onStaffUpdated={loadStaff}
+            displayNow={displayNow}
+            staffPagination={staffPagination}
+            basePath={basePath}
           />
         )}
         {activeTab === 'residents' && (
           <ResidentTab
-            staff={staff}
+            staff={paginatedStaff}
             loading={loading}
             assignmentDate={assignmentDate}
-            onStaffUpdated={loadStaff}
+            displayNow={displayNow}
+            staffPagination={staffPagination}
+            basePath={basePath}
           />
         )}
         {activeTab === 'tasks'     && (
-          <CareTaskTab assignmentDate={assignmentDate} staff={staff} />
+          <CareTaskTab staff={allStaff} />
         )}
       </div>
     </AdminPageShell>

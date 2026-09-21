@@ -1,4 +1,9 @@
+import { useTranslation } from 'react-i18next';
+
 function HygieneDeleteModal({ open, recordSummary, deleting, error, onClose, onConfirm }) {
+  const { t } = useTranslation();
+  const ns = 'caregiver';
+
   if (!open) return null;
 
   return (
@@ -10,21 +15,21 @@ function HygieneDeleteModal({ open, recordSummary, deleting, error, onClose, onC
         aria-modal="true"
       >
         <div className="hygiene-page__modal-header">
-          <h3 className="hygiene-page__modal-title">Xóa ghi nhận vệ sinh</h3>
+          <h3 className="hygiene-page__modal-title">{t(`${ns}.hygiene.deleteModal.title`)}</h3>
           <button type="button" className="hygiene-page__modal-close" onClick={onClose} disabled={deleting}>
             ×
           </button>
         </div>
         <div className="hygiene-page__modal-body">
-          <p>Bạn có chắc muốn xóa ghi nhận sau?</p>
+          <p>{t(`${ns}.hygiene.deleteModal.confirm`)}</p>
           <p className="hygiene-page__delete-summary">{recordSummary || '—'}</p>
           {error && <p className="form-error">{error}</p>}
           <div className="hygiene-page__actions">
             <button type="button" className="btn btn--delete" disabled={deleting} onClick={onConfirm}>
-              {deleting ? 'Đang xóa...' : 'Xóa'}
+              {deleting ? t(`${ns}.common.deleting`) : t('common.delete')}
             </button>
             <button type="button" className="btn-secondary" disabled={deleting} onClick={onClose}>
-              Hủy
+              {t('common.cancel')}
             </button>
           </div>
         </div>

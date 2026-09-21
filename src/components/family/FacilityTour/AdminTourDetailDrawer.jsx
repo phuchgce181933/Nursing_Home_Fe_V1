@@ -15,6 +15,7 @@ import {
   ShieldAlert,
 } from 'lucide-react';
 import facilityTourService from '../../../services/facilityTour.service';
+import { useToast } from '../../../hooks/useToast';
 
 const formatViDate = (dateStr) => {
   if (!dateStr) return 'N/A';
@@ -29,6 +30,15 @@ const formatViDate = (dateStr) => {
   } catch (e) {
     return dateStr;
   }
+};
+
+const cleanCancellationReason = (reason) => {
+  if (!reason) return '';
+  return reason
+    .replace(/^\[Admin reject(?:ed)?\]\s*/i, '')
+    .replace(/^\[Doctor evaluation\]\s*/i, '')
+    .replace(/^\[Cancelled by admin\]\s*/i, '')
+    .trim();
 };
 
 const getStatusTheme = (status) => {
@@ -79,6 +89,7 @@ const TIME_SLOTS_OPTIONS = [
 ];
 
 export default function AdminTourDetailDrawer({ isOpen, onClose, tourId, onActionSuccess }) {
+  const { showToast } = useToast();
   const [tour, setTour] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -93,6 +104,8 @@ export default function AdminTourDetailDrawer({ isOpen, onClose, tourId, onActio
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
   const [rejecting, setRejecting] = useState(false);
+
+  const [completing, setCompleting] = useState(false);
 
   useEffect(() => {
     if (!isOpen || !tourId) return;
@@ -150,7 +163,7 @@ export default function AdminTourDetailDrawer({ isOpen, onClose, tourId, onActio
       setTour(res?.tour || null);
     } catch (err) {
       console.error('Failed to approve tour request:', err);
-      alert(err.response?.data?.message || 'Đã xảy ra lỗi khi duyệt yêu cầu tham quan. Vui lòng thử lại.');
+      showToast(err.response?.data?.message || 'Đã xảy ra lỗi khi duyệt yêu cầu tham quan. Vui lòng thử lại.', 'error');
     } finally {
       setApproving(false);
     }
@@ -176,13 +189,30 @@ export default function AdminTourDetailDrawer({ isOpen, onClose, tourId, onActio
       setTour(res?.tour || null);
     } catch (err) {
       console.error('Failed to reject tour request:', err);
-      alert(err.response?.data?.message || 'Đã xảy ra lỗi khi từ chối yêu cầu tham quan.');
+      showToast(err.response?.data?.message || 'Đã xảy ra lỗi khi từ chối yêu cầu tham quan.', 'error');
     } finally {
       setRejecting(false);
     }
   };
 
+  const handleCompleteSubmit = async () => {
+    if (!tourId) return;
+    setCompleting(true);
+    try {
+      await facilityTourService.adminCompleteTour(tourId);
+      if (onActionSuccess) onActionSuccess();
+      const res = await facilityTourService.adminGetTourDetail(tourId);
+      setTour(res?.tour || null);
+    } catch (err) {
+      console.error('Failed to complete tour:', err);
+      showToast(err.response?.data?.message || 'Đã xảy ra lỗi khi xác nhận hoàn tất tham quan.', 'error');
+    } finally {
+      setCompleting(false);
+    }
+  };
+
   const isPending = tour?.status === 'pending';
+  const isConfirmed = tour?.status === 'confirmed';
   const isCancellable = ['pending', 'confirmed'].includes(tour?.status || '');
   const theme = tour ? getStatusTheme(tour.status) : null;
 
@@ -238,7 +268,7 @@ export default function AdminTourDetailDrawer({ isOpen, onClose, tourId, onActio
                 <div className="ftd-drawer__section-title">Thông tin tài khoản gia đình</div>
                 <div className="ftd-detail-card">
                   <div className="ftd-detail-card__header-row">
-                    <div className="ftd-detail-card__avatar" style={{ backgroundColor: '#eff6ff', color: '#2563eb' }}>
+                    <div className="ftd-detail-card__avatar" style={{ backgroundColor: 'rgba(15, 118, 110, 0.08)', color: '#0f766e' }}>
                       <User size={16} />
                     </div>
                     <div>
@@ -387,7 +417,7 @@ export default function AdminTourDetailDrawer({ isOpen, onClose, tourId, onActio
                           {tour.rejectionReason ? 'Bị từ chối bởi nhân viên' : 'Đã huỷ bởi gia đình'}
                         </div>
                         <p className="ftd-cancellation-card__text text-red-700 italic mt-1 font-medium" style={{ fontSize: '12.5px' }}>
-                          "{tour.cancellationReason || tour.rejectionReason}"
+                          "{cleanCancellationReason(tour.cancellationReason || tour.rejectionReason)}"
                         </p>
                         <div className="text-[11px] text-red-500 mt-2">
                           Ngày: {formatViDate(tour.cancelledAt || tour.rejectedAt)}
@@ -417,6 +447,34 @@ export default function AdminTourDetailDrawer({ isOpen, onClose, tourId, onActio
                 onClick={() => setShowApproveModal(true)}
               >
                 Duyệt tour
+              </button>
+            </div>
+          ) : isConfirmed ? (
+            <div className="w-full flex gap-3">
+              <button
+                className="ftd-btn ftd-btn--danger-outline flex-1 flex justify-center items-center gap-1.5"
+                onClick={() => setShowRejectModal(true)}
+                disabled={completing}
+              >
+                Từ chối
+              </button>
+              <button
+                className="ftd-btn flex-1 flex justify-center items-center gap-1.5"
+                style={{ backgroundColor: '#059669', color: '#fff', border: 'none' }}
+                onClick={handleCompleteSubmit}
+                disabled={completing}
+              >
+                {completing ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    Đang xử lý...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle size={14} />
+                    Xác nhận đã tham quan
+                  </>
+                )}
               </button>
             </div>
           ) : (

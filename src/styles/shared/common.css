@@ -9,20 +9,24 @@
 
 .card {
   width: 100%;
-  background: #ffffff;
+  background: var(--nh-surface);
   border-radius: 18px;
   border: 1px solid #dbe4ff;
   box-shadow: 0 18px 40px rgba(15, 23, 42, 0.15);
 }
 
+/* ── Buttons ── */
 .button {
   border: none;
-  border-radius: 10px;
+  border-radius: var(--nh-radius-sm);
   padding: 10px 16px;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .button:hover {
@@ -30,30 +34,42 @@
 }
 
 .button--primary {
-  background: #2563eb;
+  background: var(--nh-primary);
   color: #ffffff;
+  box-shadow: 0 6px 14px var(--nh-primary-shadow);
 }
 
 .button--primary:hover {
-  background: #1d4ed8;
+  background: var(--nh-primary-dark);
 }
 
 .button--secondary {
-  background: #e2e8f0;
-  color: #0f172a;
+  background: var(--nh-surface-hover);
+  color: var(--nh-text);
 }
 
 .button--secondary:hover {
-  background: #cbd5e1;
+  background: var(--nh-border);
 }
 
 .button--danger {
-  background: #dc2626;
+  background: var(--nh-danger);
   color: #ffffff;
 }
 
 .button--danger:hover {
-  background: #b91c1c;
+  background: var(--nh-danger-dark);
+}
+
+.button--ghost {
+  background: var(--nh-surface);
+  border: 1px solid var(--nh-border);
+  color: var(--nh-text);
+}
+
+.button--ghost:hover {
+  border-color: var(--nh-primary);
+  color: var(--nh-primary);
 }
 
 .button--disabled,
@@ -63,8 +79,9 @@
   transform: none;
 }
 
+/* ── Messages ── */
 .message {
-  border-radius: 10px;
+  border-radius: var(--nh-radius-sm);
   border: 1px solid transparent;
   padding: 12px 14px;
   font-size: 14px;
@@ -73,15 +90,155 @@
 .message--error {
   background: #fef2f2;
   color: #991b1b;
-  border-color: #fecaca;
+  border-color: var(--nh-danger-border);
 }
 
 .message--success {
-  background: #ecfdf5;
+  background: var(--nh-success-light);
   color: #065f46;
   border-color: #bbf7d0;
 }
 
+/* ── Status Badges (shared) ── */
+.nh-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: var(--nh-radius-pill);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.nh-badge--success,
+.nh-badge--admitted,
+.nh-badge--active,
+.nh-badge--approved,
+.nh-badge--completed {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--nh-success);
+}
+
+.nh-badge--warning,
+.nh-badge--pending,
+.nh-badge--in_progress {
+  background: var(--nh-warning-light);
+  color: var(--nh-warning);
+}
+
+.nh-badge--danger,
+.nh-badge--rejected,
+.nh-badge--cancelled,
+.nh-badge--banned {
+  background: var(--nh-danger-light);
+  color: var(--nh-danger-dark);
+}
+
+.nh-badge--info,
+.nh-badge--new,
+.nh-badge--consulting,
+.nh-badge--scheduled {
+  background: var(--nh-info-light);
+  color: var(--nh-info);
+}
+
+.nh-badge--neutral,
+.nh-badge--discharged,
+.nh-badge--inactive,
+.nh-badge--draft {
+  background: rgba(100, 116, 139, 0.15);
+  color: var(--nh-text-secondary);
+}
+
+.nh-badge--transferred {
+  background: rgba(59, 130, 246, 0.15);
+  color: #1d4ed8;
+}
+
+/* ── Empty State ── */
+.nh-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--nh-text-placeholder);
+}
+
+.nh-empty-state__icon {
+  margin-bottom: 12px;
+  opacity: 0.5;
+}
+
+.nh-empty-state__title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--nh-text-muted);
+  margin-bottom: 4px;
+}
+
+.nh-empty-state__description {
+  font-size: 13px;
+  color: var(--nh-text-placeholder);
+  max-width: 320px;
+}
+
+/* ── Loading State ── */
+.nh-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  gap: 12px;
+}
+
+.nh-loading__spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--nh-border);
+  border-top-color: var(--nh-primary);
+  border-radius: 50%;
+  animation: nh-spin 0.7s linear infinite;
+}
+
+.nh-loading__text {
+  font-size: 14px;
+  color: var(--nh-text-muted);
+}
+
+@keyframes nh-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Error State ── */
+.nh-error-banner {
+  padding: 12px 14px;
+  border-radius: var(--nh-radius-md);
+  background: #fef2f2;
+  color: var(--nh-danger-dark);
+  font-size: 14px;
+  border: 1px solid var(--nh-danger-border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nh-success-banner {
+  padding: 12px 14px;
+  border-radius: var(--nh-radius-md);
+  background: var(--nh-success-light);
+  color: #166534;
+  font-size: 14px;
+  border: 1px solid var(--nh-success-border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ── Profile/Dashboard (existing) ── */
 .profile-card {
   max-width: 520px;
   padding: 28px;
@@ -90,7 +247,16 @@
 .profile-card__title {
   margin-bottom: 14px;
   font-size: 28px;
-  color: #0f172a;
+  color: var(--nh-text);
+}
+
+.profile-card__text {
+  margin-bottom: 8px;
+  color: var(--nh-text-secondary);
+}
+
+.profile-card__logout {
+  margin-top: 18px;
 }
 
 .role-dashboard-card {
@@ -105,7 +271,7 @@
 }
 
 .role-dashboard-card p {
-  color: #475569;
+  color: var(--nh-text-secondary);
   margin-bottom: 24px;
 }
 
@@ -116,9 +282,9 @@
 }
 
 .role-dashboard-sections section {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 16px;
+  background: var(--nh-surface-subtle);
+  border: 1px solid var(--nh-border);
+  border-radius: var(--nh-radius-lg);
   padding: 20px;
 }
 
@@ -128,15 +294,6 @@
 }
 
 .role-dashboard-sections section p {
-  color: #475569;
+  color: var(--nh-text-secondary);
   line-height: 1.6;
-}
-
-.profile-card__text {
-  margin-bottom: 8px;
-  color: #475569;
-}
-
-.profile-card__logout {
-  margin-top: 18px;
 }

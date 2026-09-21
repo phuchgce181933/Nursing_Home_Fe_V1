@@ -1,11 +1,3 @@
-/**
- * pharmacy.service.js
- * API client for Pharmacy module
- *
- * Base URL: /api/pharmacy
- * Auth: Bearer Token via axiosClient
- */
-
 import axiosClient from '../api/axiosClient';
 
 const createMedication = async (body) => {
@@ -15,6 +7,11 @@ const createMedication = async (body) => {
 
 const updateMedication = async (medicationId, body) => {
   const response = await axiosClient.put(`/pharmacy/medications/${medicationId}`, body);
+  return response.data;
+};
+
+const updateSellingPrice = async (medicationId, sellingPrice) => {
+  const response = await axiosClient.patch(`/pharmacy/medications/${medicationId}/selling-price`, { sellingPrice });
   return response.data;
 };
 
@@ -111,6 +108,7 @@ const getReportSummary = async (params = {}) => {
 export default {
   createMedication,
   updateMedication,
+  updateSellingPrice,
   listMedications,
   getMedication,
   addMedicationNote,

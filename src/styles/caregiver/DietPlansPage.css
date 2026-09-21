@@ -1,77 +1,12 @@
-.diet-plans-page {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.diet-plans-page__title {
-  margin: 0;
-  padding: 18px 22px;
-  border-radius: 18px;
-  background: linear-gradient(135deg, #15803d 0%, #0ea5e9 100%);
-  color: #f0fdf4;
-  font-size: 1.75rem;
-  font-weight: 700;
-  box-shadow: 0 18px 34px rgba(21, 128, 61, 0.24);
-}
-
-.diet-plans-page__intro {
-  margin: 0;
-  padding: 12px 14px;
-  border: 1px solid #bbf7d0;
-  background: #f0fdf4;
-  border-radius: 12px;
-  color: #475569;
-  line-height: 1.6;
-}
-
-.diet-plans-page__panel {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 16px;
-  padding: 16px;
-  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.06);
-}
-
-.diet-plans-page__panel-title {
-  margin: 0 0 12px;
+.diet-plans-page__section-title {
+  margin: 16px 0 8px;
   font-size: 1rem;
   font-weight: 700;
   color: #1e293b;
 }
 
-.diet-plans-page__filters {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 12px;
-  align-items: end;
-}
-
-.diet-plans-page__filters label {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #475569;
-}
-
-.diet-plans-page__filters input,
-.diet-plans-page__filters select {
-  padding: 8px 10px;
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
-}
-
-.diet-plans-page__filter-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: flex-end;
-}
-
 .diet-plans-page__day-banner {
-  margin: 0;
+  margin: 0 0 12px;
   padding: 10px 12px;
   background: #eff6ff;
   border: 1px solid #bfdbfe;
@@ -206,13 +141,7 @@
 }
 
 @media (max-width: 768px) {
-  .diet-plans-page__title {
-    font-size: 1.45rem;
-    padding: 14px 16px;
-  }
-
-  .diet-plans-page .data-table {
-    display: block;
-    overflow-x: auto;
+  .diet-plans-page__modal-overlay {
+    padding: 12px;
   }
 }

@@ -1,4 +1,8 @@
+import { useTranslation } from 'react-i18next';
+
 export default function StaffDeactivateModal({ staff, onConfirm, onClose, loading }) {
+  const { t } = useTranslation();
+
   if (!staff) return null;
 
   return (
@@ -6,21 +10,19 @@ export default function StaffDeactivateModal({ staff, onConfirm, onClose, loadin
       <div className="modal staff-profile-modal" onClick={(e) => e.stopPropagation()}>
         <div className="deactivate-modal__icon">⚠️</div>
 
-        <h2 className="modal__title" style={{ color: '#dc2626' }}>Vô hiệu hóa tài khoản</h2>
+        <h2 className="modal__title" style={{ color: '#dc2626' }}>{t('admin.staff.profiles.deactivateTitle')}</h2>
 
         <p className="deactivate-modal__text">
-          Bạn có chắc chắn muốn vô hiệu hóa tài khoản của{' '}
-          <span className="deactivate-modal__name">{staff.fullName}</span>?
+          {t('admin.staff.profiles.deactivateConfirm', { name: staff.fullName })}
         </p>
         <p className="deactivate-modal__text" style={{ color: '#94a3b8', fontSize: '0.825rem' }}>
-          Tài khoản sẽ bị khóa và nhân viên này không thể đăng nhập hệ thống.
-          Thao tác này có thể được khôi phục bởi Admin.
+          {t('admin.staff.profiles.deactivateHint')}
         </p>
 
         <div className="modal__actions">
-          <button className="btn-cancel" onClick={onClose} disabled={loading}>Hủy</button>
+          <button className="btn-cancel" onClick={onClose} disabled={loading}>{t('common.cancel')}</button>
           <button className="btn-danger" onClick={onConfirm} disabled={loading}>
-            {loading ? 'Đang xử lý...' : 'Xác nhận vô hiệu hóa'}
+            {loading ? t('admin.staff.profiles.processing') : t('admin.staff.profiles.confirmDeactivate')}
           </button>
         </div>
       </div>

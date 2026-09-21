@@ -1,19 +1,28 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, RefreshCw, Plus, Edit3, Trash2, Filter, CalendarDays, AlertTriangle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { Search, RefreshCw, Plus, Edit3, Trash2, Filter, CalendarDays, AlertTriangle, Eye, X } from 'lucide-react';
 import activityService from '../../services/activity.service';
 import authService from '../../services/auth.service';
 import residentService from '../../services/resident.service';
 import medicalRecordService from '../../services/medicalRecord.service';
+import { useToast } from '../../hooks/useToast';
 import '../../styles/admin/AdminAdmissionRequestsPage.css';
 
 const STATUS_OPTIONS = [
-  { value: '', label: 'Tất cả trạng thái' },
-  { value: 'draft', label: 'Nháp' },
-  { value: 'scheduled', label: 'Đã lên lịch' },
-  { value: 'ongoing', label: 'Đang diễn ra' },
-  { value: 'completed', label: 'Đã hoàn thành' },
-  { value: 'cancelled', label: 'Đã huỷ' },
+  { value: '', i18nKey: 'adminActivities.statusAll' },
+  { value: 'draft', i18nKey: 'adminActivities.statusDraft' },
+  { value: 'scheduled', i18nKey: 'adminActivities.statusScheduled' },
+  { value: 'ongoing', i18nKey: 'adminActivities.statusOngoing' },
+  { value: 'completed', i18nKey: 'adminActivities.statusCompleted' },
+  { value: 'cancelled', i18nKey: 'adminActivities.statusCancelled' },
 ];
+
+const getStatusOptionsForForm = (currentStatus) => {
+  if (currentStatus === 'ongoing') {
+    return STATUS_OPTIONS;
+  }
+  return STATUS_OPTIONS.filter((item) => item.value !== 'ongoing');
+};
 
 const toInputDateTimeLocal = (isoString) => {
   if (!isoString) return '';
@@ -23,12 +32,94 @@ const toInputDateTimeLocal = (isoString) => {
   return localDate.toISOString().slice(0, 16);
 };
 
+const formatActivityDateRange = (activity) => {
+  const start = activity?.startAt || activity?.scheduledAt;
+  const end = activity?.endAt || activity?.scheduledAt || activity?.startAt;
+  if (!start) return '-';
+
+  const formatDate = (value) => {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '-';
+    return date.toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  };
+
+  if (end && new Date(end).getTime() !== new Date(start).getTime()) {
+    return `${formatDate(start)} → ${formatDate(end)}`;
+  }
+
+  return formatDate(start);
+};
+
 const toIsoString = (localDateTime) => {
   if (!localDateTime) return '';
   return new Date(localDateTime).toISOString();
 };
 
+const getAutoDurationMinutes = (startAt, endAt) => {
+  if (!startAt || !endAt) return null;
+  const start = new Date(startAt);
+  const end = new Date(endAt);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null;
+  const diffMs = end.getTime() - start.getTime();
+  if (diffMs <= 0) return 0;
+  return Math.round(diffMs / (1000 * 60));
+};
+
+const formatDurationLabel = (durationMinutes, t) => {
+  const totalMinutes = Number(durationMinutes);
+  if (!Number.isFinite(totalMinutes) || totalMinutes <= 0) return '';
+
+  const totalDays = Math.floor(totalMinutes / (24 * 60));
+  const remainingMinutes = totalMinutes % (24 * 60);
+  const hours = Math.floor(remainingMinutes / 60);
+  const minutes = remainingMinutes % 60;
+
+  const parts = [];
+  if (totalDays > 0) parts.push(t ? t('adminActivities.durationDays', { count: totalDays }) : `${totalDays} ngày`);
+  if (hours > 0) parts.push(`${hours}h`);
+  if (minutes > 0) parts.push(`${minutes}p`);
+
+  return parts.join(' ');
+};
+
+const getMinDateTimeLocal = () => {
+  const now = new Date();
+  const tzOffset = now.getTimezoneOffset();
+  const localNow = new Date(now.getTime() - tzOffset * 60000);
+  return localNow.toISOString().slice(0, 16);
+};
+
+const ACTIVITY_CATEGORY_OPTIONS = [
+  { value: 'Hoạt động chăm sóc cá nhân hằng ngày', i18nKey: 'adminActivities.categoryPersonalCare' },
+  { value: 'Hoạt động chăm sóc sức khỏe', i18nKey: 'adminActivities.categoryHealthCare' },
+  { value: 'Hoạt động ăn uống - dinh dưỡng', i18nKey: 'adminActivities.categoryNutrition' },
+  { value: 'Hoạt động thể chất - phục hồi chức năng', i18nKey: 'adminActivities.categoryPhysical' },
+  { value: 'Hoạt động giải trí', i18nKey: 'adminActivities.categoryEntertainment' },
+  { value: 'Hoạt động kích thích nhận thức', i18nKey: 'adminActivities.categoryCognitive' },
+  { value: 'Hoạt động xã hội - giao lưu', i18nKey: 'adminActivities.categorySocial' },
+  { value: 'Hoạt động tâm lý - tinh thần', i18nKey: 'adminActivities.categoryPsychological' },
+  { value: 'Hoạt động sự kiện đặc biệt', i18nKey: 'adminActivities.categorySpecialEvent' },
+  { value: 'Hoạt động với gia đình', i18nKey: 'adminActivities.categoryFamily' },
+  { value: 'Hoạt động quản lý nội bộ', i18nKey: 'adminActivities.categoryInternalManagement' },
+  { value: 'Hoạt động xử lý sự cố', i18nKey: 'adminActivities.categoryIncident' },
+  { value: 'Khác', i18nKey: 'adminActivities.categoryOther' },
+];
+
+const isActivityStaff = (staff) => {
+  if (!staff || !staff.role) return false;
+  const role = String(staff.role).toLowerCase();
+  return role.includes('nurse')
+    || role.includes('y tá')
+    || role.includes('điều dưỡng')
+    || role.includes('caregiver')
+    || role.includes('hộ lý')
+    || role.includes('doctor')
+    || role.includes('bác sĩ');
+};
+
 export default function AdminActivitiesPage() {
+  const { t } = useTranslation();
+  const { showToast } = useToast();
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -42,6 +133,7 @@ export default function AdminActivitiesPage() {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [appliedFilters, setAppliedFilters] = useState({ search: '', status: '', from: '', to: '' });
+  const [bulkStatus, setBulkStatus] = useState('scheduled');
 
   const [residents, setResidents] = useState([]);
   const [staffOptions, setStaffOptions] = useState([]);
@@ -52,14 +144,19 @@ export default function AdminActivitiesPage() {
 
   const [isCreating, setIsCreating] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const [selectedActivityId, setSelectedActivityId] = useState(null);
   const [form, setForm] = useState({
     title: '',
     category: '',
+    categoryOther: '',
     description: '',
-    scheduledAt: '',
-    durationMinutes: 30,
+    startAt: '',
+    endAt: '',
+    durationMinutes: '',
+    dailyDurationMinutes: '30',
     location: '',
-    organizerStaffId: '',
+    organizerStaffIds: [],
+    supportStaffIds: [],
     participantResidentIds: [],
     status: 'draft',
   });
@@ -84,11 +181,11 @@ export default function AdminActivitiesPage() {
       setTotalPages(res?.totalPages || 1);
     } catch (err) {
       console.error('Fetch activities failed:', err);
-      setError(err.response?.data?.message || 'Could not load activities.');
+      setError(err.response?.data?.message || t('adminActivities.errLoadActivities'));
     } finally {
       setLoading(false);
     }
-  }, [page, limit, appliedFilters]);
+  }, [page, limit, appliedFilters, t]);
 
   useEffect(() => {
     fetchActivities();
@@ -129,14 +226,11 @@ export default function AdminActivitiesPage() {
     const loadAbnormalStatus = async () => {
       try {
         const statusMap = {};
-        console.log(`📋 Loading abnormal status for ${residents.length} residents...`);
-        
         const results = await Promise.allSettled(
           residents.map(async (resident) => {
             try {
               const latestRecord = await medicalRecordService.getLatestVitals(resident._id);
               const isAbnormal = latestRecord?.abnormalFlag === true;
-              console.log(`✓ Resident ${resident.fullName} (${resident._id}): abnormal=${isAbnormal}, record=`, latestRecord);
               return { id: resident._id, isAbnormal };
             } catch (err) {
               console.error(`✗ Failed to load health status for resident ${resident.fullName} (${resident._id}):`, err.message);
@@ -144,15 +238,14 @@ export default function AdminActivitiesPage() {
             }
           })
         );
-        
+
         results.forEach((result) => {
           if (result.status === 'fulfilled' && result.value) {
             statusMap[result.value.id] = result.value.isAbnormal;
           }
         });
-        
+
         if (active) {
-          console.log(`📊 Health status map updated:`, statusMap);
           setResidentsAbnormalStatus(statusMap);
         }
       } catch (err) {
@@ -175,17 +268,14 @@ export default function AdminActivitiesPage() {
     const checkActivitiesAbnormal = async () => {
       try {
         const abnormalMap = {};
-        console.log(`🏥 Checking abnormal status for ${activities.length} activities...`);
-        
         for (const activity of activities) {
           const participantIds = activity.participantResidentIds || [];
           const abnormalCount = participantIds.filter((id) => residentsAbnormalStatus[id]).length;
           abnormalMap[activity._id] = abnormalCount;
           if (abnormalCount > 0) {
-            console.log(`  ⚠️ Activity "${activity.title}" has ${abnormalCount} abnormal participants`);
           }
         }
-        
+
         if (active) {
           setActivitiesAbnormalParticipants(abnormalMap);
         }
@@ -208,16 +298,24 @@ export default function AdminActivitiesPage() {
     setForm({
       title: '',
       category: '',
+      categoryOther: '',
       description: '',
-      scheduledAt: '',
-      durationMinutes: 30,
+      startAt: '',
+      endAt: '',
+      durationMinutes: '',
+      dailyDurationMinutes: '30',
       location: '',
-      organizerStaffId: '',
+      organizerStaffIds: [],
+      supportStaffIds: [],
       participantResidentIds: [],
       status: 'draft',
     });
     setParticipantSearch('');
     setFormError(null);
+  };
+
+  const getSelectedActivity = () => {
+    return activities.find((a) => a._id === selectedActivityId);
   };
 
   const handleApplyFilters = (e) => {
@@ -241,6 +339,32 @@ export default function AdminActivitiesPage() {
     });
   };
 
+  const toggleAllResidents = () => {
+    setForm((prevForm) => {
+      const selected = Array.isArray(prevForm.participantResidentIds)
+        ? prevForm.participantResidentIds.map((id) => String(id))
+        : [];
+      const residentIds = residents
+        .map((resident) => (resident?._id ? String(resident._id) : ''))
+        .filter(Boolean);
+
+      if (residentIds.length === 0) {
+        return prevForm;
+      }
+
+      const allSelected = residentIds.every((residentId) => selected.includes(residentId));
+      if (allSelected) {
+        return {
+          ...prevForm,
+          participantResidentIds: selected.filter((residentId) => !residentIds.includes(residentId)),
+        };
+      }
+
+      const nextSelection = Array.from(new Set([...selected, ...residentIds]));
+      return { ...prevForm, participantResidentIds: nextSelection };
+    });
+  };
+
   const handleResetFilters = () => {
     setSearch('');
     setStatus('');
@@ -255,13 +379,20 @@ export default function AdminActivitiesPage() {
     setIsCreating(true);
     setForm({
       title: activity.title || '',
-      category: activity.category || '',
+      category: activity.category && !ACTIVITY_CATEGORY_OPTIONS.some((opt) => opt.value === activity.category) ? 'Khác' : (activity.category || ''),
+      categoryOther: activity.category && !ACTIVITY_CATEGORY_OPTIONS.includes(activity.category) ? activity.category : '',
       description: activity.description || '',
-      scheduledAt: toInputDateTimeLocal(activity.scheduledAt),
-      durationMinutes: activity.durationMinutes || 30,
+      startAt: toInputDateTimeLocal(activity.startAt || activity.scheduledAt),
+      endAt: toInputDateTimeLocal(activity.endAt || activity.startAt || activity.scheduledAt),
+      durationMinutes: activity.durationMinutes || getAutoDurationMinutes(activity.startAt || activity.scheduledAt, activity.endAt || activity.startAt || activity.scheduledAt) || '',
+      dailyDurationMinutes: activity.dailyDurationMinutes || '30',
       location: activity.location || '',
-      organizerStaffId:
-        activity.organizerStaffId?._id || activity.organizerStaffId || '',
+      organizerStaffIds: Array.isArray(activity.organizerStaffIds)
+        ? activity.organizerStaffIds.map((staff) => staff?._id || staff).filter(Boolean)
+        : (activity.organizerStaffId ? [activity.organizerStaffId?._id || activity.organizerStaffId] : []),
+      supportStaffIds: Array.isArray(activity.supportStaffIds)
+        ? activity.supportStaffIds.map((staff) => staff?._id || staff).filter(Boolean)
+        : (activity.supportStaffId ? [activity.supportStaffId?._id || activity.supportStaffId] : []),
       participantResidentIds: Array.isArray(activity.participantResidentIds)
         ? activity.participantResidentIds.map((id) => id.toString())
         : [],
@@ -270,14 +401,14 @@ export default function AdminActivitiesPage() {
   };
 
   const handleDelete = async (activityId) => {
-    if (!window.confirm('Bạn có chắc muốn xóa hoạt động này không?')) return;
+    if (!window.confirm(t('adminActivities.confirmDeleteActivity'))) return;
     try {
       setLoading(true);
       await activityService.deleteActivity(activityId);
       fetchActivities();
     } catch (err) {
       console.error('Delete failed:', err);
-      alert(err.response?.data?.message || 'Không thể xóa hoạt động.');
+      showToast(err.response?.data?.message || t('adminActivities.errDeleteActivity'), 'error');
     } finally {
       setLoading(false);
     }
@@ -288,11 +419,11 @@ export default function AdminActivitiesPage() {
       .map((residentId) => {
         const resident = residents.find((item) => item._id === residentId);
         if (!resident) return null;
-        return resident.fullName || resident.residentCode || 'Cư dân';
+        return resident.fullName || resident.residentCode || t('adminActivities.residentFallback');
       })
       .filter(Boolean);
 
-    if (names.length === 0) return '0 cư dân';
+    if (names.length === 0) return t('adminActivities.zeroResidents');
     if (names.length <= 2) return names.join(', ');
     return `${names.slice(0, 2).join(', ')} +${names.length - 2}`;
   };
@@ -304,36 +435,183 @@ export default function AdminActivitiesPage() {
       fetchActivities();
     } catch (err) {
       console.error('Status update failed:', err);
-      alert(err.response?.data?.message || 'Không thể cập nhật trạng thái.');
+      showToast(err.response?.data?.message || t('adminActivities.errUpdateStatus'), 'error');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleBulkDelete = async () => {
+    const targetLabel = appliedFilters.search || appliedFilters.status || appliedFilters.from || appliedFilters.to
+      ? t('adminActivities.bulkTargetFilter')
+      : t('adminActivities.bulkTargetAll');
+
+    if (!window.confirm(t('adminActivities.confirmBulkDelete', { target: targetLabel }))) return;
+
+    try {
+      setLoading(true);
+      await activityService.bulkDeleteActivities(appliedFilters);
+      await fetchActivities();
+      showToast(t('adminActivities.successBulkDelete'), 'success');
+    } catch (err) {
+      console.error('Bulk delete failed:', err);
+      showToast(err.response?.data?.message || t('adminActivities.errBulkDelete'), 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBulkStatusChange = async () => {
+    if (!bulkStatus) return;
+
+    const targetLabel = appliedFilters.search || appliedFilters.status || appliedFilters.from || appliedFilters.to
+      ? t('adminActivities.bulkTargetFilter')
+      : t('adminActivities.bulkTargetAll');
+
+    const foundOption = STATUS_OPTIONS.find((item) => item.value === bulkStatus);
+    const statusLabel = foundOption ? t(foundOption.i18nKey) : bulkStatus;
+
+    if (!window.confirm(t('adminActivities.confirmBulkStatus', { target: targetLabel, status: statusLabel }))) return;
+
+    try {
+      setLoading(true);
+      const filters = { ...appliedFilters };
+      if (filters.status === '') {
+        delete filters.status;
+      }
+      await activityService.bulkUpdateActivityStatus({ ...filters, status: bulkStatus });
+      await fetchActivities();
+      showToast(t('adminActivities.successBulkStatus'), 'success');
+    } catch (err) {
+      console.error('Bulk status update failed:', err);
+      showToast(err.response?.data?.message || t('adminActivities.errBulkStatus'), 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleStaffSelection = (field, staffId) => {
+    setForm((prevForm) => {
+      const currentIds = Array.isArray(prevForm[field]) ? [...prevForm[field]] : [];
+      const nextIds = currentIds.includes(staffId)
+        ? currentIds.filter((id) => id !== staffId)
+        : [...currentIds, staffId];
+      return { ...prevForm, [field]: nextIds };
+    });
+  };
+
+  const toggleRoleGroupSelection = (field, roleKeywords) => {
+    const roleStaffIds = staffOptions
+      .filter((staff) => isActivityStaff(staff) && roleKeywords.some((keyword) => String(staff.role || '').toLowerCase().includes(keyword)))
+      .map((staff) => staff._id)
+      .filter(Boolean);
+
+    if (roleStaffIds.length === 0) return;
+
+    setForm((prevForm) => {
+      const currentIds = Array.isArray(prevForm[field]) ? [...prevForm[field]] : [];
+      const allSelected = roleStaffIds.every((id) => currentIds.includes(id));
+      const nextIds = allSelected
+        ? currentIds.filter((id) => !roleStaffIds.includes(id))
+        : [...new Set([...currentIds, ...roleStaffIds])];
+      return { ...prevForm, [field]: nextIds };
+    });
   };
 
   const handleSubmit = async (e) => {
     if (e) e.preventDefault();
     setFormError(null);
     if (!form.title.trim()) {
-      setFormError('Tiêu đề là bắt buộc');
+      setFormError(t('adminActivities.validTitle'));
       return;
     }
-    if (!form.scheduledAt) {
-      setFormError('Ngày/giờ lên lịch là bắt buộc');
+    if (!form.startAt) {
+      setFormError(t('adminActivities.validStartAt'));
       return;
+    }
+    if (!form.location?.trim()) {
+      setFormError(t('adminActivities.validLocation'));
+      return;
+    }
+    if (!form.category?.trim()) {
+      setFormError(t('adminActivities.validCategory'));
+      return;
+    }
+    if (form.category === 'Khác' && !form.categoryOther?.trim()) {
+      setFormError(t('adminActivities.validCategoryOther'));
+      return;
+    }
+
+    const startDate = new Date(form.startAt);
+    const endDate = form.endAt ? new Date(form.endAt) : startDate;
+    if (Number.isNaN(startDate.getTime())) {
+      setFormError(t('adminActivities.validStartDateInvalid'));
+      return;
+    }
+    if (startDate < new Date()) {
+      setFormError(t('adminActivities.validStartDatePast'));
+      return;
+    }
+    if (form.endAt && endDate <= startDate) {
+      setFormError(t('adminActivities.validEndAfterStart'));
+      return;
+    }
+
+    const computedDurationMinutes = getAutoDurationMinutes(form.startAt, form.endAt || form.startAt);
+    if (computedDurationMinutes === null) {
+      setFormError(t('adminActivities.validDateRange'));
+      return;
+    }
+    if (computedDurationMinutes <= 0) {
+      setFormError(t('adminActivities.validEndAfterStart'));
+      return;
+    }
+
+    const organizerStaffIds = Array.isArray(form.organizerStaffIds)
+      ? form.organizerStaffIds.filter(Boolean)
+      : [];
+    if (organizerStaffIds.length === 0) {
+      setFormError(t('adminActivities.validOrganizerRequired'));
+      return;
+    }
+
+    for (const organizerId of organizerStaffIds) {
+      const organizer = staffOptions.find((s) => s._id === organizerId);
+      if (!organizer || !isActivityStaff(organizer)) {
+        setFormError(t('adminActivities.validOrganizerRole'));
+        return;
+      }
+    }
+
+    const supportStaffIds = Array.isArray(form.supportStaffIds)
+      ? form.supportStaffIds.filter(Boolean)
+      : [];
+    for (const supportStaffId of supportStaffIds) {
+      const supportStaff = staffOptions.find((s) => s._id === supportStaffId);
+      if (!supportStaff || !isActivityStaff(supportStaff)) {
+        setFormError(t('adminActivities.validSupportRole'));
+        return;
+      }
     }
 
     const payload = {
       title: form.title.trim(),
-      category: form.category.trim() || undefined,
+      category: (form.category === 'Khác' ? form.categoryOther : form.category).trim() || undefined,
       description: form.description.trim() || undefined,
-      scheduledAt: toIsoString(form.scheduledAt),
-      durationMinutes: Number(form.durationMinutes || 0),
+      startAt: toIsoString(form.startAt),
+      endAt: form.endAt ? toIsoString(form.endAt) : toIsoString(form.startAt),
+      durationMinutes: computedDurationMinutes,
+      dailyDurationMinutes: form.dailyDurationMinutes ? Number(form.dailyDurationMinutes) : 30,
+      createRecurring: Boolean(form.endAt && new Date(form.endAt) > new Date(form.startAt) && new Date(form.endAt).getTime() - new Date(form.startAt).getTime() > 24 * 60 * 60 * 1000),
       location: form.location.trim() || undefined,
-      organizerStaffId: form.organizerStaffId ? form.organizerStaffId.trim() : undefined,
+      organizerStaffIds: organizerStaffIds,
+      organizerStaffId: organizerStaffIds[0] || undefined,
+      supportStaffIds: supportStaffIds,
+      supportStaffId: supportStaffIds[0] || undefined,
       participantResidentIds: Array.isArray(form.participantResidentIds)
         ? form.participantResidentIds.filter(Boolean)
         : [],
-      status: form.status,
+      ...(editingId && form.status === 'ongoing' ? {} : { status: form.status }),
     };
 
     try {
@@ -348,7 +626,7 @@ export default function AdminActivitiesPage() {
       fetchActivities();
     } catch (err) {
       console.error('Submit activity failed:', err);
-      setFormError(err.response?.data?.message || 'Có lỗi khi lưu hoạt động.');
+      setFormError(err.response?.data?.message || t('adminActivities.errSaveActivity'));
     } finally {
       setSubmitting(false);
     }
@@ -360,9 +638,9 @@ export default function AdminActivitiesPage() {
         <div>
           <h1>
             <CalendarDays size={26} />
-            Quản lý hoạt động
+            {t('adminActivities.pageTitle')}
           </h1>
-          <p>Quản lý hoạt động cho cư dân: tạo, chỉnh sửa, xóa, và cập nhật trạng thái.</p>
+          <p>{t('adminActivities.pageSubtitle')}</p>
         </div>
         <button
           type="button"
@@ -374,19 +652,19 @@ export default function AdminActivitiesPage() {
           className="adm-btn-refresh"
         >
           <Plus size={16} />
-          {isCreating ? 'Đóng form' : 'Tạo hoạt động'}
+          {isCreating ? t('adminActivities.btnCloseForm') : t('adminActivities.btnCreate')}
         </button>
       </div>
 
       <div className="adm-filter-panel">
         <form onSubmit={handleApplyFilters} className="adm-filter-grid">
           <div>
-            <label className="text-sm font-semibold">Tìm kiếm</label>
+            <label className="text-sm font-semibold">{t('adminActivities.filterSearch')}</label>
             <div className="adm-filter-input-wrapper">
               <Search className="adm-filter-input-icon" size={14} />
               <input
                 type="text"
-                placeholder="Tìm theo tiêu đề, danh mục..."
+                placeholder={t('adminActivities.filterSearchPlaceholder')}
                 className="adm-filter-input"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -395,7 +673,7 @@ export default function AdminActivitiesPage() {
           </div>
 
           <div>
-            <label className="text-sm font-semibold">Trạng thái</label>
+            <label className="text-sm font-semibold">{t('adminActivities.filterStatus')}</label>
             <select
               className="adm-filter-select"
               value={status}
@@ -403,14 +681,14 @@ export default function AdminActivitiesPage() {
             >
               {STATUS_OPTIONS.map((item) => (
                 <option key={item.value} value={item.value}>
-                  {item.label}
+                  {t(item.i18nKey)}
                 </option>
               ))}
             </select>
           </div>
 
           <div>
-            <label className="text-sm font-semibold">Từ ngày</label>
+            <label className="text-sm font-semibold">{t('adminActivities.filterFrom')}</label>
             <input
               type="date"
               className="adm-filter-select"
@@ -420,7 +698,7 @@ export default function AdminActivitiesPage() {
           </div>
 
           <div>
-            <label className="text-sm font-semibold">Đến ngày</label>
+            <label className="text-sm font-semibold">{t('adminActivities.filterTo')}</label>
             <input
               type="date"
               className="adm-filter-select"
@@ -431,23 +709,44 @@ export default function AdminActivitiesPage() {
 
           <div className="flex items-end gap-3" style={{ alignSelf: 'end' }}>
             <button type="button" className="adm-btn-refresh" onClick={handleResetFilters}>
-              <RefreshCw size={14} /> Đặt lại
+              <RefreshCw size={14} /> {t('adminActivities.btnReset')}
             </button>
             <button type="submit" className="adm-btn-refresh">
-              <Filter size={14} /> Áp dụng
+              <Filter size={14} /> {t('adminActivities.btnApply')}
             </button>
           </div>
         </form>
+
+        <div className="flex items-end gap-3" style={{ marginTop: '16px', flexWrap: 'wrap' }}>
+          <select
+            className="adm-filter-select"
+            value={bulkStatus}
+            onChange={(e) => setBulkStatus(e.target.value)}
+            style={{ minWidth: '180px' }}
+          >
+            {STATUS_OPTIONS.filter((item) => item.value).map((item) => (
+              <option key={item.value} value={item.value}>
+                {t(item.i18nKey)}
+              </option>
+            ))}
+          </select>
+          <button type="button" className="adm-btn-refresh" onClick={handleBulkStatusChange}>
+            {t('adminActivities.btnBulkChangeStatus')}
+          </button>
+          <button type="button" className="adm-btn-refresh" onClick={handleBulkDelete}>
+            <Trash2 size={14} /> {t('adminActivities.btnDeleteAll')}
+          </button>
+        </div>
       </div>
 
       {isCreating && (
         <div className="adm-filter-panel" style={{ marginBottom: '28px' }}>
           <h2 style={{ marginBottom: '12px', fontSize: '18px', fontWeight: 700 }}>
-            {editingId ? 'Chỉnh sửa hoạt động' : 'Tạo hoạt động'}
+            {editingId ? t('adminActivities.formTitleEdit') : t('adminActivities.formTitleCreate')}
           </h2>
-          <form onSubmit={handleSubmit} className="adm-filter-grid">
-            <div>
-              <label className="text-sm font-semibold">Tiêu đề</label>
+          <form onSubmit={handleSubmit} className="adm-activity-form-grid">
+            <div className="adm-form-field">
+              <label className="text-sm font-semibold">{t('adminActivities.fieldTitle')}</label>
               <input
                 type="text"
                 className="adm-filter-input"
@@ -455,36 +754,80 @@ export default function AdminActivitiesPage() {
                 onChange={(e) => setForm({ ...form, title: e.target.value })}
               />
             </div>
-            <div>
-              <label className="text-sm font-semibold">Danh mục</label>
-              <input
-                type="text"
-                className="adm-filter-input"
+            <div className="adm-form-field">
+              <label className="text-sm font-semibold">{t('adminActivities.fieldCategory')}</label>
+              <select
+                className="adm-filter-select"
                 value={form.category}
-                onChange={(e) => setForm({ ...form, category: e.target.value })}
-              />
+                onChange={(e) => setForm({ ...form, category: e.target.value, categoryOther: e.target.value === 'Khác' ? form.categoryOther : '' })}
+              >
+                <option value="">{t('adminActivities.fieldCategoryPlaceholder')}</option>
+                {ACTIVITY_CATEGORY_OPTIONS.map((item) => (
+                  <option key={item.value} value={item.value}>{t(item.i18nKey)}</option>
+                ))}
+              </select>
+              {form.category === 'Khác' && (
+                <input
+                  type="text"
+                  className="adm-filter-input"
+                  style={{ marginTop: '8px' }}
+                  value={form.categoryOther}
+                  onChange={(e) => setForm({ ...form, categoryOther: e.target.value })}
+                  placeholder={t('adminActivities.fieldCategoryOtherPlaceholder')}
+                />
+              )}
             </div>
-            <div>
-              <label className="text-sm font-semibold">Lên lịch lúc</label>
+            <div className="adm-form-field">
+              <label className="text-sm font-semibold">{t('adminActivities.fieldStartAt')}</label>
               <input
                 type="datetime-local"
                 className="adm-filter-input"
-                value={form.scheduledAt}
-                onChange={(e) => setForm({ ...form, scheduledAt: e.target.value })}
+                min={getMinDateTimeLocal()}
+                value={form.startAt}
+                onChange={(e) => {
+                  const nextStart = e.target.value;
+                  const computedMinutes = getAutoDurationMinutes(nextStart, form.endAt || nextStart);
+                  setForm({ ...form, startAt: nextStart, durationMinutes: computedMinutes === null || computedMinutes <= 0 ? '' : computedMinutes });
+                }}
               />
             </div>
-            <div>
-              <label className="text-sm font-semibold">Thời lượng (phút)</label>
+            <div className="adm-form-field">
+              <label className="text-sm font-semibold">{t('adminActivities.fieldEndAt')}</label>
+              <input
+                type="datetime-local"
+                className="adm-filter-input"
+                min={form.startAt}
+                value={form.endAt}
+                onChange={(e) => {
+                  const nextEnd = e.target.value;
+                  const computedMinutes = getAutoDurationMinutes(form.startAt, nextEnd || form.startAt);
+                  setForm({ ...form, endAt: nextEnd, durationMinutes: computedMinutes === null || computedMinutes <= 0 ? '' : computedMinutes });
+                }}
+              />
+            </div>
+            <div className="adm-form-field">
+              <label className="text-sm font-semibold">{t('adminActivities.fieldDuration')}</label>
+              <input
+                type="text"
+                className="adm-filter-input"
+                value={formatDurationLabel(form.durationMinutes, t)}
+                readOnly
+                placeholder={t('adminActivities.fieldDurationPlaceholder')}
+              />
+            </div>
+            <div className="adm-form-field">
+              <label className="text-sm font-semibold">{t('adminActivities.fieldDailyDuration')}</label>
               <input
                 type="number"
                 min="1"
                 className="adm-filter-input"
-                value={form.durationMinutes}
-                onChange={(e) => setForm({ ...form, durationMinutes: e.target.value })}
+                value={form.dailyDurationMinutes}
+                onChange={(e) => setForm({ ...form, dailyDurationMinutes: e.target.value })}
+                placeholder="30"
               />
             </div>
-            <div>
-              <label className="text-sm font-semibold">Địa điểm</label>
+            <div className="adm-form-field">
+              <label className="text-sm font-semibold">{t('adminActivities.fieldLocation')}</label>
               <input
                 type="text"
                 className="adm-filter-input"
@@ -492,57 +835,142 @@ export default function AdminActivitiesPage() {
                 onChange={(e) => setForm({ ...form, location: e.target.value })}
               />
             </div>
-            <div>
-              <label className="text-sm font-semibold">Nhân viên tổ chức</label>
-              <select
-                className="adm-filter-select"
-                value={form.organizerStaffId}
-                onChange={(e) => setForm({ ...form, organizerStaffId: e.target.value })}
-                disabled={optionsLoading}
-              >
-                <option value="">Chọn nhân viên tổ chức</option>
-                {staffOptions.map((staff) => (
-                  <option key={staff._id} value={staff._id}>
-                    {staff.fullName || staff.email} {staff.role ? `(${staff.role})` : ''}
-                  </option>
-                ))}
-              </select>
+            <div className="adm-form-field adm-form-field-full">
+              <label className="text-sm font-semibold">{t('adminActivities.fieldOrganizerStaff')}</label>
+              <div className="adm-participant-chips" style={{ marginBottom: '8px' }}>
+                <label className="adm-participant-chip" style={{ cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={staffOptions.filter((staff) => isActivityStaff(staff) && String(staff.role || '').toLowerCase().includes('doctor') || String(staff.role || '').toLowerCase().includes('bác sĩ')).length > 0 && staffOptions.filter((staff) => isActivityStaff(staff) && (String(staff.role || '').toLowerCase().includes('doctor') || String(staff.role || '').toLowerCase().includes('bác sĩ'))).every((staff) => form.organizerStaffIds.includes(staff._id))}
+                    onChange={() => toggleRoleGroupSelection('organizerStaffIds', ['doctor', 'bác sĩ'])}
+                    style={{ marginRight: '6px' }}
+                  />
+                  {t('adminActivities.allDoctors')}
+                </label>
+                <label className="adm-participant-chip" style={{ cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={staffOptions.filter((staff) => isActivityStaff(staff) && (String(staff.role || '').toLowerCase().includes('caregiver') || String(staff.role || '').toLowerCase().includes('hộ lý'))).length > 0 && staffOptions.filter((staff) => isActivityStaff(staff) && (String(staff.role || '').toLowerCase().includes('caregiver') || String(staff.role || '').toLowerCase().includes('hộ lý'))).every((staff) => form.organizerStaffIds.includes(staff._id))}
+                    onChange={() => toggleRoleGroupSelection('organizerStaffIds', ['caregiver', 'hộ lý'])}
+                    style={{ marginRight: '6px' }}
+                  />
+                  {t('adminActivities.allCaregivers')}
+                </label>
+                <label className="adm-participant-chip" style={{ cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={staffOptions.filter((staff) => isActivityStaff(staff) && (String(staff.role || '').toLowerCase().includes('nurse') || String(staff.role || '').toLowerCase().includes('y tá') || String(staff.role || '').toLowerCase().includes('điều dưỡng'))).length > 0 && staffOptions.filter((staff) => isActivityStaff(staff) && (String(staff.role || '').toLowerCase().includes('nurse') || String(staff.role || '').toLowerCase().includes('y tá') || String(staff.role || '').toLowerCase().includes('điều dưỡng'))).every((staff) => form.organizerStaffIds.includes(staff._id))}
+                    onChange={() => toggleRoleGroupSelection('organizerStaffIds', ['nurse', 'y tá', 'điều dưỡng'])}
+                    style={{ marginRight: '6px' }}
+                  />
+                  {t('adminActivities.allNurses')}
+                </label>
+              </div>
+              <div className="adm-participant-picker">
+                {staffOptions.filter(isActivityStaff).map((staff) => {
+                  const checked = form.organizerStaffIds.includes(staff._id);
+                  return (
+                    <label key={staff._id} className={`adm-participant-option${checked ? ' selected' : ''}`}>
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleStaffSelection('organizerStaffIds', staff._id)}
+                        style={{ width: '16px', height: '16px' }}
+                      />
+                      <span>
+                        {staff.fullName || staff.email || t('adminActivities.staffFallback')} {staff.role ? `(${staff.role})` : ''}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
             </div>
-            <div style={{ gridColumn: 'span 3' }}>
-              <label className="text-sm font-semibold">Người tham gia</label>
+            <div className="adm-form-field adm-form-field-full">
+              <label className="text-sm font-semibold">{t('adminActivities.fieldSupportStaff')}</label>
+              <div className="adm-participant-chips" style={{ marginBottom: '8px' }}>
+                <label className="adm-participant-chip" style={{ cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={staffOptions.filter((staff) => isActivityStaff(staff) && (String(staff.role || '').toLowerCase().includes('doctor') || String(staff.role || '').toLowerCase().includes('bác sĩ'))).length > 0 && staffOptions.filter((staff) => isActivityStaff(staff) && (String(staff.role || '').toLowerCase().includes('doctor') || String(staff.role || '').toLowerCase().includes('bác sĩ'))).every((staff) => form.supportStaffIds.includes(staff._id))}
+                    onChange={() => toggleRoleGroupSelection('supportStaffIds', ['doctor', 'bác sĩ'])}
+                    style={{ marginRight: '6px' }}
+                  />
+                  {t('adminActivities.allDoctors')}
+                </label>
+                <label className="adm-participant-chip" style={{ cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={staffOptions.filter((staff) => isActivityStaff(staff) && (String(staff.role || '').toLowerCase().includes('caregiver') || String(staff.role || '').toLowerCase().includes('hộ lý'))).length > 0 && staffOptions.filter((staff) => isActivityStaff(staff) && (String(staff.role || '').toLowerCase().includes('caregiver') || String(staff.role || '').toLowerCase().includes('hộ lý'))).every((staff) => form.supportStaffIds.includes(staff._id))}
+                    onChange={() => toggleRoleGroupSelection('supportStaffIds', ['caregiver', 'hộ lý'])}
+                    style={{ marginRight: '6px' }}
+                  />
+                  {t('adminActivities.allCaregivers')}
+                </label>
+                <label className="adm-participant-chip" style={{ cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={staffOptions.filter((staff) => isActivityStaff(staff) && (String(staff.role || '').toLowerCase().includes('nurse') || String(staff.role || '').toLowerCase().includes('y tá') || String(staff.role || '').toLowerCase().includes('điều dưỡng'))).length > 0 && staffOptions.filter((staff) => isActivityStaff(staff) && (String(staff.role || '').toLowerCase().includes('nurse') || String(staff.role || '').toLowerCase().includes('y tá') || String(staff.role || '').toLowerCase().includes('điều dưỡng'))).every((staff) => form.supportStaffIds.includes(staff._id))}
+                    onChange={() => toggleRoleGroupSelection('supportStaffIds', ['nurse', 'y tá', 'điều dưỡng'])}
+                    style={{ marginRight: '6px' }}
+                  />
+                  {t('adminActivities.allNurses')}
+                </label>
+              </div>
+              <div className="adm-participant-picker">
+                {staffOptions.filter(isActivityStaff).map((staff) => {
+                  const checked = form.supportStaffIds.includes(staff._id);
+                  return (
+                    <label key={staff._id} className={`adm-participant-option${checked ? ' selected' : ''}`}>
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleStaffSelection('supportStaffIds', staff._id)}
+                        style={{ width: '16px', height: '16px' }}
+                      />
+                      <span>
+                        {staff.fullName || staff.email || t('adminActivities.staffFallback')} {staff.role ? `(${staff.role})` : ''}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="adm-form-field adm-form-field-full">
+              <label className="text-sm font-semibold">{t('adminActivities.fieldParticipants')}</label>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '8px' }}>
+                <label className="adm-participant-chip" style={{ cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={residents.length > 0 && residents.every((resident) => form.participantResidentIds.includes(resident._id))}
+                    onChange={toggleAllResidents}
+                    style={{ marginRight: '6px' }}
+                  />
+                  {t('adminActivities.allResidents')}
+                </label>
+              </div>
               <input
                 type="text"
                 className="adm-filter-input"
-                placeholder="Tìm cư dân..."
+                placeholder={t('adminActivities.searchResidentPlaceholder')}
                 value={participantSearch}
                 onChange={(e) => setParticipantSearch(e.target.value)}
                 disabled={optionsLoading}
                 style={{ marginBottom: '8px' }}
               />
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '10px' }}>
+              <div className="adm-participant-chips">
                 {residents
                   .filter((resident) => form.participantResidentIds.includes(resident._id))
                   .slice(0, 6)
                   .map((resident) => {
                     const label =
-                      (resident.fullName || 'Cư dân') +
+                      (resident.fullName || t('adminActivities.residentFallback')) +
                       (resident.residentCode ? ' (' + resident.residentCode + ')' : '');
                     return (
                       <button
                         type="button"
                         key={resident._id}
                         onClick={() => toggleParticipant(resident._id)}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          padding: '6px 10px',
-                          borderRadius: '999px',
-                          backgroundColor: '#e2e8f0',
-                          border: 'none',
-                          cursor: 'pointer',
-                          fontSize: '13px'
-                        }}
+                        className="adm-participant-chip"
                       >
                         {label}
                         ×
@@ -550,12 +978,12 @@ export default function AdminActivitiesPage() {
                     );
                   })}
                 {form.participantResidentIds.length > 6 && (
-                  <span style={{ color: '#475569', fontSize: '13px', padding: '6px 10px', borderRadius: '999px', backgroundColor: '#f1f5f9' }}>
-                    {'+' + (form.participantResidentIds.length - 6) + ' khác'}
+                  <span className="adm-participant-chip adm-participant-chip-muted">
+                    {t('adminActivities.moreOthers', { count: form.participantResidentIds.length - 6 })}
                   </span>
                 )}
               </div>
-              <div style={{ maxHeight: '220px', overflowY: 'auto', border: '1px solid #cbd5e1', borderRadius: '12px', padding: '8px', backgroundColor: '#ffffff' }}>
+              <div className="adm-participant-picker">
                 {!optionsLoading && residents.filter((resident) => {
                   const searchText = participantSearch.trim().toLowerCase();
                   return (
@@ -569,17 +997,7 @@ export default function AdminActivitiesPage() {
                   return (
                     <label
                       key={resident._id}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '10px',
-                        padding: '8px',
-                        borderRadius: '10px',
-                        backgroundColor: selected ? (hasAbnormal ? '#fef2f2' : '#eff6ff') : 'transparent',
-                        borderLeft: hasAbnormal ? '3px solid #ef4444' : 'none',
-                        cursor: 'pointer',
-                        marginBottom: '4px'
-                      }}
+                      className={`adm-participant-option${selected ? ' selected' : ''}${hasAbnormal ? ' abnormal' : ''}`}
                     >
                       <input
                         type="checkbox"
@@ -587,13 +1005,13 @@ export default function AdminActivitiesPage() {
                         onChange={() => toggleParticipant(resident._id)}
                         style={{ width: '16px', height: '16px' }}
                       />
-                      <span style={{ fontSize: '14px' }}>
-                        {resident.fullName || 'Cư dân chưa đặt tên'}{resident.residentCode ? ` (${resident.residentCode})` : ''}
+                      <span>
+                        {resident.fullName || t('adminActivities.residentUnnamed')}{resident.residentCode ? ` (${resident.residentCode})` : ''}
                       </span>
                       {hasAbnormal && (
-                        <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#ef4444', fontWeight: 600 }}>
+                        <span className="adm-abnormal-badge">
                           <AlertTriangle size={12} />
-                          Bất thường
+                          {t('adminActivities.badgeAbnormal')}
                         </span>
                       )}
                     </label>
@@ -607,11 +1025,10 @@ export default function AdminActivitiesPage() {
                     resident.residentCode?.toLowerCase().includes(searchText)
                   );
                 }).length === 0 && (
-                  <div style={{ padding: '12px', color: '#64748b' }}>Không tìm thấy cư dân phù hợp.</div>
+                  <div className="adm-empty-state">{t('adminActivities.noResidentsFound')}</div>
                 )}
-                {optionsLoading && <div style={{ padding: '12px', color: '#64748b' }}>Đang tải danh sách cư dân...</div>}
+                {optionsLoading && <div className="adm-empty-state">{t('adminActivities.loadingResidents')}</div>}
               </div>
-              {/* Health warning banner */}
               {(() => {
                 const selectedAbnormalResidents = form.participantResidentIds
                   .map((id) => {
@@ -619,29 +1036,16 @@ export default function AdminActivitiesPage() {
                     return { resident, hasAbnormal: residentsAbnormalStatus[id] };
                   })
                   .filter((item) => item.hasAbnormal);
-                
-                console.log(`🏥 Checking health warnings: selected=${form.participantResidentIds.length}, abnormal=${selectedAbnormalResidents.length}, statusMap=`, residentsAbnormalStatus);
-                
+
                 return selectedAbnormalResidents.length > 0 ? (
-                  <div
-                    style={{
-                      marginTop: '12px',
-                      padding: '12px',
-                      backgroundColor: '#fef2f2',
-                      border: '1px solid #fecaca',
-                      borderRadius: '8px',
-                      display: 'flex',
-                      gap: '10px',
-                      alignItems: 'flex-start'
-                    }}
-                  >
-                    <AlertTriangle size={20} style={{ color: '#ef4444', flexShrink: 0, marginTop: '2px' }} />
-                    <div style={{ fontSize: '13px', color: '#991b1b' }}>
-                      <strong>⚠ Cảnh báo: Cư dân có chỉ số sức khỏe bất thường</strong>
-                      <div style={{ marginTop: '6px', fontSize: '12px', opacity: 0.9 }}>
+                  <div className="adm-warning-box">
+                    <AlertTriangle size={20} />
+                    <div>
+                      <strong>{t('adminActivities.warningAbnormalResidents')}</strong>
+                      <div className="adm-warning-list">
                         {selectedAbnormalResidents.map((item) => (
                           <div key={item.resident._id}>
-                            • {item.resident.fullName || 'Cư dân'} ({item.resident.residentCode}) - Xin hãy giám sát sau khi tham gia hoạt động
+                            • {item.resident.fullName || t('adminActivities.residentFallback')} ({item.resident.residentCode}) {t('adminActivities.monitorAfterActivity')}
                           </div>
                         ))}
                       </div>
@@ -650,22 +1054,22 @@ export default function AdminActivitiesPage() {
                 ) : null;
               })()}
             </div>
-            <div>
-              <label className="text-sm font-semibold">Trạng thái</label>
+            <div className="adm-form-field">
+              <label className="text-sm font-semibold">{t('adminActivities.fieldStatus')}</label>
               <select
                 className="adm-filter-select"
                 value={form.status}
                 onChange={(e) => setForm({ ...form, status: e.target.value })}
               >
-                {STATUS_OPTIONS.filter((item) => item.value).map((item) => (
+                {getStatusOptionsForForm(form.status).filter((item) => item.value).map((item) => (
                   <option key={item.value} value={item.value}>
-                    {item.label}
+                    {t(item.i18nKey)}
                   </option>
                 ))}
               </select>
             </div>
-            <div style={{ gridColumn: 'span 3' }}>
-              <label className="text-sm font-semibold">Mô tả</label>
+            <div className="adm-form-field adm-form-field-full">
+              <label className="text-sm font-semibold">{t('adminActivities.fieldDescription')}</label>
               <textarea
                 rows="3"
                 className="adm-filter-input"
@@ -675,14 +1079,14 @@ export default function AdminActivitiesPage() {
               />
             </div>
             {formError && (
-              <div style={{ gridColumn: 'span 3', color: '#b91c1c' }}>{formError}</div>
+              <div className="adm-form-message adm-form-field-full">{formError}</div>
             )}
-            <div style={{ gridColumn: 'span 3', display: 'flex', gap: '12px' }}>
+            <div className="adm-form-actions adm-form-field-full">
               <button type="button" className="adm-btn-refresh" onClick={() => { resetForm(); setIsCreating(false); }}>
-                Huỷ
+                {t('adminActivities.btnCancel')}
               </button>
               <button type="submit" className="adm-btn-refresh" disabled={submitting}>
-                {editingId ? 'Lưu thay đổi' : 'Tạo hoạt động'}
+                {editingId ? t('adminActivities.btnSaveChanges') : t('adminActivities.btnCreate')}
               </button>
             </div>
           </form>
@@ -698,7 +1102,7 @@ export default function AdminActivitiesPage() {
             const activity = activities.find((a) => a._id === activityId);
             return { activity, count };
           });
-        
+
         return totalAbnormal > 0 ? (
           <div
             style={{
@@ -714,11 +1118,11 @@ export default function AdminActivitiesPage() {
           >
             <AlertTriangle size={20} style={{ color: '#ef4444', flexShrink: 0, marginTop: '2px' }} />
             <div style={{ fontSize: '13px', color: '#991b1b' }}>
-              <strong>⚠ Cảnh báo: {activitiesWithAbnormal.length} hoạt động có bệnh nhân ở trạng thái bất thường</strong>
+              <strong>{t('adminActivities.warningAbnormalActivities', { count: activitiesWithAbnormal.length })}</strong>
               <div style={{ marginTop: '8px', fontSize: '12px', opacity: 0.9 }}>
                 {activitiesWithAbnormal.map(({ activity, count }) => (
                   <div key={activity._id}>
-                    • <strong>{activity.title}</strong> - {count} bệnh nhân có chỉ số bất thường
+                    • <strong>{activity.title}</strong> - {t('adminActivities.abnormalPatientCount', { count })}
                   </div>
                 ))}
               </div>
@@ -732,25 +1136,25 @@ export default function AdminActivitiesPage() {
           <table className="adm-table">
             <thead>
               <tr>
-                <th>Tiêu đề</th>
-                <th>Danh mục</th>
-                <th>Lên lịch lúc</th>
-                <th>Trạng thái</th>
-                <th>Người tham gia</th>
-                <th>Hành động</th>
+                <th>{t('adminActivities.colTitle')}</th>
+                <th>{t('adminActivities.colCategory')}</th>
+                <th>{t('adminActivities.colScheduledAt')}</th>
+                <th>{t('adminActivities.colStatus')}</th>
+                <th>{t('adminActivities.colParticipants')}</th>
+                <th>{t('adminActivities.colActions')}</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
                   <td colSpan="6" style={{ textAlign: 'center', padding: '24px' }}>
-                    Đang tải hoạt động...
+                    {t('adminActivities.loadingActivities')}
                   </td>
                 </tr>
               ) : activities.length === 0 ? (
                 <tr>
                   <td colSpan="6" style={{ textAlign: 'center', padding: '24px' }}>
-                    Không tìm thấy hoạt động nào.
+                    {t('adminActivities.noActivitiesFound')}
                   </td>
                 </tr>
               ) : (
@@ -777,13 +1181,13 @@ export default function AdminActivitiesPage() {
                               }}
                             >
                               <AlertTriangle size={10} />
-                              {abnormalCount} bất thường
+                              {t('adminActivities.abnormalCount', { count: abnormalCount })}
                             </span>
                           )}
                         </div>
                       </td>
                       <td>{activity.category || '-'}</td>
-                      <td>{activity.scheduledAt ? new Date(activity.scheduledAt).toLocaleString() : '-'}</td>
+                      <td>{formatActivityDateRange(activity)}</td>
                       <td>
                         <select
                           value={activity.status}
@@ -792,7 +1196,7 @@ export default function AdminActivitiesPage() {
                         >
                           {STATUS_OPTIONS.filter((item) => item.value).map((item) => (
                             <option key={item.value} value={item.value}>
-                              {item.label}
+                              {t(item.i18nKey)}
                             </option>
                           ))}
                         </select>
@@ -823,7 +1227,17 @@ export default function AdminActivitiesPage() {
                           type="button"
                           className="adm-btn-refresh"
                           style={{ marginRight: '8px' }}
+                          onClick={() => setSelectedActivityId(activity._id)}
+                          title={t('adminActivities.btnViewDetail')}
+                        >
+                          <Eye size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          className="adm-btn-refresh"
+                          style={{ marginRight: '8px' }}
                           onClick={() => handleEdit(activity)}
+                          title={t('adminActivities.btnEdit')}
                         >
                           <Edit3 size={14} />
                         </button>
@@ -831,6 +1245,7 @@ export default function AdminActivitiesPage() {
                           type="button"
                           className="adm-btn-refresh"
                           onClick={() => handleDelete(activity._id)}
+                          title={t('adminActivities.btnDelete')}
                         >
                           <Trash2 size={14} />
                         </button>
@@ -846,7 +1261,7 @@ export default function AdminActivitiesPage() {
 
       <div className="adm-header" style={{ marginTop: '18px', justifyContent: 'space-between' }}>
         <span>
-          Trang {page} / {totalPages} — {total} hoạt động
+          {t('adminActivities.paginationInfo', { page, totalPages, total })}
         </span>
         <div style={{ display: 'flex', gap: '10px' }}>
           <button
@@ -855,7 +1270,7 @@ export default function AdminActivitiesPage() {
             disabled={page <= 1}
             onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
           >
-            Trước
+            {t('adminActivities.btnPrev')}
           </button>
           <button
             type="button"
@@ -863,12 +1278,185 @@ export default function AdminActivitiesPage() {
             disabled={page >= totalPages}
             onClick={() => setPage((prev) => Math.min(prev + 1, totalPages))}
           >
-            Tiếp
+            {t('adminActivities.btnNext')}
           </button>
         </div>
       </div>
 
       {error && <div style={{ color: '#b91c1c', marginTop: '16px' }}>{error}</div>}
+
+      {/* ─── Activity Detail Modal ─── */}
+      {selectedActivityId && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          justifyContent: 'flex-end',
+          zIndex: 1000
+        }}>
+          <div style={{
+            width: '500px',
+            height: '100%',
+            backgroundColor: '#fff',
+            boxShadow: '-2px 0 8px rgba(0,0,0,0.1)',
+            display: 'flex',
+            flexDirection: 'column',
+            animation: 'slideInRight 0.3s ease-out',
+          }}>
+            {/* Header */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '16px 20px',
+              borderBottom: '1px solid #e2e8f0',
+            }}>
+              <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 700 }}>{t('adminActivities.modalTitle')}</h2>
+              <button
+                type="button"
+                onClick={() => setSelectedActivityId(null)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
+              {getSelectedActivity() && (() => {
+                const activity = getSelectedActivity();
+                const organizer = staffOptions.find((s) => s._id === activity.organizerStaffId);
+                const participantsList = (activity.participantResidentIds || []).map((resId) => {
+                  const resident = residents.find((r) => r._id === resId);
+                  return resident;
+                }).filter(Boolean);
+
+                return (
+                  <>
+                    {/* Title and Status */}
+                    <div style={{ marginBottom: '20px' }}>
+                      <h3 style={{ margin: '0 0 8px 0', fontSize: '20px', fontWeight: 700 }}>
+                        {activity.title}
+                      </h3>
+                      <span style={{
+                        display: 'inline-block',
+                        padding: '4px 12px',
+                        backgroundColor: activity.status === 'completed' ? '#dcfce7' : activity.status === 'cancelled' ? '#fee2e2' : '#dbeafe',
+                        color: activity.status === 'completed' ? '#166534' : activity.status === 'cancelled' ? '#b91c1c' : '#0c4a6e',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                      }}>
+                        {(() => {
+                          const found = STATUS_OPTIONS.find((s) => s.value === activity.status);
+                          return found ? t(found.i18nKey) : activity.status;
+                        })()}
+                      </span>
+                    </div>
+
+                    {/* Description */}
+                    {activity.description && (
+                      <div style={{ marginBottom: '16px' }}>
+                        <label style={{ display: 'block', fontWeight: 600, marginBottom: '4px', fontSize: '14px' }}>{t('adminActivities.detailDescription')}</label>
+                        <p style={{ margin: 0, color: '#475569', fontSize: '14px', lineHeight: 1.5 }}>{activity.description}</p>
+                      </div>
+                    )}
+
+                    {/* Category */}
+                    {activity.category && (
+                      <div style={{ marginBottom: '16px' }}>
+                        <label style={{ display: 'block', fontWeight: 600, marginBottom: '4px', fontSize: '14px' }}>{t('adminActivities.detailCategory')}</label>
+                        <p style={{ margin: 0, color: '#475569', fontSize: '14px' }}>{activity.category}</p>
+                      </div>
+                    )}
+
+                    {/* Date Range */}
+                    <div style={{ marginBottom: '16px' }}>
+                      <label style={{ display: 'block', fontWeight: 600, marginBottom: '4px', fontSize: '14px' }}>{t('adminActivities.detailDateRange')}</label>
+                      <p style={{ margin: 0, color: '#475569', fontSize: '14px' }}>{formatActivityDateRange(activity)}</p>
+                    </div>
+
+                    {/* Duration */}
+                    {activity.durationMinutes && (
+                      <div style={{ marginBottom: '16px' }}>
+                        <label style={{ display: 'block', fontWeight: 600, marginBottom: '4px', fontSize: '14px' }}>{t('adminActivities.detailDuration')}</label>
+                        <p style={{ margin: 0, color: '#475569', fontSize: '14px' }}>{formatDurationLabel(activity.durationMinutes, t)}</p>
+                      </div>
+                    )}
+
+                    {/* Location */}
+                    {activity.location && (
+                      <div style={{ marginBottom: '16px' }}>
+                        <label style={{ display: 'block', fontWeight: 600, marginBottom: '4px', fontSize: '14px' }}>{t('adminActivities.detailLocation')}</label>
+                        <p style={{ margin: 0, color: '#475569', fontSize: '14px' }}>{activity.location}</p>
+                      </div>
+                    )}
+
+                    {/* Organizer */}
+                    {organizer && (
+                      <div style={{ marginBottom: '16px' }}>
+                        <label style={{ display: 'block', fontWeight: 600, marginBottom: '4px', fontSize: '14px' }}>{t('adminActivities.detailOrganizer')}</label>
+                        <p style={{ margin: 0, color: '#475569', fontSize: '14px' }}>
+                          {organizer.fullName || organizer.email} {organizer.role ? `(${organizer.role})` : ''}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Participants */}
+                    {participantsList.length > 0 && (
+                      <div style={{ marginBottom: '16px' }}>
+                        <label style={{ display: 'block', fontWeight: 600, marginBottom: '8px', fontSize: '14px' }}>{t('adminActivities.detailParticipants', { count: participantsList.length })}</label>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          {participantsList.map((resident) => {
+                            const isAbnormal = residentsAbnormalStatus[resident._id];
+                            return (
+                              <div key={resident._id} style={{
+                                padding: '8px 12px',
+                                backgroundColor: isAbnormal ? '#fef2f2' : '#f8fafc',
+                                borderRadius: '6px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                fontSize: '14px',
+                              }}>
+                                <span>{resident.fullName || resident.residentCode}</span>
+                                {isAbnormal && (
+                                  <span style={{
+                                    fontSize: '11px',
+                                    color: '#dc2626',
+                                    backgroundColor: '#fecaca',
+                                    padding: '2px 6px',
+                                    borderRadius: '4px',
+                                    fontWeight: 600,
+                                  }}>
+                                    ⚠️ {t('adminActivities.badgeAbnormal')}
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style>{`
+        @keyframes slideInRight {
+          from {
+            transform: translateX(100%);
+          }
+          to {
+            transform: translateX(0);
+          }
+        }
+      `}</style>
     </div>
   );
 }

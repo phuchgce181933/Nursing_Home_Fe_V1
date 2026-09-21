@@ -1,8 +1,9 @@
-import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import medicationService from '../../services/medication.service';
 import residentService from '../../services/resident.service';
 import { useAuth } from '../../hooks/useAuth';
+import useToast from '../../hooks/useToast';
 import '../../styles/medications/MedicationPage.css';
 
 /* ── helpers ── */
@@ -14,32 +15,77 @@ const fmtDayLabel = (d) =>
     weekday: 'long', day: '2-digit', month: 'short', year: 'numeric',
   });
 
-const todayStr = () => new Date().toISOString().slice(0, 10);
-const maxValidUntil = () => {
-  const d = new Date();
-  d.setDate(d.getDate() + 30);
-  return d.toISOString().slice(0, 10);
+const localDateStr = (d) => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 };
 
-const ROUTES = ['oral', 'injection', 'topical', 'inhaled'];
+const todayStr = () => localDateStr(new Date());
+
+// startDate ("YYYY-MM-DD") + duration (days) -> endDate ("YYYY-MM-DD").
+// Matches the backend's own endDate = startDate + duration validation exactly.
+const addDaysStr = (dateStr, days) => {
+  if (!dateStr || !days) return '';
+  const d = new Date(`${dateStr}T00:00:00`);
+  d.setDate(d.getDate() + Number(days));
+  return localDateStr(d);
+};
+
+const syncPrescriptionDates = (items) => {
+  const startDate = todayStr();
+  const durations = items
+    .map((item) => Number(item.duration))
+    .filter((duration) => Number.isInteger(duration) && duration > 0);
+  const maxDuration = durations.length ? Math.max(...durations) : null;
+
+  return {
+    items: items.map((item) => ({ ...item, startDate })),
+    validUntil: maxDuration ? addDaysStr(startDate, maxDuration) : '',
+  };
+};
+
+const getPrescriptionErrorMessage = (err, fallback) =>
+  err?.response?.data?.message ||
+  err?.response?.data?.errors?.map((error) => error.message).filter(Boolean).join(' ') ||
+  fallback;
+
+const AVATAR_COLORS = ['#0f766e', '#e64980', '#0ca678', '#f76707', '#7048e8', '#1098ad', '#d6336c', '#5c7cfa'];
+const getAvatarColor = (name) => {
+  let hash = 0;
+  for (let i = 0; i < (name || '').length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+};
+const getInitials = (name) => {
+  if (!name) return '?';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  return parts[0][0].toUpperCase();
+};
 const MISSED_REASONS = ['refused', 'asleep', 'vomiting', 'hospitalized', 'other'];
 
-// Units chỉ hợp lệ với đường uống (oral)
-const ORAL_ONLY_UNITS = ['viên', 'viên nén', 'viên nhộng', 'viên nang', 'tablet', 'capsule', 'pill', 'lozenge'];
-
-const getUnitRouteWarning = (unit, route) => {
-  if (!unit || !route) return null;
-  const u = unit.trim().toLowerCase();
-  const isOralOnly = ORAL_ONLY_UNITS.some((o) => u === o || u.startsWith(o));
-  if (isOralOnly && route !== 'oral') return { unit: unit.trim(), route };
+// Live (as-you-type) dosage validation — mirrors the backend's specific messages.
+const getDosageError = (dosage, t) => {
+  if (dosage === '' || dosage === null || dosage === undefined) return null;
+  const n = Number(dosage);
+  if (Number.isNaN(n)) return t('medication.dosageNotNumber');
+  if (n < 0) return t('medication.dosageNegative');
+  if (n === 0) return t('medication.dosageZero');
   return null;
 };
 
 /* statuses uppercase from BE */
-const RX_STATUS_KEYS = { ACTIVE: 'statusActive', COMPLETED: 'statusCompleted', CANCELLED: 'statusCancelled' };
+const RX_STATUS_KEYS = {
+  DRAFT: 'statusDraft', ACTIVE: 'statusActive', SUSPENDED: 'statusSuspended',
+  COMPLETED: 'statusCompleted', CANCELLED: 'statusCancelled', EXPIRED: 'statusExpired',
+};
+const MANUAL_RX_STATUS_KEYS = { ACTIVE: 'statusActive', CANCELLED: 'statusCancelled' };
 const SCHED_STATUS_KEYS = {
   PENDING: 'schedPending', TAKEN: 'schedTaken', LATE_TAKEN: 'schedLateTaken',
   MISSED: 'schedMissed', SKIPPED: 'schedSkipped', OVERDUE: 'schedOverdue',
+  REFUSED: 'schedRefused', HELD: 'schedHeld', NOT_AVAILABLE: 'schedNotAvailable',
+  DISCONTINUED: 'schedDiscontinued',
 };
 
 /* ── StatusBadge ── */
@@ -49,6 +95,53 @@ function StatusBadge({ status, type }) {
   const label = keyMap[status] ? t(`medication.${keyMap[status]}`) : status;
   return (
     <span className={`med-badge med-badge--${status.toLowerCase()}`}>{label}</span>
+  );
+}
+
+// Whole calendar days between today and validUntil (can be negative if already past).
+const daysUntil = (validUntil) => {
+  if (!validUntil) return null;
+  const today = new Date(`${todayStr()}T00:00:00`);
+  const end = new Date(`${localDateStr(new Date(validUntil))}T00:00:00`);
+  return Math.round((end - today) / (24 * 60 * 60 * 1000));
+};
+
+// For an ACTIVE prescription, show remaining days instead of a static "in use" label —
+// COMPLETED/CANCELLED still fall back to the plain StatusBadge.
+function RxStatusCell({ prescription }) {
+  const { t } = useTranslation();
+  const discontinuedCount = (prescription.items || []).filter((it) => it.isActive === false).length;
+
+  if (prescription.status === 'DRAFT') {
+    return <span className="med-badge med-badge--draft">{t('medication.statusDraft')}</span>;
+  }
+  if (prescription.status === 'SUSPENDED') {
+    return <span className="med-badge med-badge--suspended">{t('medication.statusSuspended')}</span>;
+  }
+  if (prescription.status === 'EXPIRED') {
+    return <span className="med-badge med-badge--expired">{t('medication.statusExpired')}</span>;
+  }
+  if (prescription.status !== 'ACTIVE') {
+    return <StatusBadge status={prescription.status} type="rx" />;
+  }
+  if (discontinuedCount > 0) {
+    return (
+      <span className="med-badge med-badge--stopped">
+        {t('medication.discontinuedLabel')}
+        {discontinuedCount > 1 ? ` (${discontinuedCount})` : ''}
+      </span>
+    );
+  }
+
+  const days = daysUntil(prescription.validUntil);
+  if (days === null) return <StatusBadge status="ACTIVE" type="rx" />;
+  if (days < 0) return <span className="med-badge med-badge--missed">{t('medication.rxExpired')}</span>;
+  if (days === 0) return <span className="med-badge med-badge--overdue">{t('medication.rxExpiresToday')}</span>;
+  const urgent = days <= 7;
+  return (
+    <span className={`med-badge ${urgent ? 'med-badge--overdue' : 'med-badge--active'}`}>
+      {t('medication.rxDaysLeft', { count: days })}
+    </span>
   );
 }
 
@@ -98,11 +191,11 @@ function HealthWarningPanel({ residentId }) {
 
   if (!profile) return null;
 
-  const allergies   = profile.drugAllergies || profile.allergies || [];
-  const chronic     = profile.chronicConditions || [];
-  const history     = profile.medicalHistory || [];
-  const initHealth  = profile.initialHealthCondition || '';
-  const bloodType   = profile.bloodType || '';
+  const allergies = profile.drugAllergies || profile.allergies || [];
+  const chronic = profile.chronicConditions || [];
+  const history = profile.medicalHistory || [];
+  const initHealth = profile.initialHealthCondition || '';
+  const bloodType = profile.bloodType || '';
   const hasAny = allergies.length || chronic.length || history.length || initHealth || bloodType;
 
   if (!hasAny) {
@@ -117,7 +210,7 @@ function HealthWarningPanel({ residentId }) {
     <div className="med-health-panel">
       <div className="med-health-panel__title">{t('medication.healthProfile')}</div>
 
-      {/* Dị ứng thuốc — đỏ, ưu tiên cao nhất */}
+      {/* Dị ứng — đỏ, ưu tiên cao nhất */}
       {allergies.length > 0 && (
         <div className="med-health-section med-health-section--danger">
           <div className="med-health-section__head">
@@ -185,7 +278,7 @@ function HealthWarningPanel({ residentId }) {
 }
 
 /* ── Medication Autocomplete ── */
-function MedicationAutocomplete({ value, onSelect, placeholder }) {
+function MedicationAutocomplete({ value, onSelect, placeholder, excludeIds = [] }) {
   const [query, setQuery] = useState(value || '');
   const [results, setResults] = useState([]);
   const [open, setOpen] = useState(false);
@@ -220,7 +313,7 @@ function MedicationAutocomplete({ value, onSelect, placeholder }) {
           // chỉ giữ thuốc có NAME bắt đầu bằng query (prefix match)
           const q = val.trim().toLowerCase();
           const filtered = arr.filter((m) =>
-            (m.name || '').toLowerCase().startsWith(q)
+            (m.name || '').toLowerCase().startsWith(q) && !excludeIds.includes(m._id)
           ).slice(0, 10);
           setResults(filtered);
           setOpen(filtered.length > 0);
@@ -266,9 +359,9 @@ function MedicationAutocomplete({ value, onSelect, placeholder }) {
               onMouseDown={(e) => { e.preventDefault(); handlePick(med); }}
             >
               <span className="med-autocomplete__name">{med.name}</span>
-              {(med.medicationCode || med.form || med.strength) && (
+              {(med.medicationCode || med.form || med.strength || med.price != null) && (
                 <span className="med-autocomplete__meta">
-                  {[med.medicationCode, med.form, med.strength].filter(Boolean).join(' · ')}
+                  {[med.medicationCode, med.form, med.strength].filter(Boolean).join(' · ')}{med.price != null ? (med.medicationCode || med.form || med.strength ? ' · ' : '') + `${Number(med.price).toLocaleString('vi-VN')}đ` : ''}
                 </span>
               )}
             </li>
@@ -285,14 +378,42 @@ function buildTimesForFrequency(freq) {
   return defaults.slice(0, freq);
 }
 
-/* ── Single prescription item form row ── */
-function ItemRow({ item, idx, onChange, onRemove, t, canRemove }) {
-  const unitRouteWarn = getUnitRouteWarning(item.unit, item.route);
+/* ── Single prescription item form card ── */
+function ItemRow({ item, idx, onChange, onRemove, t, canRemove, errors = {}, excludeIds = [], isDuplicate = false }) {
+  const dosageError = getDosageError(item.dosage, t);
+
+  // Tự động tính số lượng = liều lượng × lần/ngày × số ngày
+  const computedQuantity = (() => {
+    const d = parseFloat(item.dosage) || 0;
+    const f = parseInt(item.frequency) || 0;
+    const dur = parseInt(item.duration) || 0;
+    return Math.max(1, Math.round(d * f * dur));
+  })();
+
+  // Sync computed quantity vào form state khi có thay đổi
+  const syncQuantity = (updatedItem) => {
+    const d = parseFloat(updatedItem.dosage) || 0;
+    const f = parseInt(updatedItem.frequency) || 0;
+    const dur = parseInt(updatedItem.duration) || 0;
+    const newQty = Math.max(1, Math.round(d * f * dur));
+    return { ...updatedItem, quantity: newQty };
+  };
 
   const handleFrequencyChange = (e) => {
     const f = parseInt(e.target.value, 10);
     const times = buildTimesForFrequency(f);
-    onChange(idx, { ...item, frequency: f, times });
+    const updated = syncQuantity({ ...item, frequency: f, times });
+    onChange(idx, updated);
+  };
+
+  const handleDosageChange = (e) => {
+    const updated = syncQuantity({ ...item, dosage: e.target.value });
+    onChange(idx, updated);
+  };
+
+  const handleDurationChange = (e) => {
+    const updated = syncQuantity({ ...item, duration: e.target.value });
+    onChange(idx, updated);
   };
 
   const handleTimeChange = (tIdx, val) => {
@@ -301,120 +422,225 @@ function ItemRow({ item, idx, onChange, onRemove, t, canRemove }) {
     onChange(idx, { ...item, times });
   };
 
+  const FREQ_LABELS = {
+    1: t('medication.freqOnce'),
+    2: t('medication.freqTwice'),
+    3: t('medication.freqThrice'),
+    4: t('medication.freqFour'),
+  };
+
   return (
-    <div className="med-item-row">
-      <div className="med-item-row__header">
-        <span className="med-item-row__label">{t('medication.itemNumber', { n: idx + 1 })}</span>
+    <div className="cpf-med-card">
+      <div className="cpf-med-card__header">
+        <span className="cpf-med-card__num">{idx + 1}</span>
+        <span className="cpf-med-card__title">{item.medicationName || t('medication.itemNumber', { n: idx + 1 })}</span>
         {canRemove && (
-          <button type="button" className="med-action-btn med-action-btn--danger" onClick={() => onRemove(idx)}>
-            {t('medication.removeMedication')}
+          <button type="button" className="cpf-med-card__remove" onClick={() => onRemove(idx)} title={t('medication.removeMedication')}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
           </button>
         )}
       </div>
 
-      <div className="med-form-row">
-        <div className="med-form-group" style={{ flex: 2 }}>
-          <label className="med-form-label">{t('medication.medicationName')} <span style={{ color: '#ef4444' }}>*</span></label>
-          <MedicationAutocomplete
-            value={item.medicationName}
-            placeholder={t('medication.medicationNamePlaceholder')}
-            onSelect={({ name, med }) => {
-              const updates = { ...item, medicationName: name };
-              if (med) {
-                updates.medicationId = med._id;          // required by BE
-                if (!item.unit && med.unit) updates.unit = med.unit;
-              } else {
-                updates.medicationId = '';               // cleared khi user tự gõ
-              }
-              onChange(idx, updates);
-            }}
-          />
-        </div>
-        <div className="med-form-group">
-          <label className="med-form-label">{t('medication.dosage')} <span style={{ color: '#ef4444' }}>*</span></label>
-          <input
-            type="number"
-            className="med-form-input"
-            value={item.dosage}
-            onChange={(e) => onChange(idx, { ...item, dosage: e.target.value })}
-            placeholder={t('medication.dosagePlaceholder')}
-            min="0"
-          />
-        </div>
-        <div className="med-form-group">
-          <label className="med-form-label">{t('medication.unit')}</label>
-          <input
-            className="med-form-input"
-            value={item.unit}
-            onChange={(e) => onChange(idx, { ...item, unit: e.target.value })}
-            placeholder={t('medication.unitPlaceholder')}
-          />
-        </div>
-      </div>
-
-      <div className="med-form-row">
-        <div className="med-form-group">
-          <label className="med-form-label">{t('medication.route')}</label>
-          <select
-            className="med-form-select"
-            value={item.route}
-            onChange={(e) => onChange(idx, { ...item, route: e.target.value })}
-          >
-            {ROUTES.map((r) => (
-              <option key={r} value={r}>{t(`medication.route${r.charAt(0).toUpperCase() + r.slice(1)}`)}</option>
-            ))}
-          </select>
-        </div>
-        <div className="med-form-group">
-          <label className="med-form-label">{t('medication.frequencyLabel')} <span style={{ color: '#ef4444' }}>*</span></label>
-          <select className="med-form-select" value={item.frequency} onChange={handleFrequencyChange}>
-            {[1, 2, 3, 4].map((n) => <option key={n} value={n}>{n}</option>)}
-          </select>
-        </div>
-        <div className="med-form-group">
-          <label className="med-form-label">{t('medication.duration')}</label>
-          <input
-            type="number"
-            className="med-form-input"
-            value={item.duration}
-            onChange={(e) => onChange(idx, { ...item, duration: e.target.value })}
-            min="1"
-          />
-        </div>
-        <div className="med-form-group">
-          <label className="med-form-label">{t('medication.startDate')}</label>
-          <input
-            type="date"
-            className="med-form-input"
-            value={item.startDate}
-            onChange={(e) => onChange(idx, { ...item, startDate: e.target.value })}
-          />
-        </div>
-      </div>
-
-      {/* Cảnh báo unit ↔ route không hợp lệ */}
-      {unitRouteWarn && (
-        <div className="med-unit-route-warn">
-          <span>⚠️</span>
-          {t('medication.unitRouteWarning', {
-            unit: unitRouteWarn.unit,
-            route: t(`medication.route${unitRouteWarn.route.charAt(0).toUpperCase() + unitRouteWarn.route.slice(1)}`),
-          })}
-        </div>
-      )}
-
-      <div className="med-form-group">
-        <label className="med-form-label">{t('medication.times')}</label>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {item.times.map((tm, tIdx) => (
-            <input
-              key={tIdx}
-              type="time"
-              className="med-time-add__input"
-              value={tm}
-              onChange={(e) => handleTimeChange(tIdx, e.target.value)}
+      <div className="cpf-med-card__body">
+        <div className="cpf-row-3">
+          <div className="cpf-field" style={{ gridColumn: '1 / 3' }}>
+            <label className="cpf-label">{t('medication.medicationName')}</label>
+            <MedicationAutocomplete
+              value={item.medicationName}
+              placeholder={t('medication.medicationNamePlaceholder')}
+              excludeIds={excludeIds}
+              onSelect={({ name, med }) => {
+                const updates = { ...item, medicationName: name };
+                if (med) {
+                  updates.medicationId = med._id;
+                  updates.unit = med.unit || '';
+                  updates.price = med.price ?? '';
+                } else {
+                  updates.medicationId = '';
+                  updates.unit = '';
+                  updates.price = '';
+                }
+                onChange(idx, updates);
+              }}
             />
-          ))}
+            {(errors[`item_${idx}_name`] || isDuplicate) && (
+              <span className="cpf-error">{errors[`item_${idx}_name`] || t('medication.duplicateMedication')}</span>
+            )}
+          </div>
+          <div className="cpf-field">
+            <label className="cpf-label">{t('medication.dosage')}</label>
+            <input
+              type="number"
+              className={`cpf-input${dosageError ? ' cpf-input--err' : ''}`}
+              value={item.dosage}
+              onChange={handleDosageChange}
+              placeholder={t('medication.dosagePlaceholder')}
+              min="0"
+            />
+            {dosageError && <span className="cpf-error">{dosageError}</span>}
+          </div>
+        </div>
+
+        <div className="cpf-row-3">
+          <div className="cpf-field">
+            <label className="cpf-label">{t('medication.unit')}</label>
+            <input
+              className="cpf-input edit-input--readonly"
+              value={item.unit}
+              readOnly
+              placeholder={t('medication.unitPlaceholder')}
+            />
+            <small className="cpf-hint">{t('medication.unitAutoHint')}</small>
+          </div>
+          <div className="cpf-field">
+            <label className="cpf-label">{t('medication.quantity')}</label>
+            <input
+              type="number"
+              className="cpf-input edit-input--readonly"
+              value={item.quantity || computedQuantity}
+              readOnly
+              title={t('medication.quantityAutoHint') || 'Tự động tính: Liều lượng × Lần/ngày × Số ngày'}
+            />
+            <small className="cpf-hint">{t('medication.quantityAutoHint') || '= Liều × Lần/ngày × Ngày'}</small>
+          </div>
+          <div className="cpf-field">
+            <label className="cpf-label">{t('medication.frequencyLabel')}</label>
+            <select className="cpf-input" value={item.frequency} onChange={handleFrequencyChange}>
+              {[1, 2, 3, 4].map((n) => <option key={n} value={n}>{FREQ_LABELS[n] || `${n}×`}</option>)}
+            </select>
+          </div>
+          <div className="cpf-field">
+            <label className="cpf-label">{t('medication.duration')}</label>
+            <input
+              type="number"
+              className={`cpf-input${errors[`item_${idx}_duration`] ? ' cpf-input--err' : ''}`}
+              value={item.duration}
+              onChange={handleDurationChange}
+              min="1"
+              placeholder="7"
+            />
+            <small className="cpf-hint">{t('medication.durationAutoScheduleHint')}</small>
+            {errors[`item_${idx}_duration`] && <span className="cpf-error">{errors[`item_${idx}_duration`]}</span>}
+          </div>
+        </div>
+
+        {/* Schedule Times */}
+        {!item.isPRN && item.times && item.times.length > 0 && (
+          <div className="cpf-field">
+            <label className="cpf-label">{t('medication.times')}</label>
+            <div className="sched-times">
+              {item.times.map((tm, tIdx) => (
+                <div key={tIdx} className="sched-time-slot">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
+                  </svg>
+                  <input
+                    type="time"
+                    className="sched-time-input"
+                    value={tm}
+                    onChange={(e) => handleTimeChange(tIdx, e.target.value)}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Meal Timing */}
+        {!item.isPRN && (
+          <div className="sched-meal-timing">
+            <div className="sched-meal-timing__left">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0f766e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 8h1a4 4 0 0 1 0 8h-1" /><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z" /><line x1="6" y1="1" x2="6" y2="4" /><line x1="10" y1="1" x2="10" y2="4" /><line x1="14" y1="1" x2="14" y2="4" />
+              </svg>
+              <div>
+                <span className="sched-meal-timing__label">{t('medication.mealTiming')}</span>
+                <span className="sched-meal-timing__desc">{t('medication.mealTimingDesc')}</span>
+              </div>
+            </div>
+            <div className="sched-meal-btns">
+              {['before_meal', 'after_meal', 'with_meal', 'empty_stomach'].map((opt) => (
+                <button
+                  key={opt}
+                  type="button"
+                  className={`sched-meal-btn ${item.mealTiming === opt ? 'sched-meal-btn--active' : ''}`}
+                  onClick={() => onChange(idx, { ...item, mealTiming: item.mealTiming === opt ? '' : opt })}
+                >
+                  {t(`medication.meal_${opt}`)}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Instructions */}
+        <div className="cpf-field">
+          <label className="cpf-label">{t('medication.instructions')}</label>
+          <input
+            className="cpf-input"
+            value={item.instructions || ''}
+            onChange={(e) => onChange(idx, { ...item, instructions: e.target.value })}
+            placeholder={t('medication.instructionsPlaceholder')}
+          />
+        </div>
+
+        {/* PRN Toggle */}
+        <div className="cpf-prn-row">
+          <label className="cpf-prn-toggle">
+            <input
+              type="checkbox"
+              checked={!!item.isPRN}
+              onChange={(e) => onChange(idx, { ...item, isPRN: e.target.checked })}
+            />
+            <span className="cpf-prn-toggle__label">{t('medication.prnLabel')}</span>
+            <span className="cpf-prn-toggle__desc">{t('medication.prnDesc')}</span>
+          </label>
+          {item.isPRN && (
+            <div className="cpf-row-2" style={{ marginTop: 8 }}>
+              <div className="cpf-field">
+                <label className="cpf-label">{t('medication.prnReason')}</label>
+                <input
+                  className="cpf-input"
+                  value={item.prnReason || ''}
+                  onChange={(e) => onChange(idx, { ...item, prnReason: e.target.value })}
+                  placeholder={t('medication.prnReasonPlaceholder')}
+                />
+                {errors[`item_${idx}_prnReason`] && <span className="cpf-error">{errors[`item_${idx}_prnReason`]}</span>}
+              </div>
+              <div className="cpf-field">
+                <label className="cpf-label">{t('medication.maxDailyDoses')}</label>
+                <input
+                  type="number"
+                  className="cpf-input"
+                  value={item.maxDailyDoses || ''}
+                  onChange={(e) => onChange(idx, { ...item, maxDailyDoses: e.target.value })}
+                  min="1"
+                  max="12"
+                  placeholder="4"
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Resident Info Card (shown after selecting resident) ── */
+function ResidentInfoCard({ resident, t }) {
+  if (!resident) return null;
+  return (
+    <div className="cpf-resident-card">
+      <div className="cpf-resident-card__avatar" style={{ background: getAvatarColor(resident.fullName) }}>
+        {getInitials(resident.fullName)}
+      </div>
+      <div className="cpf-resident-card__info">
+        <div className="cpf-resident-card__name">{resident.fullName}</div>
+        <div className="cpf-resident-card__meta">
+          {resident.residentCode && <span>{resident.residentCode}</span>}
         </div>
       </div>
     </div>
@@ -428,28 +654,69 @@ function CreatePrescriptionModal({ residents, onSave, onClose }) {
     residentId: '',
     diagnosisNote: '',
     validUntil: '',
-    items: [{ medicationId: '', medicationName: '', dosage: '', unit: '', frequency: 1, times: ['08:00'], route: 'oral', duration: '', startDate: todayStr() }],
+    items: [{ medicationId: '', medicationName: '', dosage: '', unit: '', quantity: 1, frequency: 1, times: ['08:00'], route: 'oral', duration: '', startDate: todayStr(), isPRN: false, prnReason: '', maxDailyDoses: '', mealTiming: '', instructions: '', price: '' }],
   });
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+
+  const selectedResident = residents.find((r) => r._id === form.residentId);
+
+  // Live (as-you-type) duplicate detection — medicationIds used by more than one item.
+  const duplicateMedicationIds = useMemo(() => {
+    const counts = new Map();
+    form.items.forEach((it) => {
+      if (!it.medicationId) return;
+      counts.set(it.medicationId, (counts.get(it.medicationId) || 0) + 1);
+    });
+    return new Set([...counts.entries()].filter(([, n]) => n > 1).map(([id]) => id));
+  }, [form.items]);
 
   const validate = () => {
     const errs = {};
     if (!form.residentId) errs.residentId = t('medication.resident');
     if (!form.diagnosisNote || form.diagnosisNote.trim().length < 10)
       errs.diagnosisNote = t('medication.diagnosisNoteHint');
-    if (!form.validUntil) errs.validUntil = t('medication.validUntil');
+    const seenMedicationIds = new Set();
+
     form.items.forEach((item, i) => {
       if (!item.medicationName.trim()) errs[`item_${i}_name`] = t('medication.medicationName');
       if (!item.medicationId) errs[`item_${i}_name`] = t('medication.selectFromList');
-      if (!item.dosage) errs[`item_${i}_dosage`] = t('medication.dosage');
-      // Chặn submit nếu unit không tương thích với route
-      const warn = getUnitRouteWarning(item.unit, item.route);
-      if (warn) {
-        errs[`item_${i}_unitroute`] = t('medication.unitRouteWarning', {
-          unit: warn.unit,
-          route: t(`medication.route${warn.route.charAt(0).toUpperCase() + warn.route.slice(1)}`),
-        });
+
+      if (item.medicationId) {
+        if (seenMedicationIds.has(item.medicationId)) {
+          errs[`item_${i}_duplicate`] = t('medication.duplicateMedication');
+        }
+        seenMedicationIds.add(item.medicationId);
+      }
+
+      if (item.dosage === '' || item.dosage === null || item.dosage === undefined) {
+        errs[`item_${i}_dosage`] = t('medication.dosageRequired');
+      } else {
+        const dosageNum = Number(item.dosage);
+        if (Number.isNaN(dosageNum)) errs[`item_${i}_dosage`] = t('medication.dosageNotNumber');
+        else if (dosageNum < 0) errs[`item_${i}_dosage`] = t('medication.dosageNegative');
+        else if (dosageNum === 0) errs[`item_${i}_dosage`] = t('medication.dosageZero');
+      }
+
+      // PRN items don't need schedule fields
+      if (item.isPRN) {
+        if (!item.prnReason && !item.instructions) {
+          errs[`item_${i}_prnReason`] = t('medication.prnReasonRequired');
+        }
+      }
+
+      if (item.duration === '' || item.duration === null || item.duration === undefined) {
+        errs[`item_${i}_duration`] = t('medication.durationRequired');
+      } else {
+        const durationValue = Number(item.duration);
+        if (Number.isNaN(durationValue)) {
+          errs[`item_${i}_duration`] = t('medication.durationNotNumber');
+        } else if (!Number.isInteger(durationValue) || durationValue < 1) {
+          errs[`item_${i}_duration`] = t('medication.durationPositive');
+        } else if (durationValue > 30) {
+          errs[`item_${i}_duration`] = t('medication.validUntilTooFar');
+        }
       }
     });
     setErrors(errs);
@@ -457,320 +724,419 @@ function CreatePrescriptionModal({ residents, onSave, onClose }) {
   };
 
   const handleItemChange = (idx, updated) => {
+    setSubmitError('');
     setForm((p) => {
       const items = [...p.items];
       items[idx] = updated;
-      return { ...p, items };
+      return { ...p, ...syncPrescriptionDates(items) };
     });
   };
 
   const handleAddItem = () =>
-    setForm((p) => ({
-      ...p,
-      items: [...p.items, { medicationId: '', medicationName: '', dosage: '', unit: '', frequency: 1, times: ['08:00'], route: 'oral', duration: '', startDate: todayStr() }],
-    }));
+    setForm((p) => {
+      const newItems = [...p.items, { medicationId: '', medicationName: '', dosage: '', unit: '', quantity: 1, frequency: 1, times: ['08:00'], route: 'oral', duration: '', startDate: todayStr(), isPRN: false, prnReason: '', maxDailyDoses: '', mealTiming: '', instructions: '', price: '' }];
+      return { ...p, ...syncPrescriptionDates(newItems) };
+    });
 
   const handleRemoveItem = (idx) =>
-    setForm((p) => ({ ...p, items: p.items.filter((_, i) => i !== idx) }));
+    setForm((p) => ({ ...p, ...syncPrescriptionDates(p.items.filter((_, i) => i !== idx)) }));
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (saveAsDraft = false) => {
+    setSubmitError('');
     if (!validate()) return;
     setSaving(true);
     try {
-      await onSave({
+      const TAX_RATE = 0.05; // 5%
+      const result = await onSave({
         residentId: form.residentId,
         diagnosisNote: form.diagnosisNote.trim(),
-        validUntil: form.validUntil,
-        items: form.items.map((item) => ({
-          medicationId: item.medicationId,
-          medicationName: item.medicationName.trim(),
-          dosage: parseFloat(item.dosage),
-          unit: item.unit.trim(),
-          frequency: parseInt(item.frequency, 10),
-          times: item.times,
-          route: item.route,
-          duration: item.duration ? parseInt(item.duration, 10) : undefined,
-          startDate: item.startDate || undefined,
-        })),
+        validUntil: syncPrescriptionDates(form.items).validUntil,
+        saveAsDraft,
+        items: form.items.map((item) => {
+          const price = Number(item.price) || 0;
+          const quantity = Number(item.quantity) || 1;
+          const subtotalExclTax = price * quantity;
+          const taxAmount = Math.round(subtotalExclTax * TAX_RATE * 100) / 100;
+          const subtotalInclTax = subtotalExclTax + taxAmount;
+
+          return {
+            medicationId: item.medicationId,
+            medicationName: item.medicationName.trim(),
+            dosage: parseFloat(item.dosage),
+            unit: item.unit.trim(),
+            quantity,
+            price,
+            taxRate: TAX_RATE,
+            subtotalExclTax: Math.round(subtotalExclTax * 100) / 100,
+            taxAmount,
+            subtotalInclTax: Math.round(subtotalInclTax * 100) / 100,
+            frequency: parseInt(item.frequency, 10),
+            times: item.isPRN ? [] : item.times,
+            route: item.route,
+            duration: item.duration ? parseInt(item.duration, 10) : undefined,
+            startDate: item.isPRN ? undefined : (item.startDate || undefined),
+            endDate: item.isPRN ? undefined : (item.duration ? addDaysStr(item.startDate, item.duration) : undefined),
+            isPRN: item.isPRN || false,
+            prnReason: item.isPRN ? item.prnReason : undefined,
+            maxDailyDoses: item.isPRN && item.maxDailyDoses ? parseInt(item.maxDailyDoses, 10) : undefined,
+            mealTiming: item.isPRN ? undefined : (item.mealTiming || undefined),
+            instructions: item.instructions ? item.instructions.trim() : undefined,
+          };
+        }),
       });
+      if (result?.error) setSubmitError(result.error);
+    } catch (err) {
+      setSubmitError(getPrescriptionErrorMessage(err, t('medication.createError')));
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <Modal
-      title={t('medication.createPrescription')}
-      onClose={onClose}
-      size="xl"
-      footer={
-        <>
-          <button className="med-btn med-btn--secondary" onClick={onClose} disabled={saving}>{t('medication.cancelBtn')}</button>
-          <button className="med-btn med-btn--primary" onClick={handleSubmit} disabled={saving}>
+    <div className="cpf-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="cpf-drawer">
+        {/* Drawer header */}
+        <div className="cpf-drawer__header">
+          <div className="cpf-drawer__header-left">
+            <div className="cpf-drawer__icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="12" y1="11" x2="12" y2="17" /><line x1="9" y1="14" x2="15" y2="14" />
+              </svg>
+            </div>
+            <div>
+              <h2 className="cpf-drawer__title">{t('medication.createPrescription')}</h2>
+              <p className="cpf-drawer__subtitle">{t('medication.createPrescriptionDesc')}</p>
+            </div>
+          </div>
+          <button className="cpf-drawer__close" onClick={onClose}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Body — 2-column layout */}
+        <div className="cpf-drawer__body">
+          {submitError && <div className="cpf-submit-error" role="alert">{submitError}</div>}
+          <div className="cpf-grid">
+            {/* Left column: Resident + Diagnosis */}
+            <div className="cpf-grid__left">
+              <div className="cpf-section">
+                <div className="cpf-section__head">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
+                  </svg>
+                  <span>{t('medication.sectionResident')}</span>
+                </div>
+                <div className="cpf-field">
+                  <label className="cpf-label">{t('medication.selectResident')}</label>
+                  <select
+                    className={`cpf-input${errors.residentId ? ' cpf-input--err' : ''}`}
+                    value={form.residentId}
+                    onChange={(e) => setForm((p) => ({ ...p, residentId: e.target.value }))}
+                  >
+                    <option value="">{t('medication.selectResident')}</option>
+                    {residents.map((r) => (
+                      <option key={r._id} value={r._id}>{r.fullName} ({r.residentCode})</option>
+                    ))}
+                  </select>
+                  {errors.residentId && <span className="cpf-error">{errors.residentId}</span>}
+                </div>
+                <ResidentInfoCard resident={selectedResident} t={t} />
+                <HealthWarningPanel residentId={form.residentId} />
+              </div>
+
+              <div className="cpf-section">
+                <div className="cpf-section__head">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><line x1="12" y1="17" x2="12.01" y2="17" />
+                  </svg>
+                  <span>{t('medication.sectionDiagnosis')}</span>
+                </div>
+                <div className="cpf-field">
+                  <label className="cpf-label">{t('medication.diagnosisNote')} <span className="cpf-req">*</span></label>
+                  <input
+                    className={`cpf-input${errors.diagnosisNote ? ' cpf-input--err' : ''}`}
+                    value={form.diagnosisNote}
+                    onChange={(e) => setForm((p) => ({ ...p, diagnosisNote: e.target.value }))}
+                    placeholder={t('medication.diagnosisNoteHint')}
+                  />
+                  {errors.diagnosisNote && <span className="cpf-error">{errors.diagnosisNote}</span>}
+                </div>
+                <div className="cpf-row-2">
+                  <div className="cpf-field">
+                    <label className="cpf-label">{t('medication.validUntil')}</label>
+                    <input
+                      type="date"
+                      className={`cpf-input${errors.validUntil ? ' cpf-input--err' : ''}`}
+                      value={form.validUntil}
+                      readOnly
+                    />
+                    <small className="cpf-hint">{t('medication.autoDateHint')}</small>
+                    {errors.validUntil && <span className="cpf-error">{errors.validUntil}</span>}
+                  </div>
+                  <div className="cpf-field">
+                    <label className="cpf-label">{t('medication.startDate')}</label>
+                    <input
+                      type="date"
+                      className={`cpf-input${errors.item_0_startDate ? ' cpf-input--err' : ''}`}
+                      value={form.items[0]?.startDate || ''}
+                      readOnly
+                    />
+                    {errors.item_0_startDate && <span className="cpf-error">{errors.item_0_startDate}</span>}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Right column: Medications */}
+            <div className="cpf-grid__right">
+              <div className="cpf-section">
+                <div className="cpf-section__head">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M10.5 1.5H8A6.5 6.5 0 0 0 1.5 8v0A6.5 6.5 0 0 0 8 14.5h0a6.5 6.5 0 0 0 6.5-6.5V5.5" /><path d="M14 10l5.5-5.5" /><path d="M17 1.5L22.5 7" />
+                  </svg>
+                  <span>{t('medication.sectionMedications')}</span>
+                </div>
+                <p className="cpf-section__desc">{t('medication.sectionMedicationsDesc')}</p>
+
+                {form.items.map((item, idx) => (
+                  <ItemRow
+                    key={idx}
+                    item={item}
+                    idx={idx}
+                    onChange={handleItemChange}
+                    onRemove={handleRemoveItem}
+                    t={t}
+                    canRemove={form.items.length > 1}
+                    errors={errors}
+                    excludeIds={form.items.filter((_, i) => i !== idx).map((it) => it.medicationId).filter(Boolean)}
+                    isDuplicate={item.medicationId && duplicateMedicationIds.has(item.medicationId)}
+                  />
+                ))}
+
+                <button type="button" className="cpf-add-btn" onClick={handleAddItem}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+                  </svg>
+                  {t('medication.addMedication')}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Drawer footer */}
+        <div className="cpf-drawer__footer">
+          <button className="cpf-btn cpf-btn--ghost" onClick={onClose} disabled={saving}>{t('medication.cancelBtn')}</button>
+          <button className="cpf-btn cpf-btn--outline" onClick={() => handleSubmit(true)} disabled={saving}>
+            {saving ? t('medication.loading') : t('medication.saveAsDraft')}
+          </button>
+          <button className="cpf-btn cpf-btn--primary" onClick={() => handleSubmit(false)} disabled={saving}>
             {saving ? t('medication.loading') : t('medication.createPrescription')}
           </button>
-        </>
-      }
-    >
-      {/* Resident */}
-      <div className="med-form-group">
-        <label className="med-form-label">{t('medication.resident')} <span style={{ color: '#ef4444' }}>*</span></label>
-        <select
-          className={`med-form-select${errors.residentId ? ' med-form-select--err' : ''}`}
-          value={form.residentId}
-          onChange={(e) => setForm((p) => ({ ...p, residentId: e.target.value }))}
-        >
-          <option value="">{t('medication.selectResident')}</option>
-          {residents.map((r) => (
-            <option key={r._id} value={r._id}>{r.fullName} ({r.residentCode})</option>
-          ))}
-        </select>
-        {errors.residentId && <span className="med-form-error">{errors.residentId}</span>}
-      </div>
-
-      <HealthWarningPanel residentId={form.residentId} />
-
-      <div className="med-form-row">
-        <div className="med-form-group" style={{ flex: 2 }}>
-          <label className="med-form-label">{t('medication.diagnosisNote')} <span style={{ color: '#ef4444' }}>*</span></label>
-          <textarea
-            className={`med-form-textarea${errors.diagnosisNote ? ' med-form-input--err' : ''}`}
-            rows={2}
-            value={form.diagnosisNote}
-            onChange={(e) => setForm((p) => ({ ...p, diagnosisNote: e.target.value }))}
-            placeholder={t('medication.diagnosisNoteHint')}
-          />
-          {errors.diagnosisNote && <span className="med-form-error">{errors.diagnosisNote}</span>}
-        </div>
-        <div className="med-form-group">
-          <label className="med-form-label">{t('medication.validUntil')} <span style={{ color: '#ef4444' }}>*</span></label>
-          <input
-            type="date"
-            className={`med-form-input${errors.validUntil ? ' med-form-input--err' : ''}`}
-            value={form.validUntil}
-            min={todayStr()}
-            max={maxValidUntil()}
-            onChange={(e) => setForm((p) => ({ ...p, validUntil: e.target.value }))}
-          />
-          <small className="med-form-hint">{t('medication.validUntilHint')}</small>
-          {errors.validUntil && <span className="med-form-error">{errors.validUntil}</span>}
         </div>
       </div>
-
-      <div style={{ borderTop: '1px solid #e2e8f0', margin: '16px 0 12px' }} />
-
-      {form.items.map((item, idx) => (
-        <ItemRow
-          key={idx}
-          item={item}
-          idx={idx}
-          onChange={handleItemChange}
-          onRemove={handleRemoveItem}
-          t={t}
-          canRemove={form.items.length > 1}
-        />
-      ))}
-
-      <button type="button" className="med-btn med-btn--secondary" onClick={handleAddItem}>
-        {t('medication.addMedication')}
-      </button>
-    </Modal>
+    </div>
   );
 }
 
-/* ── Set Schedule Modal (per prescription items) ── */
-function SetScheduleModal({ prescription, onSave, onClose }) {
-  const { t } = useTranslation();
-  const [itemStates, setItemStates] = useState(
-    (prescription.items || []).map((it) => ({
-      prescriptionItemId: it._id,
-      medicationName: it.medicationName,
-      frequency: it.frequency || 1,
-      startDate: it.startDate ? new Date(it.startDate).toISOString().slice(0, 10) : todayStr(),
-      endDate: it.endDate ? new Date(it.endDate).toISOString().slice(0, 10) : '',
-      times: it.times?.length ? [...it.times] : buildTimesForFrequency(it.frequency || 1),
-    }))
-  );
-  const [saving, setSaving] = useState(false);
-
-  const handleTimeChange = (iIdx, tIdx, val) => {
-    setItemStates((prev) => {
-      const updated = prev.map((s, i) => {
-        if (i !== iIdx) return s;
-        const times = [...s.times];
-        times[tIdx] = val;
-        return { ...s, times };
-      });
-      return updated;
-    });
-  };
-
-  const handleFieldChange = (iIdx, field, val) => {
-    setItemStates((prev) => prev.map((s, i) => (i === iIdx ? { ...s, [field]: val } : s)));
-  };
-
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      await onSave({
-        prescriptionId: prescription._id,
-        items: itemStates.map((s) => ({
-          prescriptionItemId: s.prescriptionItemId,
-          startDate: s.startDate || undefined,
-          endDate: s.endDate || undefined,
-          times: s.times,
-        })),
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <Modal
-      title={`${t('medication.scheduleModalTitle')} — ${prescription.residentId?.fullName}`}
-      onClose={onClose}
-      size="lg"
-      footer={
-        <>
-          <button className="med-btn med-btn--secondary" onClick={onClose} disabled={saving}>{t('medication.cancelBtn')}</button>
-          <button className="med-btn med-btn--primary" onClick={handleSave} disabled={saving}>
-            {saving ? t('medication.loading') : t('medication.saveBtn')}
-          </button>
-        </>
-      }
-    >
-      {itemStates.map((s, iIdx) => (
-        <div key={s.prescriptionItemId} className="med-item-row">
-          <div className="med-item-row__header">
-            <span className="med-item-row__label">{s.medicationName}</span>
-          </div>
-          <div className="med-form-row">
-            <div className="med-form-group">
-              <label className="med-form-label">{t('medication.startDate')}</label>
-              <input type="date" className="med-form-input" value={s.startDate}
-                onChange={(e) => handleFieldChange(iIdx, 'startDate', e.target.value)} />
-            </div>
-            <div className="med-form-group">
-              <label className="med-form-label">{t('medication.endDate')}</label>
-              <input type="date" className="med-form-input" value={s.endDate}
-                onChange={(e) => handleFieldChange(iIdx, 'endDate', e.target.value)} />
-            </div>
-          </div>
-          <div className="med-form-group">
-            <label className="med-form-label">{t('medication.times')}</label>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {s.times.map((tm, tIdx) => (
-                <input
-                  key={tIdx}
-                  type="time"
-                  className="med-time-add__input"
-                  value={tm}
-                  onChange={(e) => handleTimeChange(iIdx, tIdx, e.target.value)}
-                />
-              ))}
-            </div>
-          </div>
-        </div>
-      ))}
-    </Modal>
-  );
-}
-
-/* ── History Modal (compliance stats per resident) ── */
+/* ── History Full-Screen (compliance stats + records table) ── */
 function HistoryModal({ prescription, onClose }) {
   const { t } = useTranslation();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [medFilter, setMedFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
 
   useEffect(() => {
-    const residentId =
-      prescription.residentId?._id || prescription.residentId;
+    const residentId = prescription.residentId?._id || prescription.residentId;
     medicationService
-      .getHistory({ residentId })
-      .then((res) => setData(res))
+      .getHistory({ residentId, prescriptionId: prescription._id })
+      .then((res) => setData(res?.data || res))
       .catch(() => setData(null))
       .finally(() => setLoading(false));
   }, [prescription]);
 
   const resident = prescription.residentId;
+  const prescriptionMedNames = useMemo(
+    () => [...new Set((prescription.items || []).map((it) => it.medicationName).filter(Boolean))].join(', '),
+    [prescription]
+  );
+  const summary = data?.summary || {};
+  const records = data?.records || [];
+
+  const filtered = useMemo(() => {
+    return records.filter((r) => {
+      const matchMed = !medFilter || (r.medicationName || '').toLowerCase().includes(medFilter.toLowerCase());
+      const matchStatus = !statusFilter || r.status === statusFilter;
+      return matchMed && matchStatus;
+    });
+  }, [records, medFilter, statusFilter]);
 
   return (
-    <Modal
-      title={`${t('medication.historyTitle')} — ${resident?.fullName || ''} (${resident?.residentCode || ''})`}
-      onClose={onClose}
-      size="lg"
-    >
-      {loading ? (
-        <p className="med-empty">{t('medication.loading')}</p>
-      ) : !data ? (
-        <p className="med-empty">{t('medication.noData')}</p>
-      ) : (
-        <>
-          <div className="med-stats" style={{ marginBottom: 20 }}>
-            {[
-              ['totalDoses', data.summary?.total],
-              ['taken', (data.summary?.taken || 0) + (data.summary?.lateTaken || 0)],
-              ['lateTaken', data.summary?.lateTaken],
-              ['missed', data.summary?.missed],
-              ['skipped', data.summary?.skipped],
-            ].map(([key, val]) => (
-              <div key={key} className={`med-stat-card med-stat-card--${key === 'totalDoses' ? 'pending' : key}`}>
-                <div className="med-stat-card__label">{t(`medication.${key}`)}</div>
-                <div className="med-stat-card__value">{val ?? '—'}</div>
-              </div>
-            ))}
-          </div>
-
-          <div className="med-info-card" style={{ marginBottom: 16 }}>
-            <div className="med-info-card__row">
-              <span className="med-info-card__label">{t('medication.complianceRate')}</span>
-              <span className="med-info-card__value" style={{ fontWeight: 700, color: data.lowCompliance ? '#ef4444' : '#10b981' }}>
-                {data.summary?.complianceRate != null ? `${data.summary.complianceRate.toFixed(1)}%` : '—'}
-                {data.lowCompliance && (
-                  <span style={{ marginLeft: 8, fontSize: 12, color: '#ef4444' }}>
-                    ⚠ {t('medication.lowCompliance')}
-                  </span>
-                )}
-              </span>
+    <div className="cpf-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="cpf-drawer">
+        {/* Header */}
+        <div className="cpf-drawer__header">
+          <div className="cpf-drawer__header-left">
+            <div className="cpf-drawer__icon" style={{ background: '#f0fdf4', color: '#16a34a' }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+              </svg>
+            </div>
+            <div>
+              <h2 className="cpf-drawer__title">{t('medication.historyTitle')}</h2>
+              <p className="cpf-drawer__subtitle">
+                {resident?.fullName} — {resident?.residentCode}
+                {prescriptionMedNames && <> · {prescriptionMedNames}</>}
+              </p>
             </div>
           </div>
+          <button className="cpf-drawer__close" onClick={onClose}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
 
-          {data.weeklyCompliance?.length > 0 && (
+        {/* Body */}
+        <div className="cpf-drawer__body">
+          {loading ? (
+            <div className="med-loading"><div className="med-loading__spinner" /><span>{t('medication.loading')}</span></div>
+          ) : !data ? (
+            <div className="med-empty-state"><span>{t('medication.noData')}</span></div>
+          ) : (
             <>
-              <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>{t('medication.weeklyCompliance')}</h3>
+              {/* Summary stats */}
+              <div className="mh-bottom-stats">
+                <div className="mh-stat-card mh-stat-card--compliance">
+                  <div className="mh-stat-card__icon" style={{ background: '#dcfce7', color: '#16a34a' }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" />
+                    </svg>
+                  </div>
+                  <div className="mh-stat-card__content">
+                    <span className="mh-stat-card__label">{t('medication.complianceRate')}</span>
+                    <span className="mh-stat-card__value" style={{ color: data.lowCompliance ? '#dc2626' : '#16a34a' }}>
+                      {summary.complianceRate != null ? `${summary.complianceRate.toFixed(1)}%` : '—'}
+                    </span>
+                    {data.lowCompliance && <span className="mh-stat-card__sub" style={{ color: '#dc2626' }}>{t('medication.lowCompliance')}</span>}
+                  </div>
+                </div>
+                <div className="mh-stat-card">
+                  <div className="mh-stat-card__icon" style={{ background: '#fee2e2', color: '#dc2626' }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" />
+                    </svg>
+                  </div>
+                  <div className="mh-stat-card__content">
+                    <span className="mh-stat-card__label">{t('medication.missed')}</span>
+                    <span className="mh-stat-card__value">{summary.missed ?? 0}</span>
+                    {summary.missed > 0 && <span className="mh-stat-card__sub" style={{ color: '#dc2626' }}>{t('medication.needsAttention')}</span>}
+                  </div>
+                </div>
+                <div className="mh-stat-card">
+                  <div className="mh-stat-card__icon" style={{ background: 'rgba(15, 118, 110, 0.12)', color: '#0f766e' }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
+                    </svg>
+                  </div>
+                  <div className="mh-stat-card__content">
+                    <span className="mh-stat-card__label">{t('medication.totalDoses')}</span>
+                    <span className="mh-stat-card__value">{summary.total ?? 0}</span>
+                    <span className="mh-stat-card__sub">{t('medication.taken')}: {(summary.taken || 0) + (summary.lateTaken || 0)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Filters */}
+              <div className="mh-filters">
+                <div className="med-filter-bar__search-wrap" style={{ flex: 1 }}>
+                  <svg className="med-filter-bar__search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+                  </svg>
+                  <input
+                    className="med-filter-bar__search"
+                    placeholder={t('medication.searchPlaceholder')}
+                    value={medFilter}
+                    onChange={(e) => setMedFilter(e.target.value)}
+                  />
+                </div>
+                <select className="med-filter-bar__select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ minWidth: 140 }}>
+                  <option value="">{t('medication.allStatuses')}</option>
+                  {Object.keys(SCHED_STATUS_KEYS).map((k) => (
+                    <option key={k} value={k}>{t(`medication.${SCHED_STATUS_KEYS[k]}`)}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Records table */}
               <div className="med-table-wrap">
                 <table className="med-table">
                   <thead>
                     <tr>
-                      <th>{t('medication.week')}</th>
-                      <th>{t('medication.complianceRate')}</th>
+                      <th>{t('medication.colMedication')}</th>
+                      <th>{t('medication.colDosage')}</th>
+                      <th>{t('medication.colTime')}</th>
+                      <th>{t('medication.colActualTime')}</th>
+                      <th>{t('medication.colStatus')}</th>
+                      <th>{t('medication.colProvider')}</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {data.weeklyCompliance.map((w, i) => (
-                      <tr key={i}>
-                        <td>{w.week}</td>
-                        <td style={{ color: w.rate < 80 ? '#ef4444' : '#10b981', fontWeight: 600 }}>
-                          {w.rate?.toFixed(1)}%
-                        </td>
-                      </tr>
-                    ))}
+                    {filtered.length === 0 ? (
+                      <tr><td colSpan={6}><div className="med-empty-state"><span>{t('medication.noData')}</span></div></td></tr>
+                    ) : (
+                      filtered.map((r) => (
+                        <tr key={r._id} className="med-table__row-animated">
+                          <td>
+                            <span className="med-drug-name">{r.medicationName}</span>
+                            {r.route && <div className="med-resident-cell__code">{r.route}</div>}
+                          </td>
+                          <td>{r.dosage || '—'}</td>
+                          <td><span className="med-time-badge">{fmtTime(r.scheduledTime)}</span></td>
+                          <td>
+                            {r.actualTimeTaken
+                              ? (
+                                <>
+                                  <span className="med-actual-time">{fmtTime(r.actualTimeTaken)}</span>
+                                  {r.administrationTiming && (
+                                    <div className="med-reason-note">
+                                      ({t(`medication.timing${r.administrationTiming === 'early' ? 'Early' : r.administrationTiming === 'late' ? 'Late' : 'OnTime'}`)})
+                                    </div>
+                                  )}
+                                </>
+                              )
+                              : <span className="med-no-data">—</span>}
+                          </td>
+                          <td>
+                            <StatusBadge status={r.status} type="sched" />
+                            {r.missedReason && <div className="med-reason-note">({t(`medication.reason${r.missedReason.charAt(0).toUpperCase() + r.missedReason.slice(1)}`)})</div>}
+                          </td>
+                          <td>
+                            {r.markedBy
+                              ? <span className="med-dosage">{r.markedBy.fullName}</span>
+                              : <span className="med-no-data">—</span>}
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
             </>
           )}
-        </>
-      )}
-    </Modal>
+        </div>
+      </div>
+    </div>
   );
 }
 
 /* ════════════════════════════════════════
-   Tab 1 — Prescriptions
+   Tab 1 — Prescriptions (2-column dashboard)
    ════════════════════════════════════════ */
-function PrescriptionsTab({ prescriptions, residents, loading, selectedResidentId, onResidentChange, onOpenCreate, onOpenSchedule, onOpenHistory }) {
+function PrescriptionsTab({ prescriptions, residents, loading, selectedResidentId, onResidentChange, onOpenCreate, onOpenHistory, onActivate, onSuspend, onResume }) {
   const { t } = useTranslation();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ACTIVE');
@@ -796,142 +1162,228 @@ function PrescriptionsTab({ prescriptions, residents, loading, selectedResidentI
       return next;
     });
 
+  const pendingRenewals = useMemo(() => {
+    const soon = new Date();
+    soon.setDate(soon.getDate() + 7);
+    return prescriptions.filter(
+      (p) => p.status === 'ACTIVE' && p.validUntil && new Date(p.validUntil) <= soon
+    );
+  }, [prescriptions]);
+
   return (
-    <div className="med-tab-content">
-      {/* Resident selector — bác sĩ chỉ xem đơn của cư dân được giao */}
-      <div className="med-filter" style={{ marginBottom: 8 }}>
-        <select
-          className="med-filter__select"
-          value={selectedResidentId}
-          onChange={(e) => onResidentChange(e.target.value)}
-          style={{ minWidth: 240 }}
-        >
-          <option value="">{t('medication.selectResident')}</option>
-          {residents.map((r) => (
-            <option key={r._id} value={r._id}>{r.fullName} ({r.residentCode})</option>
-          ))}
-        </select>
-        <input
-          className="med-filter__search"
-          type="text"
-          placeholder={t('medication.searchPlaceholder')}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <select
-          className="med-filter__select"
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-        >
-          <option value="">{t('medication.allStatuses')}</option>
-          {Object.keys(RX_STATUS_KEYS).map((k) => (
-            <option key={k} value={k}>{t(`medication.${RX_STATUS_KEYS[k]}`)}</option>
-          ))}
-        </select>
+    <div className="med-dashboard-layout">
+      {/* ── Left: prescriptions table ── */}
+      <div className="med-dashboard-main">
+        <div className="med-card">
+          <div className="med-card__header">
+            <h2 className="med-card__title">{t('medication.recentPrescriptions')}</h2>
+            <div className="med-card__header-actions">
+              <select
+                className="med-filter-bar__select"
+                value={selectedResidentId}
+                onChange={(e) => onResidentChange(e.target.value)}
+              >
+                <option value="">{t('medication.allResidents')}</option>
+                {residents.map((r) => (
+                  <option key={r._id} value={r._id}>{r.fullName}</option>
+                ))}
+              </select>
+              <div className="med-filter-bar__search-wrap" style={{ minWidth: 180 }}>
+                <svg className="med-filter-bar__search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+                <input
+                  className="med-filter-bar__search"
+                  type="text"
+                  placeholder={t('medication.searchPlaceholder')}
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
+              <select
+                className="med-filter-bar__select"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+              >
+                <option value="">{t('medication.allStatuses')}</option>
+                {Object.keys(RX_STATUS_KEYS).map((k) => (
+                  <option key={k} value={k}>{t(`medication.${RX_STATUS_KEYS[k]}`)}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {loading ? (
+            <div className="med-loading">
+              <div className="med-loading__spinner" />
+              <span>{t('medication.loading')}</span>
+            </div>
+          ) : (
+            <div className="med-table-wrap" style={{ border: 'none', boxShadow: 'none' }}>
+              <table className="med-table">
+                <thead>
+                  <tr>
+                    <th>{t('medication.colResident')}</th>
+                    <th>{t('medication.colMedication')}</th>
+                    <th>{t('medication.colDosage')}</th>
+                    <th>{t('medication.colStatus')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.length === 0 ? (
+                    <tr>
+                      <td colSpan={4}>
+                        <div className="med-empty-state">
+                          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" />
+                          </svg>
+                          <span>{residents.length ? t('medication.noData') : t('medication.selectResidentHint')}</span>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    filtered.map((p) => {
+                      const isOpen = expanded.has(p._id);
+                      const firstItem = (p.items || [])[0];
+                      const itemCount = (p.items || []).length;
+                      return (
+                        <React.Fragment key={p._id}>
+                          <tr className="med-table__row-animated" onClick={() => toggleExpand(p._id)} style={{ cursor: 'pointer' }}>
+                            <td>
+                              <div className="med-resident-cell">
+                                <div className="med-resident-cell__avatar" style={{ background: getAvatarColor(p.residentId?.fullName) }}>
+                                  {getInitials(p.residentId?.fullName)}
+                                </div>
+                                <div className="med-resident-cell__info">
+                                  <div className="med-resident-cell__name">{p.residentId?.fullName}</div>
+                                  <div className="med-resident-cell__code">{p.residentId?.residentCode}</div>
+                                </div>
+                              </div>
+                            </td>
+                            <td>
+                              <span className="med-drug-name">{firstItem?.medicationName || '—'}</span>
+                              {itemCount > 1 && <div className="med-resident-cell__code">+{itemCount - 1} {t('medication.more')}</div>}
+                            </td>
+                            <td>
+                              <span className="med-dosage">{firstItem?.dosage || '—'}</span>
+                              {firstItem?.unit && <span className="med-resident-cell__code">{firstItem.unit}</span>}
+                            </td>
+                            <td><RxStatusCell prescription={p} /></td>
+                          </tr>
+                          {isOpen && (p.items || []).length > 0 && (
+                            <tr>
+                              <td colSpan={4} style={{ padding: 0 }}>
+                                <div className="med-rx-card__detail">
+                                  <table className="med-table med-table--nested">
+                                    <thead>
+                                      <tr>
+                                        <th>{t('medication.medicationName')}</th>
+                                        <th>{t('medication.dosage')}</th>
+                                        <th>{t('medication.frequencyLabel')}</th>
+                                        <th>{t('medication.times')}</th>
+                                        <th>{t('medication.startDate')}</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {p.items.map((it) => (
+                                        <tr key={it._id}>
+                                          <td><span className="med-drug-name">{it.medicationName}</span></td>
+                                          <td>{it.dosage} {it.unit || ''}</td>
+                                          <td>{it.frequency}×/{t('medication.day')}</td>
+                                          <td>
+                                            <div className="med-time-chips">
+                                              {(it.times || []).map((tm) => (
+                                                <span key={tm} className="med-time-chip">{tm}</span>
+                                              ))}
+                                            </div>
+                                          </td>
+                                          <td>{it.startDate ? fmtDate(it.startDate) : '—'}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                  <div className="med-rx-detail-actions">
+                                    <button className="med-action-btn med-action-btn--history" onClick={() => onOpenHistory(p)}>
+                                      {t('medication.viewHistory')}
+                                    </button>
+                                    {p.status === 'DRAFT' && onActivate && (
+                                      <button className="med-action-btn med-action-btn--activate" onClick={() => onActivate(p._id)}>
+                                        {t('medication.activatePrescription')}
+                                      </button>
+                                    )}
+                                    {p.status === 'ACTIVE' && onSuspend && (
+                                      <button className="med-action-btn med-action-btn--suspend" onClick={() => onSuspend(p._id)}>
+                                        {t('medication.suspendPrescription')}
+                                      </button>
+                                    )}
+                                    {p.status === 'SUSPENDED' && onResume && (
+                                      <button className="med-action-btn med-action-btn--activate" onClick={() => onResume(p._id)}>
+                                        {t('medication.resumePrescription')}
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
 
-      {!selectedResidentId ? (
-        <p className="med-empty">{t('medication.selectResident')}</p>
-      ) : loading ? (
-        <p className="med-empty">{t('medication.loading')}</p>
-      ) : (
-        <div className="med-table-wrap">
-          <table className="med-table">
-            <thead>
-              <tr>
-                <th>{t('medication.colResident')}</th>
-                <th>{t('medication.colDiagnosis')}</th>
-                <th>{t('medication.colValidUntil')}</th>
-                <th>{t('medication.colMedications')}</th>
-                <th>{t('medication.colPrescribedBy')}</th>
-                <th>{t('medication.colStatus')}</th>
-                <th>{t('medication.colActions')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.length === 0 ? (
-                <tr><td colSpan={7} className="med-empty">{t('medication.noData')}</td></tr>
-              ) : (
-                filtered.map((p) => {
-                  const isOpen = expanded.has(p._id);
-                  return (
-                    <>
-                      <tr key={p._id}>
-                        <td>
-                          <div className="med-resident__name">{p.residentId?.fullName}</div>
-                          <div className="med-resident__code">{p.residentId?.residentCode}</div>
-                        </td>
-                        <td style={{ maxWidth: 220 }}>
-                          <div style={{ fontSize: 13 }}>{p.diagnosisNote}</div>
-                        </td>
-                        <td>{fmtDate(p.validUntil)}</td>
-                        <td>
-                          <button
-                            className="med-action-btn med-action-btn--schedule"
-                            onClick={() => toggleExpand(p._id)}
-                          >
-                            {(p.items || []).length} {t('medication.items')} {isOpen ? '▲' : '▼'}
-                          </button>
-                        </td>
-                        <td>{p.prescribedByStaffId?.userId?.fullName || '—'}</td>
-                        <td><StatusBadge status={p.status} type="rx" /></td>
-                        <td>
-                          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                            <button className="med-action-btn med-action-btn--schedule" onClick={() => onOpenSchedule(p)}>
-                              {t('medication.editSchedule')}
-                            </button>
-                            <button className="med-action-btn med-action-btn--history" onClick={() => onOpenHistory(p)}>
-                              {t('medication.viewHistory')}
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                      {isOpen && (p.items || []).length > 0 && (
-                        <tr key={`${p._id}-items`}>
-                          <td colSpan={7} style={{ padding: 0, background: '#f8fafc' }}>
-                            <div style={{ padding: '8px 16px' }}>
-                              <table className="med-table" style={{ margin: 0 }}>
-                                <thead>
-                                  <tr>
-                                    <th>{t('medication.medicationName')}</th>
-                                    <th>{t('medication.dosage')}</th>
-                                    <th>{t('medication.unit')}</th>
-                                    <th>{t('medication.route')}</th>
-                                    <th>{t('medication.frequencyLabel')}</th>
-                                    <th>{t('medication.times')}</th>
-                                    <th>{t('medication.startDate')}</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {p.items.map((it) => (
-                                    <tr key={it._id}>
-                                      <td className="med-drug__name">{it.medicationName}</td>
-                                      <td>{it.dosage}</td>
-                                      <td>{it.unit || '—'}</td>
-                                      <td>{t(`medication.route${it.route ? it.route.charAt(0).toUpperCase() + it.route.slice(1) : ''}`) || it.route || '—'}</td>
-                                      <td>{it.frequency}</td>
-                                      <td>
-                                        {(it.times || []).map((tm) => (
-                                          <span key={tm} className="med-time-chip" style={{ marginRight: 4 }}>{tm}</span>
-                                        ))}
-                                      </td>
-                                      <td>{it.startDate ? fmtDate(it.startDate) : '—'}</td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+      {/* ── Right: sidebar cards ── */}
+      <div className="med-dashboard-sidebar">
+        {/* Pending Renewals */}
+        <div className="med-sidebar-card med-sidebar-card--renewals">
+          <div className="med-sidebar-card__accent" />
+          <div className="med-sidebar-card__body">
+            <h3 className="med-sidebar-card__title">{t('medication.pendingRenewals')}</h3>
+            <div className="med-sidebar-card__big-num">{pendingRenewals.length}</div>
+            <p className="med-sidebar-card__desc">{t('medication.pendingRenewalsDesc')}</p>
+          </div>
         </div>
-      )}
+
+        {/* Clinical Alerts */}
+        <div className="med-sidebar-card">
+          <h3 className="med-sidebar-card__title" style={{ padding: '18px 20px 12px' }}>{t('medication.clinicalAlerts')}</h3>
+          <div className="med-sidebar-alerts">
+            {pendingRenewals.length > 0 ? (
+              pendingRenewals.slice(0, 3).map((p) => (
+                <div key={p._id} className="med-sidebar-alert med-sidebar-alert--warning">
+                  <div className="med-sidebar-alert__icon">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
+                    </svg>
+                  </div>
+                  <div className="med-sidebar-alert__content">
+                    <span className="med-sidebar-alert__label">{t('medication.expiringPrescription')}</span>
+                    <span className="med-sidebar-alert__detail">
+                      {p.residentId?.fullName} — {fmtDate(p.validUntil)}
+                    </span>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="med-sidebar-alert med-sidebar-alert--ok">
+                <div className="med-sidebar-alert__icon">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" />
+                  </svg>
+                </div>
+                <div className="med-sidebar-alert__content">
+                  <span className="med-sidebar-alert__label">{t('medication.noAlerts')}</span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -945,8 +1397,9 @@ function DailyTab() {
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState('');
+  const [search, setSearch] = useState('');
 
-  const dateStr = date.toISOString().slice(0, 10);
+  const dateStr = localDateStr(date);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -968,19 +1421,30 @@ function DailyTab() {
     setDate(d);
   };
 
-  // Flatten groups → rows for display
-  const rows = useMemo(() => {
-    const flat = [];
-    groups.forEach((group) => {
-      const resident = group.residentId || group.resident || {};
-      (group.schedules || []).forEach((s) => {
-        if (!statusFilter || s.status === statusFilter) {
-          flat.push({ ...s, _resident: resident });
-        }
-      });
-    });
-    return flat.sort((a, b) => new Date(a.scheduledTime) - new Date(b.scheduledTime));
-  }, [groups, statusFilter]);
+  const goToday = () => setDate(new Date());
+  const isToday = dateStr === todayStr();
+
+  // Group rows by resident so a doctor can scan one patient's full day at a glance,
+  // instead of hunting through one long list sorted only by time.
+  const residentGroups = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return groups
+      .map((group) => {
+        const residentName = group.residentName || group.residentId?.fullName || '—';
+        const schedules = (group.schedules || [])
+          .filter((s) => !statusFilter || s.status === statusFilter)
+          .sort((a, b) => new Date(a.scheduledTime) - new Date(b.scheduledTime));
+        return {
+          key: group.residentId || residentName,
+          residentName,
+          room: group.room || '',
+          hasOverdue: schedules.some((s) => s.status === 'OVERDUE'),
+          schedules,
+        };
+      })
+      .filter((g) => g.schedules.length > 0 && (!q || g.residentName.toLowerCase().includes(q)))
+      .sort((a, b) => a.residentName.localeCompare(b.residentName));
+  }, [groups, statusFilter, search]);
 
   const counts = useMemo(() => {
     const all = groups.flatMap((g) => g.schedules || []);
@@ -994,10 +1458,23 @@ function DailyTab() {
 
   return (
     <div className="med-tab-content">
-      <div className="med-date-nav">
-        <button className="med-date-nav__btn" onClick={() => shiftDate(-1)}>&#8249;</button>
-        <span className="med-date-nav__label">{fmtDayLabel(date)}</span>
-        <button className="med-date-nav__btn" onClick={() => shiftDate(1)}>&#8250;</button>
+      <div className="med-date-nav-row">
+        <div className="med-date-nav">
+          <button className="med-date-nav__btn" onClick={() => shiftDate(-1)} title={t('medication.previousDay')}>&#8249;</button>
+          <span className="med-date-nav__label">{fmtDayLabel(date)}</span>
+          <button className="med-date-nav__btn" onClick={() => shiftDate(1)} title={t('medication.nextDay')}>&#8250;</button>
+        </div>
+        <div className="med-date-nav__tools">
+          {!isToday && (
+            <button className="cpf-btn cpf-btn--ghost" onClick={goToday}>{t('medication.today')}</button>
+          )}
+          <input
+            type="date"
+            className="med-filter-bar__select"
+            value={dateStr}
+            onChange={(e) => e.target.value && setDate(new Date(`${e.target.value}T00:00:00`))}
+          />
+        </div>
       </div>
 
       <div className="med-stats">
@@ -1014,8 +1491,20 @@ function DailyTab() {
         ))}
       </div>
 
-      <div className="med-filter">
-        <select className="med-filter__select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+      <div className="med-card__header-actions" style={{ padding: '0' }}>
+        <div className="med-filter-bar__search-wrap" style={{ minWidth: 220 }}>
+          <svg className="med-filter-bar__search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          <input
+            className="med-filter-bar__search"
+            type="text"
+            placeholder={t('medication.searchPlaceholder')}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <select className="med-filter-bar__select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
           <option value="">{t('medication.allStatuses')}</option>
           {Object.keys(SCHED_STATUS_KEYS).map((k) => (
             <option key={k} value={k}>{t(`medication.${SCHED_STATUS_KEYS[k]}`)}</option>
@@ -1025,45 +1514,72 @@ function DailyTab() {
 
       {loading ? (
         <p className="med-empty">{t('medication.loading')}</p>
+      ) : residentGroups.length === 0 ? (
+        <p className="med-empty">{t('medication.noDataForDate')}</p>
       ) : (
-        <div className="med-table-wrap">
-          <table className="med-table">
-            <thead>
-              <tr>
-                <th>{t('medication.colTime')}</th>
-                <th>{t('medication.colResident')}</th>
-                <th>{t('medication.colMedication')}</th>
-                <th>{t('medication.colDosage')}</th>
-                <th>{t('medication.colStatus')}</th>
-                <th>{t('medication.colActualTime')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.length === 0 ? (
-                <tr><td colSpan={6} className="med-empty">{t('medication.noDataForDate')}</td></tr>
-              ) : (
-                rows.map((s) => (
-                  <tr key={s._id}>
-                    <td><span className="med-time">{fmtTime(s.scheduledTime)}</span></td>
-                    <td>
-                      <div className="med-resident__name">{s._resident?.fullName}</div>
-                      <div className="med-resident__code">{s._resident?.residentCode}</div>
-                    </td>
-                    <td className="med-drug__name">{s.medicationName}</td>
-                    <td>{s.dosage}</td>
-                    <td>
-                      <StatusBadge status={s.status} type="sched" />
-                    </td>
-                    <td>
-                      {s.actualTimeTaken
-                        ? `${t('medication.atTime')} ${fmtTime(s.actualTimeTaken)}`
-                        : '—'}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+        <div className="med-daily-groups">
+          {residentGroups.map((group) => (
+            <div key={group.key} className="med-card">
+              <div className="med-card__header">
+                <div className="med-resident-cell">
+                  <div className="med-resident-cell__avatar" style={{ background: getAvatarColor(group.residentName) }}>
+                    {getInitials(group.residentName)}
+                  </div>
+                  <div className="med-resident-cell__info">
+                    <div className="med-resident-cell__name">{group.residentName}</div>
+                    {group.room && <div className="med-resident-cell__code">{group.room}</div>}
+                  </div>
+                </div>
+                <span className={`med-badge ${group.hasOverdue ? 'med-badge--overdue' : 'med-badge--pending'}`}>
+                  {group.schedules.length} {t('medication.items')}
+                </span>
+              </div>
+              <div className="med-table-wrap" style={{ border: 'none', boxShadow: 'none' }}>
+                <table className="med-table med-table--nested">
+                  <thead>
+                    <tr>
+                      <th>{t('medication.colTime')}</th>
+                      <th>{t('medication.colMedication')}</th>
+                      <th>{t('medication.colDosage')}</th>
+                      <th>{t('medication.colStatus')}</th>
+                      <th>{t('medication.colActualTime')}</th>
+                      <th>{t('medication.colNotes')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {group.schedules.map((s) => (
+                      <tr key={s.id || s._id} className={s.status === 'OVERDUE' ? 'med-row--overdue' : ''}>
+                        <td><span className="med-time-badge">{fmtTime(s.scheduledTime)}</span></td>
+                        <td className="med-drug__name">{s.medicationName}</td>
+                        <td>{s.dosage}</td>
+                        <td>
+                          <StatusBadge status={s.status} type="sched" />
+                          {s.status === 'MISSED' && s.missedReason && (
+                            <div className="med-reason-note">
+                              ({t(`medication.reason${s.missedReason.charAt(0).toUpperCase() + s.missedReason.slice(1)}`)})
+                            </div>
+                          )}
+                        </td>
+                        <td>
+                          {s.actualTimeTaken ? (
+                            <>
+                              {`${t('medication.atTime')} ${fmtTime(s.actualTimeTaken)}`}
+                              {s.administrationTiming && (
+                                <div className="med-reason-note">
+                                  ({t(`medication.timing${s.administrationTiming === 'early' ? 'Early' : s.administrationTiming === 'late' ? 'Late' : 'OnTime'}`)})
+                                </div>
+                              )}
+                            </>
+                          ) : '—'}
+                        </td>
+                        <td>{s.notes || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -1076,6 +1592,7 @@ function DailyTab() {
 function DoctorMedicationPage() {
   const { t } = useTranslation();
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState('prescriptions');
   const [residents, setResidents] = useState([]);        // assigned residents only
   const [selectedResidentId, setSelectedResidentId] = useState('');
@@ -1103,12 +1620,11 @@ function DoctorMedicationPage() {
       .catch(() => setResidents([]));
   }, [assignedIds]);
 
-  // Load prescriptions khi chọn cư dân
+  // Load prescriptions — cho 1 cư dân, hoặc tất cả cư dân được giao nếu resId rỗng
   const loadPrescriptions = useCallback((resId) => {
-    if (!resId) { setPrescriptions([]); return; }
     setLoadingRx(true);
     medicationService
-      .listPrescriptions({ residentId: resId, limit: 100 })
+      .listPrescriptions({ residentId: resId || undefined, limit: 100 })
       .then((res) => {
         const arr = Array.isArray(res) ? res : (res?.data || []);
         setPrescriptions(arr);
@@ -1117,11 +1633,14 @@ function DoctorMedicationPage() {
       .finally(() => setLoadingRx(false));
   }, []);
 
-  // Tự động chọn cư dân đầu tiên nếu chỉ có 1
+  // Load lần đầu khi có danh sách cư dân — mặc định "Tất cả cư dân"
   useEffect(() => {
+    if (!residents.length) { setPrescriptions([]); return; }
     if (residents.length === 1 && !selectedResidentId) {
       setSelectedResidentId(residents[0]._id);
       loadPrescriptions(residents[0]._id);
+    } else if (!selectedResidentId) {
+      loadPrescriptions('');
     }
   }, [residents, selectedResidentId, loadPrescriptions]);
 
@@ -1132,38 +1651,100 @@ function DoctorMedicationPage() {
 
   const closeModal = () => setModal({ type: null, prescription: null });
 
+  // Informational-only stock warnings never block save — just let the doctor know so
+  // they can flag it to the pharmacist (who also gets a system notification).
+  const showStockWarnings = (warnings) => {
+    const stockWarnings = (warnings || []).filter((w) => w.type === 'INSUFFICIENT_STOCK');
+    if (!stockWarnings.length) return;
+    const names = stockWarnings.map((w) => w.medicationName).join(', ');
+    showToast(
+      t('medication.insufficientStockWarning', { names }),
+      'info',
+      8000
+    );
+  };
+
   const handleCreate = async (payload) => {
     try {
-      await medicationService.createPrescription(payload);
+      const result = await medicationService.createPrescription(payload);
       closeModal();
       loadPrescriptions(payload.residentId);
       if (!selectedResidentId) setSelectedResidentId(payload.residentId);
+      showToast(t('medication.createSuccess'), 'success');
+      showStockWarnings(result?.warnings);
+      return result;
     } catch (err) {
-      alert(err.response?.data?.message || t('medication.createError'));
-      throw err;
+      const responseData = err.response?.data;
+      if (responseData?.errorCode === 'DUPLICATE_WARNING' && responseData.duplicates?.length) {
+        const duplicateNames = responseData.duplicates.map((item) => item.medicationName).join(', ');
+        const shouldContinue = window.confirm(
+          t('medication.duplicatePrescriptionConfirm', { names: duplicateNames })
+        );
+        if (shouldContinue) {
+          return handleCreate({ ...payload, acknowledgeDuplicates: true });
+        }
+      }
+      const message = getPrescriptionErrorMessage(err, t('medication.createError'));
+      showToast(message, 'error');
+      return { error: message };
     }
   };
 
-  const handleSaveSchedule = async (payload) => {
+  const handleActivate = async (id) => {
     try {
-      await medicationService.setMedicationSchedule(payload);
-      closeModal();
+      await medicationService.activatePrescription(id);
+      loadPrescriptions(selectedResidentId);
+      showToast(t('medication.activateSuccess'), 'success');
     } catch (err) {
-      alert(err.response?.data?.message || t('medication.scheduleError'));
-      throw err;
+      showToast(err.response?.data?.message || t('medication.activateError'), 'error');
+    }
+  };
+
+  const handleSuspend = async (id) => {
+    const reason = window.prompt(t('medication.suspendReasonPrompt'));
+    if (!reason || reason.trim().length < 5) {
+      showToast(t('medication.suspendReasonRequired'), 'error');
+      return;
+    }
+    try {
+      await medicationService.suspendPrescription(id, { reason: reason.trim() });
+      loadPrescriptions(selectedResidentId);
+      showToast(t('medication.suspendSuccess'), 'success');
+    } catch (err) {
+      showToast(err.response?.data?.message || t('medication.suspendError'), 'error');
+    }
+  };
+
+  const handleResume = async (id) => {
+    try {
+      await medicationService.resumePrescription(id);
+      loadPrescriptions(selectedResidentId);
+      showToast(t('medication.resumeSuccess'), 'success');
+    } catch (err) {
+      showToast(err.response?.data?.message || t('medication.resumeError'), 'error');
     }
   };
 
   return (
     <div className="med-page">
       <div className="med-page__header">
-        <h1 className="med-page__title">{t('medication.pageTitle')}</h1>
+        <div className="med-page__title-group">
+          <h1 className="med-page__title">{t('medication.pageTitle')}</h1>
+          <div className="med-page__breadcrumb">
+            <span className="med-page__breadcrumb-item">{t('medication.clinicalStaff')}</span>
+            <span className="med-page__breadcrumb-sep">›</span>
+            <span className="med-page__breadcrumb-active">{t('medication.tabPrescriptions')}</span>
+          </div>
+        </div>
         {activeTab === 'prescriptions' && (
           <button
-            className="med-btn med-btn--primary"
+            className="med-btn med-btn--create"
             onClick={() => setModal({ type: 'create', prescription: null })}
           >
-            + {t('medication.createPrescription')}
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            {t('medication.createPrescription')}
           </button>
         )}
       </div>
@@ -1173,12 +1754,18 @@ function DoctorMedicationPage() {
           className={`med-tab ${activeTab === 'prescriptions' ? 'med-tab--active' : ''}`}
           onClick={() => setActiveTab('prescriptions')}
         >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" />
+          </svg>
           {t('medication.tabPrescriptions')}
         </button>
         <button
           className={`med-tab ${activeTab === 'daily' ? 'med-tab--active' : ''}`}
           onClick={() => setActiveTab('daily')}
         >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
+          </svg>
           {t('medication.tabDailySchedule')}
         </button>
       </div>
@@ -1191,8 +1778,10 @@ function DoctorMedicationPage() {
           selectedResidentId={selectedResidentId}
           onResidentChange={handleResidentChange}
           onOpenCreate={() => setModal({ type: 'create', prescription: null })}
-          onOpenSchedule={(p) => setModal({ type: 'schedule', prescription: p })}
           onOpenHistory={(p) => setModal({ type: 'history', prescription: p })}
+          onActivate={handleActivate}
+          onSuspend={handleSuspend}
+          onResume={handleResume}
         />
       ) : (
         <DailyTab />
@@ -1202,13 +1791,6 @@ function DoctorMedicationPage() {
         <CreatePrescriptionModal
           residents={residents}
           onSave={handleCreate}
-          onClose={closeModal}
-        />
-      )}
-      {modal.type === 'schedule' && (
-        <SetScheduleModal
-          prescription={modal.prescription}
-          onSave={handleSaveSchedule}
           onClose={closeModal}
         />
       )}

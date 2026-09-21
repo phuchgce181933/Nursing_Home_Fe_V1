@@ -1,8 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useLocation } from 'react-router-dom';
+import AdminPageShell from '../../../components/admin/AdminPageShell';
+import ListPagination from '../../../components/ui/ListPagination';
+import { ADMIN_LIST_PAGE_SIZE } from '../../../constants/adminListPage';
 import caregiverCareTaskService from '../../../services/caregiverCareTask.service';
 import caregiverResidentService from '../../../services/caregiverResident.service';
 import { getLocalDateString } from '../../../utils/dateUtils';
 import '../../../styles/caregiver/DailyCareSchedulePage.css';
+import { resolveApiError } from '../../../utils/apiMessage';
 import CareTaskDetailModal from './components/CareTaskDetailModal';
 import CareTasksTable from './components/CareTasksTable';
 import ScheduleFilters from './components/ScheduleFilters';
@@ -10,6 +16,14 @@ import ScheduleFilters from './components/ScheduleFilters';
 const today = () => getLocalDateString();
 
 function DailyCareSchedulePage() {
+  const { t } = useTranslation();
+  const { pathname } = useLocation();
+  const ns = pathname.includes('/doctor/')
+    ? 'doctor.careTasks'
+    : pathname.includes('/nurse/')
+      ? 'nurse.careTasks'
+      : 'caregiver.dailyCareSchedule';
+
   const [workDate, setWorkDate] = useState(today());
   const [status, setStatus] = useState('');
   const [residentId, setResidentId] = useState('');
@@ -17,7 +31,10 @@ function DailyCareSchedulePage() {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [detailTaskId, setDetailTaskId] = useState(null);
+  const [taskModal, setTaskModal] = useState(null);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
 
   const loadResidents = useCallback(async () => {
     try {
@@ -37,36 +54,40 @@ function DailyCareSchedulePage() {
         workDate,
         status: status || undefined,
         residentId: residentId || undefined,
-        limit: 100,
+        page,
+        limit: ADMIN_LIST_PAGE_SIZE,
       });
       const list = Array.isArray(res.data) ? res.data : [];
       list.sort((a, b) => String(a.scheduledTime || '').localeCompare(String(b.scheduledTime || '')));
       setTasks(list);
+      const count = res.total ?? list.length;
+      setTotal(count);
+      setTotalPages(
+        res.totalPages ?? Math.max(1, Math.ceil(count / ADMIN_LIST_PAGE_SIZE))
+      );
     } catch (e) {
-      setError(e?.response?.data?.message || 'Không tải được lịch chăm sóc');
+      setError(resolveApiError(e, t, `${ns}.loadFailed`));
       setTasks([]);
     } finally {
       setLoading(false);
     }
-  }, [workDate, status, residentId]);
+  }, [workDate, status, residentId, page, t, ns]);
 
   useEffect(() => {
     loadResidents();
   }, [loadResidents]);
 
   useEffect(() => {
+    setPage(1);
+  }, [workDate, status, residentId]);
+
+  useEffect(() => {
     loadTasks();
   }, [loadTasks]);
 
   return (
-    <div className="page card daily-care-page">
-      <h1 className="daily-care-page__title">Lịch chăm sóc hằng ngày</h1>
-      <p className="daily-care-page__intro">
-        Xem và cập nhật các nhiệm vụ chăm sóc được phân công cho bạn trong ngày. Lịch được tạo khi
-        quản lý publish lịch chăm sóc hoặc giao nhiệm vụ riêng lẻ.
-      </p>
-
-      {error && <p className="form-error">{error}</p>}
+    <AdminPageShell title={t(`${ns}.title`)} subtitle={t(`${ns}.subtitle`)}>
+      {error && <div className="resident-page__error">{error}</div>}
 
       <ScheduleFilters
         workDate={workDate}
@@ -83,18 +104,26 @@ function DailyCareSchedulePage() {
       <CareTasksTable
         tasks={tasks}
         loading={loading}
-        onView={(row) => setDetailTaskId(row._id)}
-        onQuickStatus={(row) => setDetailTaskId(row._id)}
+        ns={ns}
+        onView={(row) => setTaskModal({ taskId: row._id, mode: 'view' })}
+        onQuickStatus={(row) => setTaskModal({ taskId: row._id, mode: 'update' })}
       />
 
-      {detailTaskId && (
+      {!loading && total > 0 && (
+        <ListPagination page={page} totalPages={totalPages} total={total} onPageChange={setPage} />
+      )}
+
+      {taskModal && (
         <CareTaskDetailModal
-          taskId={detailTaskId}
-          onClose={() => setDetailTaskId(null)}
+          key={`${taskModal.taskId}-${taskModal.mode}`}
+          taskId={taskModal.taskId}
+          mode={taskModal.mode}
+          ns={ns}
+          onClose={() => setTaskModal(null)}
           onUpdated={loadTasks}
         />
       )}
-    </div>
+    </AdminPageShell>
   );
 }
 

@@ -1,26 +1,28 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import caregiverCareTaskService from '../../../../services/caregiverCareTask.service';
-import {
-  CARE_TASK_STATUS_LABELS,
-  careTaskTypeLabel,
-} from '../../../../utils/blockingCareTasks';
-import {
-  CARE_LEVEL_LABELS,
-  STATUS_ACTION_LABELS,
-  TASK_STATUS_NEXT,
-} from '../constants';
+import { careTaskTypeLabel } from '../../../../utils/blockingCareTasks';
+import { resolveApiError } from '../../../../utils/apiMessage';
+import { TASK_STATUS_NEXT } from '../constants';
 
-function shiftDetail(shift) {
+function shiftDetail(shift, shiftFallback, t) {
   if (!shift) return '—';
-  return `${shift.name || 'Ca'} · ${shift.startTime || '—'} – ${shift.endTime || '—'} (${shift.status || '—'})`;
+  const name = shift.name || shiftFallback;
+  const statusLabel = shift.status
+    ? t(`common.shiftStatus.${shift.status}`, { defaultValue: shift.status })
+    : '—';
+  return `${name} · ${shift.startTime || '—'} – ${shift.endTime || '—'} (${statusLabel})`;
 }
 
-function CareTaskDetailModal({ taskId, onClose, onUpdated }) {
+function CareTaskDetailModal({ taskId, mode = 'view', ns, onClose, onUpdated }) {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [task, setTask] = useState(null);
   const [error, setError] = useState('');
   const [notes, setNotes] = useState('');
+
+  const isViewMode = mode === 'view';
 
   const loadTask = useCallback(async () => {
     if (!taskId) return;
@@ -31,17 +33,21 @@ function CareTaskDetailModal({ taskId, onClose, onUpdated }) {
       setTask(data);
       setNotes(data.notes || '');
     } catch (e) {
-      setError(e?.response?.data?.message || 'Không tải được chi tiết nhiệm vụ');
+      setError(resolveApiError(e, t, `${ns}.taskDetailLoadFailed`));
     } finally {
       setLoading(false);
     }
-  }, [taskId]);
+  }, [taskId, t, ns]);
 
   useEffect(() => {
     loadTask();
   }, [loadTask]);
 
   const handleStatus = async (status) => {
+    if (status === 'skipped' && !notes.trim()) {
+      setError(t(`${ns}.skipNotesRequired`));
+      return;
+    }
     setSaving(true);
     setError('');
     try {
@@ -49,7 +55,7 @@ function CareTaskDetailModal({ taskId, onClose, onUpdated }) {
       onUpdated();
       onClose();
     } catch (e) {
-      setError(e?.response?.data?.message || 'Cập nhật thất bại');
+      setError(resolveApiError(e, t, `${ns}.updateFailed`));
     } finally {
       setSaving(false);
     }
@@ -60,79 +66,111 @@ function CareTaskDetailModal({ taskId, onClose, onUpdated }) {
   const nextStatuses = task ? TASK_STATUS_NEXT[task.status] || [] : [];
   const resident = task?.residentId;
   const roomNum = resident?.roomId?.roomNumber;
+  const modalTitle = isViewMode ? t(`${ns}.detailTitle`) : t(`${ns}.updateTitle`);
+  const modalClass = isViewMode
+    ? 'daily-care-page__modal daily-care-page__modal--view'
+    : 'daily-care-page__modal daily-care-page__modal--edit';
+
+  const updateContext =
+    task &&
+    [
+      task.scheduledTime || '—',
+      resident?.fullName || resident?.residentCode || '—',
+      careTaskTypeLabel(task.taskType, t),
+    ].join(' · ');
 
   return (
     <div className="daily-care-page__modal-overlay" onClick={saving ? undefined : onClose}>
       <div
-        className="daily-care-page__modal"
+        className={modalClass}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
       >
         <div className="daily-care-page__modal-header">
-          <h3 className="daily-care-page__modal-title">Chi tiết nhiệm vụ</h3>
+          <h3 className="daily-care-page__modal-title">{modalTitle}</h3>
           <button type="button" className="daily-care-page__modal-close" onClick={onClose} disabled={saving}>
             ×
           </button>
         </div>
         <div className="daily-care-page__modal-body">
-          {loading && <p>Đang tải...</p>}
+          {loading && <p>{t('common.loading')}</p>}
           {error && <p className="form-error">{error}</p>}
-          {!loading && task && (
+          {!loading && task && isViewMode && (
             <>
               <div className="daily-care-page__detail-grid">
                 <p>
-                  <strong>Giờ:</strong> {task.scheduledTime}
+                  <strong>{t(`${ns}.colTime`)}:</strong> {task.scheduledTime || '—'}
                 </p>
                 <p>
-                  <strong>Cư dân:</strong> {resident?.fullName || resident?.residentCode || '—'}
-                  {roomNum != null && roomNum !== '' && <> · Phòng {roomNum}</>}
+                  <strong>{t('common.colResident')}:</strong>{' '}
+                  {resident?.fullName || resident?.residentCode || '—'}
+                  {roomNum != null && roomNum !== '' && (
+                    <>
+                      {' '}
+                      · {t(`${ns}.colRoom`)} {roomNum}
+                    </>
+                  )}
                 </p>
                 <p>
-                  <strong>Loại:</strong> {careTaskTypeLabel(task.taskType)}
+                  <strong>{t(`${ns}.colTaskType`)}:</strong> {careTaskTypeLabel(task.taskType, t)}
                 </p>
                 <p>
-                  <strong>Mức độ:</strong> {CARE_LEVEL_LABELS[task.careLevel] || task.careLevel}
+                  <strong>{t(`${ns}.colCareLevel`)}:</strong>{' '}
+                  {t(`common.careLevel.${task.careLevel}`, { defaultValue: task.careLevel || '—' })}
                 </p>
                 <p>
-                  <strong>Ca:</strong> {shiftDetail(task.shiftId)}
+                  <strong>{t(`${ns}.colShift`)}:</strong>{' '}
+                  {shiftDetail(task.shiftId, t(`${ns}.colShift`), t)}
                 </p>
                 <p>
-                  <strong>Trạng thái:</strong>{' '}
+                  <strong>{t('common.colStatus')}:</strong>{' '}
                   <span className={`daily-care-page__status daily-care-page__status--${task.status}`}>
-                    {CARE_TASK_STATUS_LABELS[task.status] || task.status}
+                    {t(`common.careTaskStatus.${task.status}`, { defaultValue: task.status })}
                   </span>
                 </p>
+                <p>
+                  <strong>{t(`${ns}.notes`)}:</strong> {task.notes?.trim() ? task.notes : t(`${ns}.noNotes`)}
+                </p>
               </div>
+              <div className="daily-care-page__actions">
+                <button type="button" className="btn-secondary" onClick={onClose}>
+                  {t('common.close')}
+                </button>
+              </div>
+            </>
+          )}
+          {!loading && task && !isViewMode && (
+            <>
+              <p className="daily-care-page__update-context">{updateContext}</p>
               <label className="daily-care-page__notes-field">
-                Ghi chú
+                {t(`${ns}.notes`)}
                 <textarea
-                  rows={2}
+                  rows={3}
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   disabled={saving || !nextStatuses.length}
                 />
               </label>
-              {nextStatuses.length > 0 && (
-                <div className="daily-care-page__actions">
-                  {nextStatuses.map((st) => (
-                    <button
-                      key={st}
-                      type="button"
-                      className={st === 'skipped' ? 'btn-secondary' : 'btn-primary'}
-                      disabled={saving}
-                      onClick={() => handleStatus(st)}
-                    >
-                      {saving ? 'Đang lưu...' : STATUS_ACTION_LABELS[st] || st}
-                    </button>
-                  ))}
-                </div>
-              )}
               {!nextStatuses.length && (
-                <p className="daily-care-page__hint">
-                  Nhiệm vụ đã kết thúc. Trạng thái &quot;bỏ lỡ&quot; do hệ thống tự gán khi hết ca.
-                </p>
+                <p className="daily-care-page__hint">{t(`${ns}.taskEndedHint`)}</p>
               )}
+              <div className="daily-care-page__actions">
+                <button type="button" className="btn-secondary" onClick={onClose} disabled={saving}>
+                  {t('common.close')}
+                </button>
+                {nextStatuses.map((st) => (
+                  <button
+                    key={st}
+                    type="button"
+                    className={st === 'skipped' ? 'btn-secondary' : 'btn-primary'}
+                    disabled={saving}
+                    onClick={() => handleStatus(st)}
+                  >
+                    {saving ? t('common.saving') : t(`${ns}.statusAction.${st}`, { defaultValue: st })}
+                  </button>
+                ))}
+              </div>
             </>
           )}
         </div>

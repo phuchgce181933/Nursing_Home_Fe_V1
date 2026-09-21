@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Search,
   Plus,
@@ -12,36 +13,41 @@ import {
   Home,
 } from 'lucide-react';
 import residentService from '../../../services/resident.service';
+import { useAuth } from '../../../hooks/useAuth';
+import { useToast } from '../../../hooks/useToast';
+import FamilyAccountPicker from '../../../components/ui/FamilyAccountPicker';
 import '../../../styles/admin/ResidentPage.css';
+import { resolveApiError } from '../../../utils/apiMessage';
+import { isValidStaffPhone } from '../../../utils/staffPhoneValidation';
 
 const GENDERS = [
-  { value: '', label: 'Tất cả giới tính' },
-  { value: 'male', label: 'Nam' },
-  { value: 'female', label: 'Nữ' },
-  { value: 'other', label: 'Khác' },
-  { value: 'unknown', label: 'Không xác định' },
+  { value: '', i18nKey: 'adminResidents.genders.allGenders' },
+  { value: 'male', i18nKey: 'adminResidents.genders.male' },
+  { value: 'female', i18nKey: 'adminResidents.genders.female' },
+  { value: 'other', i18nKey: 'adminResidents.genders.other' },
+  { value: 'unknown', i18nKey: 'adminResidents.genders.unknown' },
 ];
 
 const BLOOD_TYPES = [
-  { value: '', label: 'Tất cả nhóm máu' },
-  { value: 'A+', label: 'A+' },
-  { value: 'A-', label: 'A-' },
-  { value: 'B+', label: 'B+' },
-  { value: 'B-', label: 'B-' },
-  { value: 'AB+', label: 'AB+' },
-  { value: 'AB-', label: 'AB-' },
-  { value: 'O+', label: 'O+' },
-  { value: 'O-', label: 'O-' },
-  { value: 'unknown', label: 'Không xác định' },
+  { value: '', i18nKey: 'adminResidents.bloodTypes.allBloodTypes' },
+  { value: 'A+', i18nKey: 'adminResidents.bloodTypes.aPlus' },
+  { value: 'A-', i18nKey: 'adminResidents.bloodTypes.aMinus' },
+  { value: 'B+', i18nKey: 'adminResidents.bloodTypes.bPlus' },
+  { value: 'B-', i18nKey: 'adminResidents.bloodTypes.bMinus' },
+  { value: 'AB+', i18nKey: 'adminResidents.bloodTypes.abPlus' },
+  { value: 'AB-', i18nKey: 'adminResidents.bloodTypes.abMinus' },
+  { value: 'O+', i18nKey: 'adminResidents.bloodTypes.oPlus' },
+  { value: 'O-', i18nKey: 'adminResidents.bloodTypes.oMinus' },
+  { value: 'unknown', i18nKey: 'adminResidents.bloodTypes.unknown' },
 ];
 
 const RESIDENCY_STATUSES = [
-  { value: '', label: 'Tất cả trạng thái' },
-  { value: 'pending', label: 'Chờ xử lý' },
-  { value: 'admitted', label: 'Đã nhận vào ở' },
-  { value: 'discharged', label: 'Đã xuất viện' },
-  { value: 'transferred', label: 'Đã chuyển viện' },
-  { value: 'inactive', label: 'Không hoạt động' },
+  { value: '', i18nKey: 'adminResidents.residencyStatuses.allStatuses' },
+  { value: 'pending', i18nKey: 'adminResidents.residencyStatuses.pending' },
+  { value: 'admitted', i18nKey: 'adminResidents.residencyStatuses.admitted' },
+  { value: 'discharged', i18nKey: 'adminResidents.residencyStatuses.discharged' },
+  { value: 'transferred', i18nKey: 'adminResidents.residencyStatuses.transferred' },
+  { value: 'inactive', i18nKey: 'adminResidents.residencyStatuses.inactive' },
 ];
 
 const formatDateTime = (value) => {
@@ -77,10 +83,10 @@ const splitList = (value) =>
     .map((item) => item.trim())
     .filter(Boolean);
 
-const parseFamilyIds = (value) => splitList(value).filter(Boolean);
-
-const buildContactsPayload = (contacts) => {
+const buildContactsPayload = (contacts, t) => {
   const payload = [];
+  const seenPhones = new Map();
+  const seenEmails = new Map();
 
   for (const contact of contacts) {
     const fullName = String(contact.fullName || '').trim();
@@ -93,7 +99,25 @@ const buildContactsPayload = (contacts) => {
     if (!hasAny) continue;
 
     if (!fullName || !relationship || !phone) {
-      return { error: 'Mỗi liên hệ khẩn cấp phải có họ tên, quan hệ và số điện thoại.' };
+      return { error: t('admin.residents.family.validation.contactRequiredFields') };
+    }
+
+    if (!isValidStaffPhone(phone)) {
+      return { error: t('admin.residents.family.validation.phoneInvalid') };
+    }
+
+    const phoneKey = phone.replace(/\D/g, '');
+    if (seenPhones.has(phoneKey)) {
+      return { error: t('admin.residents.family.validation.duplicatePhone', { phone }) };
+    }
+    seenPhones.set(phoneKey, fullName);
+
+    const emailKey = email.toLowerCase();
+    if (emailKey) {
+      if (seenEmails.has(emailKey)) {
+        return { error: t('admin.residents.family.validation.duplicateEmail', { email }) };
+      }
+      seenEmails.set(emailKey, fullName);
     }
 
     payload.push({
@@ -108,6 +132,10 @@ const buildContactsPayload = (contacts) => {
 
   return { contacts: payload };
 };
+
+const AVATAR_PLACEHOLDER = `data:image/svg+xml;utf8,${encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96"><rect fill="#DEE2E6" width="100%" height="100%"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#6C757D" font-family="Arial, sans-serif" font-size="14">Avatar</text></svg>'
+)}`;
 
 const emptyPersonalForm = {
   residentCode: '',
@@ -127,7 +155,12 @@ const emptyPersonalForm = {
   servicePackage: '',
 };
 
-function ResidentPage({ defaultMode }) {
+function ResidentPage({ defaultMode = '' }) {
+  const { t } = useTranslation();
+  const { showToast } = useToast();
+  const { user } = useAuth();
+  const canManageResidents = true;
+
   const [residents, setResidents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -156,7 +189,7 @@ function ResidentPage({ defaultMode }) {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createForm, setCreateForm] = useState({ ...emptyPersonalForm });
   const [createContacts, setCreateContacts] = useState([]);
-  const [createFamilyIds, setCreateFamilyIds] = useState('');
+  const [createFamilyAccounts, setCreateFamilyAccounts] = useState([]);
   const [createError, setCreateError] = useState(null);
   const [creating, setCreating] = useState(false);
 
@@ -165,13 +198,14 @@ function ResidentPage({ defaultMode }) {
   const [selectedResident, setSelectedResident] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
 
   const [personalForm, setPersonalForm] = useState({ ...emptyPersonalForm });
   const [personalError, setPersonalError] = useState(null);
   const [personalSaving, setPersonalSaving] = useState(false);
 
   const [familyContacts, setFamilyContacts] = useState([]);
-  const [familyIds, setFamilyIds] = useState('');
+  const [familyAccounts, setFamilyAccounts] = useState([]);
   const [familyError, setFamilyError] = useState(null);
   const [familySaving, setFamilySaving] = useState(false);
 
@@ -199,12 +233,15 @@ function ResidentPage({ defaultMode }) {
       };
 
       const res = await residentService.getResidentList(params);
+      // DEBUG: log first resident to verify avatarUrl is present (remove in production)
+      // eslint-disable-next-line no-console
+      console.debug('admin resident list sample:', res?.data?.[0]);
       setResidents(res?.data || []);
       setTotal(res?.total || 0);
       setTotalPages(res?.totalPages || 1);
     } catch (err) {
       console.error('Failed to load residents:', err);
-      setError('Không thể tải danh sách cư dân. Vui lòng kiểm tra quyền truy cập hoặc kết nối mạng.');
+      setError(resolveApiError(err, t, 'admin.residents.common.loadListFailed'));
     } finally {
       setLoading(false);
     }
@@ -251,14 +288,12 @@ function ResidentPage({ defaultMode }) {
         setFamilyContacts(
           Array.isArray(resident?.emergencyContacts) ? resident.emergencyContacts : []
         );
-        setFamilyIds(
-          Array.isArray(resident?.familyPortalAccounts)
-            ? resident.familyPortalAccounts.map((user) => user._id).join('\n')
-            : ''
+        setFamilyAccounts(
+          Array.isArray(resident?.familyPortalAccounts) ? resident.familyPortalAccounts : []
         );
       } catch (err) {
         console.error('Failed to load resident details:', err);
-        setDetailError('Không thể tải thông tin chi tiết cư dân.');
+        setDetailError(resolveApiError(err, t, 'admin.residents.common.loadDetailFailed'));
       } finally {
         setDetailLoading(false);
       }
@@ -266,6 +301,29 @@ function ResidentPage({ defaultMode }) {
 
     loadDetail();
   }, [selectedResidentId, showDetailModal]);
+
+  const handleAvatarFileChange = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file || !selectedResidentId) return;
+    // basic validations
+    if (file.size > 5 * 1024 * 1024) {
+      showToast(t('adminResidents.validation.avatarTooLarge'), 'error');
+      return;
+    }
+
+    try {
+      setAvatarUploading(true);
+      const data = await residentService.adminUploadAvatar(selectedResidentId, file);
+      const resident = data?.resident || null;
+      setSelectedResident(resident);
+    } catch (err) {
+      console.error('Upload avatar failed', err);
+      showToast(resolveApiError(err, t, 'admin.residents.common.updateFailed'), 'error');
+    } finally {
+      setAvatarUploading(false);
+      event.target.value = '';
+    }
+  };
 
   const handleApplyFilters = (event) => {
     if (event) event.preventDefault();
@@ -294,7 +352,7 @@ function ResidentPage({ defaultMode }) {
   const resetCreateForm = () => {
     setCreateForm({ ...emptyPersonalForm });
     setCreateContacts([]);
-    setCreateFamilyIds('');
+    setCreateFamilyAccounts([]);
     setCreateError(null);
   };
 
@@ -324,11 +382,28 @@ function ResidentPage({ defaultMode }) {
   const handleCreateResident = async (event) => {
     if (event) event.preventDefault();
     if (!createForm.fullName.trim()) {
-      setCreateError('Họ tên là bắt buộc.');
+      setCreateError(t('adminResidents.validation.fullNameRequired'));
       return;
     }
+    if (createForm.dateOfBirth) {
+      if (createForm.dateOfBirth === 'INVALID_DATE') {
+        setCreateError(t('adminResidents.validation.dobInvalid'));
+        return;
+      }
+      const dobDate = new Date(createForm.dateOfBirth);
+      const today = new Date();
+      let age = today.getFullYear() - dobDate.getFullYear();
+      const m = today.getMonth() - dobDate.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < dobDate.getDate())) {
+        age--;
+      }
+      if (age < 50 || age > 110) {
+        setCreateError(t('adminResidents.validation.ageRange'));
+        return;
+      }
+    }
 
-    const { contacts, error: contactsError } = buildContactsPayload(createContacts);
+    const { contacts, error: contactsError } = buildContactsPayload(createContacts, t);
     if (contactsError) {
       setCreateError(contactsError);
       return;
@@ -351,7 +426,7 @@ function ResidentPage({ defaultMode }) {
       dischargedAt: createForm.dischargedAt || undefined,
       servicePackage: createForm.servicePackage.trim() || undefined,
       emergencyContacts: contacts || [],
-      familyPortalAccountIds: parseFamilyIds(createFamilyIds),
+      familyPortalAccountIds: createFamilyAccounts.map((a) => a._id),
     };
 
     try {
@@ -363,7 +438,7 @@ function ResidentPage({ defaultMode }) {
       fetchResidents();
     } catch (err) {
       console.error('Failed to create resident:', err);
-      setCreateError(err.response?.data?.message || 'Không thể tạo hồ sơ cư dân.');
+      setCreateError(resolveApiError(err, t, 'admin.residents.common.saveFailed'));
     } finally {
       setCreating(false);
     }
@@ -373,8 +448,25 @@ function ResidentPage({ defaultMode }) {
     if (event) event.preventDefault();
     if (!selectedResidentId) return;
     if (!personalForm.fullName.trim()) {
-      setPersonalError('Họ tên là bắt buộc.');
+      setPersonalError(t('adminResidents.validation.fullNameRequired'));
       return;
+    }
+    if (personalForm.dateOfBirth) {
+      if (personalForm.dateOfBirth === 'INVALID_DATE') {
+        setPersonalError(t('adminResidents.validation.dobInvalid'));
+        return;
+      }
+      const dobDate = new Date(personalForm.dateOfBirth);
+      const today = new Date();
+      let age = today.getFullYear() - dobDate.getFullYear();
+      const m = today.getMonth() - dobDate.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < dobDate.getDate())) {
+        age--;
+      }
+      if (age < 50 || age > 110) {
+        setPersonalError(t('adminResidents.validation.ageRange'));
+        return;
+      }
     }
 
     try {
@@ -400,7 +492,7 @@ function ResidentPage({ defaultMode }) {
       fetchResidents();
     } catch (err) {
       console.error('Failed to update personal info:', err);
-      setPersonalError(err.response?.data?.message || 'Không thể cập nhật thông tin cá nhân.');
+      setPersonalError(resolveApiError(err, t, 'admin.residents.common.updateFailed'));
     } finally {
       setPersonalSaving(false);
     }
@@ -410,7 +502,7 @@ function ResidentPage({ defaultMode }) {
     if (event) event.preventDefault();
     if (!selectedResidentId) return;
 
-    const { contacts, error: contactsError } = buildContactsPayload(familyContacts);
+    const { contacts, error: contactsError } = buildContactsPayload(familyContacts, t);
     if (contactsError) {
       setFamilyError(contactsError);
       return;
@@ -421,14 +513,14 @@ function ResidentPage({ defaultMode }) {
       setFamilyError(null);
       const payload = {
         emergencyContacts: contacts || [],
-        familyPortalAccountIds: parseFamilyIds(familyIds),
+        familyPortalAccountIds: familyAccounts.map((a) => a._id),
       };
       const res = await residentService.updateResidentFamilyInfo(selectedResidentId, payload);
       setSelectedResident(res?.resident || selectedResident);
       fetchResidents();
     } catch (err) {
       console.error('Failed to update family info:', err);
-      setFamilyError(err.response?.data?.message || 'Không thể cập nhật thông tin gia đình.');
+      setFamilyError(resolveApiError(err, t, 'admin.residents.common.updateFailed'));
     } finally {
       setFamilySaving(false);
     }
@@ -448,6 +540,11 @@ function ResidentPage({ defaultMode }) {
   };
 
   const removeContact = (index, setter, current) => {
+    const contact = current[index];
+    if (contact?.isPrimary && contact?._id) {
+      showToast(t('admin.residents.family.cannotDeletePrimary'), 'error');
+      return;
+    }
     const next = [...current];
     next.splice(index, 1);
     setter(next);
@@ -457,9 +554,9 @@ function ResidentPage({ defaultMode }) {
     <div className="resident-page">
       <div className="resident-page__header">
         <div>
-          <h1 className="resident-page__title">Quản lý cư dân</h1>
+          <h1 className="resident-page__title">{t('adminResidents.pageTitle')}</h1>
           <p className="resident-page__subtitle">
-            Tìm kiếm, xem và cập nhật hồ sơ cư dân cùng thông tin y tế và gia đình.
+            {t('adminResidents.pageSubtitle')}
           </p>
         </div>
         <div className="resident-page__actions">
@@ -469,15 +566,17 @@ function ResidentPage({ defaultMode }) {
             disabled={loading}
           >
             <RefreshCw size={16} className={loading ? 'spin' : ''} />
-            Làm mới
+            {t('adminResidents.refreshButton')}
           </button>
-          <button
-            className="resident-page__button resident-page__button--primary"
-            onClick={handleOpenCreate}
-          >
-            <Plus size={16} />
-            Thêm cư dân
-          </button>
+          {canManageResidents && (
+            <button
+              className="resident-page__button resident-page__button--primary"
+              onClick={handleOpenCreate}
+            >
+              <Plus size={16} />
+              {t('adminResidents.addResidentButton')}
+            </button>
+          )}
         </div>
       </div>
 
@@ -487,7 +586,7 @@ function ResidentPage({ defaultMode }) {
             <Users size={20} />
           </div>
           <div>
-            <span>Tổng cư dân</span>
+            <span>{t('adminResidents.stats.totalResidents')}</span>
             <strong>{String(total).padStart(2, '0')}</strong>
           </div>
         </div>
@@ -496,7 +595,7 @@ function ResidentPage({ defaultMode }) {
             <Home size={20} />
           </div>
           <div>
-            <span>Đã nhận vào ở</span>
+            <span>{t('adminResidents.stats.admitted')}</span>
             <strong>{String(stats.admittedCount).padStart(2, '0')}</strong>
           </div>
         </div>
@@ -505,7 +604,7 @@ function ResidentPage({ defaultMode }) {
             <HeartPulse size={20} />
           </div>
           <div>
-            <span>Chờ xử lý</span>
+            <span>{t('adminResidents.stats.pending')}</span>
             <strong>{String(stats.pendingCount).padStart(2, '0')}</strong>
           </div>
         </div>
@@ -514,7 +613,7 @@ function ResidentPage({ defaultMode }) {
             <Users size={20} />
           </div>
           <div>
-            <span>Không hoạt động</span>
+            <span>{t('adminResidents.stats.inactive')}</span>
             <strong>{String(stats.inactiveCount).padStart(2, '0')}</strong>
           </div>
         </div>
@@ -523,46 +622,46 @@ function ResidentPage({ defaultMode }) {
       <form className="resident-page__filters" onSubmit={handleApplyFilters}>
         <div className="resident-page__filter-row">
           <label className="resident-page__filter">
-            <span>Tìm kiếm</span>
+            <span>{t('adminResidents.filters.search')}</span>
             <div className="resident-page__filter-input">
               <Search size={16} />
               <input
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Tìm theo mã, họ tên, CCCD"
+                placeholder={t('adminResidents.filters.searchPlaceholder')}
               />
             </div>
           </label>
 
           <label className="resident-page__filter">
-            <span>Trạng thái</span>
+            <span>{t('adminResidents.filters.status')}</span>
             <select value={residencyStatus} onChange={(e) => setResidencyStatus(e.target.value)}>
               {RESIDENCY_STATUSES.map((option) => (
                 <option key={option.value} value={option.value}>
-                  {option.label}
+                  {t(option.i18nKey)}
                 </option>
               ))}
             </select>
           </label>
 
           <label className="resident-page__filter">
-            <span>Giới tính</span>
+            <span>{t('adminResidents.filters.gender')}</span>
             <select value={gender} onChange={(e) => setGender(e.target.value)}>
               {GENDERS.map((option) => (
                 <option key={option.value} value={option.value}>
-                  {option.label}
+                  {t(option.i18nKey)}
                 </option>
               ))}
             </select>
           </label>
 
           <label className="resident-page__filter">
-            <span>Nhóm máu</span>
+            <span>{t('adminResidents.filters.bloodType')}</span>
             <select value={bloodType} onChange={(e) => setBloodType(e.target.value)}>
               {BLOOD_TYPES.map((option) => (
                 <option key={option.value} value={option.value}>
-                  {option.label}
+                  {t(option.i18nKey)}
                 </option>
               ))}
             </select>
@@ -571,7 +670,7 @@ function ResidentPage({ defaultMode }) {
 
         <div className="resident-page__filter-row">
           <label className="resident-page__filter">
-            <span>Nhận vào từ ngày</span>
+            <span>{t('adminResidents.filters.admittedFrom')}</span>
             <input
               type="date"
               value={admittedFrom}
@@ -580,7 +679,7 @@ function ResidentPage({ defaultMode }) {
           </label>
 
           <label className="resident-page__filter">
-            <span>Nhận vào đến ngày</span>
+            <span>{t('adminResidents.filters.admittedTo')}</span>
             <input
               type="date"
               value={admittedTo}
@@ -590,14 +689,14 @@ function ResidentPage({ defaultMode }) {
 
           <div className="resident-page__filter-actions">
             <button className="resident-page__button resident-page__button--primary" type="submit">
-              Áp dụng bộ lọc
+              {t('adminResidents.filters.applyFilters')}
             </button>
             <button
               className="resident-page__button resident-page__button--ghost"
               type="button"
               onClick={handleResetFilters}
             >
-              Đặt lại
+              {t('adminResidents.filters.resetFilters')}
             </button>
           </div>
         </div>
@@ -609,28 +708,31 @@ function ResidentPage({ defaultMode }) {
         <table className="resident-page__table-element">
           <thead>
             <tr className="resident-page__table-header">
-              <th>Mã</th>
-              <th>Họ tên</th>
-              <th>Trạng thái</th>
-              <th>Phòng</th>
-              <th>Giường</th>
-              <th>Ngày nhận vào</th>
-              <th>Hành động</th>
+              <th>{t('adminResidents.table.code')}</th>
+              <th>{t('adminResidents.table.avatar')}</th>
+              <th>{t('adminResidents.table.fullName')}</th>
+              <th>{t('adminResidents.table.citizenId')}</th>
+              <th>{t('adminResidents.table.status')}</th>
+              <th>{t('adminResidents.table.room')}</th>
+              <th>{t('adminResidents.table.bed')}</th>
+              <th>{t('adminResidents.table.admittedAt')}</th>
+              <th>{t('adminResidents.table.actions')}</th>
             </tr>
           </thead>
           <tbody>
+
             {loading && (
               <tr>
-                <td colSpan="7" className="resident-page__empty">
-                  Đang tải danh sách cư dân...
+                <td colSpan="9" className="resident-page__empty">
+                  {t('adminResidents.table.loading')}
                 </td>
               </tr>
             )}
 
             {!loading && residents.length === 0 && (
               <tr>
-                <td colSpan="7" className="resident-page__empty">
-                  Không tìm thấy cư dân nào.
+                <td colSpan="9" className="resident-page__empty">
+                  {t('adminResidents.table.empty')}
                 </td>
               </tr>
             )}
@@ -640,11 +742,16 @@ function ResidentPage({ defaultMode }) {
                 <tr key={resident._id} className="resident-page__table-row">
                   <td>{resident.residentCode}</td>
                   <td>
-                    <div className="resident-page__name">
-                      <strong>{resident.fullName}</strong>
-                      <span>{resident.citizenId || 'Chưa có CCCD'}</span>
-                    </div>
+                    <img
+                      src={resident.avatarUrl || AVATAR_PLACEHOLDER}
+                      alt={resident.fullName || 'avatar'}
+                      className="resident-page__avatar"
+                    />
                   </td>
+                  <td>
+                    <strong>{resident.fullName}</strong>
+                  </td>
+                  <td>{resident.citizenId || '—'}</td>
                   <td>
                     <span
                       className={`resident-page__status resident-page__status--${
@@ -654,8 +761,8 @@ function ResidentPage({ defaultMode }) {
                       {resident.residencyStatus || 'pending'}
                     </span>
                   </td>
-                  <td>{resident.room?.roomCode || 'Chưa phân công'}</td>
-                  <td>{resident.bed?.bedCode || 'Chưa phân công'}</td>
+                  <td>{resident.room?.roomNumber || t('adminResidents.table.unassigned')}</td>
+                  <td>{resident.bed?.bedCode || t('adminResidents.table.unassigned')}</td>
                   <td>{formatDateTime(resident.admittedAt)}</td>
                   <td>
                     <button
@@ -663,7 +770,7 @@ function ResidentPage({ defaultMode }) {
                       onClick={() => handleOpenDetail(resident._id)}
                     >
                       <Eye size={16} />
-                      Xem
+                      {t('adminResidents.table.viewButton')}
                     </button>
                   </td>
                 </tr>
@@ -679,17 +786,17 @@ function ResidentPage({ defaultMode }) {
           disabled={page <= 1}
         >
           <ChevronLeft size={16} />
-          Trước
+          {t('adminResidents.pagination.previous')}
         </button>
         <span>
-          Trang {page} / {totalPages}
+          {t('adminResidents.pagination.pageOf', { page, totalPages })}
         </span>
         <button
           className="resident-page__page-btn"
           onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
           disabled={page >= totalPages}
         >
-          Tiếp
+          {t('adminResidents.pagination.next')}
           <ChevronRight size={16} />
         </button>
       </div>
@@ -699,8 +806,8 @@ function ResidentPage({ defaultMode }) {
           <div className="resident-modal__content">
             <div className="resident-modal__header">
               <div>
-                <h2>Tạo hồ sơ cư dân</h2>
-                <p>Nhập thông tin cá nhân và gia đình để mở hồ sơ mới.</p>
+                <h2>{t('adminResidents.createModal.title')}</h2>
+                <p>{t('adminResidents.createModal.subtitle')}</p>
               </div>
               <button className="resident-modal__close" onClick={handleCloseCreate}>
                 <X size={18} />
@@ -710,39 +817,30 @@ function ResidentPage({ defaultMode }) {
             <form className="resident-modal__body" onSubmit={handleCreateResident}>
               <div className="resident-form-grid">
                 <label>
-                  Họ tên *
+                  {t('adminResidents.createModal.fullNameLabel')}
                   <input
                     type="text"
                     value={createForm.fullName}
                     onChange={(e) =>
                       setCreateForm((prev) => ({ ...prev, fullName: e.target.value }))
                     }
-                    placeholder="Nhập họ tên cư dân"
+                    placeholder={t('adminResidents.createModal.fullNamePlaceholder')}
                   />
                 </label>
                 <label>
-                  Mã cư dân
+                  {t('adminResidents.createModal.residentCodeLabel')}
                   <input
                     type="text"
                     value={createForm.residentCode}
                     onChange={(e) =>
                       setCreateForm((prev) => ({ ...prev, residentCode: e.target.value }))
                     }
-                    placeholder="Tự động tạo nếu để trống"
+                    placeholder={t('adminResidents.createModal.residentCodePlaceholder')}
                   />
                 </label>
+
                 <label>
-                  Ngày sinh
-                  <input
-                    type="date"
-                    value={createForm.dateOfBirth}
-                    onChange={(e) =>
-                      setCreateForm((prev) => ({ ...prev, dateOfBirth: e.target.value }))
-                    }
-                  />
-                </label>
-                <label>
-                  Giới tính
+                  {t('adminResidents.createModal.genderLabel')}
                   <select
                     value={createForm.gender}
                     onChange={(e) =>
@@ -751,13 +849,13 @@ function ResidentPage({ defaultMode }) {
                   >
                     {GENDERS.filter((option) => option.value !== '').map((option) => (
                       <option key={option.value} value={option.value}>
-                        {option.label}
+                        {t(option.i18nKey)}
                       </option>
                     ))}
                   </select>
                 </label>
                 <label>
-                  CCCD
+                  {t('adminResidents.createModal.citizenIdLabel')}
                   <input
                     type="text"
                     value={createForm.citizenId}
@@ -767,7 +865,7 @@ function ResidentPage({ defaultMode }) {
                   />
                 </label>
                 <label>
-                  Số bảo hiểm
+                  {t('adminResidents.createModal.insuranceLabel')}
                   <input
                     type="text"
                     value={createForm.insuranceNumber}
@@ -777,7 +875,7 @@ function ResidentPage({ defaultMode }) {
                   />
                 </label>
                 <label>
-                  Nhóm máu
+                  {t('adminResidents.createModal.bloodTypeLabel')}
                   <select
                     value={createForm.bloodType}
                     onChange={(e) =>
@@ -786,13 +884,13 @@ function ResidentPage({ defaultMode }) {
                   >
                     {BLOOD_TYPES.filter((option) => option.value !== '').map((option) => (
                       <option key={option.value} value={option.value}>
-                        {option.label}
+                        {t(option.i18nKey)}
                       </option>
                     ))}
                   </select>
                 </label>
                 <label className="full">
-                  Địa chỉ
+                  {t('adminResidents.createModal.addressLabel')}
                   <input
                     type="text"
                     value={createForm.personalAddress}
@@ -802,7 +900,7 @@ function ResidentPage({ defaultMode }) {
                   />
                 </label>
                 <label>
-                  Trạng thái cư trú
+                  {t('adminResidents.createModal.residencyStatusLabel')}
                   <select
                     value={createForm.residencyStatus}
                     onChange={(e) =>
@@ -811,13 +909,13 @@ function ResidentPage({ defaultMode }) {
                   >
                     {RESIDENCY_STATUSES.filter((option) => option.value !== '').map((option) => (
                       <option key={option.value} value={option.value}>
-                        {option.label}
+                        {t(option.i18nKey)}
                       </option>
                     ))}
                   </select>
                 </label>
                 <label>
-                  Ngày nhận vào
+                  {t('adminResidents.createModal.admittedAtLabel')}
                   <input
                     type="datetime-local"
                     value={createForm.admittedAt}
@@ -827,7 +925,7 @@ function ResidentPage({ defaultMode }) {
                   />
                 </label>
                 <label>
-                  Ngày xuất viện
+                  {t('adminResidents.createModal.dischargedAtLabel')}
                   <input
                     type="datetime-local"
                     value={createForm.dischargedAt}
@@ -837,7 +935,7 @@ function ResidentPage({ defaultMode }) {
                   />
                 </label>
                 <label>
-                  Gói dịch vụ
+                  {t('adminResidents.createModal.servicePackageLabel')}
                   <input
                     type="text"
                     value={createForm.servicePackage}
@@ -847,7 +945,7 @@ function ResidentPage({ defaultMode }) {
                   />
                 </label>
                 <label className="full">
-                  Dị ứng (mỗi dòng một mục)
+                  {t('adminResidents.createModal.allergiesLabel')}
                   <textarea
                     rows="3"
                     value={createForm.allergies}
@@ -857,7 +955,7 @@ function ResidentPage({ defaultMode }) {
                   />
                 </label>
                 <label className="full">
-                  Bệnh mãn tính (mỗi dòng một mục)
+                  {t('adminResidents.createModal.chronicConditionsLabel')}
                   <textarea
                     rows="3"
                     value={createForm.chronicConditions}
@@ -867,7 +965,7 @@ function ResidentPage({ defaultMode }) {
                   />
                 </label>
                 <label className="full">
-                  Tình trạng sức khỏe ban đầu
+                  {t('adminResidents.createModal.initialHealthLabel')}
                   <textarea
                     rows="3"
                     value={createForm.initialHealthCondition}
@@ -880,23 +978,23 @@ function ResidentPage({ defaultMode }) {
 
               <div className="resident-form-section">
                 <div className="resident-form-section__header">
-                  <h3>Liên hệ khẩn cấp</h3>
+                  <h3>{t('adminResidents.contacts.sectionTitle')}</h3>
                   <button
                     type="button"
                     className="resident-page__button resident-page__button--ghost"
                     onClick={() => addContactRow(setCreateContacts, createContacts)}
                   >
-                    Thêm liên hệ
+                    {t('adminResidents.contacts.addContact')}
                   </button>
                 </div>
                 {createContacts.length === 0 && (
-                  <p className="resident-form-empty">Chưa có liên hệ nào.</p>
+                  <p className="resident-form-empty">{t('adminResidents.contacts.noContacts')}</p>
                 )}
                 {createContacts.map((contact, index) => (
                   <div key={`create-contact-${index}`} className="resident-contact-row">
                     <input
                       type="text"
-                      placeholder="Họ tên"
+                      placeholder={t('adminResidents.contacts.fullNamePlaceholder')}
                       value={contact.fullName}
                       onChange={(e) =>
                         updateContact(index, 'fullName', e.target.value, setCreateContacts, createContacts)
@@ -904,7 +1002,7 @@ function ResidentPage({ defaultMode }) {
                     />
                     <input
                       type="text"
-                      placeholder="Quan hệ"
+                      placeholder={t('adminResidents.contacts.relationshipPlaceholder')}
                       value={contact.relationship}
                       onChange={(e) =>
                         updateContact(index, 'relationship', e.target.value, setCreateContacts, createContacts)
@@ -912,7 +1010,7 @@ function ResidentPage({ defaultMode }) {
                     />
                     <input
                       type="text"
-                      placeholder="Điện thoại"
+                      placeholder={t('adminResidents.contacts.phonePlaceholder')}
                       value={contact.phone}
                       onChange={(e) =>
                         updateContact(index, 'phone', e.target.value, setCreateContacts, createContacts)
@@ -920,7 +1018,7 @@ function ResidentPage({ defaultMode }) {
                     />
                     <input
                       type="email"
-                      placeholder="Email"
+                      placeholder={t('adminResidents.contacts.emailPlaceholder')}
                       value={contact.email}
                       onChange={(e) =>
                         updateContact(index, 'email', e.target.value, setCreateContacts, createContacts)
@@ -928,7 +1026,7 @@ function ResidentPage({ defaultMode }) {
                     />
                     <input
                       type="text"
-                      placeholder="Địa chỉ"
+                      placeholder={t('adminResidents.contacts.addressPlaceholder')}
                       value={contact.address}
                       onChange={(e) =>
                         updateContact(index, 'address', e.target.value, setCreateContacts, createContacts)
@@ -942,27 +1040,22 @@ function ResidentPage({ defaultMode }) {
                           updateContact(index, 'isPrimary', e.target.checked, setCreateContacts, createContacts)
                         }
                       />
-                      Liên hệ chính
+                      {t('adminResidents.contacts.isPrimaryLabel')}
                     </label>
                     <button
                       type="button"
                       className="resident-contact-row__remove"
                       onClick={() => removeContact(index, setCreateContacts, createContacts)}
                     >
-                      Xóa
+                      {t('adminResidents.contacts.removeButton')}
                     </button>
                   </div>
                 ))}
               </div>
 
               <div className="resident-form-section">
-                <h3>ID tài khoản gia đình (mỗi dòng một ID)</h3>
-                <textarea
-                  rows="3"
-                  value={createFamilyIds}
-                  onChange={(e) => setCreateFamilyIds(e.target.value)}
-                  placeholder="Dán ID tài khoản thành viên gia đình vào đây"
-                />
+                <h3>{t('admin.residents.common.familyAccountsLabel')}</h3>
+                <FamilyAccountPicker value={createFamilyAccounts} onChange={setCreateFamilyAccounts} />
               </div>
 
               {createError && <p className="resident-form-error">{createError}</p>}
@@ -973,14 +1066,14 @@ function ResidentPage({ defaultMode }) {
                   className="resident-page__button resident-page__button--ghost"
                   onClick={handleCloseCreate}
                 >
-                  Huỷ
+                  {t('adminResidents.buttons.cancel')}
                 </button>
                 <button
                   type="submit"
                   className="resident-page__button resident-page__button--primary"
                   disabled={creating}
                 >
-                  {creating ? 'Đang tạo...' : 'Tạo cư dân'}
+                  {creating ? t('adminResidents.buttons.creating') : t('adminResidents.buttons.createResident')}
                 </button>
               </div>
             </form>
@@ -993,55 +1086,80 @@ function ResidentPage({ defaultMode }) {
           <div className="resident-modal__content resident-modal__content--wide">
             <div className="resident-modal__header">
               <div>
-                <h2>Hồ sơ cư dân</h2>
-                <p>Xem và cập nhật thông tin cá nhân hoặc gia đình.</p>
+                <h2>{t('adminResidents.detailModal.title')}</h2>
+                <p>
+                  {canManageResidents
+                    ? t('adminResidents.detailModal.subtitleEdit')
+                    : t('adminResidents.detailModal.subtitleReadOnly')}
+                </p>
               </div>
               <button className="resident-modal__close" onClick={handleCloseDetail}>
                 <X size={18} />
               </button>
             </div>
 
-            {detailLoading && <p className="resident-form-empty">Đang tải thông tin...</p>}
+            {detailLoading && <p className="resident-form-empty">{t('adminResidents.detailModal.loadingInfo')}</p>}
             {detailError && <p className="resident-form-error">{detailError}</p>}
 
             {!detailLoading && selectedResident && (
               <div className="resident-modal__body">
                 <div className="resident-detail-card">
-                  <div>
-                    <h3>{selectedResident.fullName}</h3>
-                    <p>{selectedResident.residentCode}</p>
+                  <div className="resident-detail-card__identity">
+                                    <div className="resident-avatar">
+                                      <img
+                                        src={selectedResident.avatarUrl || AVATAR_PLACEHOLDER}
+                                        alt="avatar"
+                                        width="96"
+                                        height="96"
+                                      />
+                      {canManageResidents && (
+                        <div className="resident-avatar__upload">
+                          <label className="button button--ghost">
+                            {avatarUploading ? t('adminResidents.detailModal.uploadingAvatar') : t('adminResidents.detailModal.changeAvatar')}
+                            <input type="file" accept="image/*" onChange={handleAvatarFileChange} style={{ display: 'none' }} />
+                          </label>
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <h3>{selectedResident.fullName}</h3>
+                      <p>{selectedResident.residentCode}</p>
+                    </div>
                   </div>
                   <div>
-                    <span>Trạng thái</span>
+                    <span>{t('adminResidents.detailModal.statusLabel')}</span>
                     <strong>{selectedResident.residencyStatus}</strong>
                   </div>
                   <div>
-                    <span>Phòng / Giường</span>
+                    <span>{t('adminResidents.detailModal.roomBedLabel')}</span>
                     <strong>
-                      {selectedResident.room?.roomCode || 'Chưa phân công'} /{' '}
-                      {selectedResident.bed?.bedCode || 'Chưa phân công'}
+                      {selectedResident.room?.roomNumber || t('adminResidents.table.unassigned')} /{' '}
+                      {selectedResident.bed?.bedCode || t('adminResidents.table.unassigned')}
                     </strong>
                   </div>
                   <div>
-                    <span>Ngày nhận vào</span>
+                    <span>{t('adminResidents.detailModal.admittedAtLabel')}</span>
                     <strong>{formatDateTime(selectedResident.admittedAt)}</strong>
                   </div>
                 </div>
 
                 <form className="resident-form-section" onSubmit={handleSavePersonalInfo}>
                   <div className="resident-form-section__header">
-                    <h3>Thông tin cá nhân</h3>
-                    <button
-                      className="resident-page__button resident-page__button--primary"
-                      type="submit"
-                      disabled={personalSaving}
-                    >
-                      {personalSaving ? 'Đang lưu...' : 'Lưu thông tin cá nhân'}
-                    </button>
+                    <h3>{t('adminResidents.personalInfo.sectionTitle')}</h3>
+                    {canManageResidents && (
+                      <button
+                        className="resident-page__button resident-page__button--primary"
+                        type="submit"
+                        disabled={personalSaving}
+                      >
+                        {personalSaving ? t('adminResidents.personalInfo.saving') : t('adminResidents.personalInfo.saveButton')}
+                      </button>
+                    )}
                   </div>
+                  <fieldset className="resident-form-fieldset" disabled={!canManageResidents}>
                   <div className="resident-form-grid">
                     <label>
-                      Họ tên *
+                      {t('adminResidents.personalInfo.fullNameLabel')}
                       <input
                         type="text"
                         value={personalForm.fullName}
@@ -1051,7 +1169,7 @@ function ResidentPage({ defaultMode }) {
                       />
                     </label>
                     <label>
-                      Ngày sinh
+                      {t('adminResidents.personalInfo.dobLabel')}
                       <input
                         type="date"
                         value={personalForm.dateOfBirth}
@@ -1061,7 +1179,7 @@ function ResidentPage({ defaultMode }) {
                       />
                     </label>
                     <label>
-                      Giới tính
+                      {t('adminResidents.personalInfo.genderLabel')}
                       <select
                         value={personalForm.gender}
                         onChange={(e) =>
@@ -1070,13 +1188,13 @@ function ResidentPage({ defaultMode }) {
                       >
                         {GENDERS.filter((option) => option.value !== '').map((option) => (
                           <option key={option.value} value={option.value}>
-                            {option.label}
+                            {t(option.i18nKey)}
                           </option>
                         ))}
                       </select>
                     </label>
                     <label>
-                      CCCD
+                      {t('adminResidents.personalInfo.citizenIdLabel')}
                       <input
                         type="text"
                         value={personalForm.citizenId}
@@ -1086,7 +1204,7 @@ function ResidentPage({ defaultMode }) {
                       />
                     </label>
                     <label>
-                      Số bảo hiểm
+                      {t('adminResidents.personalInfo.insuranceLabel')}
                       <input
                         type="text"
                         value={personalForm.insuranceNumber}
@@ -1096,7 +1214,7 @@ function ResidentPage({ defaultMode }) {
                       />
                     </label>
                     <label>
-                      Nhóm máu
+                      {t('adminResidents.personalInfo.bloodTypeLabel')}
                       <select
                         value={personalForm.bloodType}
                         onChange={(e) =>
@@ -1105,13 +1223,13 @@ function ResidentPage({ defaultMode }) {
                       >
                         {BLOOD_TYPES.filter((option) => option.value !== '').map((option) => (
                           <option key={option.value} value={option.value}>
-                            {option.label}
+                            {t(option.i18nKey)}
                           </option>
                         ))}
                       </select>
                     </label>
                     <label className="full">
-                      Địa chỉ
+                      {t('adminResidents.personalInfo.addressLabel')}
                       <input
                         type="text"
                         value={personalForm.personalAddress}
@@ -1121,7 +1239,7 @@ function ResidentPage({ defaultMode }) {
                       />
                     </label>
                     <label className="full">
-                      Dị ứng (mỗi dòng một mục)
+                      {t('adminResidents.personalInfo.allergiesLabel')}
                       <textarea
                         rows="3"
                         value={personalForm.allergies}
@@ -1131,7 +1249,7 @@ function ResidentPage({ defaultMode }) {
                       />
                     </label>
                     <label className="full">
-                      Bệnh mãn tính (mỗi dòng một mục)
+                      {t('adminResidents.personalInfo.chronicConditionsLabel')}
                       <textarea
                         rows="3"
                         value={personalForm.chronicConditions}
@@ -1141,7 +1259,7 @@ function ResidentPage({ defaultMode }) {
                       />
                     </label>
                     <label className="full">
-                      Tình trạng sức khỏe ban đầu
+                      {t('adminResidents.personalInfo.initialHealthLabel')}
                       <textarea
                         rows="3"
                         value={personalForm.initialHealthCondition}
@@ -1151,40 +1269,46 @@ function ResidentPage({ defaultMode }) {
                       />
                     </label>
                   </div>
+                  </fieldset>
                   {personalError && <p className="resident-form-error">{personalError}</p>}
                 </form>
 
                 <form className="resident-form-section" onSubmit={handleSaveFamilyInfo}>
                   <div className="resident-form-section__header">
-                    <h3>Thông tin gia đình</h3>
-                    <button
-                      className="resident-page__button resident-page__button--primary"
-                      type="submit"
-                      disabled={familySaving}
-                    >
-                      {familySaving ? 'Đang lưu...' : 'Lưu thông tin gia đình'}
-                    </button>
+                    <h3>{t('adminResidents.familyInfo.sectionTitle')}</h3>
+                    {canManageResidents && (
+                      <button
+                        className="resident-page__button resident-page__button--primary"
+                        type="submit"
+                        disabled={familySaving}
+                      >
+                        {familySaving ? t('adminResidents.familyInfo.saving') : t('adminResidents.familyInfo.saveButton')}
+                      </button>
+                    )}
                   </div>
 
+                  <fieldset className="resident-form-fieldset" disabled={!canManageResidents}>
                   <div className="resident-form-section__header sub">
-                    <h4>Liên hệ khẩn cấp</h4>
-                    <button
-                      type="button"
-                      className="resident-page__button resident-page__button--ghost"
-                      onClick={() => addContactRow(setFamilyContacts, familyContacts)}
-                    >
-                      Thêm liên hệ
-                    </button>
+                    <h4>{t('adminResidents.familyInfo.emergencyContactsTitle')}</h4>
+                    {canManageResidents && (
+                      <button
+                        type="button"
+                        className="resident-page__button resident-page__button--ghost"
+                        onClick={() => addContactRow(setFamilyContacts, familyContacts)}
+                      >
+                        {t('adminResidents.contacts.addContact')}
+                      </button>
+                    )}
                   </div>
 
                   {familyContacts.length === 0 && (
-                    <p className="resident-form-empty">Chưa có liên hệ nào.</p>
+                    <p className="resident-form-empty">{t('adminResidents.contacts.noContacts')}</p>
                   )}
                   {familyContacts.map((contact, index) => (
                     <div key={`family-contact-${index}`} className="resident-contact-row">
                       <input
                         type="text"
-                        placeholder="Họ tên"
+                        placeholder={t('adminResidents.contacts.fullNamePlaceholder')}
                         value={contact.fullName || ''}
                         onChange={(e) =>
                           updateContact(index, 'fullName', e.target.value, setFamilyContacts, familyContacts)
@@ -1192,7 +1316,7 @@ function ResidentPage({ defaultMode }) {
                       />
                       <input
                         type="text"
-                        placeholder="Quan hệ"
+                        placeholder={t('adminResidents.contacts.relationshipPlaceholder')}
                         value={contact.relationship || ''}
                         onChange={(e) =>
                           updateContact(index, 'relationship', e.target.value, setFamilyContacts, familyContacts)
@@ -1200,7 +1324,7 @@ function ResidentPage({ defaultMode }) {
                       />
                       <input
                         type="text"
-                        placeholder="Điện thoại"
+                        placeholder={t('adminResidents.contacts.phonePlaceholder')}
                         value={contact.phone || ''}
                         onChange={(e) =>
                           updateContact(index, 'phone', e.target.value, setFamilyContacts, familyContacts)
@@ -1208,7 +1332,7 @@ function ResidentPage({ defaultMode }) {
                       />
                       <input
                         type="email"
-                        placeholder="Email"
+                        placeholder={t('adminResidents.contacts.emailPlaceholder')}
                         value={contact.email || ''}
                         onChange={(e) =>
                           updateContact(index, 'email', e.target.value, setFamilyContacts, familyContacts)
@@ -1216,7 +1340,7 @@ function ResidentPage({ defaultMode }) {
                       />
                       <input
                         type="text"
-                        placeholder="Địa chỉ"
+                        placeholder={t('adminResidents.contacts.addressPlaceholder')}
                         value={contact.address || ''}
                         onChange={(e) =>
                           updateContact(index, 'address', e.target.value, setFamilyContacts, familyContacts)
@@ -1230,27 +1354,25 @@ function ResidentPage({ defaultMode }) {
                             updateContact(index, 'isPrimary', e.target.checked, setFamilyContacts, familyContacts)
                           }
                         />
-                        Liên hệ chính
+                        {t('adminResidents.contacts.isPrimaryLabel')}
                       </label>
-                      <button
-                        type="button"
-                        className="resident-contact-row__remove"
-                        onClick={() => removeContact(index, setFamilyContacts, familyContacts)}
-                      >
-                        Xóa
-                      </button>
+                      {!(contact._id && contact.isPrimary) && (
+                        <button
+                          type="button"
+                          className="resident-contact-row__remove"
+                          onClick={() => removeContact(index, setFamilyContacts, familyContacts)}
+                        >
+                          {t('adminResidents.contacts.removeButton')}
+                        </button>
+                      )}
                     </div>
                   ))}
 
                   <div className="resident-form-section">
-                    <h4>ID tài khoản gia đình (mỗi dòng một ID)</h4>
-                    <textarea
-                      rows="3"
-                      value={familyIds}
-                      onChange={(e) => setFamilyIds(e.target.value)}
-                      placeholder="Dán ID tài khoản thành viên gia đình vào đây"
-                    />
+                    <h4>{t('admin.residents.common.familyAccountsLabel')}</h4>
+                    <FamilyAccountPicker value={familyAccounts} onChange={setFamilyAccounts} />
                   </div>
+                  </fieldset>
 
                   {familyError && <p className="resident-form-error">{familyError}</p>}
                 </form>
@@ -1263,8 +1385,6 @@ function ResidentPage({ defaultMode }) {
   );
 }
 
-ResidentPage.defaultProps = {
-  defaultMode: '',
-};
+// defaultMode default parameter is set in the function signature
 
 export default ResidentPage;

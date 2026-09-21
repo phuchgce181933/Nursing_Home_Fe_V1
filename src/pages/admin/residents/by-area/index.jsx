@@ -1,15 +1,25 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Search, RefreshCw, Building2, MapPin } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { Search, RefreshCw, Building2, MapPin, Download } from 'lucide-react';
 import AdminPageShell from '../../../../components/admin/AdminPageShell';
+import ListPagination from '../../../../components/ui/ListPagination';
+import { ADMIN_LIST_PAGE_SIZE } from '../../../../constants/adminListPage';
+import useDebouncedSearch from '../../../../hooks/useDebouncedSearch';
 import facilityService, { getFacilityErrorMessage } from '../../../../services/facility.service';
 import residentService, { RESIDENT_AREA_ROUTE_HINT } from '../../../../services/resident.service';
 import { FaEye } from 'react-icons/fa';
 import { formatLeaveDate } from '../../../../utils/leaveUtils';
 import '../../../../styles/admin/residentActionIcons.css';
-import { GENDER_LABELS, RESIDENCY_LABELS } from '../_shared/residentLabels';
+import { getGenderLabel, getResidencyLabel } from '../_shared/residentLabels';
 import { formatResidentAreaLine, pickDrugAllergiesList } from '../../../../utils/residentArea';
+import {
+  exportResidentListToCSV,
+  exportResidentListToPDF,
+} from '../../../../utils/residentListExport';
+import { useAuth } from '../../../../hooks/useAuth';
+import { useToast } from '../../../../hooks/useToast';
 
-function ResidentDetailModal({ loading, error, resident, onClose }) {
+function ResidentDetailModal({ loading, error, resident, onClose, t }) {
   if (!loading && !error && !resident) return null;
 
   const area = resident?.area;
@@ -18,60 +28,61 @@ function ResidentDetailModal({ loading, error, resident, onClose }) {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal modal--wide" onClick={(e) => e.stopPropagation()}>
-        <h2 className="modal__title">Chi tiết cư dân</h2>
+        <h2 className="modal__title">{t('admin.residents.byArea.residentDetailModal')}</h2>
 
-        {loading && <p className="empty-state">Đang tải...</p>}
+        {loading && <p className="empty-state">{t('common.loading')}</p>}
         {!loading && error && <p className="form-error">{error}</p>}
 
         {!loading && !error && resident && (
           <>
-            <div className="modal__section">Thông tin cơ bản</div>
-            <div className="detail-row"><strong>Mã:</strong> {resident.residentCode}</div>
-            <div className="detail-row"><strong>Họ tên:</strong> {resident.fullName}</div>
+            <div className="modal__section">{t('admin.residents.common.basicInfo')}</div>
+            <div className="detail-row"><strong>{t('admin.residents.common.colCode')}:</strong> {resident.residentCode}</div>
+            <div className="detail-row"><strong>{t('admin.residents.common.colFullName')}:</strong> {resident.fullName}</div>
             <div className="detail-row">
-              <strong>Ngày sinh:</strong>{' '}
+              <strong>{t('admin.residents.common.dateOfBirth')}:</strong>{' '}
               {resident.dateOfBirth ? formatLeaveDate(resident.dateOfBirth) : '—'}
-              {resident.age != null && ` (${resident.age} tuổi)`}
+              {resident.age != null && ` ${t('admin.residents.byArea.ageSuffix', { age: resident.age })}`}
             </div>
             <div className="detail-row">
-              <strong>Giới tính:</strong> {GENDER_LABELS[resident.gender] || resident.gender || '—'}
+              <strong>{t('profile.gender')}:</strong> {getGenderLabel(t, resident.gender)}
             </div>
             <div className="detail-row">
-              <strong>Trạng thái:</strong>{' '}
+              <strong>{t('admin.residents.common.colStatus')}:</strong>{' '}
               <span className={`residency-badge residency-badge--${resident.residencyStatus || 'default'}`}>
-                {RESIDENCY_LABELS[resident.residencyStatus] || resident.residencyStatus}
+                {getResidencyLabel(t, resident.residencyStatus)}
               </span>
             </div>
 
-            <div className="modal__section">Khu vực</div>
+            <div className="modal__section">{t('admin.residents.common.areaSection')}</div>
             <div className="detail-row">
-              <strong>Tòa:</strong> {area?.building?.name || area?.building?.code || '—'}
+              <strong>{t('admin.residents.common.building')}:</strong> {area?.building?.name || area?.building?.code || '—'}
             </div>
             <div className="detail-row">
-              <strong>Tầng:</strong> {area?.floor?.label || area?.floor?.name || '—'}
+              <strong>{t('admin.residents.common.floor')}:</strong> {area?.floor?.label || area?.floor?.name || '—'}
             </div>
             <div className="detail-row">
-              <strong>Phòng:</strong> {area?.room?.label || (area?.room?.roomNumber ? `Phòng ${area.room.roomNumber}` : '—')}
+              <strong>{t('admin.residents.common.room')}:</strong>{' '}
+              {area?.room?.label || (area?.room?.roomNumber ? `${t('admin.residents.common.room')} ${area.room.roomNumber}` : '—')}
             </div>
             <div className="detail-row">
-              <strong>Giường:</strong> {area?.bed?.bedCode || '—'}
+              <strong>{t('admin.residents.common.bed')}:</strong> {area?.bed?.bedCode || '—'}
             </div>
 
-            <div className="modal__section">Sức khỏe khi nhập viện</div>
+            <div className="modal__section">{t('admin.residents.common.healthAtAdmission')}</div>
             <div className="detail-row">
-              <strong>Nhóm máu:</strong>{' '}
+              <strong>{t('admin.residents.common.bloodType')}:</strong>{' '}
               {resident.bloodType && resident.bloodType !== 'unknown' ? resident.bloodType : '—'}
             </div>
             <div className="detail-row">
-              <strong>Tình trạng khi nhập viện:</strong>
+              <strong>{t('admin.residents.common.initialCondition')}:</strong>
             </div>
             <div className="health-description">
               {resident.initialHealthCondition || '—'}
             </div>
 
-            <div className="modal__section">Bệnh lý &amp; tiền sử (trước vào viện)</div>
+            <div className="modal__section">{t('admin.residents.common.chronicAndHistory')}</div>
             <div className="detail-row">
-              <strong>Bệnh lý nền / mạn tính:</strong>
+              <strong>{t('admin.residents.common.chronicConditions')}:</strong>
               {resident.chronicConditions?.length ? (
                 <div className="detail-tags">
                   {resident.chronicConditions.map((c) => (
@@ -81,7 +92,7 @@ function ResidentDetailModal({ loading, error, resident, onClose }) {
               ) : '—'}
             </div>
             <div className="detail-row">
-              <strong>Tiền sử bệnh:</strong>
+              <strong>{t('admin.residents.common.medicalHistory')}:</strong>
               {Array.isArray(resident.medicalHistory) && resident.medicalHistory.length ? (
                 <div className="detail-tags">
                   {resident.medicalHistory.map((item) => (
@@ -95,9 +106,9 @@ function ResidentDetailModal({ loading, error, resident, onClose }) {
               )}
             </div>
 
-            <div className="modal__section">Dị ứng thuốc</div>
+            <div className="modal__section">{t('admin.residents.common.drugAllergiesSection')}</div>
             <div className="detail-row">
-              <strong>Thuốc dị ứng:</strong>
+              <strong>{t('admin.residents.common.drugAllergies')}:</strong>
               {drugAllergiesList.length ? (
                 <div className="detail-tags">
                   {drugAllergiesList.map((d) => (
@@ -105,29 +116,29 @@ function ResidentDetailModal({ loading, error, resident, onClose }) {
                   ))}
                 </div>
               ) : (
-                <span className="detail-row--muted">Chưa ghi nhận dị ứng thuốc</span>
+                <span className="detail-row--muted">{t('admin.residents.common.noDrugAllergies')}</span>
               )}
             </div>
 
-            <div className="modal__section">Khác</div>
-            <div className="detail-row"><strong>CCCD:</strong> {resident.citizenId || '—'}</div>
-            <div className="detail-row"><strong>BHYT:</strong> {resident.insuranceNumber || '—'}</div>
-            <div className="detail-row"><strong>Địa chỉ:</strong> {resident.personalAddress || '—'}</div>
+            <div className="modal__section">{t('admin.residents.common.other')}</div>
+            <div className="detail-row"><strong>{t('admin.residents.common.citizenId')}:</strong> {resident.citizenId || '—'}</div>
+            <div className="detail-row"><strong>{t('admin.residents.common.insurance')}:</strong> {resident.insuranceNumber || '—'}</div>
+            <div className="detail-row"><strong>{t('admin.residents.common.address')}:</strong> {resident.personalAddress || '—'}</div>
             <div className="detail-row">
-              <strong>Ngày nhập viện:</strong>{' '}
+              <strong>{t('admin.residents.common.admittedAt')}:</strong>{' '}
               {resident.admittedAt ? formatLeaveDate(resident.admittedAt) : '—'}
             </div>
             <div className="detail-row">
-              <strong>Gói dịch vụ:</strong> {resident.servicePackage || '—'}
+              <strong>{t('admin.residents.common.servicePackage')}:</strong> {resident.servicePackage || '—'}
             </div>
             <div className="detail-row">
-              <strong>Liên hệ khẩn cấp:</strong> {resident.emergencyContactCount ?? 0}
+              <strong>{t('admin.residents.common.emergencyContacts')}:</strong> {resident.emergencyContactCount ?? 0}
             </div>
           </>
         )}
 
         <div className="modal__actions">
-          <button type="button" className="btn-cancel" onClick={onClose}>Đóng</button>
+          <button type="button" className="btn-cancel" onClick={onClose}>{t('admin.residents.common.close')}</button>
         </div>
       </div>
     </div>
@@ -135,11 +146,17 @@ function ResidentDetailModal({ loading, error, resident, onClose }) {
 }
 
 export default function ResidentsByAreaPage() {
+  const { t } = useTranslation();
+  const { showToast } = useToast();
+  const { user } = useAuth();
   const [buildings, setBuildings] = useState([]);
   const [buildingId, setBuildingId] = useState('');
   const [statusFilter, setStatusFilter] = useState('admitted');
-  const [searchInput, setSearchInput] = useState('');
-  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const resetPageOnSearch = useCallback(() => setPage(1), []);
+  const { search, setSearch, debouncedSearch } = useDebouncedSearch({
+    onDebouncedChange: resetPageOnSearch,
+  });
 
   const [summary, setSummary] = useState(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
@@ -150,13 +167,13 @@ export default function ResidentsByAreaPage() {
 
   const [residents, setResidents] = useState([]);
   const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [listLoading, setListLoading] = useState(false);
   const [listError, setListError] = useState('');
 
   const [detailModal, setDetailModal] = useState(null);
   const [usingFallbackApi, setUsingFallbackApi] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     facilityService
@@ -184,12 +201,12 @@ export default function ResidentsByAreaPage() {
       setSummary(data);
       if (data?._fallback) setUsingFallbackApi(true);
     } catch (e) {
-      setSummaryError(e.response?.data?.message || getFacilityErrorMessage(e, 'Không tải được tổng quan khu vực'));
+      setSummaryError(e.response?.data?.message || getFacilityErrorMessage(e, t('admin.residents.byArea.loadSummaryFailed')));
       setSummary(null);
     } finally {
       setSummaryLoading(false);
     }
-  }, [buildingId, statusFilter]);
+  }, [buildingId, statusFilter, t]);
 
   const loadList = useCallback(async () => {
     if (!buildingId && !floorId && !roomId) {
@@ -203,22 +220,22 @@ export default function ResidentsByAreaPage() {
         buildingId: buildingId || undefined,
         floorId: floorId || undefined,
         roomId: roomId || undefined,
-        search: search || undefined,
+        search: debouncedSearch || undefined,
         status: statusFilter || undefined,
         page,
-        limit: 15,
+        limit: ADMIN_LIST_PAGE_SIZE,
       });
       setResidents(Array.isArray(res.data) ? res.data : []);
       setTotal(res.total ?? 0);
       setTotalPages(res.totalPages ?? 0);
       if (res?._fallback) setUsingFallbackApi(true);
     } catch (e) {
-      setListError(e.response?.data?.message || 'Không thể tải danh sách cư dân');
+      setListError(e.response?.data?.message || t('admin.residents.byArea.loadListFailed'));
       setResidents([]);
     } finally {
       setListLoading(false);
     }
-  }, [buildingId, floorId, roomId, search, statusFilter, page]);
+  }, [buildingId, floorId, roomId, debouncedSearch, statusFilter, page, t]);
 
   useEffect(() => {
     setFloorId('');
@@ -230,12 +247,6 @@ export default function ResidentsByAreaPage() {
   useEffect(() => { loadSummary(); }, [loadSummary]);
 
   useEffect(() => { loadList(); }, [loadList]);
-
-  const handleSearch = (e) => {
-    e.preventDefault();
-    setPage(1);
-    setSearch(searchInput.trim());
-  };
 
   const selectFloor = (id) => {
     setFloorId(id);
@@ -263,7 +274,7 @@ export default function ResidentsByAreaPage() {
     } catch (e) {
       setDetailModal({
         loading: false,
-        error: e.response?.data?.message || 'Không thể tải chi tiết',
+        error: e.response?.data?.message || t('admin.residents.common.loadDetailFailed'),
         resident: null,
       });
     }
@@ -275,7 +286,64 @@ export default function ResidentsByAreaPage() {
         ?.find(({ room }) => String(room._id) === String(roomId))?.room.label
     : floorId
       ? summary?.floors?.find((f) => String(f._id) === String(floorId))?.label
-      : buildings.find((b) => String(b._id) === String(buildingId))?.name || 'Toàn tòa';
+      : buildings.find((b) => String(b._id) === String(buildingId))?.name || t('admin.residents.common.wholeBuilding');
+
+  const buildExportFilterSummary = () => {
+    const parts = [];
+    if (activeFilterLabel) parts.push(t('admin.residents.common.areaFilter', { label: activeFilterLabel }));
+    parts.push(
+      t('admin.residents.common.statusFilter', {
+        label: statusFilter ? getResidencyLabel(t, statusFilter) : t('common.allStatuses'),
+      })
+    );
+    if (search) parts.push(t('admin.residents.common.searchFilter', { query: search }));
+    return parts.join(' | ');
+  };
+
+  const handleExport = async (format) => {
+    if (!buildingId) {
+      showToast(t('admin.residents.common.exportSelectBuilding'), 'error');
+      return;
+    }
+    try {
+      setExporting(true);
+      setListError('');
+      const rows = await residentService.fetchAllResidentsByAreaForExport({
+        buildingId,
+        floorId: floorId || undefined,
+        roomId: roomId || undefined,
+        search: debouncedSearch || undefined,
+        status: statusFilter || undefined,
+      });
+      if (!rows.length) {
+        showToast(t('admin.residents.common.exportNoData'), 'error');
+        return;
+      }
+      const meta = {
+        title: t('admin.residents.byArea.export.listTitle'),
+        filterSummary: buildExportFilterSummary(),
+        exportedBy: user?.fullName || user?.email || '—',
+        buildingLabel: activeFilterLabel,
+        buildingId,
+        summaryStats: {
+          totalInBuilding: summary?.totalResidents ?? 0,
+          floorCount: summary?.floors?.length ?? 0,
+          filteredCount: rows.length,
+        },
+      };
+      if (format === 'csv') {
+        exportResidentListToCSV(rows, meta);
+      } else {
+        exportResidentListToPDF(rows, meta, (msg) => showToast(msg, 'error'));
+      }
+    } catch (e) {
+      console.error('Failed to export residents by area:', e);
+      setListError(e.response?.data?.message || t('admin.residents.byArea.exportFailed'));
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const floorOptions = summary?.floors || [];
   const selectedFloor = floorOptions.find((f) => String(f._id) === String(floorId));
   const roomOptions = floorId
@@ -285,88 +353,110 @@ export default function ResidentsByAreaPage() {
   const pageStats = useMemo(
     () => [
       {
-        label: 'Tổng trong tòa',
+        label: t('admin.residents.byArea.statTotalInBuilding'),
         value: String(summary?.totalResidents ?? 0).padStart(2, '0'),
         icon: <Building2 size={20} />,
       },
       {
-        label: 'Số tầng',
+        label: t('admin.residents.byArea.statFloorCount'),
         value: String(summary?.floors?.length ?? 0).padStart(2, '0'),
         icon: <MapPin size={20} />,
         iconClass: 'resident-stat__icon--admitted',
       },
       {
-        label: 'Đang lọc',
+        label: t('admin.residents.byArea.statFiltered'),
         value: String(total).padStart(2, '0'),
         icon: <MapPin size={20} />,
         iconClass: 'resident-stat__icon--pending',
       },
     ],
-    [summary, total]
+    [summary, total, t]
   );
 
   return (
     <AdminPageShell
-      title="Cư dân theo khu vực"
-      subtitle="Lọc theo tòa, tầng, phòng và xem chi tiết hồ sơ cư dân."
+      title={t('admin.residents.byArea.title')}
+      subtitle={t('admin.residents.byArea.subtitle')}
       actions={
-        <button
-          type="button"
-          className="resident-page__button resident-page__button--ghost"
-          onClick={() => {
-            loadSummary();
-            loadList();
-          }}
-          disabled={listLoading}
-        >
-          <RefreshCw size={16} className={listLoading ? 'spin' : ''} />
-          Làm mới
-        </button>
+        <>
+          <button
+            type="button"
+            className="resident-page__button resident-page__button--ghost"
+            onClick={() => {
+              loadSummary();
+              loadList();
+            }}
+            disabled={listLoading || exporting}
+          >
+            <RefreshCw size={16} className={listLoading ? 'spin' : ''} />
+            {t('admin.residents.common.refresh')}
+          </button>
+          <button
+            type="button"
+            className="resident-page__button resident-page__button--export"
+            onClick={() => handleExport('csv')}
+            disabled={listLoading || exporting || !buildingId}
+            title={t('admin.residents.byArea.exportCsvTitle')}
+          >
+            <Download size={16} />
+            {exporting ? t('admin.residents.byArea.exporting') : t('admin.residents.byArea.exportExcel')}
+          </button>
+          <button
+            type="button"
+            className="resident-page__button resident-page__button--export-pdf"
+            onClick={() => handleExport('pdf')}
+            disabled={listLoading || exporting || !buildingId}
+            title={t('admin.residents.byArea.exportPdfTitle')}
+          >
+            <Download size={16} />
+            {t('admin.residents.common.exportPdf')}
+          </button>
+        </>
       }
       stats={summary ? pageStats : undefined}
     >
-      <form className="resident-page__filters" onSubmit={handleSearch}>
+      <div className="resident-page__filters">
         <div className="resident-page__filter-row">
           <label className="resident-page__filter">
-            <span>Tòa nhà</span>
+            <span>{t('admin.residents.common.filterBuilding')}</span>
             <select
               value={buildingId}
               onChange={(e) => setBuildingId(e.target.value)}
               disabled={!buildings.length}
             >
-              {!buildings.length && <option value="">— Không có tòa —</option>}
+              {!buildings.length && <option value="">{t('admin.residents.common.noBuilding')}</option>}
               {buildings.map((b) => (
                 <option key={b._id} value={b._id}>{b.name || b.code}</option>
               ))}
             </select>
           </label>
           <label className="resident-page__filter">
-            <span>Trạng thái</span>
+            <span>{t('admin.residents.common.status')}</span>
             <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}>
-              <option value="admitted">Đang điều trị</option>
-              <option value="pending">Chờ nhập viện</option>
-              <option value="discharged">Đã xuất viện</option>
-              <option value="">Tất cả trạng thái</option>
+              <option value="admitted">{t('common.residency.admitted')}</option>
+              <option value="pending">{t('common.residency.pending')}</option>
+              <option value="discharged">{t('common.residency.discharged')}</option>
+              <option value="">{t('common.allStatuses')}</option>
             </select>
           </label>
           <label className="resident-page__filter">
-            <span>Tầng</span>
+            <span>{t('admin.residents.byArea.floor')}</span>
             <select value={floorId} onChange={(e) => selectFloor(e.target.value)}>
-              <option value="">Tất cả tầng</option>
+              <option value="">{t('admin.residents.byArea.allFloors')}</option>
               {floorOptions.map((f) => (
                 <option key={f._id} value={f._id}>
-                  {f.label || f.name || `Tầng ${f.floorNumber}`}
+                  {f.label || f.name || `${t('admin.residents.common.floor')} ${f.floorNumber}`}
                 </option>
               ))}
             </select>
           </label>
           <label className="resident-page__filter">
-            <span>Phòng</span>
+            <span>{t('admin.residents.byArea.room')}</span>
             <select value={roomId} onChange={(e) => setRoomId(e.target.value)}>
-              <option value="">Tất cả phòng</option>
+              <option value="">{t('admin.residents.byArea.allRooms')}</option>
               {roomOptions.map((r) => (
                 <option key={r._id} value={r._id}>
-                  {r.label || `Phòng ${r.roomNumber}`}
+                  {r.label || `${t('admin.residents.common.room')} ${r.roomNumber}`}
                 </option>
               ))}
             </select>
@@ -374,31 +464,28 @@ export default function ResidentsByAreaPage() {
         </div>
         <div className="resident-page__filter-row">
           <label className="resident-page__filter">
-            <span>Tìm kiếm</span>
+            <span>{t('admin.residents.common.search')}</span>
             <div className="resident-page__filter-input">
               <Search size={16} />
               <input
-                type="text"
-                placeholder="Tên hoặc mã cư dân..."
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
+                type="search"
+                placeholder={t('admin.residents.common.searchPlaceholder')}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
               />
             </div>
           </label>
           <div className="resident-page__filter-actions">
-            <button type="submit" className="resident-page__button resident-page__button--primary">
-              Áp dụng
-            </button>
             <button
               type="button"
               className="resident-page__button resident-page__button--ghost"
               onClick={selectAllBuilding}
             >
-              Bỏ lọc khu vực
+              {t('admin.residents.common.clearAreaFilter')}
             </button>
           </div>
         </div>
-      </form>
+      </div>
 
       {usingFallbackApi && (
         <p className="resident-page__hint-box">⚠️ {RESIDENT_AREA_ROUTE_HINT}</p>
@@ -409,51 +496,45 @@ export default function ResidentsByAreaPage() {
       )}
 
       {summary && activeFilterLabel && (
-        <p className="resident-page__hint">Đang lọc: <strong>{activeFilterLabel}</strong></p>
+        <p className="resident-page__hint">{t('admin.residents.common.filteringLabel', { label: activeFilterLabel })}</p>
       )}
 
       <div className="resident-page__table">
         <table className="resident-page__table-element">
           <thead>
             <tr className="resident-page__table-header">
-              <th>Mã</th>
-              <th>Họ tên</th>
-              <th>Khu vực</th>
-              <th>Dị ứng thuốc</th>
-              <th>Trạng thái</th>
-              <th>Thao tác</th>
+              <th>{t('admin.residents.common.colCode')}</th>
+              <th>{t('admin.residents.common.colFullName')}</th>
+              <th>{t('admin.residents.byArea.colArea')}</th>
+              <th>{t('admin.residents.common.colStatus')}</th>
+              <th>{t('admin.residents.common.colActions')}</th>
             </tr>
           </thead>
           <tbody>
             {listLoading && (
-              <tr><td colSpan={6} className="resident-page__empty">Đang tải...</td></tr>
+              <tr><td colSpan={5} className="resident-page__empty">{t('common.loading')}</td></tr>
             )}
             {!listLoading && !buildingId && (
-              <tr><td colSpan={6} className="resident-page__empty">Chọn tòa nhà để xem cư dân</td></tr>
+              <tr><td colSpan={5} className="resident-page__empty">{t('admin.residents.common.selectBuildingToView')}</td></tr>
             )}
             {!listLoading && buildingId && residents.length === 0 && (
-              <tr><td colSpan={6} className="resident-page__empty">Không có cư dân trong khu vực này</td></tr>
+              <tr><td colSpan={5} className="resident-page__empty">{t('admin.residents.common.noResidentsInArea')}</td></tr>
             )}
             {!listLoading && residents.map((r) => (
               <tr key={r._id} className="resident-page__table-row">
                 <td style={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>{r.residentCode}</td>
                 <td style={{ fontWeight: 600 }}>{r.fullName}</td>
-                <td>{formatResidentAreaLine(r) || '—'}</td>
-                <td>
-                  {r.hasDrugAllergiesRecord
-                    ? `Đã ghi (${r.drugAllergiesCount ?? pickDrugAllergiesList(r).length ?? 0})`
-                    : 'Chưa ghi'}
-                </td>
+                <td>{formatResidentAreaLine(r, t) || '—'}</td>
                 <td>
                   <span className={`residency-badge residency-badge--${r.residencyStatus || 'default'}`}>
-                    {RESIDENCY_LABELS[r.residencyStatus] || r.residencyStatus || '—'}
+                    {getResidencyLabel(t, r.residencyStatus)}
                   </span>
                 </td>
                 <td className="resident-action-cell">
                   <button
                     type="button"
                     className="resident-icon-btn resident-icon-btn--view"
-                    title="Xem chi tiết"
+                    title={t('admin.residents.byArea.viewDetails')}
                     onClick={() => openDetail(r._id)}
                   >
                     <FaEye />
@@ -465,28 +546,13 @@ export default function ResidentsByAreaPage() {
         </table>
       </div>
 
-      {!listLoading && totalPages > 1 && (
-        <div className="resident-page__pagination">
-          <span>{total} cư dân · Trang {page}/{totalPages}</span>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button
-              type="button"
-              className="resident-page__page-btn"
-              disabled={page <= 1}
-              onClick={() => setPage((p) => p - 1)}
-            >
-              ← Trước
-            </button>
-            <button
-              type="button"
-              className="resident-page__page-btn"
-              disabled={page >= totalPages}
-              onClick={() => setPage((p) => p + 1)}
-            >
-              Sau →
-            </button>
-          </div>
-        </div>
+      {!listLoading && residents.length > 0 && (
+        <ListPagination
+          page={page}
+          totalPages={Math.max(totalPages, 1)}
+          total={total}
+          onPageChange={setPage}
+        />
       )}
 
       {detailModal && (
@@ -495,6 +561,7 @@ export default function ResidentsByAreaPage() {
           error={detailModal.error}
           resident={detailModal.resident}
           onClose={() => setDetailModal(null)}
+          t={t}
         />
       )}
     </AdminPageShell>

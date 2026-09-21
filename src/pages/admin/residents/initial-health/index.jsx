@@ -1,18 +1,18 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useLocation } from 'react-router-dom';
 import residentService, { RESIDENT_INITIAL_HEALTH_ROUTE_HINT } from '../../../../services/resident.service';
 import { FaEye, FaPen } from 'react-icons/fa';
 import { formatLeaveDate } from '../../../../utils/leaveUtils';
 import AdminPageShell from '../../../../components/admin/AdminPageShell';
+import ListPagination from '../../../../components/ui/ListPagination';
+import { ADMIN_LIST_PAGE_SIZE } from '../../../../constants/adminListPage';
+import useDebouncedSearch from '../../../../hooks/useDebouncedSearch';
 import '../../../../styles/admin/InitialHealthPage.css';
 import '../../../../styles/admin/residentActionIcons.css';
-import { GENDER_LABELS, RESIDENCY_LABELS } from '../_shared/residentLabels';
+import { getGenderLabel, getResidencyLabel } from '../_shared/residentLabels';
 
 const BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', 'unknown'];
-
-const BLOOD_TYPE_LABELS = {
-  unknown: 'Chưa xác định',
-};
 
 const emptyForm = () => ({
   bloodType: '',
@@ -20,14 +20,20 @@ const emptyForm = () => ({
 });
 
 export default function InitialHealthPage() {
+  const { t } = useTranslation();
   const location = useLocation();
-  const residentBase = location.pathname.startsWith('/manager') ? '/manager' : '/admin';
+  const currentRoleBase = ['/doctor', '/nurse'].find((base) => location.pathname.startsWith(base)) || '/admin';
+  const residentBase = currentRoleBase;
+  const canViewPreExisting = currentRoleBase === '/admin';
+  const canViewDrugAllergies = canViewPreExisting || currentRoleBase === '/doctor';
   const [residents, setResidents] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [search, setSearch] = useState('');
-  const [searchInput, setSearchInput] = useState('');
+  const resetPageOnSearch = useCallback(() => setPage(1), []);
+  const { search, setSearch, debouncedSearch } = useDebouncedSearch({
+    onDebouncedChange: resetPageOnSearch,
+  });
   const [statusFilter, setStatusFilter] = useState('admitted');
   const [recordedFilter, setRecordedFilter] = useState('');
   const [listLoading, setListLoading] = useState(false);
@@ -51,8 +57,8 @@ export default function InitialHealthPage() {
     try {
       const params = {
         page,
-        limit: 15,
-        search: search || undefined,
+        limit: ADMIN_LIST_PAGE_SIZE,
+        search: debouncedSearch || undefined,
         status: statusFilter || undefined,
       };
       if (recordedFilter === 'true') params.recorded = true;
@@ -64,12 +70,12 @@ export default function InitialHealthPage() {
       setTotalPages(res.totalPages ?? 1);
       if (res._fallback) setUsingFallbackApi(true);
     } catch (e) {
-      setListError(e.response?.data?.message || 'Không thể tải danh sách cư dân');
+      setListError(e.response?.data?.message || t('admin.residents.common.loadListFailed'));
       setResidents([]);
     } finally {
       if (!silent) setListLoading(false);
     }
-  }, [page, search, statusFilter, recordedFilter]);
+  }, [page, debouncedSearch, statusFilter, recordedFilter, t]);
 
   const loadDetail = useCallback(async (residentId) => {
     if (!residentId) {
@@ -91,14 +97,14 @@ export default function InitialHealthPage() {
       });
     } catch (e) {
       const status = e?.response?.status;
-      setDetailError(e.response?.data?.message || 'Không thể tải thông tin sức khỏe');
+      setDetailError(e.response?.data?.message || t('admin.residents.initialHealth.loadHealthFailed'));
       if (status === 404 || status === 403) setUsingFallbackApi(true);
       setHealthData(null);
       setForm(emptyForm());
     } finally {
       setDetailLoading(false);
     }
-  }, []);
+  }, [t]);
 
   const refreshAfterSave = useCallback(async () => {
     const tasks = [loadList({ silent: true })];
@@ -114,32 +120,19 @@ export default function InitialHealthPage() {
     loadDetail(selectedId);
   }, [selectedId, loadDetail]);
 
-  const handleSearch = (e) => {
-    e.preventDefault();
-    setPage(1);
-    setSearch(searchInput.trim());
-  };
-
-  const handleSelect = (r) => {
-    setSelectedId(r._id);
-    setPanelMsg('');
-    setFormError('');
-    setDetailError('');
-  };
-
   const setField = (key, value) => setForm((p) => ({ ...p, [key]: value }));
 
   const validateForm = () => {
     const desc = form.initialHealthCondition.trim();
-    if (!desc) return 'Mô tả tình trạng khi nhập viện là bắt buộc';
-    if (desc.length < 10) return 'Mô tả phải có ít nhất 10 ký tự';
+    if (!desc) return t('admin.residents.initialHealth.conditionRequired');
+    if (desc.length < 10) return t('admin.residents.initialHealth.minCharsError');
     return '';
   };
 
   const handleSave = async (e) => {
     e.preventDefault();
     if (!selectedId) {
-      setFormError('Chưa chọn cư dân');
+      setFormError(t('admin.residents.common.noResidentSelected'));
       return;
     }
     const err = validateForm();
@@ -158,12 +151,12 @@ export default function InitialHealthPage() {
 
       const res = await residentService.recordInitialHealth(selectedId, payload);
       if (res._fallback) setUsingFallbackApi(true);
-      setPanelMsg(res.message || 'Đã lưu tình trạng sức khỏe ban đầu');
+      setPanelMsg(res.message || t('admin.residents.initialHealth.saveSuccess'));
       await refreshAfterSave();
       setEditPopup(false);
     } catch (e) {
       const status = e?.response?.status;
-      setFormError(e.response?.data?.message || 'Lưu thất bại');
+      setFormError(e.response?.data?.message || t('admin.residents.common.saveFailed'));
       if (status === 404 || status === 405 || status === 403) setUsingFallbackApi(true);
     } finally {
       setSaving(false);
@@ -198,7 +191,7 @@ export default function InitialHealthPage() {
     } catch (err) {
       setViewPopup({
         loading: false,
-        error: err.response?.data?.message || 'Không thể tải chi tiết',
+        error: err.response?.data?.message || t('admin.residents.common.loadDetailFailed'),
         summary: r,
         resident: null,
         initialHealth: null,
@@ -223,27 +216,22 @@ export default function InitialHealthPage() {
 
   return (
     <AdminPageShell
-      title="Ghi nhận tình trạng sức khỏe ban đầu"
-      subtitle={
-        <>
-          Ghi nhận tình trạng sức khỏe của cư dân <strong>khi nhập viện</strong> (khỏe mạnh, yếu, cần chăm 1-1…).
-          Bệnh nền và tiền sử trước khi vào viện ghi ở tab khác; dị ứng thuốc ghi ở tab Dị ứng thuốc.
-        </>
-      }
+      title={t('admin.residents.initialHealth.title')}
+      subtitle={t('admin.residents.initialHealth.subtitle')}
     >
-      <form className="resident-page__filters" onSubmit={handleSearch}>
+      <div className="resident-page__filters">
         <div className="resident-page__filter-row">
           <label className="resident-page__filter">
-            <span>Tìm kiếm</span>
+            <span>{t('admin.residents.common.search')}</span>
             <input
-              type="text"
-              placeholder="Tên hoặc mã cư dân..."
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
+              type="search"
+              placeholder={t('admin.residents.common.searchPlaceholder')}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
             />
           </label>
           <label className="resident-page__filter">
-            <span>Trạng thái</span>
+            <span>{t('admin.residents.common.status')}</span>
             <select
               value={statusFilter}
               onChange={(e) => {
@@ -251,14 +239,14 @@ export default function InitialHealthPage() {
                 setPage(1);
               }}
             >
-              <option value="admitted">Đang điều trị</option>
-              <option value="pending">Chờ nhập viện</option>
-              <option value="discharged">Đã xuất viện</option>
-              <option value="">Tất cả trạng thái</option>
+              <option value="admitted">{t('common.residency.admitted')}</option>
+              <option value="pending">{t('common.residency.pending')}</option>
+              <option value="discharged">{t('common.residency.discharged')}</option>
+              <option value="">{t('common.allStatuses')}</option>
             </select>
           </label>
           <label className="resident-page__filter">
-            <span>Ghi nhận</span>
+            <span>{t('admin.residents.common.recordFilter')}</span>
             <select
               value={recordedFilter}
               onChange={(e) => {
@@ -266,18 +254,13 @@ export default function InitialHealthPage() {
                 setPage(1);
               }}
             >
-              <option value="">Tất cả (đã/chưa ghi)</option>
-              <option value="false">Chưa ghi nhận</option>
-              <option value="true">Đã ghi nhận</option>
+              <option value="">{t('admin.residents.common.recordFilterAllRecorded')}</option>
+              <option value="false">{t('admin.residents.common.notRecordedYet')}</option>
+              <option value="true">{t('admin.residents.common.recorded')}</option>
             </select>
           </label>
-          <div className="resident-page__filter-actions">
-            <button type="submit" className="resident-page__button resident-page__button--primary">
-              Áp dụng
-            </button>
-          </div>
         </div>
-      </form>
+      </div>
 
       {listError && <div className="resident-page__error">{listError}</div>}
       {usingFallbackApi && (
@@ -288,24 +271,24 @@ export default function InitialHealthPage() {
         <table className="resident-page__table-element">
           <thead>
             <tr className="resident-page__table-header">
-              <th>Mã</th>
-              <th>Họ tên</th>
-              <th>Trạng thái ghi</th>
-              <th>Thao tác</th>
+              <th>{t('admin.residents.common.colCode')}</th>
+              <th>{t('admin.residents.common.colFullName')}</th>
+              <th>{t('admin.residents.initialHealth.colRecordStatus')}</th>
+              <th>{t('admin.residents.common.colActions')}</th>
             </tr>
           </thead>
           <tbody>
             {listLoading && (
               <tr>
                 <td colSpan={4} className="empty-state">
-                  Đang tải...
+                  {t('common.loading')}
                 </td>
               </tr>
             )}
             {!listLoading && residents.length === 0 && (
               <tr>
                 <td colSpan={4} className="empty-state">
-                  Không có cư dân nào
+                  {t('admin.residents.common.noResidents')}
                 </td>
               </tr>
             )}
@@ -320,7 +303,9 @@ export default function InitialHealthPage() {
                         r.hasInitialHealthRecord ? 'health-badge--recorded' : 'health-badge--pending'
                       }`}
                     >
-                      {r.hasInitialHealthRecord ? 'Đã ghi nhận' : 'Chưa ghi nhận'}
+                      {r.hasInitialHealthRecord
+                        ? t('admin.residents.initialHealth.recordBadgeRecorded')
+                        : t('admin.residents.initialHealth.recordBadgePending')}
                     </span>
                   </td>
                   <td className="resident-action-cell">
@@ -328,7 +313,7 @@ export default function InitialHealthPage() {
                       <button
                         type="button"
                         className="resident-icon-btn resident-icon-btn--view"
-                        title="Xem chi tiết"
+                        title={t('admin.residents.common.viewResidentDetail')}
                         onClick={(e) => openViewPopup(r, e)}
                       >
                         <FaEye />
@@ -336,7 +321,7 @@ export default function InitialHealthPage() {
                       <button
                         type="button"
                         className="resident-icon-btn resident-icon-btn--edit"
-                        title="Sửa"
+                        title={t('admin.residents.common.edit')}
                         onClick={(e) => openEditPopup(r, e)}
                       >
                         <FaPen />
@@ -347,40 +332,23 @@ export default function InitialHealthPage() {
               ))}
           </tbody>
         </table>
-        {!listLoading && totalPages > 1 && (
-          <div className="resident-page__pagination" style={{ padding: '12px 16px', borderTop: '1px solid #e2e8f0' }}>
-            <span>
-              {total} cư dân · Trang {page}/{totalPages}
-            </span>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                type="button"
-                className="resident-page__page-btn"
-                disabled={page <= 1}
-                onClick={() => setPage((p) => p - 1)}
-              >
-                ← Trước
-              </button>
-              <button
-                type="button"
-                className="resident-page__page-btn"
-                disabled={page >= totalPages}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                Sau →
-              </button>
-            </div>
-          </div>
+        {!listLoading && residents.length > 0 && (
+          <ListPagination
+            page={page}
+            totalPages={Math.max(totalPages, 1)}
+            total={total}
+            onPageChange={setPage}
+          />
         )}
       </div>
 
       {viewPopup && (
         <div className="modal-overlay" onClick={() => setViewPopup(null)}>
           <div className="modal modal--wide" onClick={(e) => e.stopPropagation()}>
-            <h2 className="modal__title">Tình trạng sức khỏe khi nhập viện</h2>
+            <h2 className="modal__title">{t('admin.residents.initialHealth.viewModalTitle')}</h2>
             {viewPopup.loading && (
               <p className="empty-state" style={{ padding: '16px 0' }}>
-                Đang tải...
+                {t('common.loading')}
               </p>
             )}
             {!viewPopup.loading && viewPopup.error && (
@@ -389,10 +357,11 @@ export default function InitialHealthPage() {
             {!viewPopup.loading && viewPopup.notRecorded && (
               <>
                 <div className="detail-row">
-                  <strong>Cư dân:</strong> {viewPopup.summary.fullName} ({viewPopup.summary.residentCode})
+                  <strong>{t('admin.residents.common.residentLabel')}:</strong>{' '}
+                  {viewPopup.summary.fullName} ({viewPopup.summary.residentCode})
                 </div>
                 <p className="empty-state" style={{ padding: '24px 0' }}>
-                  Chưa ghi nhận tình trạng khi nhập viện.
+                  {t('admin.residents.initialHealth.notRecordedAdmission')}
                 </p>
               </>
             )}
@@ -402,41 +371,42 @@ export default function InitialHealthPage() {
               viewPopup.resident && (
                 <>
                   <div className="detail-row">
-                    <strong>Cư dân:</strong> {viewPopup.resident.fullName} ({viewPopup.resident.residentCode})
+                    <strong>{t('admin.residents.common.residentLabel')}:</strong>{' '}
+                    {viewPopup.resident.fullName} ({viewPopup.resident.residentCode})
                   </div>
                   <div className="detail-row">
-                    <strong>Giới tính:</strong>{' '}
-                    {GENDER_LABELS[viewPopup.resident.gender] || viewPopup.resident.gender || '—'}
+                    <strong>{t('profile.gender')}:</strong>{' '}
+                    {getGenderLabel(t, viewPopup.resident.gender)}
                   </div>
                   <div className="detail-row">
-                    <strong>Trạng thái:</strong>{' '}
-                    {RESIDENCY_LABELS[viewPopup.resident.residencyStatus] ||
-                      viewPopup.resident.residencyStatus ||
-                      '—'}
+                    <strong>{t('admin.residents.common.colStatus')}:</strong>{' '}
+                    {getResidencyLabel(t, viewPopup.resident.residencyStatus)}
                   </div>
                   <hr className="modal-divider" />
                   <div className="detail-row">
-                    <strong>Nhóm máu:</strong>{' '}
-                    {BLOOD_TYPE_LABELS[viewPopup.initialHealth?.bloodType] ||
-                      viewPopup.initialHealth?.bloodType ||
-                      '—'}
+                    <strong>{t('admin.residents.common.bloodType')}:</strong>{' '}
+                    {viewPopup.initialHealth?.bloodType === 'unknown'
+                      ? t('admin.residents.initialHealth.bloodTypeUnknown')
+                      : viewPopup.initialHealth?.bloodType || '—'}
                   </div>
                   <div className="detail-row">
-                    <strong>Mô tả tình trạng khi nhập viện:</strong>
+                    <strong>{t('admin.residents.initialHealth.conditionDescription')}:</strong>
                   </div>
                   <div className="health-description">
                     {viewPopup.initialHealth?.initialHealthCondition || '—'}
                   </div>
                   {viewPopup.initialHealth?.updatedAt && (
                     <div className="detail-row detail-row--muted">
-                      Cập nhật lần cuối: {formatLeaveDate(viewPopup.initialHealth.updatedAt)}
+                      {t('admin.residents.common.lastUpdated', {
+                        date: formatLeaveDate(viewPopup.initialHealth.updatedAt),
+                      })}
                     </div>
                   )}
                 </>
               )}
             <div className="modal__actions">
               <button type="button" className="btn-cancel" onClick={() => setViewPopup(null)}>
-                Đóng
+                {t('admin.residents.common.close')}
               </button>
               {!viewPopup.loading && viewPopup.summary && (
                 <button
@@ -448,7 +418,9 @@ export default function InitialHealthPage() {
                     openEditPopup(summary);
                   }}
                 >
-                  {viewPopup.notRecorded ? 'Ghi nhận' : 'Chỉnh sửa'}
+                  {viewPopup.notRecorded
+                    ? t('admin.residents.initialHealth.recordAction')
+                    : t('admin.residents.initialHealth.updateAction')}
                 </button>
               )}
             </div>
@@ -459,10 +431,12 @@ export default function InitialHealthPage() {
         <div className="modal-overlay" onClick={() => setEditPopup(false)}>
           <div className="modal modal--wide" onClick={(e) => e.stopPropagation()}>
             <h2 className="modal__title">
-              {hasRecord ? 'Cập nhật tình trạng nhập viện' : 'Ghi nhận tình trạng nhập viện'}
+              {hasRecord
+                ? t('admin.residents.initialHealth.editPanelTitle')
+                : t('admin.residents.initialHealth.recordPanelTitle')}
             </h2>
             {detailLoading ? (
-              <div className="empty-state">Đang tải thông tin...</div>
+              <div className="empty-state">{t('admin.residents.common.loadingDetail')}</div>
             ) : detailError && !healthData ? (
               <div className="empty-state">
                 <p>{detailError}</p>
@@ -472,7 +446,7 @@ export default function InitialHealthPage() {
                   style={{ marginTop: 12 }}
                   onClick={() => loadDetail(selectedId)}
                 >
-                  Thử tải lại
+                  {t('admin.residents.common.retryLoad')}
                 </button>
               </div>
             ) : (
@@ -481,56 +455,74 @@ export default function InitialHealthPage() {
                   {selectedSummary?.fullName || resident?.fullName}
                   {' · '}
                   {selectedSummary?.residentCode || resident?.residentCode}
-                  {resident?.age != null && ` · ${resident.age} tuổi`}
-                  {resident?.gender && ` · ${GENDER_LABELS[resident.gender] || resident.gender}`}
+                  {resident?.age != null && ` · ${t('admin.residents.common.yearsOldWithAge', { age: resident.age })}`}
+                  {resident?.gender && ` · ${getGenderLabel(t, resident.gender)}`}
                 </p>
                 {panelMsg && <p className="form-success">{panelMsg}</p>}
                 {formError && <p className="form-error">{formError}</p>}
                 <form onSubmit={handleSave}>
                   <div className="form-grid">
                     <div className="form-group">
-                      <label>Nhóm máu</label>
+                      <label>{t('admin.residents.common.bloodType')}</label>
                       <select
                         value={form.bloodType}
                         onChange={(e) => setField('bloodType', e.target.value)}
                       >
-                        <option value="">— Giữ nguyên / chưa xác định —</option>
+                        <option value="">{t('admin.residents.common.keepUnchanged')}</option>
                         {BLOOD_TYPES.map((bt) => (
                           <option key={bt} value={bt}>
-                            {BLOOD_TYPE_LABELS[bt] || bt}
+                            {bt === 'unknown' ? t('admin.residents.initialHealth.bloodTypeUnknown') : bt}
                           </option>
                         ))}
                       </select>
                     </div>
                     <div className="form-group form-grid--full">
-                      <label>Mô tả tình trạng khi nhập viện *</label>
+                      <label>{t('admin.residents.initialHealth.conditionDescription')} *</label>
                       <textarea
                         value={form.initialHealthCondition}
                         onChange={(e) => setField('initialHealthCondition', e.target.value)}
-                        placeholder="Ví dụ: Khỏe mạnh, hoạt động bình thường; hoặc: Yếu, cần chăm sóc 1-1..."
+                        placeholder={t('admin.residents.initialHealth.formPlaceholder')}
                         rows={6}
                         required
                       />
                       <span className="form-hint">
-                        {form.initialHealthCondition.trim().length}/10 ký tự tối thiểu
+                        {t('admin.residents.common.minChars', {
+                          current: form.initialHealthCondition.trim().length,
+                        })}
                       </span>
                     </div>
-                    <p className="initial-health-related-tabs">
-                      Bệnh lý nền / tiền sử trước vào viện:{' '}
-                      <Link to={`${residentBase}/residents/pre-existing-conditions`}>
-                        Bệnh lý nền &amp; tiền sử bệnh
-                      </Link>
-                      {' · '}
-                      Dị ứng thuốc:{' '}
-                      <Link to={`${residentBase}/residents/drug-allergies`}>Quản lý dị ứng thuốc</Link>
-                    </p>
+                    {(canViewPreExisting || canViewDrugAllergies) && (
+                      <p className="initial-health-related-tabs">
+                        {canViewPreExisting && (
+                          <>
+                            {t('admin.residents.initialHealth.linkPreExisting')}{' '}
+                            <Link to={`${residentBase}/residents/pre-existing-conditions`}>
+                              {t('admin.residents.initialHealth.linkPreExistingTab')}
+                            </Link>
+                          </>
+                        )}
+                        {canViewPreExisting && canViewDrugAllergies && ' · '}
+                        {canViewDrugAllergies && (
+                          <>
+                            {t('admin.residents.initialHealth.linkDrugAllergies')}{' '}
+                            <Link to={`${residentBase}/residents/drug-allergies`}>
+                              {t('admin.residents.initialHealth.linkDrugAllergiesTab')}
+                            </Link>
+                          </>
+                        )}
+                      </p>
+                    )}
                   </div>
                   <div className="modal__actions">
                     <button type="button" className="btn-cancel" onClick={() => setEditPopup(false)}>
-                      Đóng
+                      {t('admin.residents.common.close')}
                     </button>
                     <button type="submit" className="btn-save" disabled={saving}>
-                      {saving ? 'Đang lưu...' : hasRecord ? 'Cập nhật' : 'Ghi nhận'}
+                      {saving
+                        ? t('common.saving')
+                        : hasRecord
+                          ? t('admin.residents.initialHealth.updateAction')
+                          : t('admin.residents.initialHealth.recordAction')}
                     </button>
                   </div>
                 </form>

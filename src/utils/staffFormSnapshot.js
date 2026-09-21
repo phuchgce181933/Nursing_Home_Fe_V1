@@ -9,5 +9,10 @@ export const staffToEditForm = (staff) => ({
   address: staff?.address || '',
   avatarFile: null,
   avatarUrl: staff?.avatarUrl || '',
-  password: '',
+  existingCertDocs: (staff?.staffProfile?.certificationDocuments || []).map((doc) => ({
+    ...doc,
+    issueDate: doc.issueDate ? String(doc.issueDate).slice(0, 10) : '',
+  })),
+  certificationEntries: [],
+  removedCertPublicIds: [],
 });

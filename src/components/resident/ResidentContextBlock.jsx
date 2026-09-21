@@ -1,15 +1,7 @@
+import { useTranslation } from 'react-i18next';
 import { formatResidentArea, hasAssignedArea } from '../../utils/residentArea';
+import { getGenderLabel, getResidencyLabel } from '../../pages/admin/residents/_shared/residentLabels';
 import '../../styles/components/ResidentContextBlock.css';
-
-const GENDER_LABELS = { male: 'Nam', female: 'Nữ', other: 'Khác', unknown: 'Không rõ' };
-
-const RESIDENCY_LABELS = {
-  pending: 'Chờ nhập viện',
-  admitted: 'Đang điều trị',
-  discharged: 'Đã xuất viện',
-  transferred: 'Chuyển viện',
-  deceased: 'Đã qua đời',
-};
 
 function mergeResident(resident, summary) {
   if (resident && summary) {
@@ -31,17 +23,18 @@ export default function ResidentContextBlock({
   showGender = false,
   showStatus = false,
 }) {
+  const { t } = useTranslation();
   const r = mergeResident(resident, summary);
   if (!r) return null;
 
-  const area = formatResidentArea(r);
+  const area = formatResidentArea(r, t);
   const assigned = hasAssignedArea(r);
 
   const identityParts = [
     r.fullName,
-    r.residentCode ? `Mã ${r.residentCode}` : null,
-    r.age != null ? `${r.age} tuổi` : null,
-    showGender && r.gender ? GENDER_LABELS[r.gender] || r.gender : null,
+    r.residentCode ? `${t('admin.residents.common.colCode')} ${r.residentCode}` : null,
+    r.age != null ? t('admin.residents.common.yearsOldWithAge', { age: r.age }) : null,
+    showGender && r.gender ? getGenderLabel(t, r.gender) : null,
   ].filter(Boolean);
 
   return (
@@ -52,27 +45,27 @@ export default function ResidentContextBlock({
           <span
             className={`residency-badge residency-badge--${r.residencyStatus || 'default'}`}
           >
-            {RESIDENCY_LABELS[r.residencyStatus] || r.residencyStatus}
+            {getResidencyLabel(t, r.residencyStatus)}
           </span>
         </p>
       )}
-      <div className="resident-context__section">Vị trí</div>
+      <div className="resident-context__section">{t('admin.residents.common.areaSection')}</div>
       {!assigned ? (
-        <p className="resident-context__unassigned">Chưa xếp phòng</p>
+        <p className="resident-context__unassigned">{t('admin.residents.common.unassignedRoom')}</p>
       ) : (
         <>
           <div className="resident-context__row">
-            <strong>Tòa:</strong> {area.building || '—'}
+            <strong>{t('admin.residents.common.building')}:</strong> {area.building || '—'}
           </div>
           <div className="resident-context__row">
-            <strong>Tầng:</strong> {area.floor || '—'}
+            <strong>{t('admin.residents.common.floor')}:</strong> {area.floor || '—'}
           </div>
           <div className="resident-context__row">
-            <strong>Phòng:</strong> {area.room || '—'}
+            <strong>{t('admin.residents.common.room')}:</strong> {area.room || '—'}
           </div>
           {area.bed && (
             <div className="resident-context__row">
-              <strong>Giường:</strong> {area.bed}
+              <strong>{t('admin.residents.common.bed')}:</strong> {area.bed}
             </div>
           )}
         </>

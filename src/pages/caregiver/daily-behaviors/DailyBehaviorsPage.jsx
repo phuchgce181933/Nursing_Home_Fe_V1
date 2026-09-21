@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import AdminPageShell from '../../../components/admin/AdminPageShell';
+import ListPagination from '../../../components/ui/ListPagination';
+import useClientPagination from '../../../hooks/useClientPagination';
+import useAuth from '../../../hooks/useAuth';
 import dailyBehaviorService from '../../../services/dailyBehavior.service';
+import { resolveApiError } from '../../../utils/apiMessage';
 import { getLocalDateString } from '../../../utils/dateUtils';
-import { formatVNDate } from '../../../utils/nutritionLabels';
+import { formatLocaleDate } from '../../../utils/nutritionLabels';
 import {
   behaviorTypeLabel,
   moodLevelLabel,
@@ -15,21 +21,24 @@ import BehaviorRecordsTable from './components/BehaviorRecordsTable';
 
 const today = () => getLocalDateString();
 
-function detailSummary(row) {
+function detailSummary(row, t) {
   if (row.observationCategory === 'mood' && row.moodLevel) {
-    return moodLevelLabel(row.moodLevel);
+    return moodLevelLabel(row.moodLevel, t);
   }
-  if (row.behaviorType) return behaviorTypeLabel(row.behaviorType);
+  if (row.behaviorType) return behaviorTypeLabel(row.behaviorType, t);
   return row.notes?.slice(0, 40) || '—';
 }
 
 function DailyBehaviorsPage() {
+  const { t, i18n } = useTranslation();
+  const { user } = useAuth();
   const [workDate, setWorkDate] = useState(today());
   const [observationCategory, setObservationCategory] = useState('');
   const [severity, setSeverity] = useState('');
   const [residentId, setResidentId] = useState('');
   const [residents, setResidents] = useState([]);
   const [records, setRecords] = useState([]);
+  const [canMutate, setCanMutate] = useState(false);
   const [loading, setLoading] = useState(false);
   const [listError, setListError] = useState('');
 
@@ -43,7 +52,7 @@ function DailyBehaviorsPage() {
       const res = await dailyBehaviorService.listResidents();
       setResidents(Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : []);
     } catch (e) {
-      setListError(e?.response?.data?.message || 'Không tải được danh sách cư dân');
+      setListError(resolveApiError(e, t, 'caregiver.dailyBehaviors.loadResidentsFailed'));
     }
   };
 
@@ -59,13 +68,15 @@ function DailyBehaviorsPage() {
         limit: 100,
       });
       setRecords(Array.isArray(res?.data) ? res.data : []);
+      setCanMutate(Boolean(res?.meta?.canMutate));
     } catch (e) {
-      setListError(e?.response?.data?.message || 'Không tải được danh sách ghi nhận');
+      setListError(resolveApiError(e, t, 'caregiver.dailyBehaviors.loadRecordsFailed'));
       setRecords([]);
+      setCanMutate(false);
     } finally {
       setLoading(false);
     }
-  }, [workDate, observationCategory, severity, residentId]);
+  }, [workDate, observationCategory, severity, residentId, t]);
 
   useEffect(() => {
     loadResidents();
@@ -75,10 +86,18 @@ function DailyBehaviorsPage() {
     loadRecords();
   }, [loadRecords]);
 
+  const {
+    paginatedItems: paginatedRecords,
+    page,
+    setPage,
+    totalPages,
+    total,
+  } = useClientPagination(records);
+
   const handleOpenDelete = (row) => {
     const name = row.residentId?.fullName || row.residentId?.residentCode || '—';
     const wd = (row.workDate || '').slice(0, 10);
-    const summary = `${name} · ${observationCategoryLabel(row.observationCategory)} · ${detailSummary(row)} · ${formatVNDate(wd)}`;
+    const summary = `${name} · ${observationCategoryLabel(row.observationCategory, t)} · ${detailSummary(row, t)} · ${formatLocaleDate(wd, i18n.language)}`;
     setDeleteError('');
     setDeleteModal({ id: row._id, summary });
   };
@@ -92,21 +111,21 @@ function DailyBehaviorsPage() {
       setDeleteModal(null);
       loadRecords();
     } catch (e) {
-      setDeleteError(e?.response?.data?.message || 'Xóa thất bại');
+      setDeleteError(resolveApiError(e, t, 'common.deleteFailed'));
     } finally {
       setDeleting(false);
     }
   };
 
   return (
-    <div className="page card behavior-page">
-      <h1 className="behavior-page__title">Ghi nhận hành vi hằng ngày</h1>
-      <p className="behavior-page__intro">
-        Ghi nhận tâm trạng, hành vi hoặc biểu hiện bất thường của cư dân phụ trách trong ngày. Bạn có
-        thể tạo nhiều bản ghi cho cùng một cư dân trong một ngày.
-      </p>
+    <AdminPageShell title={t('caregiver.dailyBehaviors.title')} subtitle={t('caregiver.dailyBehaviors.subtitle')}>
+      {listError && <div className="resident-page__error">{listError}</div>}
 
-      {listError && <p className="form-error">{listError}</p>}
+      {!loading && !canMutate && (
+        <p className="behavior-page__context behavior-page__context--warn">
+          {t('caregiver.dailyBehaviors.shiftWindowClosed')}
+        </p>
+      )}
 
       <BehaviorListFilters
         workDate={workDate}
@@ -116,6 +135,7 @@ function DailyBehaviorsPage() {
         residents={residents}
         loading={loading}
         maxDate={today()}
+        canCreate={canMutate}
         onWorkDateChange={setWorkDate}
         onObservationCategoryChange={setObservationCategory}
         onSeverityChange={setSeverity}
@@ -125,11 +145,18 @@ function DailyBehaviorsPage() {
       />
 
       <BehaviorRecordsTable
-        records={records}
+        records={paginatedRecords}
         loading={loading}
+        canMutate={canMutate}
+        showRecordedBy
+        currentUserId={user?._id}
         onEdit={(row) => setFormModal({ mode: 'edit', id: row._id })}
         onDelete={handleOpenDelete}
       />
+
+      {!loading && records.length > 0 && (
+        <ListPagination page={page} totalPages={totalPages} total={total} onPageChange={setPage} />
+      )}
 
       <BehaviorFormModal
         open={Boolean(formModal)}
@@ -138,6 +165,7 @@ function DailyBehaviorsPage() {
         residents={residents}
         defaultWorkDate={workDate}
         maxDate={today()}
+        canMutate={canMutate}
         onClose={() => setFormModal(null)}
         onSuccess={() => {
           setFormModal(null);
@@ -153,7 +181,7 @@ function DailyBehaviorsPage() {
         onClose={() => setDeleteModal(null)}
         onConfirm={handleConfirmDelete}
       />
-    </div>
+    </AdminPageShell>
   );
 }
 

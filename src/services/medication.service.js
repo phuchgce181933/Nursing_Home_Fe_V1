@@ -46,6 +46,34 @@ const markTaken = (id, payload = {}) =>
 const markMissed = (id, payload) =>
   axiosClient.patch(`/medications/schedule/${id}/missed`, payload).then((r) => r.data);
 
+// Nurse: mark refused
+const markRefused = (id, payload) =>
+  axiosClient.patch(`/medications/schedule/${id}/refused`, payload).then((r) => r.data);
+
+// Nurse: mark held
+const markHeld = (id, payload) =>
+  axiosClient.patch(`/medications/schedule/${id}/held`, payload).then((r) => r.data);
+
+// Nurse: mark not available
+const markNotAvailable = (id, payload) =>
+  axiosClient.patch(`/medications/schedule/${id}/not-available`, payload).then((r) => r.data);
+
+// Nurse: PRN administration
+const administerPRN = (payload) =>
+  axiosClient.post('/medications/prn-administration', payload).then((r) => r.data);
+
+// Doctor: activate DRAFT prescription
+const activatePrescription = (id) =>
+  axiosClient.patch(`/prescriptions/${id}/activate`).then((r) => r.data);
+
+// Doctor: suspend ACTIVE prescription
+const suspendPrescription = (id, payload) =>
+  axiosClient.patch(`/prescriptions/${id}/suspend`, payload).then((r) => r.data);
+
+// Doctor: resume SUSPENDED prescription
+const resumePrescription = (id) =>
+  axiosClient.patch(`/prescriptions/${id}/resume`).then((r) => r.data);
+
 // History + compliance stats per resident
 const getHistory = (params = {}) =>
   axiosClient.get('/medications/history', { params }).then((r) => r.data);
@@ -63,5 +91,12 @@ export default {
   setMedicationSchedule,
   markTaken,
   markMissed,
+  markRefused,
+  markHeld,
+  markNotAvailable,
+  administerPRN,
+  activatePrescription,
+  suspendPrescription,
+  resumePrescription,
   getHistory,
 };

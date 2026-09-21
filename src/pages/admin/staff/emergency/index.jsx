@@ -1,5 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Eye } from 'lucide-react';
 import staffService from '../../../../services/staff.service';
+import ListPagination from '../../../../components/ui/ListPagination';
+import useClientPagination from '../../../../hooks/useClientPagination';
 import {
   isReadinessRealtimeAvailable,
   subscribeEmergencyReadiness,
@@ -7,50 +11,59 @@ import {
 import { getLocalDateString } from '../../../../utils/dateUtils';
 import {
   formatResponsibleFloorLabels,
-  formatTaskSummary,
 } from '../../../../utils/staffAvailabilityDisplay';
 import facilityService from '../../../../services/facility.service';
-import { floorLabel } from '../../../../components/facility/FloorRoomSelect';
+import { formatFloorWithBuilding } from '../../../../utils/residentArea';
 import EmergencyStaffDetailModal from './EmergencyStaffDetailModal';
 import AdminPageShell from '../../../../components/admin/AdminPageShell';
 import '../../../../styles/admin/EmergencyAvailabilityPage.css';
 
-const ROLE_LABELS = { doctor: 'Bác sĩ', nurse: 'Y tá' };
+const READINESS_CONFIG = (t) => ({
+  ready: { label: t('admin.staff.emergency.readiness.ready'), dot: 'available', badge: 'available', legacy: 'Available' },
+  caring: { label: t('admin.staff.emergency.readiness.caring'), dot: 'on-duty', badge: 'on-duty', legacy: 'On Duty' },
+  off_duty: { label: t('admin.staff.emergency.readiness.off_duty'), dot: 'off-shift', badge: 'off-shift', legacy: 'Off Shift' },
+  on_leave: { label: t('admin.staff.emergency.readiness.on_leave'), dot: 'on-leave', badge: 'on-leave', legacy: 'On Leave' },
+});
 
-const READINESS_CONFIG = {
-  ready: { label: 'Sẵn sàng', dot: 'available', badge: 'available', legacy: 'Available' },
-  caring: { label: 'Đang chăm sóc', dot: 'on-duty', badge: 'on-duty', legacy: 'On Duty' },
-  off_duty: { label: 'Không trực', dot: 'off-shift', badge: 'off-shift', legacy: 'Off Shift' },
-  on_leave: { label: 'Nghỉ phép', dot: 'on-leave', badge: 'on-leave', legacy: 'On Leave' },
-};
-
-const LEGACY_AVAIL_CONFIG = {
-  Available: READINESS_CONFIG.ready,
-  'On Duty': READINESS_CONFIG.caring,
-  'Off Shift': READINESS_CONFIG.off_duty,
-  'On Leave': READINESS_CONFIG.on_leave,
+const LEGACY_AVAIL_CONFIG = (t) => {
+  const cfg = READINESS_CONFIG(t);
+  return {
+    Available: cfg.ready,
+    'On Duty': cfg.caring,
+    'Off Shift': cfg.off_duty,
+    'On Leave': cfg.on_leave,
+  };
 };
 
 const AUTO_REFRESH_SECONDS = 30;
 
-const formatCheckDateVi = (iso) => {
+const dateLocale = (language) => (language === 'vi' ? 'vi-VN' : 'en-US');
+
+const formatCheckDate = (iso, language) => {
   if (!iso) return '';
   const d = new Date(`${iso}T12:00:00`);
-  return d.toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' });
+  return d.toLocaleDateString(dateLocale(language), {
+    weekday: 'long',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
 };
 
-const resolveReadiness = (person) => {
-  if (person.readinessLevel && READINESS_CONFIG[person.readinessLevel]) {
+const resolveReadiness = (person, t) => {
+  const readinessConfig = READINESS_CONFIG(t);
+  if (person.readinessLevel && readinessConfig[person.readinessLevel]) {
     return {
-      ...READINESS_CONFIG[person.readinessLevel],
-      label: person.readinessLabelVi || READINESS_CONFIG[person.readinessLevel].label,
+      ...readinessConfig[person.readinessLevel],
+      label: person.readinessLabelVi || readinessConfig[person.readinessLevel].label,
     };
   }
-  const legacy = LEGACY_AVAIL_CONFIG[person.availabilityStatus];
+  const legacy = LEGACY_AVAIL_CONFIG(t)[person.availabilityStatus];
   return legacy || { label: person.availabilityStatus || '—', dot: 'off-shift', badge: 'off-shift' };
 };
 
 export default function EmergencyAvailabilityPage() {
+  const { t, i18n } = useTranslation();
   const [data, setData] = useState([]);
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -64,6 +77,7 @@ export default function EmergencyAvailabilityPage() {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [liveConnected, setLiveConnected] = useState(false);
   const [floorOptions, setFloorOptions] = useState([]);
+  const [buildingOptions, setBuildingOptions] = useState([]);
   const [detailPerson, setDetailPerson] = useState(null);
 
   const timerRef = useRef(null);
@@ -72,11 +86,40 @@ export default function EmergencyAvailabilityPage() {
 
   const isToday = checkDate === getLocalDateString();
 
+  const floorById = useMemo(() => {
+    const map = new Map();
+    for (const floor of floorOptions) {
+      if (floor?._id) map.set(String(floor._id), floor);
+    }
+    return map;
+  }, [floorOptions]);
+
+  const buildingById = useMemo(() => {
+    const map = new Map();
+    for (const building of buildingOptions) {
+      if (building?._id) map.set(String(building._id), building);
+    }
+    return map;
+  }, [buildingOptions]);
+
+  const areaLookup = useMemo(
+    () => ({ floorById, buildingById }),
+    [floorById, buildingById]
+  );
+
   useEffect(() => {
-    facilityService
-      .listFloors({ activeOnly: true })
-      .then((data) => setFloorOptions(Array.isArray(data) ? data : []))
-      .catch(() => setFloorOptions([]));
+    Promise.all([
+      facilityService.listFloors({ activeOnly: true }),
+      facilityService.listBuildings({ activeOnly: true }),
+    ])
+      .then(([floors, buildings]) => {
+        setFloorOptions(Array.isArray(floors) ? floors : []);
+        setBuildingOptions(Array.isArray(buildings) ? buildings : []);
+      })
+      .catch(() => {
+        setFloorOptions([]);
+        setBuildingOptions([]);
+      });
   }, []);
 
   const applyPayload = useCallback((res) => {
@@ -96,11 +139,11 @@ export default function EmergencyAvailabilityPage() {
       const res = await staffService.getAvailability(params);
       applyPayload(res);
     } catch (e) {
-      setError(e.response?.data?.message || 'Không thể tải dữ liệu sẵn sàng');
+      setError(e.response?.data?.message || t('admin.staff.emergency.loadFailed'));
     } finally {
       setLoading(false);
     }
-  }, [checkDate, filterRole, filterFloor, applyPayload]);
+  }, [checkDate, filterRole, filterFloor, applyPayload, t]);
 
   useEffect(() => {
     loadFromApi();
@@ -179,7 +222,7 @@ export default function EmergencyAvailabilityPage() {
   }, [checkDate, filterRole, filterFloor, isToday, applyPayload]);
 
   const filtered = data.filter((person) => {
-    const cfg = resolveReadiness(person);
+    const cfg = resolveReadiness(person, t);
     const matchAvail = filterAvail
       ? person.readinessLevel === filterAvail
         || person.availabilityStatus === filterAvail
@@ -188,6 +231,18 @@ export default function EmergencyAvailabilityPage() {
     const matchSearch = !search || person.fullName?.toLowerCase().includes(search.toLowerCase());
     return matchAvail && matchSearch;
   });
+
+  const {
+    paginatedItems: paginatedStaff,
+    page,
+    setPage,
+    totalPages,
+    total: filteredTotal,
+  } = useClientPagination(filtered);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, filterAvail, filterRole, filterFloor, checkDate, setPage]);
 
   const stat = (key) => {
     if (summary) {
@@ -199,34 +254,36 @@ export default function EmergencyAvailabilityPage() {
 
   return (
     <AdminPageShell
-      title="Sẵn sàng khẩn cấp"
+      title={t('admin.staff.emergency.title')}
       subtitle={
         <>
-          Trạng thái bác sĩ/y tá theo ngày đã chọn — ca đã đăng hoặc đã xác nhận; nhiệm vụ chỉ tính khi cùng ngày và còn ca hợp lệ.
-          {isToday && ' Cập nhật theo thời gian thực khi xem hôm nay.'}
+          {t('admin.staff.emergency.subtitle')}
+          {isToday && t('admin.staff.emergency.subtitleTodaySuffix')}
         </>
       }
     >
 
       {!isToday && (
         <p className="emergency-date-hint">
-          Đang xem ngày <strong>{formatCheckDateVi(checkDate)}</strong>. Đổi ngày để so sánh — nhiệm vụ ngày khác không hiển thị ở đây.
+          {t('admin.staff.emergency.dateHint', { date: formatCheckDate(checkDate, i18n.language) })}
         </p>
       )}
 
       <div className="emergency-banner">
         <span style={{ fontSize: '1.2rem' }}>🚨</span>
-        Trong trường hợp khẩn cấp, liên hệ nhân viên trạng thái <strong>Sẵn sàng</strong> trước tiên.
+        {t('admin.staff.emergency.banner')}
         <span className="emergency-banner__meta">
           {liveConnected && (
             <span className="live-badge">
-              <span className="live-badge__dot" /> Realtime
+              <span className="live-badge__dot" /> {t('admin.staff.emergency.realtime')}
             </span>
           )}
           {lastUpdated && (
             <span>
-              Cập nhật lúc {lastUpdated.toLocaleTimeString('vi-VN')}
-              {!liveConnected && isToday && ` · làm mới sau ${countdown}s`}
+              {t('admin.staff.emergency.updatedAt', {
+                time: lastUpdated.toLocaleTimeString(dateLocale(i18n.language)),
+              })}
+              {!liveConnected && isToday && ` · ${t('admin.staff.emergency.refreshIn', { seconds: countdown })}`}
             </span>
           )}
         </span>
@@ -235,49 +292,49 @@ export default function EmergencyAvailabilityPage() {
       <div className="emergency-stats">
         <div className="stat-card stat-card--available">
           <div className="stat-card__value">{stat('ready')}</div>
-          <div className="stat-card__label">🟢 Sẵn sàng</div>
+          <div className="stat-card__label">🟢 {t('admin.staff.emergency.statReady')}</div>
         </div>
         <div className="stat-card stat-card--busy">
           <div className="stat-card__value">{stat('caring')}</div>
-          <div className="stat-card__label">🟡 Đang chăm sóc</div>
+          <div className="stat-card__label">🟡 {t('admin.staff.emergency.statCaring')}</div>
         </div>
         <div className="stat-card stat-card--busy" style={{ opacity: 0.7 }}>
           <div className="stat-card__value">{stat('off_duty')}</div>
-          <div className="stat-card__label">⚫ Không trực</div>
+          <div className="stat-card__label">⚫ {t('admin.staff.emergency.statOffDuty')}</div>
         </div>
         <div className="stat-card stat-card--off">
           <div className="stat-card__value">{stat('on_leave')}</div>
-          <div className="stat-card__label">🔴 Nghỉ phép</div>
+          <div className="stat-card__label">🔴 {t('admin.staff.emergency.statOnLeave')}</div>
         </div>
       </div>
 
       <div className="filter-row">
-        <input type="text" placeholder="Tìm tên..." value={search} onChange={(e) => setSearch(e.target.value)} />
+        <input type="search" placeholder={t('admin.staff.emergency.searchPlaceholder')} value={search} onChange={(e) => setSearch(e.target.value)} />
         <input type="date" value={checkDate} onChange={(e) => setCheckDate(e.target.value)} />
         <select value={filterRole} onChange={(e) => setFilterRole(e.target.value)}>
-          <option value="">Tất cả vai trò</option>
-          <option value="doctor">Bác sĩ</option>
-          <option value="nurse">Y tá</option>
+          <option value="">{t('admin.staff.common.allRoles')}</option>
+          <option value="doctor">{t('common.roles.doctor')}</option>
+          <option value="nurse">{t('common.roles.nurse')}</option>
         </select>
         <select value={filterAvail} onChange={(e) => setFilterAvail(e.target.value)}>
-          <option value="">Tất cả trạng thái</option>
-          <option value="ready">🟢 Sẵn sàng</option>
-          <option value="caring">🟡 Đang chăm sóc</option>
-          <option value="off_duty">⚫ Không trực</option>
-          <option value="on_leave">🔴 Nghỉ phép</option>
+          <option value="">{t('common.allStatuses')}</option>
+          <option value="ready">🟢 {t('admin.staff.emergency.statReady')}</option>
+          <option value="caring">🟡 {t('admin.staff.emergency.statCaring')}</option>
+          <option value="off_duty">⚫ {t('admin.staff.emergency.statOffDuty')}</option>
+          <option value="on_leave">🔴 {t('admin.staff.emergency.statOnLeave')}</option>
         </select>
         <select
           value={filterFloor}
           onChange={(e) => setFilterFloor(e.target.value)}
           style={{ minWidth: 200 }}
         >
-          <option value="">Tất cả tầng</option>
+          <option value="">{t('admin.staff.emergency.allFloors')}</option>
           {floorOptions.map((f) => (
-            <option key={f._id} value={f._id}>{floorLabel(f)}</option>
+            <option key={f._id} value={f._id}>{formatFloorWithBuilding(f, t, areaLookup)}</option>
           ))}
         </select>
         <button type="button" className="refresh-btn" onClick={loadFromApi}>
-          🔄 Làm mới
+          {t('admin.staff.common.refresh')}
         </button>
       </div>
 
@@ -287,29 +344,27 @@ export default function EmergencyAvailabilityPage() {
         <table className="resident-page__table-element">
           <thead>
             <tr className="resident-page__table-header">
-              <th>Họ tên</th>
-              <th>Vai trò</th>
-              <th>Tầng phụ trách</th>
-              <th>Nhiệm vụ</th>
-              <th>Mức sẵn sàng</th>
-              <th>Thao tác</th>
+              <th>{t('admin.staff.emergency.colName')}</th>
+              <th>{t('common.colRole')}</th>
+              <th>{t('admin.staff.emergency.colFloors')}</th>
+              <th>{t('admin.staff.emergency.colReadiness')}</th>
+              <th>{t('common.colActions')}</th>
             </tr>
           </thead>
           <tbody>
             {loading && !data.length && (
               <tr>
-                <td colSpan={6} className="empty-state">Đang tải...</td>
+                <td colSpan={5} className="empty-state">{t('common.loading')}</td>
               </tr>
             )}
             {!loading && filtered.length === 0 && (
               <tr>
-                <td colSpan={6} className="empty-state">Không tìm thấy nhân viên phù hợp</td>
+                <td colSpan={5} className="empty-state">{t('admin.staff.emergency.emptyFiltered')}</td>
               </tr>
             )}
-            {filtered.map((person) => {
-              const cfg = resolveReadiness(person);
-              const floorLabel = formatResponsibleFloorLabels(person);
-              const taskLabel = formatTaskSummary(person);
+            {paginatedStaff.map((person) => {
+              const cfg = resolveReadiness(person, t);
+              const floorLabelText = formatResponsibleFloorLabels(person, t, areaLookup);
 
               return (
                 <tr key={person._id}>
@@ -321,16 +376,11 @@ export default function EmergencyAvailabilityPage() {
                   </td>
                   <td>
                     <span className={`role-badge role-badge--${person.role}`}>
-                      {ROLE_LABELS[person.role] || person.role}
+                      {t(`common.roles.${person.role}`, { defaultValue: person.role })}
                     </span>
                   </td>
-                  <td className="emergency-table-cell--wrap" title={floorLabel}>
-                    {floorLabel}
-                  </td>
-                  <td>
-                    <span className={person.hasTasks ? 'task-active' : 'task-inactive'}>
-                      {taskLabel}
-                    </span>
+                  <td className="emergency-table-cell--wrap" title={floorLabelText}>
+                    {floorLabelText}
                   </td>
                   <td>
                     <span className={`avail-badge avail-badge--${cfg.badge}`}>
@@ -343,8 +393,10 @@ export default function EmergencyAvailabilityPage() {
                       type="button"
                       className="emergency-detail-btn"
                       onClick={() => setDetailPerson(person)}
+                      aria-label={t('admin.staff.emergency.detail')}
+                      title={t('admin.staff.emergency.detail')}
                     >
-                      Chi tiết
+                      <Eye size={16} />
                     </button>
                   </td>
                 </tr>
@@ -354,11 +406,21 @@ export default function EmergencyAvailabilityPage() {
         </table>
       </div>
 
+      {!loading && filtered.length > 0 && (
+        <ListPagination
+          page={page}
+          totalPages={totalPages}
+          total={filteredTotal}
+          onPageChange={setPage}
+        />
+      )}
+
       {detailPerson && (
         <EmergencyStaffDetailModal
           person={detailPerson}
-          readinessConfig={resolveReadiness(detailPerson)}
-          checkDateLabel={formatCheckDateVi(checkDate)}
+          readinessConfig={resolveReadiness(detailPerson, t)}
+          checkDateLabel={formatCheckDate(checkDate, i18n.language)}
+          floorById={areaLookup}
           onClose={() => setDetailPerson(null)}
         />
       )}

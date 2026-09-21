@@ -1,5 +1,203 @@
 /* Shell/tabs/tables: ResidentPage.css */
 
+.assignment-panel {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 20px;
+  min-width: 0;
+}
+
+.assignment-detail-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 8px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  color: #475569;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.assignment-detail-back:hover {
+  background: #f8fafc;
+}
+
+.assignment-detail-panel {
+  max-width: 960px;
+}
+
+.resident-page .ar-table-row--clickable {
+  cursor: pointer;
+}
+
+.resident-page .ar-table-row--clickable:hover {
+  background: #f8fafc;
+}
+
+.assignment-table-wrap {
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+.resident-page .data-table-wrap.assignment-table-wrap {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.resident-page .assignment-table {
+  table-layout: fixed;
+  width: 100%;
+  min-width: 520px;
+}
+
+.resident-page .assignment-table th,
+.resident-page .assignment-table td {
+  vertical-align: top;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.resident-page .assignment-table th {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 11px;
+  padding: 12px 10px;
+  letter-spacing: 0.03em;
+}
+
+.resident-page .assignment-table td {
+  padding: 12px 10px;
+  word-break: break-word;
+}
+
+.resident-page .assignment-col--name {
+  width: 22%;
+}
+
+.resident-page .assignment-col--role {
+  width: 14%;
+}
+
+.resident-page .assignment-col--shift {
+  width: 24%;
+}
+
+.resident-page .assignment-col--area {
+  width: 28%;
+}
+
+.resident-page .assignment-col--action {
+  width: 72px;
+}
+
+.assignment-table__cell--name {
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.assignment-table__cell--badges {
+  line-height: 1.4;
+  max-width: 100%;
+}
+
+.assignment-table__cell--badges > .assignment-cell-badges,
+.assignment-table__cell--badges > .shift-badge-group {
+  width: 100%;
+  min-width: 0;
+}
+
+.assignment-table__cell--actions {
+  vertical-align: middle !important;
+  white-space: nowrap;
+  text-align: center;
+  padding-left: 6px !important;
+  padding-right: 6px !important;
+}
+
+.assignment-table__empty {
+  color: #94a3b8;
+  font-size: 0.8rem;
+}
+
+.assignment-table__count {
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+.assignment-table__count-btn {
+  padding: 0;
+  border: none;
+  background: none;
+  color: #1d4ed8;
+  font-weight: 600;
+  font-size: inherit;
+  font-family: inherit;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.assignment-table__count-btn:hover {
+  text-decoration: underline;
+}
+
+.assigned-residents-view-modal {
+  max-width: 640px;
+  width: calc(100% - 32px);
+}
+
+.assigned-residents-view-modal__header {
+  margin-bottom: 16px;
+}
+
+.assigned-residents-view-modal__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.assigned-residents-view-modal__count {
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+.assigned-residents-view-modal__body {
+  margin-bottom: 8px;
+}
+
+.assigned-residents-view-modal__table th,
+.assigned-residents-view-modal__table td {
+  font-size: 0.875rem;
+}
+
+.assignment-table__cell--actions .assignment-action-group {
+  justify-content: flex-end;
+}
+
+.assignment-table__cell--actions .resident-action-group {
+  justify-content: center;
+}
+
+.assignment-cell-badges,
+.shift-badge-group,
+.assignment-action-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: flex-start;
+  min-width: 0;
+  max-width: 100%;
+}
+
 .assignment-steps-hint {
   font-size: 14px;
   color: #475569;
@@ -21,19 +219,37 @@
 .resident-page .section-title {
   font-size: 1rem;
   font-weight: 700;
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: inherit;
   color: #0f172a;
   margin: 0;
 }
 
-.area-badge {
+.area-badge,
+.room-badge {
   display: inline-flex;
-  padding: 4px 10px;
+  flex: 0 1 auto;
+  max-width: 100%;
+  padding: 3px 8px;
   border-radius: 999px;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.area-badge {
   background: rgba(15, 118, 110, 0.12);
   color: #0f766e;
+}
+
+.room-badge {
+  background: rgba(37, 99, 235, 0.12);
+  color: #1d4ed8;
+}
+
+.shift-badge-group .shift-badge {
+  flex: 0 1 auto;
 }
 
 .priority-badge {
@@ -177,12 +393,12 @@
 
 .shift-badge {
   display: inline-flex;
-  padding: 4px 10px;
+  max-width: 100%;
+  padding: 3px 8px;
   border-radius: 999px;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   white-space: nowrap;
-  max-width: 180px;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -271,4 +487,10 @@
 
 .shift-detail-panel__hint--warn {
   color: #c2410c;
+}
+
+@media (max-width: 960px) {
+  .assignment-tab-layout {
+    grid-template-columns: 1fr;
+  }
 }

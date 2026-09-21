@@ -1,40 +1,39 @@
-const ROLE_LABELS = {
-  doctor: 'Bác sĩ', nurse: 'Y tá', staff: 'Chăm sóc viên',
-  caregiver: 'Hộ lý', chef: 'Đầu bếp', pharmacist: 'Dược sĩ',
-  family: 'Gia đình', manager: 'Quản lý', admin: 'Admin',
-};
+import { useTranslation } from 'react-i18next';
+import { STAFF_ROLE_LABELS } from '../../../../constants/rolePolicy';
 
-function StatusBadge({ s }) {
-  if (s.isBanned) return <span className="status-badge status-badge--banned">Đã ban</span>;
-  if (!s.isActive) return <span className="status-badge status-badge--inactive">Vô hiệu hóa</span>;
-  return <span className="status-badge status-badge--active">Đang làm</span>;
+function StatusBadge({ s, t }) {
+  if (s.isBanned) return <span className="status-badge status-badge--banned">{t('admin.staff.profiles.statusBanned')}</span>;
+  if (!s.isActive) return <span className="status-badge status-badge--inactive">{t('admin.staff.profiles.statusInactive')}</span>;
+  return <span className="status-badge status-badge--active">{t('admin.staff.profiles.statusActive')}</span>;
 }
 
 export default function StaffTable({ staff, loading, onView, onEdit, onBan, canManage }) {
+  const { t } = useTranslation();
+
   return (
     <div className="resident-page__table">
       <table className="resident-page__table-element">
         <thead>
           <tr className="resident-page__table-header">
-            <th>Mã NV</th>
-            <th>Họ tên</th>
-            <th>Email</th>
-            <th>Số điện thoại</th>
-            <th>Vai trò</th>
-            <th>Chuyên môn</th>
-            <th>Trạng thái</th>
-            <th>Thao tác</th>
+            <th>{t('admin.staff.profiles.colStaffCode')}</th>
+            <th>{t('common.colFullName')}</th>
+            <th>{t('admin.staff.profiles.colEmail')}</th>
+            <th>{t('admin.staff.profiles.colPhone')}</th>
+            <th>{t('common.colRole')}</th>
+            <th>{t('admin.staff.profiles.colSpecialty')}</th>
+            <th>{t('common.colStatus')}</th>
+            <th>{t('common.colActions')}</th>
           </tr>
         </thead>
         <tbody>
           {loading && (
             <tr>
-              <td colSpan={8} className="resident-page__empty">Đang tải...</td>
+              <td colSpan={8} className="resident-page__empty">{t('common.loading')}</td>
             </tr>
           )}
           {!loading && staff.length === 0 && (
             <tr>
-              <td colSpan={8} className="resident-page__empty">Không có nhân viên nào</td>
+              <td colSpan={8} className="resident-page__empty">{t('admin.staff.profiles.emptyList')}</td>
             </tr>
           )}
           {!loading && staff.map((s) => {
@@ -58,31 +57,33 @@ export default function StaffTable({ staff, loading, onView, onEdit, onBan, canM
               <td>{s.phone || '—'}</td>
               <td>
                 <span className={`role-badge role-badge--${s.role}`}>
-                  {ROLE_LABELS[s.role] || s.role}
+                  {STAFF_ROLE_LABELS[s.role] || t(`common.roles.${s.role}`, { defaultValue: s.role })}
                 </span>
               </td>
               <td>{s.staffProfile?.specialty || '—'}</td>
               <td>
-                <StatusBadge s={s} />
+                <StatusBadge s={s} t={t} />
               </td>
-              <td style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                <button
-                  type="button"
-                  className="resident-page__action"
-                  onClick={() => onView(s)}
-                >
-                  Xem
-                </button>
+              <td>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                   <button
-                  type="button"
-                  className="resident-page__action"
-                  style={s.isBanned ? undefined : { background: 'rgba(220, 38, 38, 0.12)', color: '#b91c1c' }}
-                  onClick={() => onBan(s)}
-                  disabled={!manageable}
-                  title={!manageable ? 'Không có quyền ban tài khoản admin/quản lý' : undefined}
-                >
-                  {s.isBanned ? 'Gỡ ban' : 'Ban'}
-                </button>
+                    type="button"
+                    className="resident-page__action"
+                    onClick={() => onView(s)}
+                  >
+                    {t('common.view')}
+                  </button>
+                  <button
+                    type="button"
+                    className="resident-page__action"
+                    style={s.isBanned ? undefined : { background: 'rgba(220, 38, 38, 0.12)', color: '#b91c1c' }}
+                    onClick={() => onBan(s)}
+                    disabled={!manageable}
+                    title={!manageable ? t('admin.staff.profiles.banNoPermission') : undefined}
+                  >
+                    {s.isBanned ? t('admin.staff.profiles.unban') : t('admin.staff.profiles.ban')}
+                  </button>
+                </div>
               </td>
             </tr>
           );

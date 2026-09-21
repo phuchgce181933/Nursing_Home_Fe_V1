@@ -1,14 +1,19 @@
+import { useTranslation, Trans } from 'react-i18next';
 import { useAuth } from '../../hooks/useAuth';
 
 function RoleDashboard({ title, greeting, roleLabel, sections }) {
+  const { t } = useTranslation();
   const { user } = useAuth();
 
   return (
     <div className="role-dashboard-card">
       <h1>{title}</h1>
       <p>
-        Chào mừng {user?.fullName || greeting}, bạn đang ở khu vực dành cho{' '}
-        <strong>{roleLabel}</strong>.
+        <Trans
+          i18nKey="dashboard.welcomeMessage"
+          values={{ name: user?.fullName || greeting, role: roleLabel }}
+          components={{ strong: <strong /> }}
+        />
       </p>
       <div className="role-dashboard-sections">
         {sections.map((section) => (

@@ -1,10 +1,31 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Calendar, MapPin, Clock, Users, Search, RefreshCw, UserCheck } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { motion, AnimatePresence } from 'motion/react';
+import { Calendar, MapPin, Clock, Users, Search, RefreshCw, UserCheck, UserX, Eye, X, CheckCircle2, AlertTriangle } from 'lucide-react';
 import activityService from '../../services/activity.service';
 import residentService from '../../services/resident.service';
 import '../../styles/admin/AdminAdmissionRequestsPage.css';
+import '../../styles/family/FamilyActivityPage.css';
+
+const formatDurationLabel = (durationMinutes) => {
+  const totalMinutes = Number(durationMinutes);
+  if (!Number.isFinite(totalMinutes) || totalMinutes <= 0) return '';
+
+  const totalDays = Math.floor(totalMinutes / (24 * 60));
+  const remainingMinutes = totalMinutes % (24 * 60);
+  const hours = Math.floor(remainingMinutes / 60);
+  const minutes = remainingMinutes % 60;
+
+  const parts = [];
+  if (totalDays > 0) parts.push(`${totalDays}d`);
+  if (hours > 0) parts.push(`${hours}h`);
+  if (minutes > 0) parts.push(`${minutes}p`);
+
+  return parts.join(' ');
+};
 
 export default function FamilyActivityPage() {
+  const { t } = useTranslation();
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -19,6 +40,9 @@ export default function FamilyActivityPage() {
   const [familyResidents, setFamilyResidents] = useState([]);
   const [selectedResident, setSelectedResident] = useState(null);
   const [registering, setRegistering] = useState(false);
+  const [selectedActivityId, setSelectedActivityId] = useState(null);
+  const [actionMessage, setActionMessage] = useState('');
+  const [actionMessageType, setActionMessageType] = useState('success');
 
   const fetchActivities = useCallback(async () => {
     try {
@@ -38,7 +62,7 @@ export default function FamilyActivityPage() {
       setTotalPages(res?.totalPages || 1);
     } catch (err) {
       console.error('Fetch activities failed:', err);
-      setError(err.response?.data?.message || 'Could not load activities.');
+      setError(err.response?.data?.message || t('familyActivity.error'));
     } finally {
       setLoading(false);
     }
@@ -66,28 +90,83 @@ export default function FamilyActivityPage() {
 
   const handleRegisterResident = async (activityId) => {
     if (!selectedResident) {
-      alert('Vui lòng chọn cư dân');
+      setActionMessageType('error');
+      setActionMessage(t('familyActivity.selectResidentWarning'));
       return;
     }
 
     try {
       setRegistering(true);
+      setActionMessage('');
       await activityService.registerResident(activityId, selectedResident);
-      
+
       setRegisteredResidents(prev => {
         const newSet = new Set(prev);
         newSet.add(`${activityId}-${selectedResident}`);
         return newSet;
       });
-      
-      alert('Đã đăng ký hoạt động thành công!');
+
+      setActionMessageType('success');
+      setActionMessage(t('familyActivity.registerSuccess'));
       fetchActivities();
     } catch (err) {
       console.error('Register failed:', err);
-      alert(err.response?.data?.message || 'Không thể đăng ký hoạt động.');
+      setActionMessageType('error');
+      setActionMessage(err?.response?.data?.message || t('familyActivity.registerError'));
     } finally {
       setRegistering(false);
     }
+  };
+
+  const handleUnregisterResident = async (activityId) => {
+    if (!selectedResident) return;
+    try {
+      setRegistering(true);
+      setActionMessage('');
+      await activityService.unregisterResident(activityId, selectedResident);
+
+      setRegisteredResidents(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(`${activityId}-${selectedResident}`);
+        return newSet;
+      });
+
+      setActionMessageType('success');
+      setActionMessage(t('familyActivity.unregisterSuccess'));
+      fetchActivities();
+    } catch (err) {
+      console.error('Unregister failed:', err);
+      setActionMessageType('error');
+      setActionMessage(err?.response?.data?.message || t('familyActivity.unregisterError'));
+    } finally {
+      setRegistering(false);
+    }
+  };
+
+  const getSelectedActivity = () => {
+    return activities.find((a) => a._id === selectedActivityId);
+  };
+
+  const formatActivityDateTime = (activity) => {
+    const startDate = new Date(activity.startAt || activity.scheduledAt);
+    const endDate = activity.endAt ? new Date(activity.endAt) : startDate;
+    
+    if (startDate.toDateString() === endDate.toDateString()) {
+      return `${startDate.toLocaleDateString('vi-VN')} ${startDate.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} → ${endDate.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}`;
+    } else {
+      return `${startDate.toLocaleDateString('vi-VN')} ${startDate.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} → ${endDate.toLocaleDateString('vi-VN')} ${endDate.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}`;
+    }
+  };
+
+  const getStatusLabel = (status) => {
+    const statusMap = {
+      'draft': 'familyActivity.statusDraft',
+      'scheduled': 'familyActivity.statusScheduled',
+      'ongoing': 'familyActivity.statusOngoing',
+      'completed': 'familyActivity.statusCompleted',
+      'cancelled': 'familyActivity.statusCancelled'
+    };
+    return statusMap[status] ? t(statusMap[status]) : status;
   };
 
   const isRegistered = (activityId, residentId) => {
@@ -102,24 +181,24 @@ export default function FamilyActivityPage() {
         <div>
           <h1>
             <Calendar size={26} />
-            Hoạt động của cơ sở
+            {t('familyActivity.title')}
           </h1>
-          <p>Xem và đăng ký hoạt động cho cư dân gia đình.</p>
+          <p>{t('familyActivity.subtitle')}</p>
         </div>
       </div>
 
       <div className="adm-filter-panel">
         <div style={{ marginBottom: '16px' }}>
-          <label className="text-sm font-semibold">Chọn cư dân</label>
+          <label className="text-sm font-semibold">{t('familyActivity.selectResident')}</label>
           <select
             className="adm-filter-select"
             value={selectedResident}
             onChange={(e) => setSelectedResident(e.target.value)}
           >
-            <option value="">Chọn cư dân</option>
+            <option value="">{t('familyActivity.selectResident')}</option>
             {familyResidents.map((resident) => (
               <option key={resident._id} value={resident._id}>
-                {resident.fullName || 'Cư dân chưa đặt tên'} {resident.residentCode ? `(${resident.residentCode})` : ''}
+                {resident.fullName || t('familyActivity.unnamedResident')} {resident.residentCode ? `(${resident.residentCode})` : ''}
               </option>
             ))}
           </select>
@@ -127,12 +206,12 @@ export default function FamilyActivityPage() {
 
         <form className="adm-filter-grid">
           <div>
-            <label className="text-sm font-semibold">Tìm kiếm</label>
+            <label className="text-sm font-semibold">{t('familyActivity.searchLabel')}</label>
             <div className="adm-filter-input-wrapper">
               <Search className="adm-filter-input-icon" size={14} />
               <input
                 type="text"
-                placeholder="Tìm theo tiêu đề, danh mục..."
+                placeholder={t('familyActivity.searchPlaceholder')}
                 className="adm-filter-input"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -141,30 +220,56 @@ export default function FamilyActivityPage() {
           </div>
 
           <div>
-            <label className="text-sm font-semibold">Trạng thái</label>
+            <label className="text-sm font-semibold">{t('familyActivity.statusLabel')}</label>
             <select
               className="adm-filter-select"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
             >
-              <option value="">Tất cả</option>
-              <option value="scheduled">Sắp diễn ra</option>
-              <option value="ongoing">Đang diễn ra</option>
-              <option value="completed">Đã hoàn thành</option>
+              <option value="">{t('familyActivity.statusAll')}</option>
+              <option value="scheduled">{t('familyActivity.statusScheduled')}</option>
+              <option value="ongoing">{t('familyActivity.statusOngoing')}</option>
+              <option value="completed">{t('familyActivity.statusCompleted')}</option>
             </select>
           </div>
 
           <div style={{ alignSelf: 'flex-end' }}>
             <button type="button" className="adm-btn-refresh" onClick={() => fetchActivities()}>
-              <RefreshCw size={14} /> Làm mới
+              <RefreshCw size={14} /> {t('familyActivity.refresh')}
             </button>
           </div>
         </form>
       </div>
 
+      <AnimatePresence>
+        {actionMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: -8, height: 0 }}
+            animate={{ opacity: 1, y: 0, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.25 }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '10px 14px',
+              borderRadius: '8px',
+              marginBottom: '16px',
+              fontSize: '13px',
+              fontWeight: 500,
+              backgroundColor: actionMessageType === 'success' ? '#dcfce7' : '#fee2e2',
+              color: actionMessageType === 'success' ? '#166534' : '#b91c1c',
+            }}
+          >
+            {actionMessageType === 'success' ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
+            {actionMessage}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {loading ? (
         <div style={{ textAlign: 'center', padding: '40px' }}>
-          Đang tải hoạt động...
+          {t('familyActivity.loading')}
         </div>
       ) : error ? (
         <div style={{ color: '#b91c1c', padding: '20px', backgroundColor: '#fee2e2', borderRadius: '8px' }}>
@@ -172,7 +277,7 @@ export default function FamilyActivityPage() {
         </div>
       ) : activities.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
-          Không tìm thấy hoạt động nào.
+          {t('familyActivity.empty')}
         </div>
       ) : (
         <>
@@ -182,11 +287,14 @@ export default function FamilyActivityPage() {
             gap: '16px',
             marginBottom: '24px'
           }}>
-            {activities.map((activity) => {
+            {activities.map((activity, idx) => {
               const isResidentRegistered = selectedResident && isRegistered(activity._id, selectedResident);
               return (
-                <div
+                <motion.div
                   key={activity._id}
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: 0.03 * (idx % 12) }}
                   style={{
                     backgroundColor: 'white',
                     borderRadius: '12px',
@@ -234,13 +342,13 @@ export default function FamilyActivityPage() {
                     {activity.durationMinutes && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
                         <Clock size={14} />
-                        <span>{activity.durationMinutes} phút</span>
+                        <span>{formatDurationLabel(activity.durationMinutes)}</span>
                       </div>
                     )}
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <Users size={14} />
-                      <span>{activity.participantResidentIds?.length || 0} cư dân</span>
+                      <span>{t('familyActivity.residentCount', { count: activity.participantResidentIds?.length || 0 })}</span>
                     </div>
                   </div>
 
@@ -251,31 +359,164 @@ export default function FamilyActivityPage() {
                     marginBottom: '12px',
                     fontSize: '12px'
                   }}>
-                    <strong>Trạng thái:</strong> <span style={{ textTransform: 'capitalize' }}>{activity.status}</span>
+                    <strong>{t('familyActivity.statusPrefix')}</strong> <span style={{ textTransform: 'capitalize' }}>{getStatusLabel(activity.status)}</span>
                   </div>
 
-                  <button
-                    type="button"
-                    className="adm-btn-refresh"
-                      disabled={!selectedResident || isResidentRegistered || registering || activity.status === 'cancelled' || activity.status === 'completed'}
-                      onClick={() => handleRegisterResident(activity._id)}
-                      style={{
-                        marginTop: 'auto',
-                        opacity: !selectedResident || isResidentRegistered || registering || activity.status === 'cancelled' || activity.status === 'completed' ? 0.5 : 1,
-                        cursor: !selectedResident || isResidentRegistered || registering || activity.status === 'cancelled' || activity.status === 'completed' ? 'not-allowed' : 'pointer'
-                      }}
+                  <div style={{ display: 'flex', gap: '8px', marginTop: 'auto' }}>
+                    <button
+                      type="button"
+                      className="adm-btn-refresh"
+                      onClick={() => setSelectedActivityId(activity._id)}
+                      title={t('familyActivity.viewDetails')}
+                      style={{ flex: 1 }}
                     >
-                      <UserCheck size={14} />
-                      {isResidentRegistered ? 'Đã đăng ký' : activity.status === 'completed' ? 'Không thể đăng ký' : 'Đăng ký'}
-                  </button>
-                </div>
+                      <Eye size={14} /> {t('familyActivity.viewDetails')}
+                    </button>
+                    {isResidentRegistered ? (
+                      <button
+                        type="button"
+                        className="adm-btn-refresh"
+                        disabled={!selectedResident || registering || activity.status === 'completed'}
+                        onClick={() => handleUnregisterResident(activity._id)}
+                        style={{
+                          flex: 1,
+                          opacity: registering || activity.status === 'completed' ? 0.5 : 1,
+                          cursor: registering || activity.status === 'completed' ? 'not-allowed' : 'pointer',
+                          color: '#b91c1c',
+                        }}
+                      >
+                        <UserX size={14} /> {t('familyActivity.unregister')}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="adm-btn-refresh"
+                        disabled={!selectedResident || registering || activity.status === 'cancelled' || activity.status === 'completed'}
+                        onClick={() => handleRegisterResident(activity._id)}
+                        style={{
+                          flex: 1,
+                          opacity: !selectedResident || registering || activity.status === 'cancelled' || activity.status === 'completed' ? 0.5 : 1,
+                          cursor: !selectedResident || registering || activity.status === 'cancelled' || activity.status === 'completed' ? 'not-allowed' : 'pointer'
+                        }}
+                      >
+                        <UserCheck size={14} />
+                        {activity.status === 'completed' ? t('familyActivity.cannotRegister') : t('familyActivity.register')}
+                      </button>
+                    )}
+                  </div>
+                </motion.div>
               );
             })}
           </div>
 
+          {/* ─── Activity Detail Modal ─── */}
+          {selectedActivityId && (
+            <div style={{
+              position: 'fixed',
+              inset: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              zIndex: 1000
+            }}>
+              <div className="family-activity-modal" style={{
+                width: '500px',
+                height: '100%',
+                backgroundColor: '#fff',
+                boxShadow: '-2px 0 8px rgba(0,0,0,0.1)',
+                display: 'flex',
+                flexDirection: 'column',
+              }}>
+                {/* Header */}
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '16px 20px',
+                  borderBottom: '1px solid #e2e8f0',
+                }}>
+                  <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 700 }}>{t('familyActivity.modalTitle')}</h2>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedActivityId(null)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+
+                {/* Content */}
+                <div className="family-activity-modal-content" style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
+                  {getSelectedActivity() && (() => {
+                    const activity = getSelectedActivity();
+                    return (
+                      <>
+                        {/* Title and Status */}
+                        <div style={{ marginBottom: '20px' }}>
+                          <h3 style={{ margin: '0 0 8px 0', fontSize: '20px', fontWeight: 700 }}>
+                            {activity.title}
+                          </h3>
+                          <span style={{
+                            display: 'inline-block',
+                            padding: '4px 12px',
+                            backgroundColor: activity.status === 'completed' ? '#dcfce7' : activity.status === 'cancelled' ? '#fee2e2' : '#dbeafe',
+                            color: activity.status === 'completed' ? '#166534' : activity.status === 'cancelled' ? '#b91c1c' : '#0c4a6e',
+                            borderRadius: '6px',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                          }}>
+                            {getStatusLabel(activity.status)}
+                          </span>
+                        </div>
+
+                        {/* Description */}
+                        {activity.description && (
+                          <div style={{ marginBottom: '16px' }}>
+                            <label style={{ display: 'block', fontWeight: 600, marginBottom: '4px', fontSize: '14px' }}>{t('familyActivity.description')}</label>
+                            <p style={{ margin: 0, color: '#475569', fontSize: '14px', lineHeight: 1.5 }}>{activity.description}</p>
+                          </div>
+                        )}
+
+                        {/* Category */}
+                        {activity.category && (
+                          <div style={{ marginBottom: '16px' }}>
+                            <label style={{ display: 'block', fontWeight: 600, marginBottom: '4px', fontSize: '14px' }}>{t('familyActivity.category')}</label>
+                            <p style={{ margin: 0, color: '#475569', fontSize: '14px' }}>{activity.category}</p>
+                          </div>
+                        )}
+
+                        {/* Date Range */}
+                        <div style={{ marginBottom: '16px' }}>
+                          <label style={{ display: 'block', fontWeight: 600, marginBottom: '4px', fontSize: '14px' }}>{t('familyActivity.time')}</label>
+                          <p style={{ margin: 0, color: '#475569', fontSize: '14px' }}>{formatActivityDateTime(activity)}</p>
+                        </div>
+
+                        {/* Duration */}
+                        {activity.durationMinutes && (
+                          <div style={{ marginBottom: '16px' }}>
+                            <label style={{ display: 'block', fontWeight: 600, marginBottom: '4px', fontSize: '14px' }}>{t('familyActivity.duration')}</label>
+                            <p style={{ margin: 0, color: '#475569', fontSize: '14px' }}>{formatDurationLabel(activity.durationMinutes)}</p>
+                          </div>
+                        )}
+
+                        {/* Location */}
+                        {activity.location && (
+                          <div style={{ marginBottom: '16px' }}>
+                            <label style={{ display: 'block', fontWeight: 600, marginBottom: '4px', fontSize: '14px' }}>{t('familyActivity.location')}</label>
+                            <p style={{ margin: 0, color: '#475569', fontSize: '14px' }}>{activity.location}</p>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="adm-header" style={{ marginTop: '18px', justifyContent: 'space-between' }}>
             <span>
-              Trang {page} / {totalPages} — {total} hoạt động
+              {t('familyActivity.pageInfo', { current: page, total: totalPages, count: total })}
             </span>
             <div style={{ display: 'flex', gap: '10px' }}>
               <button
@@ -284,7 +525,7 @@ export default function FamilyActivityPage() {
                 disabled={page <= 1}
                 onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
               >
-                Trước
+                {t('familyActivity.prev')}
               </button>
               <button
                 type="button"
@@ -292,7 +533,7 @@ export default function FamilyActivityPage() {
                 disabled={page >= totalPages}
                 onClick={() => setPage((prev) => Math.min(prev + 1, totalPages))}
               >
-                Tiếp
+                {t('familyActivity.next')}
               </button>
             </div>
           </div>

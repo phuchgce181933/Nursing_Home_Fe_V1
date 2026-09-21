@@ -1,0 +1,175 @@
+/* ─── Family Appointments Page ─────────────────────────── */
+.fap-root {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #0c2340 100%);
+  padding: 28px 24px;
+  font-family: inherit;
+  color: #f1f5f9;
+}
+
+/* Header */
+.fap-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.fap-title-block { display: flex; align-items: center; gap: 14px; }
+.fap-title-icon {
+  width: 48px; height: 48px;
+  background: linear-gradient(135deg, #1e293b, #334155);
+  border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 8px 20px rgba(14,165,233,0.35);
+}
+.fap-title { font-size: 24px; font-weight: 700; color: #f1f5f9; margin: 0; }
+.fap-subtitle { font-size: 13px; color: #94a3b8; margin: 2px 0 0; }
+
+/* Resident selector */
+.fap-resident-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.fap-resident-label { font-size: 13px; color: #94a3b8; }
+.fap-resident-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+.fap-resident-tab {
+  padding: 8px 18px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.05);
+  color: #94a3b8;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.fap-resident-tab:hover { background: rgba(14,165,233,0.12); color: #e2e8f0; border-color: rgba(14,165,233,0.3); }
+.fap-resident-tab.active {
+  background: linear-gradient(135deg, rgba(14,165,233,0.25), rgba(99,102,241,0.25));
+  color: #7dd3fc;
+  border-color: rgba(14,165,233,0.5);
+}
+
+/* Filters */
+.fap-filters {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.fap-filter-select, .fap-filter-input {
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.06);
+  color: #e2e8f0;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.fap-filter-select:focus, .fap-filter-input:focus { border-color: rgba(14,165,233,0.5); }
+.fap-filter-select option { background: #1e293b; }
+
+/* Stats */
+.fap-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 12px;
+  margin-bottom: 22px;
+}
+.fap-stat {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 14px;
+  padding: 16px;
+  text-align: center;
+}
+.fap-stat-num { font-size: 26px; font-weight: 700; margin-bottom: 4px; }
+.fap-stat-label { font-size: 12px; color: #94a3b8; }
+
+/* Appointment cards */
+.fap-list { display: flex; flex-direction: column; gap: 12px; }
+.fap-empty {
+  text-align: center;
+  padding: 60px 24px;
+  color: #475569;
+}
+.fap-card {
+  background: rgba(255,255,255,0.06);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 16px;
+  padding: 20px 24px;
+  display: grid;
+  grid-template-columns: auto 1px 1fr auto;
+  align-items: center;
+  gap: 20px;
+  border-left: 4px solid transparent;
+  transition: all 0.2s;
+}
+.fap-card:hover { background: rgba(255,255,255,0.09); transform: translateY(-1px); box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
+.fap-card.scheduled { border-left-color: var(--nh-info); }
+.fap-card.in_progress { border-left-color: #f59e0b; }
+.fap-card.completed { border-left-color: #10b981; }
+.fap-card.cancelled { border-left-color: #475569; opacity: 0.65; }
+
+.fap-card-date {
+  text-align: center;
+  min-width: 64px;
+}
+.fap-card-day { font-size: 26px; font-weight: 700; color: #f1f5f9; line-height: 1; }
+.fap-card-month { font-size: 12px; color: #94a3b8; }
+.fap-card-divider { width: 1px; background: rgba(255,255,255,0.08); align-self: stretch; }
+.fap-card-body { flex: 1; }
+.fap-card-type { font-size: 16px; font-weight: 600; color: #f1f5f9; margin-bottom: 6px; }
+.fap-card-time { font-size: 13px; color: #94a3b8; margin-bottom: 8px; }
+.fap-card-staff { font-size: 13px; color: #7dd3fc; margin-bottom: 8px; }
+.fap-card-tags { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.fap-badge {
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-weight: 600;
+}
+.fap-badge-scheduled { background: rgba(59,130,246,0.2); color: #93c5fd; }
+.fap-badge-in_progress { background: rgba(245,158,11,0.2); color: #fcd34d; }
+.fap-badge-completed { background: rgba(16,185,129,0.2); color: #6ee7b7; }
+.fap-badge-cancelled { background: rgba(148,163,184,0.1); color: #94a3b8; }
+
+.fap-card-icon {
+  width: 40px; height: 40px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.06);
+  display: flex; align-items: center; justify-content: center;
+  color: #64748b;
+}
+.fap-card.scheduled .fap-card-icon { background: rgba(59,130,246,0.12); color: #93c5fd; }
+.fap-card.in_progress .fap-card-icon { background: rgba(245,158,11,0.12); color: #fcd34d; }
+.fap-card.completed .fap-card-icon { background: rgba(16,185,129,0.12); color: #6ee7b7; }
+
+/* Upcoming highlight */
+.fap-upcoming-label {
+  font-size: 12px;
+  color: #fb923c;
+  background: rgba(251,146,60,0.12);
+  padding: 2px 8px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Loading / Error */
+.fap-loading { display: flex; align-items: center; justify-content: center; gap: 10px; color: #94a3b8; padding: 60px; font-size: 14px; }
+.fap-error { text-align: center; padding: 60px; color: #f87171; font-size: 14px; }
+
+@media (max-width: 640px) {
+  .fap-card { grid-template-columns: 1fr; }
+  .fap-card-divider { display: none; }
+  .fap-card-date { text-align: left; display: flex; gap: 8px; align-items: baseline; }
+}
