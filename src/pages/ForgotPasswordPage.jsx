@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { KeyRound, Mail, Leaf, HeartPulse, Activity, Stethoscope, Plus, CheckCircle2, ArrowLeft, AlertCircle } from 'lucide-react';
 import authService from '../services/auth.service';
@@ -12,6 +12,7 @@ const DECOR_ICONS = [Leaf, HeartPulse, Activity, Stethoscope, Plus, Leaf, HeartP
 
 function ForgotPasswordPage() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [message, setMessage] = useState('');
   const [isSuccess, setIsSuccess] = useState(false);
@@ -21,7 +22,7 @@ function ForgotPasswordPage() {
 
   const validateEmail = useCallback((value) => {
     if (!value) return '';
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
     return emailRegex.test(value) ? '' : t('forgotPassword.invalidEmail');
   }, [t]);
 
@@ -120,6 +121,9 @@ function ForgotPasswordPage() {
               >
                 {loading ? t('forgotPassword.sending') : t('forgotPassword.resend')}
               </button>
+              <Link to="/reset-password" className="forgot-back-link">
+                {t('forgotPassword.haveTokenButton')}
+              </Link>
               <Link to="/login" className="forgot-back-link">
                 <ArrowLeft size={16} />
                 {t('forgotPassword.back')}
@@ -195,6 +199,13 @@ function ForgotPasswordPage() {
               </button>
             </form>
 
+            <Link
+              to="/reset-password"
+              className="forgot-back-link"
+              style={{ marginTop: 12, display: 'inline-block' }}
+            >
+              {t('forgotPassword.haveTokenButton')}
+            </Link>
             <Link to="/login" className="forgot-back-link">
               <ArrowLeft size={16} />
               {t('forgotPassword.back')}

@@ -69,7 +69,7 @@ export default function ServicesPage() {
 
   const bookPath = (token && user?.role === 'family')
     ? '/family/admission-requests/new'
-    : '/login';
+    : '/contact';
 
   return (
     <div className="home-page">

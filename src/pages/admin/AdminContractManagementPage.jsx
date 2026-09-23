@@ -867,10 +867,8 @@ export default function AdminContractManagementPage() {
       // (xuất = gửi cho family xem và thanh toán)
       const currentStatus = String(inv?.status || '').toUpperCase();
       if (currentStatus === 'DRAFT') {
-        console.log('🔄 [EXPORT] DRAFT invoice → auto transition to ISSUED', { invoiceId });
         try {
-          const transitionResult = await contractService.transitionInvoice(invoiceId, { status: 'ISSUED' });
-          console.log('🔄 [EXPORT] transition result', transitionResult);
+          await contractService.transitionInvoice(invoiceId, { status: 'ISSUED' });
         } catch (transErr) {
           console.error('🔄 [EXPORT] transition failed, export aborted', transErr);
           // eslint-disable-next-line no-alert
