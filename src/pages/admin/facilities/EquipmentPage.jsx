@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Plus,
@@ -14,8 +14,11 @@ import {
 import facilityService from '../../../services/facility.service';
 import useFacilitiesData from './useFacilitiesData';
 import FacilitiesSubNav from './FacilitiesSubNav';
+import ListPagination from '../../../components/ui/ListPagination';
 import { useToast } from '../../../hooks/useToast';
 import '../../../styles/admin/FacilitiesPage.css';
+
+const PAGE_SIZE_OPTIONS = [10, 20, 50];
 
 export default function EquipmentPage() {
   const { t } = useTranslation();
@@ -24,6 +27,12 @@ export default function EquipmentPage() {
   const { loading, setLoading, stats, buildings, floors, refetch } = useFacilitiesData({ withFloors: true });
 
   const [equipment, setEquipment] = useState([]);
+
+  // Pagination
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
 
   // Submitting/Form statuses
   const [submitting, setSubmitting] = useState(false);
@@ -54,23 +63,46 @@ export default function EquipmentPage() {
 
   // Filters for Equipment
   const [eqSearchTerm, setEqSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [eqStatusFilter, setEqStatusFilter] = useState('');
 
-  // Fetch equipment list on mount
+  // Debounce search input
+  const searchTimerRef = useRef(null);
   useEffect(() => {
-    const fetchEqData = async () => {
-      try {
-        setLoading(true);
-        const loadedEq = await facilityService.listEquipment();
-        setEquipment(loadedEq || []);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchEqData();
-  }, [setLoading]);
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(() => {
+      setDebouncedSearch(eqSearchTerm);
+      setPage(1);
+    }, 400);
+    return () => clearTimeout(searchTimerRef.current);
+  }, [eqSearchTerm]);
+
+  // Reset page when status filter changes
+  useEffect(() => {
+    setPage(1);
+  }, [eqStatusFilter]);
+
+  // Fetch equipment with pagination
+  const fetchEquipment = useCallback(async () => {
+    try {
+      setLoading(true);
+      const params = { page, limit: pageSize };
+      if (debouncedSearch) params.search = debouncedSearch;
+      if (eqStatusFilter) params.status = eqStatusFilter;
+      const res = await facilityService.listEquipment(params);
+      setEquipment(res?.data || []);
+      setTotal(res?.total || 0);
+      setTotalPages(res?.totalPages || 1);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, [page, pageSize, debouncedSearch, eqStatusFilter, setLoading]);
+
+  useEffect(() => {
+    fetchEquipment();
+  }, [fetchEquipment]);
 
   // Modal Building selection change -> Filter floors
   useEffect(() => {
@@ -200,9 +232,7 @@ export default function EquipmentPage() {
         notes: formEqNotes.trim(),
       });
       setShowCreateEqModal(false);
-      // Refresh equipment list
-      const loadedEq = await facilityService.listEquipment();
-      setEquipment(loadedEq || []);
+      await fetchEquipment();
       refetch();
     } catch (err) {
       console.error(err);
@@ -246,9 +276,7 @@ export default function EquipmentPage() {
         notes: formEqNotes.trim(),
       });
       setShowEditEqModal(false);
-      // Refresh equipment list
-      const loadedEq = await facilityService.listEquipment();
-      setEquipment(loadedEq || []);
+      await fetchEquipment();
       refetch();
     } catch (err) {
       console.error(err);
@@ -264,9 +292,12 @@ export default function EquipmentPage() {
       setSubmitting(true);
       await facilityService.deleteEquipment(selectedEq._id);
       setShowDeleteEqModal(false);
-      // Refresh equipment list
-      const loadedEq = await facilityService.listEquipment();
-      setEquipment(loadedEq || []);
+      // If we just deleted the last item on this page, go back one page
+      if (equipment.length === 1 && page > 1) {
+        setPage(page - 1);
+      } else {
+        await fetchEquipment();
+      }
       refetch();
     } catch (err) {
       console.error(err);
@@ -274,6 +305,11 @@ export default function EquipmentPage() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handlePageSizeChange = (e) => {
+    setPageSize(Number(e.target.value));
+    setPage(1);
   };
 
   return (
@@ -299,7 +335,7 @@ export default function EquipmentPage() {
             onChange={(e) => setEqSearchTerm(e.target.value)}
           />
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
           <select
             className="fac-form-control"
             style={{ width: '180px', borderRadius: '12px' }}
@@ -312,6 +348,16 @@ export default function EquipmentPage() {
             <option value="maintenance">{t('facilities.equipStatusMaintenance')}</option>
             <option value="retired">{t('facilities.equipStatusRetired')}</option>
           </select>
+          <select
+            className="fac-form-control fac-page-size-select"
+            value={pageSize}
+            onChange={handlePageSizeChange}
+            aria-label={t('facilities.pageSize', 'Items per page')}
+          >
+            {PAGE_SIZE_OPTIONS.map(size => (
+              <option key={size} value={size}>{size} / {t('facilities.pageSizeSuffix', 'page')}</option>
+            ))}
+          </select>
         </div>
       </div>
 
@@ -320,36 +366,31 @@ export default function EquipmentPage() {
           <Loader2 className="animate-spin mb-3 text-indigo-600" size={32} />
           <p>{t('facilities.loadingEquipment')}</p>
         </div>
-      ) : equipment.filter(eq =>
-        (!eqStatusFilter || eq.status === eqStatusFilter) &&
-        (!eqSearchTerm || eq.name?.toLowerCase().includes(eqSearchTerm.toLowerCase()) || eq.code?.toLowerCase().includes(eqSearchTerm.toLowerCase()))
-      ).length === 0 ? (
+      ) : equipment.length === 0 ? (
         <div className="fac-table-card">
           <div className="fac-empty-box">
-            {t('facilities.emptyEquipment')}
+            {(debouncedSearch || eqStatusFilter)
+              ? t('facilities.emptyEquipmentFiltered', 'No equipment matches your search or filter.')
+              : t('facilities.emptyEquipment')}
           </div>
         </div>
       ) : (
-        <div className="fac-table-card">
-          <table className="fac-table">
-            <thead>
-              <tr>
-                <th>{t('facilities.colEquipCode')}</th>
-                <th>{t('facilities.colEquipName')}</th>
-                <th>{t('facilities.colCategory')}</th>
-                <th>{t('facilities.colLocation')}</th>
-                <th>{t('facilities.colMaintenanceDue')}</th>
-                <th>{t('facilities.colStatus')}</th>
-                <th style={{ textAlign: 'right' }}>{t('facilities.colActions')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {equipment
-                .filter(eq =>
-                  (!eqStatusFilter || eq.status === eqStatusFilter) &&
-                  (!eqSearchTerm || eq.name?.toLowerCase().includes(eqSearchTerm.toLowerCase()) || eq.code?.toLowerCase().includes(eqSearchTerm.toLowerCase()))
-                )
-                .map((eq) => (
+        <>
+          <div className="fac-table-card">
+            <table className="fac-table">
+              <thead>
+                <tr>
+                  <th>{t('facilities.colEquipCode')}</th>
+                  <th>{t('facilities.colEquipName')}</th>
+                  <th>{t('facilities.colCategory')}</th>
+                  <th>{t('facilities.colLocation')}</th>
+                  <th>{t('facilities.colMaintenanceDue')}</th>
+                  <th>{t('facilities.colStatus')}</th>
+                  <th style={{ textAlign: 'right' }}>{t('facilities.colActions')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {equipment.map((eq) => (
                   <tr key={eq._id}>
                     <td style={{ fontWeight: '600', color: '#1e293b' }}>{eq.code}</td>
                     <td style={{ fontWeight: '550' }}>{eq.name}</td>
@@ -401,9 +442,19 @@ export default function EquipmentPage() {
                     </td>
                   </tr>
                 ))}
-            </tbody>
-          </table>
-        </div>
+              </tbody>
+            </table>
+          </div>
+
+          <div className="fac-pagination-row">
+            <ListPagination
+              page={page}
+              totalPages={totalPages}
+              total={total}
+              onPageChange={setPage}
+            />
+          </div>
+        </>
       )}
 
       {/* CREATE EQUIPMENT MODAL */}

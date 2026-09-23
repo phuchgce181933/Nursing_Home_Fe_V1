@@ -232,8 +232,6 @@ function ResidentPage({ defaultMode = '' }) {
       };
 
       const res = await residentService.getResidentList(params);
-      // eslint-disable-next-line no-console
-      console.debug('admin resident list sample:', res?.data?.[0]);
       setResidents(res?.data || []);
       setTotal(res?.total || 0);
       setTotalPages(res?.totalPages || 1);

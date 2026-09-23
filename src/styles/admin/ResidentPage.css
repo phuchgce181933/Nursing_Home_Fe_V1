@@ -295,12 +295,28 @@
   border: 1px solid #e2e8f0;
 }
 
+.resident-page__table-element th:last-child,
+.resident-page__table-element td:last-child {
+  position: sticky;
+  right: 0;
+  z-index: 2;
+}
+.resident-page__table-element th:last-child {
+  background: #0f172a;
+}
+.resident-page__table-element td:last-child {
+  background: #fff;
+}
+
 .resident-page__table-row {
   border-bottom: 1px solid #e2e8f0;
   transition: background 0.2s ease;
 }
 
 .resident-page__table-row:hover {
+  background: #f1f5f9;
+}
+.resident-page__table-row:hover td:last-child {
   background: #f1f5f9;
 }
 
@@ -704,8 +720,14 @@
 .resident-page__table-row.is-selected {
   background: rgba(15, 118, 110, 0.08);
 }
+.resident-page__table-row.is-selected td:last-child {
+  background: rgba(15, 118, 110, 0.08);
+}
 
 .resident-page__table-row.is-selected:hover {
+  background: rgba(15, 118, 110, 0.12);
+}
+.resident-page__table-row.is-selected:hover td:last-child {
   background: rgba(15, 118, 110, 0.12);
 }
 
@@ -1063,7 +1085,8 @@
   background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 16px;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
   box-shadow: 0 12px 24px rgba(15, 23, 42, 0.04);
 }
 
@@ -1090,6 +1113,22 @@
 }
 
 .resident-page .data-table tbody tr:hover {
+  background: #f1f5f9;
+}
+
+.resident-page .data-table th:last-child,
+.resident-page .data-table td:last-child {
+  position: sticky;
+  right: 0;
+  z-index: 2;
+}
+.resident-page .data-table th:last-child {
+  background: #0f172a;
+}
+.resident-page .data-table td:last-child {
+  background: #fff;
+}
+.resident-page .data-table tbody tr:hover td:last-child {
   background: #f1f5f9;
 }
 

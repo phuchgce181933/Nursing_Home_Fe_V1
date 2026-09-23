@@ -55,7 +55,7 @@ export default function LivingPage() {
   const { t } = useTranslation();
   const { token, user } = useAuth();
   const GALLERY = getGallery(t);
-  const tourPath = (token && user?.role === 'family') ? '/family/facility-tours/new' : '/login';
+  const tourPath = (token && user?.role === 'family') ? '/family/facility-tours/new' : '/contact';
 
   return (
     <div className="zh-page home-page">

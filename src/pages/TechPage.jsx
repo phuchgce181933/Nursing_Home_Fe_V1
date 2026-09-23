@@ -39,7 +39,7 @@ export default function TechPage() {
   const { token, user } = useAuth();
   const EHR_ITEMS = getEhrItems(t);
   const AI_CHIPS = getAiChips(t);
-  const tourPath = (token && user?.role === 'family') ? '/family/facility-tours/new' : '/login';
+  const tourPath = (token && user?.role === 'family') ? '/family/facility-tours/new' : '/contact';
 
   return (
     <div className="zh-page home-page">

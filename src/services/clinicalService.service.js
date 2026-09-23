@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { getAuthToken } from '../utils/auth';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ? `${import.meta.env.VITE_API_BASE_URL.replace(/\/$/, '')}/api` : 'http://localhost:3000/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ? `${import.meta.env.VITE_API_BASE_URL.replace(/\/$/, '')}/api` : '/api';
 const ENDPOINT = '/clinical/services';
 
 const createHeaders = () => {

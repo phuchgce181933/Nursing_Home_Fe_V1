@@ -251,7 +251,8 @@
   border: 1px solid #f1f5f9;
   border-radius: 12px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .cap-table-responsive {
@@ -290,6 +291,22 @@
 
 .cap-table-row:hover {
   background-color: #f8fafc;
+}
+
+.cap-table th:last-child,
+.cap-table td:last-child {
+  position: sticky;
+  right: 0;
+  z-index: 2;
+}
+.cap-table th:last-child {
+  background: #f8fafc;
+}
+.cap-table td:last-child {
+  background: #fff;
+}
+.cap-table-row:hover td:last-child {
+  background: #f8fafc;
 }
 
 .cap-resident-info {

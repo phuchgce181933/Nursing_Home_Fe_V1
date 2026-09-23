@@ -48,6 +48,7 @@ export const apiErrorsVi = {
   AUTH_CANNOT_TOGGLE_SELF: 'Không thể thay đổi trạng thái của chính bạn',
   AUTH_EMAIL_REQUIRED: 'Email là bắt buộc',
   AUTH_EMAIL_ALREADY_CURRENT: 'Email này đang được sử dụng',
+  AUTH_INVALID_EMAIL: 'Email không hợp lệ',
   AUTH_PHONE_REQUIRED: 'Số điện thoại là bắt buộc',
   AUTH_PHONE_ALREADY_CURRENT: 'Số điện thoại này đang được sử dụng',
   AUTH_OTP_REQUIRED: 'otpId và mã OTP là bắt buộc',

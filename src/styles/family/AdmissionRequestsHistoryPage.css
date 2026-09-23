@@ -184,6 +184,22 @@
   background: rgba(26, 54, 93, 0.02);
 }
 
+.arh-table th:last-child,
+.arh-table td:last-child {
+  position: sticky;
+  right: 0;
+  z-index: 2;
+}
+.arh-table th:last-child {
+  background: #f8fafc;
+}
+.arh-table td:last-child {
+  background: #fff;
+}
+.arh-table tbody tr:hover td:last-child {
+  background: #f8fafc;
+}
+
 .arh-table__name {
   font-weight: 600;
   color: #1A365D !important;

@@ -215,7 +215,6 @@ function FamilyDashboardPage() {
       setPreviewLoading(true);
       setError(null);
       const invoiceDetail = await familyPortalService.getInvoiceDetail(residentId, invoiceId);
-      console.log('[DEBUG invoicePreview] invoiceDetail:', JSON.stringify(invoiceDetail?.prescriptionId?.items, null, 2));
       // Find the resident
       const resident = residents.find(r => r._id === residentId) || {};
       setPreviewInvoice({ invoice: invoiceDetail, resident });
@@ -310,7 +309,7 @@ function FamilyDashboardPage() {
       });
 
       setOtpId(payload.otpId);
-      setOtpMaskedPhone(payload.maskedPhone || '');
+      setOtpMaskedPhone(payload.maskedRecipient || '');
       setOtpCode('');
       setPendingWalletPayment({ residentId, invoiceIds: [invoiceId], amount });
       setShowOtpModal(true);
@@ -352,6 +351,8 @@ function FamilyDashboardPage() {
       setOtpMaskedPhone('');
       setOtpCode('');
       setPendingWalletPayment(null);
+      // Thanh toán theo lô: đóng luôn hộp thoại chọn hóa đơn sau khi trả xong.
+      if (showPaymentModal) closePaymentModal();
     } catch (err) {
       console.error('OTP verification failed:', err);
       setOtpError(err?.response?.data?.message || err.message || t('familyDashboard.otp.verifyError'));
@@ -371,7 +372,7 @@ function FamilyDashboardPage() {
         residentId: pendingWalletPayment.residentId,
       });
       setOtpId(payload.otpId);
-      setOtpMaskedPhone(payload.maskedPhone || '');
+      setOtpMaskedPhone(payload.maskedRecipient || '');
       setOtpCode('');
     } catch (err) {
       console.error('OTP resend failed:', err);
@@ -510,30 +511,19 @@ function FamilyDashboardPage() {
           closePaymentModal();
         }
       } else {
-        // For wallet payment - require OTP verification
-        try {
-          setWalletError(null);
-          setOtpError(null);
-          setIsWalletPaymentProcessing(true);
+        // Thanh toán bằng ví phải qua OTP: chỉ xin mã ở bước này, ví sẽ bị trừ
+        // sau khi người dùng nhập đúng mã trong hộp thoại xác thực.
+        const payload = await familyPortalService.initiateWalletPayment({
+          amount: totalAmount,
+          invoiceIds,
+        });
 
-          const payload = await familyPortalService.initiateWalletPayment({
-            amount: totalAmount,
-            invoiceIds,
-            residentId: resident._id,
-          });
-
-          setOtpId(payload.otpId);
-          setOtpMaskedPhone(payload.maskedRecipient || '');
-          setOtpCode('');
-          setPendingWalletPayment({ residentId: resident._id, invoiceIds, amount: totalAmount });
-          setShowOtpModal(true);
-          closePaymentModal();
-        } catch (err) {
-          console.error('Wallet payment initiate failed:', err);
-          setWalletError(err?.response?.data?.message || err.message || t('familyDashboard.wallet.paymentOtpError'));
-        } finally {
-          setIsWalletPaymentProcessing(false);
-        }
+        setOtpId(payload.otpId);
+        setOtpMaskedPhone(payload.maskedRecipient || '');
+        setOtpCode('');
+        setOtpError(null);
+        setPendingWalletPayment({ residentId: resident._id, invoiceIds, amount: totalAmount });
+        setShowOtpModal(true);
       }
     } catch (err) {
       console.error('Batch payment error:', err);
