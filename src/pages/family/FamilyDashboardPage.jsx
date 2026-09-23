@@ -306,6 +306,7 @@ function FamilyDashboardPage() {
       const payload = await familyPortalService.initiateWalletPayment({
         amount,
         invoiceIds: [invoiceId],
+        residentId,
       });
 
       setOtpId(payload.otpId);
@@ -367,6 +368,7 @@ function FamilyDashboardPage() {
       const payload = await familyPortalService.initiateWalletPayment({
         amount: pendingWalletPayment.amount,
         invoiceIds: pendingWalletPayment.invoiceIds,
+        residentId: pendingWalletPayment.residentId,
       });
       setOtpId(payload.otpId);
       setOtpMaskedPhone(payload.maskedPhone || '');
@@ -508,24 +510,29 @@ function FamilyDashboardPage() {
           closePaymentModal();
         }
       } else {
-        // For wallet payment
-        const response = await familyPortalService.batchPayment(resident._id, {
-          invoiceIds,
-          paymentMethod: 'wallet',
-        });
-
-        if (response) {
+        // For wallet payment - require OTP verification
+        try {
           setWalletError(null);
-          // Reload invoices
-          const updatedInvoices = await familyPortalService.getResidentInvoices(resident._id);
-          setInvoicesList(prev => ({
-            ...prev,
-            [resident._id]: Array.isArray(updatedInvoices) ? updatedInvoices : updatedInvoices?.data || [],
-          }));
-          // Reload wallet
-          const updatedWallet = await familyPortalService.getWalletBalance();
-          setWalletInfo(updatedWallet);
+          setOtpError(null);
+          setIsWalletPaymentProcessing(true);
+
+          const payload = await familyPortalService.initiateWalletPayment({
+            amount: totalAmount,
+            invoiceIds,
+            residentId: resident._id,
+          });
+
+          setOtpId(payload.otpId);
+          setOtpMaskedPhone(payload.maskedRecipient || '');
+          setOtpCode('');
+          setPendingWalletPayment({ residentId: resident._id, invoiceIds, amount: totalAmount });
+          setShowOtpModal(true);
           closePaymentModal();
+        } catch (err) {
+          console.error('Wallet payment initiate failed:', err);
+          setWalletError(err?.response?.data?.message || err.message || t('familyDashboard.wallet.paymentOtpError'));
+        } finally {
+          setIsWalletPaymentProcessing(false);
         }
       }
     } catch (err) {

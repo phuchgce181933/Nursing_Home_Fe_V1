@@ -51,12 +51,14 @@ const BUSINESS_MODULE_LABELS = {
   clinicalService: 'admin.auditLogs.businessModules.clinicalService',
   conversation: 'admin.auditLogs.businessModules.conversation',
   medication: 'admin.auditLogs.businessModules.medication',
+  prescription: 'admin.auditLogs.businessModules.prescription',
+  'clinical-billing': 'admin.auditLogs.businessModules.clinicalBilling',
   auth: 'admin.auditLogs.businessModules.auth',
   contract: 'admin.auditLogs.businessModules.contract',
 };
 
 const ROLE_LABELS = {
-  doctor: 'admin.auditLogs.roles.doctor',
+  // doctor role hidden from display
   nurse: 'admin.auditLogs.roles.nurse',
   caregiver: 'admin.auditLogs.roles.caregiver',
   pharmacist: 'admin.auditLogs.roles.pharmacist',
@@ -552,6 +554,13 @@ function GenericChangeDiff({ log, t, isVi }) {
   const hasBoth = beforeData && afterData;
   const dataOnly = afterData || beforeData;
 
+  // Build resident name lookup from metadata (for attendance / participation records)
+  const metadata = log.metadata || {};
+  const residentNameLookup = {};
+  if (Array.isArray(metadata.residentNames)) {
+    metadata.residentNames.forEach(n => { if (n?.id) residentNameLookup[n.id] = n.name; });
+  }
+
   if (hasBoth) {
     const rows = collectGenericChanges(beforeData, afterData, isVi);
     if (rows.length === 0) return <p style={{ color: '#94a3b8', fontSize: 13 }}>—</p>;
@@ -641,6 +650,7 @@ const formatFieldNameVi = (field) => {
     birthDate: 'Ngày sinh',
     gender: 'Giới tính',
     allergies: 'Dị ứng',
+    drugAllergies: 'Dị ứng thuốc',
     chronicConditions: 'Bệnh lý',
     isPrimary: 'Liên hệ chính',
     emergencyContact: 'Liên hệ khẩn cấp',
@@ -872,6 +882,24 @@ const formatFieldNameVi = (field) => {
     residentIds: 'Cư dân liên quan',
     previousStatus: 'Trạng thái trước',
     newStatus: 'Trạng thái mới',
+    // Activity attendance / participation fields
+    attendanceRecords: 'Bản ghi điểm danh',
+    participationRecords: 'Bản ghi tham gia',
+    participantResultNotes: 'Ghi chú kết quả',
+    // Prescription fields
+    diagnosisNote: 'Chẩn đoán',
+    validUntil: 'Ngày hết hạn',
+    frequency: 'Tần suất',
+    dosage: 'Liều lượng',
+    unit: 'Đơn vị',
+    times: 'Giờ uống',
+    route: 'Đường dùng',
+    duration: 'Thời gian',
+    instructions: 'Hướng dẫn',
+    isPRN: 'Khi cần',
+    maxDailyDoses: 'Liều tối đa/ngày',
+    prnReason: 'Lý do khi cần',
+    itemCount: 'Số loại thuốc',
   };
   return fieldMap[field] || field;
 };
@@ -1129,6 +1157,24 @@ const formatFieldNameEn = (field) => {
     residentIds: 'Residents Involved',
     previousStatus: 'Previous Status',
     newStatus: 'New Status',
+    // Activity attendance / participation fields
+    attendanceRecords: 'Attendance Records',
+    participationRecords: 'Participation Records',
+    participantResultNotes: 'Result Notes',
+    // Prescription fields
+    diagnosisNote: 'Diagnosis',
+    validUntil: 'Valid Until',
+    frequency: 'Frequency',
+    dosage: 'Dosage',
+    unit: 'Unit',
+    times: 'Administration Times',
+    route: 'Route',
+    duration: 'Duration',
+    instructions: 'Instructions',
+    isPRN: 'PRN',
+    maxDailyDoses: 'Max Daily Doses',
+    prnReason: 'PRN Reason',
+    itemCount: 'Item Count',
   };
   return fieldMap[field] || field;
 };
@@ -1619,6 +1665,33 @@ const renderValue = (val, field, isVi, dataContext) => {
           return fvLines ? `${name}${qty}\n${fvLines}` : `${name}${qty}`;
         }).join('\n\n');
       }
+
+      // attendanceRecords: show resident name + attendance status + date
+      if (field === 'attendanceRecords' || field === 'Bản ghi điểm danh') {
+        const ATTENDANCE_LABELS_VI = { present: 'Có mặt', absent: 'Vắng mặt', late: 'Đi muộn', left_early: 'Về sớm' };
+        const ATTENDANCE_LABELS_EN = { present: 'Present', absent: 'Absent', late: 'Late', left_early: 'Left early' };
+        return val.map((rec) => {
+          const name = dataContext?.residentNameLookup?.[rec.residentId] || rec.residentId;
+          const statusLabel = (isVi ? ATTENDANCE_LABELS_VI[rec.status] : ATTENDANCE_LABELS_EN[rec.status]) || rec.status || '—';
+          const dateStr = rec.occurrenceDate ? new Date(rec.occurrenceDate).toLocaleDateString(isVi ? 'vi-VN' : 'en-GB', { day: '2-digit', month: '2-digit' }) : '';
+          const note = rec.notes ? ` (${rec.notes})` : '';
+          return `${name}: ${statusLabel}${dateStr ? ` · ${dateStr}` : ''}${note}`;
+        }).join('\n');
+      }
+
+      // participationRecords: show resident name + participation level + date
+      if (field === 'participationRecords' || field === 'Bản ghi tham gia') {
+        const LEVEL_LABELS_VI = { active: 'Tích cực', partial: 'Một phần', passive: 'Thụ động' };
+        const LEVEL_LABELS_EN = { active: 'Active', partial: 'Partial', passive: 'Passive' };
+        return val.map((rec) => {
+          const name = dataContext?.residentNameLookup?.[rec.residentId] || rec.residentId;
+          const levelLabel = (isVi ? LEVEL_LABELS_VI[rec.level] : LEVEL_LABELS_EN[rec.level]) || rec.level || '—';
+          const dateStr = rec.occurrenceDate ? new Date(rec.occurrenceDate).toLocaleDateString(isVi ? 'vi-VN' : 'en-GB', { day: '2-digit', month: '2-digit' }) : '';
+          const note = rec.notes ? ` (${rec.notes})` : '';
+          return `${name}: ${levelLabel}${dateStr ? ` · ${dateStr}` : ''}${note}`;
+        }).join('\n');
+      }
+
       return summarizeArray(val, isVi);
     }
     return val.join(', ');
@@ -1996,7 +2069,8 @@ const ChangeDetails = ({ log, t, i18n }) => {
               <span className="al-change-item__before" title={t('admin.auditLogs.kpi.before')}>
                 {isAddEmergencyContact && change.before === undefined
                   ? (isVi ? 'Chưa có liên hệ' : 'No contact existed')
-                  : renderValue(change.before, change.fieldKey, isVi, { before: log.beforeData, after: log.afterData })}
+                  : renderValue(change.before, change.fieldKey, isVi, { before: log.beforeData, after: log.afterData, residentNameLookup })}
+
               </span>
             </span>
             <span className="al-change-item__arrow">→</span>
@@ -2005,7 +2079,7 @@ const ChangeDetails = ({ log, t, i18n }) => {
                 {isVi ? 'Mới' : 'New'}
               </span>
               <span className="al-change-item__after" title={t('admin.auditLogs.kpi.after')}>
-                {renderValue(change.after, change.fieldKey, isVi, { before: log.beforeData, after: log.afterData })}
+                {renderValue(change.after, change.fieldKey, isVi, { before: log.beforeData, after: log.afterData, residentNameLookup })}
               </span>
             </span>
           </div>
