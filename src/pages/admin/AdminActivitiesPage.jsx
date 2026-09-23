@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Search, RefreshCw, Plus, Edit3, Trash2, Filter, CalendarDays, AlertTriangle, Eye, X } from 'lucide-react';
+import { Search, RefreshCw, Plus, Edit3, Trash2, Filter, CalendarDays, AlertTriangle, Eye } from 'lucide-react';
 import activityService from '../../services/activity.service';
 import authService from '../../services/auth.service';
 import residentService from '../../services/resident.service';
 import medicalRecordService from '../../services/medicalRecord.service';
 import { useToast } from '../../hooks/useToast';
+import BulkEditActivityModal from '../../components/admin/BulkEditActivityModal';
 import '../../styles/admin/AdminAdmissionRequestsPage.css';
 
 const STATUS_OPTIONS = [
@@ -145,6 +146,19 @@ export default function AdminActivitiesPage() {
   const [isCreating, setIsCreating] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [selectedActivityId, setSelectedActivityId] = useState(null);
+  const [bulkEditActivity, setBulkEditActivity] = useState(null);
+  const [bulkEditForm, setBulkEditForm] = useState({
+    title: '',
+    category: '',
+    categoryOther: '',
+    location: '',
+    organizerStaffIds: [],
+    supportStaffIds: [],
+    participantResidentIds: [],
+    status: '',
+  });
+  const [bulkEditError, setBulkEditError] = useState(null);
+  const [bulkSubmitting, setBulkSubmitting] = useState(false);
   const [form, setForm] = useState({
     title: '',
     category: '',
@@ -400,6 +414,64 @@ export default function AdminActivitiesPage() {
     });
   };
 
+  const handleBulkEdit = (activity) => {
+    setBulkEditActivity(activity);
+    setBulkEditForm({
+      title: activity.title || '',
+      category: activity.category && !ACTIVITY_CATEGORY_OPTIONS.some((opt) => opt.value === activity.category) ? 'Khác' : (activity.category || ''),
+      categoryOther: activity.category && !ACTIVITY_CATEGORY_OPTIONS.includes(activity.category) ? activity.category : '',
+      location: activity.location || '',
+      organizerStaffIds: Array.isArray(activity.organizerStaffIds)
+        ? activity.organizerStaffIds.map((staff) => staff?._id || staff).filter(Boolean)
+        : (activity.organizerStaffId ? [activity.organizerStaffId?._id || activity.organizerStaffId] : []),
+      supportStaffIds: Array.isArray(activity.supportStaffIds)
+        ? activity.supportStaffIds.map((staff) => staff?._id || staff).filter(Boolean)
+        : (activity.supportStaffId ? [activity.supportStaffId?._id || activity.supportStaffId] : []),
+      participantResidentIds: Array.isArray(activity.participantResidentIds)
+        ? activity.participantResidentIds.map((id) => id.toString())
+        : [],
+      status: activity.status || '',
+    });
+    setBulkEditError(null);
+  };
+
+  const handleBulkSave = async () => {
+    const { title, category, categoryOther, location, organizerStaffIds, supportStaffIds, participantResidentIds, status } = bulkEditForm;
+    const updateSeries = {};
+
+    if (title !== (bulkEditActivity?.title || '')) updateSeries.title = title;
+    if (category || categoryOther) {
+      updateSeries.category = category === 'Khác' ? categoryOther : category;
+    }
+    if (location !== (bulkEditActivity?.location || '')) updateSeries.location = location;
+    if (JSON.stringify(organizerStaffIds.sort()) !== JSON.stringify([...(bulkEditActivity?.organizerStaffIds || []).map((s) => s?._id || s).sort()])) {
+      updateSeries.organizerStaffIds = organizerStaffIds;
+    }
+    if (JSON.stringify(supportStaffIds.sort()) !== JSON.stringify([...(bulkEditActivity?.supportStaffIds || []).map((s) => s?._id || s).sort()])) {
+      updateSeries.supportStaffIds = supportStaffIds;
+    }
+    if (JSON.stringify(participantResidentIds.sort()) !== JSON.stringify([...(bulkEditActivity?.participantResidentIds || []).map((id) => String(id)).sort()])) {
+      updateSeries.participantResidentIds = participantResidentIds;
+    }
+    if (status && status !== (bulkEditActivity?.status || '')) updateSeries.status = status;
+
+    if (Object.keys(updateSeries).length === 0) {
+      setBulkEditError(t('adminActivities.bulkNoChange'));
+      return;
+    }
+
+    setBulkSubmitting(true);
+    try {
+      await activityService.bulkUpdateActivities(bulkEditActivity._id, updateSeries);
+      setBulkEditActivity(null);
+      fetchActivities();
+    } catch (err) {
+      setBulkEditError(err.response?.data?.message || t('adminActivities.bulkSaveFailed'));
+    } finally {
+      setBulkSubmitting(false);
+    }
+  };
+
   const handleDelete = async (activityId) => {
     if (!window.confirm(t('adminActivities.confirmDeleteActivity'))) return;
     try {
@@ -493,10 +565,19 @@ export default function AdminActivitiesPage() {
   const toggleStaffSelection = (field, staffId) => {
     setForm((prevForm) => {
       const currentIds = Array.isArray(prevForm[field]) ? [...prevForm[field]] : [];
-      const nextIds = currentIds.includes(staffId)
-        ? currentIds.filter((id) => id !== staffId)
-        : [...currentIds, staffId];
-      return { ...prevForm, [field]: nextIds };
+      const isAdding = !currentIds.includes(staffId);
+      const nextIds = isAdding ? [...currentIds, staffId] : currentIds.filter((id) => id !== staffId);
+      const nextForm = { ...prevForm, [field]: nextIds };
+
+      // Keep organizer and support sets disjoint
+      if (field === 'organizerStaffIds' && isAdding && Array.isArray(nextForm.supportStaffIds) && nextForm.supportStaffIds.includes(staffId)) {
+        nextForm.supportStaffIds = nextForm.supportStaffIds.filter((id) => id !== staffId);
+      }
+      if (field === 'supportStaffIds' && isAdding && Array.isArray(nextForm.organizerStaffIds) && nextForm.organizerStaffIds.includes(staffId)) {
+        nextForm.organizerStaffIds = nextForm.organizerStaffIds.filter((id) => id !== staffId);
+      }
+
+      return nextForm;
     });
   };
 
@@ -656,9 +737,9 @@ export default function AdminActivitiesPage() {
         </button>
       </div>
 
-      <div className="adm-filter-panel">
-        <form onSubmit={handleApplyFilters} className="adm-filter-grid">
-          <div>
+      <div className="adm-filter-panel" style={{ marginBottom: '16px' }}>
+        <div className="flex items-end gap-3" style={{ marginBottom: '12px', flexWrap: 'wrap' }}>
+          <div style={{ flex: '1 1 120px', minWidth: 0 }}>
             <label className="text-sm font-semibold">{t('adminActivities.filterSearch')}</label>
             <div className="adm-filter-input-wrapper">
               <Search className="adm-filter-input-icon" size={14} />
@@ -672,7 +753,7 @@ export default function AdminActivitiesPage() {
             </div>
           </div>
 
-          <div>
+          <div style={{ flex: '0 0 140px' }}>
             <label className="text-sm font-semibold">{t('adminActivities.filterStatus')}</label>
             <select
               className="adm-filter-select"
@@ -687,7 +768,7 @@ export default function AdminActivitiesPage() {
             </select>
           </div>
 
-          <div>
+          <div style={{ flex: '0 0 140px' }}>
             <label className="text-sm font-semibold">{t('adminActivities.filterFrom')}</label>
             <input
               type="date"
@@ -697,7 +778,7 @@ export default function AdminActivitiesPage() {
             />
           </div>
 
-          <div>
+          <div style={{ flex: '0 0 140px' }}>
             <label className="text-sm font-semibold">{t('adminActivities.filterTo')}</label>
             <input
               type="date"
@@ -707,17 +788,17 @@ export default function AdminActivitiesPage() {
             />
           </div>
 
-          <div className="flex items-end gap-3" style={{ alignSelf: 'end' }}>
+          <div className="flex items-end gap-2" style={{ flexShrink: 0 }}>
             <button type="button" className="adm-btn-refresh" onClick={handleResetFilters}>
               <RefreshCw size={14} /> {t('adminActivities.btnReset')}
             </button>
-            <button type="submit" className="adm-btn-refresh">
+            <button type="button" className="adm-btn-refresh" onClick={handleApplyFilters}>
               <Filter size={14} /> {t('adminActivities.btnApply')}
             </button>
           </div>
-        </form>
+        </div>
 
-        <div className="flex items-end gap-3" style={{ marginTop: '16px', flexWrap: 'wrap' }}>
+        <div className="flex items-end gap-3" style={{ flexWrap: 'wrap' }}>
           <select
             className="adm-filter-select"
             value={bulkStatus}
@@ -782,8 +863,9 @@ export default function AdminActivitiesPage() {
               <input
                 type="datetime-local"
                 className="adm-filter-input"
-                min={getMinDateTimeLocal()}
+                min={editingId ? undefined : getMinDateTimeLocal()}
                 value={form.startAt}
+                readOnly={Boolean(editingId)}
                 onChange={(e) => {
                   const nextStart = e.target.value;
                   const computedMinutes = getAutoDurationMinutes(nextStart, form.endAt || nextStart);
@@ -798,6 +880,7 @@ export default function AdminActivitiesPage() {
                 className="adm-filter-input"
                 min={form.startAt}
                 value={form.endAt}
+                readOnly={Boolean(editingId)}
                 onChange={(e) => {
                   const nextEnd = e.target.value;
                   const computedMinutes = getAutoDurationMinutes(form.startAt, nextEnd || form.startAt);
@@ -917,7 +1000,7 @@ export default function AdminActivitiesPage() {
                 </label>
               </div>
               <div className="adm-participant-picker">
-                {staffOptions.filter(isActivityStaff).map((staff) => {
+                {staffOptions.filter(isActivityStaff).filter((staff) => !form.organizerStaffIds.includes(staff._id)).map((staff) => {
                   const checked = form.supportStaffIds.includes(staff._id);
                   return (
                     <label key={staff._id} className={`adm-participant-option${checked ? ' selected' : ''}`}>
@@ -1241,6 +1324,17 @@ export default function AdminActivitiesPage() {
                         >
                           <Edit3 size={14} />
                         </button>
+                        {activity.seriesId && (
+                          <button
+                            type="button"
+                            className="adm-btn-refresh"
+                            style={{ marginRight: '8px', background: '#7c3aed', color: '#fff', border: 'none' }}
+                            onClick={() => handleBulkEdit(activity)}
+                            title={t('adminActivities.btnEditSeries')}
+                          >
+                            <Filter size={14} />
+                          </button>
+                        )}
                         <button
                           type="button"
                           className="adm-btn-refresh"
@@ -1457,6 +1551,19 @@ export default function AdminActivitiesPage() {
           }
         }
       `}</style>
+      {bulkEditActivity && <BulkEditActivityModal
+        bulkEditActivity={bulkEditActivity}
+        bulkEditForm={bulkEditForm}
+        setBulkEditForm={setBulkEditForm}
+        bulkEditError={bulkEditError}
+        bulkSubmitting={bulkSubmitting}
+        bulkSubmit={handleBulkSave}
+        onClose={() => setBulkEditActivity(null)}
+        t={t}
+        staffOptions={staffOptions}
+        residents={residents}
+        isActivityStaff={isActivityStaff}
+      />}
     </div>
   );
 }

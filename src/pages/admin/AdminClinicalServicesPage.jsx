@@ -12,6 +12,7 @@ import {
   DollarSign,
 } from 'lucide-react';
 import clinicalServiceService from '../../services/clinicalService.service';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import '../../styles/admin/AdminCommon.css';
 
 const CATEGORIES = [
@@ -19,13 +20,25 @@ const CATEGORIES = [
   { value: 'ECG', i18nKey: 'adminClinicalServices.catEcg' },
   { value: 'IMAGING', i18nKey: 'adminClinicalServices.catImaging' },
   { value: 'LAB_RESULT', i18nKey: 'adminClinicalServices.catLabResult' },
+  { value: 'LABORATORY', i18nKey: 'adminClinicalServices.catLaboratory' },
   { value: 'COGNITIVE', i18nKey: 'adminClinicalServices.catCognitive' },
   { value: 'FUNCTIONAL', i18nKey: 'adminClinicalServices.catFunctional' },
   { value: 'FALL_RISK', i18nKey: 'adminClinicalServices.catFallRisk' },
   { value: 'NUTRITION', i18nKey: 'adminClinicalServices.catNutrition' },
+  { value: 'CHRONIC_DISEASE', i18nKey: 'adminClinicalServices.catChronicDisease' },
+  { value: 'NEUROLOGY', i18nKey: 'adminClinicalServices.catNeurology' },
+  { value: 'REHABILITATION', i18nKey: 'adminClinicalServices.catRehabilitation' },
+  { value: 'NURSING', i18nKey: 'adminClinicalServices.catNursing' },
+  { value: 'GASTROENTEROLOGY', i18nKey: 'adminClinicalServices.catGastroenterology' },
+  { value: 'MENTAL_HEALTH', i18nKey: 'adminClinicalServices.catMentalHealth' },
+  { value: 'VITAL_SIGNS', i18nKey: 'adminClinicalServices.catVitalSigns' },
+  { value: 'RESPIRATORY', i18nKey: 'adminClinicalServices.catRespiratory' },
+  { value: 'DERMATOLOGY', i18nKey: 'adminClinicalServices.catDermatology' },
 ];
 
-const SERVICE_NAME_REGEX = /^[A-Za-zÀ-ỹ0-9\s(),.+\/\-]+$/;
+// Allow any Unicode letter (including all Vietnamese precomposed forms and decomposed combining marks),
+// numbers, whitespace, and a few safe punctuation chars. Using \p{L}\p{M}\p{N} makes the regex locale-agnostic.
+const SERVICE_NAME_REGEX = /^[\p{L}\p{M}\p{N}\s(),.+\/\-]+$/u;
 
 export default function AdminClinicalServicesPage() {
   const { t } = useTranslation();
@@ -38,6 +51,7 @@ export default function AdminClinicalServicesPage() {
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState({ open: false, onConfirm: null });
   const [formData, setFormData] = useState({
     serviceCode: '',
     serviceName: '',
@@ -50,12 +64,14 @@ export default function AdminClinicalServicesPage() {
 
   const generateServiceCode = (category, name) => {
     if (!category) return '';
+    // Normalize NFC then remove all non-alphanumeric characters and collapse spaces to underscores
     const slug = (name || '')
-      .toString()
+      .normalize('NFC')
+      .replace(/[\p{P}\p{S}]/gu, '') // remove punctuation/symbols first
       .trim()
-      .toUpperCase()
       .replace(/\s+/g, '_')
-      .replace(/[^A-Z0-9_]/g, '');
+      .replace(/[^\p{L}\p{M}\p{N}_]/gu, '')
+      .toUpperCase();
     const base = slug ? `${category}_${slug}` : `${category}_${Date.now().toString().slice(-5)}`;
     return base.slice(0, 40);
   };
@@ -77,11 +93,12 @@ export default function AdminClinicalServicesPage() {
 
   const slugifyFieldCode = (label) =>
     (label || '')
-      .toString()
+      .normalize('NFC')
+      .replace(/[^\p{L}\p{M}\p{N}\s]/gu, '')
       .trim()
       .toUpperCase()
       .replace(/\s+/g, '_')
-      .replace(/[^A-Z0-9_]/g, '')
+      .replace(/[^\p{L}\p{M}\p{N}_]/gu, '')
       .slice(0, 40);
 
   const validateFieldThresholds = (field) => {
@@ -199,7 +216,7 @@ export default function AdminClinicalServicesPage() {
       setError(t('adminClinicalServices.validationServiceName'));
       return;
     }
-    if (!SERVICE_NAME_REGEX.test(formData.serviceName.trim())) {
+    if (!SERVICE_NAME_REGEX.test(formData.serviceName.trim().normalize('NFC'))) {
       setError(t('adminClinicalServices.validationServiceNameChars'));
       return;
     }
@@ -286,36 +303,52 @@ export default function AdminClinicalServicesPage() {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm(t('adminClinicalServices.confirmDelete'))) return;
-
-    try {
-      setError('');
-      await clinicalServiceService.deleteService(id);
-      setSuccess(t('adminClinicalServices.successDelete'));
-      loadServices();
-      setTimeout(() => setSuccess(''), 1500);
-    } catch (err) {
-      console.error(err);
-      setError(err.response?.data?.message || t('adminClinicalServices.errorDelete'));
-    }
+    setConfirmDialog({
+      open: true,
+      title: t('adminClinicalServices.confirmDeleteTitle'),
+      message: t('adminClinicalServices.confirmDelete'),
+      onConfirm: async () => {
+        setConfirmDialog((d) => ({ ...d, loading: true }));
+        try {
+          setError('');
+          await clinicalServiceService.deleteService(id);
+          setSuccess(t('adminClinicalServices.successDelete'));
+          loadServices();
+          setTimeout(() => setSuccess(''), 1500);
+        } catch (err) {
+          console.error(err);
+          setError(err.response?.data?.message || t('adminClinicalServices.errorDelete'));
+        } finally {
+          setConfirmDialog({ open: false, onConfirm: null });
+        }
+      },
+    });
   };
 
   const handleReopen = async (service) => {
-    if (!window.confirm(t('adminClinicalServices.confirmReopen'))) return;
-
-    try {
-      setError('');
-      await clinicalServiceService.updateService(service._id, {
-        ...service,
-        active: true,
-      });
-      setSuccess(t('adminClinicalServices.successReopen'));
-      loadServices();
-      setTimeout(() => setSuccess(''), 1500);
-    } catch (err) {
-      console.error(err);
-      setError(err.response?.data?.message || t('adminClinicalServices.errorReopen'));
-    }
+    setConfirmDialog({
+      open: true,
+      title: t('adminClinicalServices.confirmReopenTitle'),
+      message: t('adminClinicalServices.confirmReopen'),
+      onConfirm: async () => {
+        setConfirmDialog((d) => ({ ...d, loading: true }));
+        try {
+          setError('');
+          await clinicalServiceService.updateService(service._id, {
+            ...service,
+            active: true,
+          });
+          setSuccess(t('adminClinicalServices.successReopen'));
+          loadServices();
+          setTimeout(() => setSuccess(''), 1500);
+        } catch (err) {
+          console.error(err);
+          setError(err.response?.data?.message || t('adminClinicalServices.errorReopen'));
+        } finally {
+          setConfirmDialog({ open: false, onConfirm: null });
+        }
+      },
+    });
   };
 
   const filteredServices = services.filter((s) => {
@@ -397,13 +430,12 @@ export default function AdminClinicalServicesPage() {
                   onChange={(e) =>
                     setFormData((prev) => {
                       const nextName = e.target.value;
-                      const normalizedName = nextName.replace(/[^A-Za-zÀ-ỹ0-9\s(),.+\/\-]/g, '');
                       // If creating new and serviceCode is empty or was auto-generated from category, update it
                       const shouldUpdateCode = !editingId && (!prev.serviceCode || (prev.category && prev.serviceCode.startsWith(prev.category + '_')));
                       return {
                         ...prev,
-                        serviceName: normalizedName,
-                        serviceCode: shouldUpdateCode ? generateServiceCode(prev.category, normalizedName) : prev.serviceCode,
+                        serviceName: nextName,
+                        serviceCode: shouldUpdateCode ? generateServiceCode(prev.category, nextName) : prev.serviceCode,
                       };
                     })
                   }
@@ -830,6 +862,16 @@ export default function AdminClinicalServicesPage() {
           </tbody>
         </table>
       </div>
+
+      <ConfirmDialog
+        open={confirmDialog.open}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        danger
+        loading={confirmDialog.loading}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => setConfirmDialog({ open: false, onConfirm: null })}
+      />
     </div>
   );
 }

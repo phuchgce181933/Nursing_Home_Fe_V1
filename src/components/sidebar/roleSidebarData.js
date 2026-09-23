@@ -20,8 +20,6 @@ import {
   Brain,
   Apple,
   Dumbbell,
-  Image,
-  LifeBuoy,
   CalendarDays,
   TrendingUp,
 } from 'lucide-react';
@@ -94,12 +92,6 @@ export const roleSidebarData = {
       icon: Apple,
       path: '/caregiver/diet-plans',
     },
-
-    {
-      title: 'sidebar.residentPhotos',
-      icon: Image,
-      path: '/caregiver/resident-photos',
-    },
     {
       title: 'sidebar.hygieneActivities',
       icon: Droplets,
@@ -146,7 +138,6 @@ export const roleSidebarData = {
     { title: 'sidebar.mealPlans', icon: Soup, path: '/nurse/meal-plans' },
     { title: 'sidebar.medication', icon: Pill, path: '/nurse/medications' },
     { title: 'sidebar.admissionRequests', icon: ClipboardList, path: '/nurse/admission-requests' },
-    { title: 'sidebar.residentVisitRequests', icon: Calendar, path: '/nurse/resident-visits' },
     { title: 'sidebar.servicePackages', icon: HeartPulse, path: '/nurse/service-packages' },
     { title: 'sidebar.incidents', icon: FileText, path: '/nurse/incidents' },
     { title: 'sidebar.staffLeave', icon: CalendarOff, path: '/nurse/leave' },
@@ -158,14 +149,11 @@ export const roleSidebarData = {
     { title: 'sidebar.familyDashboard', icon: LayoutDashboard, path: '/family/dashboard' },
     { title: 'sidebar.admissionHistory', icon: History, path: '/family/admission-requests' },
     { title: 'sidebar.facilityTourHistory', icon: Calendar, path: '/family/facility-tours' },
-    { title: 'sidebar.residentVisits', icon: Calendar, path: '/family/resident-visits' },
-    { title: 'sidebar.residentPhotos', icon: Image, path: '/family/resident-photos' },
     { title: 'sidebar.residentAppointments', icon: CalendarDays, path: '/family/appointments' },
     { title: 'sidebar.activities', icon: Activity, path: '/family/activities' },
     { title: 'sidebar.residentInfo', icon: Users, path: '/family/resident' },
     { title: 'sidebar.notifications', icon: Bell, path: '/family/notifications' },
     { title: 'sidebar.messages', icon: MessageSquare, path: '/family/messages' },
-    { title: 'sidebar.supportRequests', icon: LifeBuoy, path: '/family/support-requests' },
   ],
 
   pharmacist: [

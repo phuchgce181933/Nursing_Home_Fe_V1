@@ -157,22 +157,22 @@
 }
 
 .arh-table th {
-  padding: 16px 20px;
-  border-bottom: 1.5px solid #e2e8f0;
-  font-size: 11px;
-  font-weight: 800;
-  color: #94a3b8;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  background: #f8fafc;
+  padding: 16px 20px !important;
+  border-bottom: 2px solid #0f172a !important;
+  font-size: 13px !important;
+  font-weight: 800 !important;
+  color: #000000 !important;
+  letter-spacing: 0.05em !important;
+  text-transform: uppercase !important;
+  background: #f1f5f9 !important;
 }
 
 .arh-table td {
-  padding: 18px 20px;
-  border-bottom: 1px solid #f1f5f9;
-  font-size: 13.5px;
-  color: #334155;
-  vertical-align: middle;
+  padding: 18px 20px !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  font-size: 14px !important;
+  color: #0f172a !important;
+  vertical-align: middle !important;
 }
 
 .arh-table tbody tr {
@@ -384,8 +384,7 @@
 .arh-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.4);
-  backdrop-filter: blur(4px);
+  background: rgba(15, 23, 42, 0.5);
   z-index: 1000;
   opacity: 0;
   pointer-events: none;
@@ -465,10 +464,8 @@
   left: 0;
   width: 100%;
   padding: 16px 24px;
-  border-top: 1px solid rgba(232, 237, 244, 0.8);
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  border-top: 1px solid #e8edf4;
+  background: #ffffff;
   display: flex;
   gap: 12px;
   z-index: 10;
@@ -517,10 +514,10 @@
 /* ─── details inside drawer ────────────────────────── */
 .arh-detail-card {
   background: #ffffff;
-  border: 1px solid #e8edf4;
+  border: 1px solid #e2e8f0;
   border-radius: 14px;
   padding: 18px;
-  box-shadow: 0 2px 10px rgba(26, 54, 93, 0.02);
+  box-shadow: 0 2px 10px rgba(26, 54, 93, 0.06);
 }
 
 .arh-detail-card__profile {
@@ -805,8 +802,7 @@
 .arh-modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.4);
-  backdrop-filter: blur(4px);
+  background: rgba(15, 23, 42, 0.5);
   z-index: 2000;
   display: flex;
   align-items: center;
@@ -961,13 +957,13 @@
 }
 
 .arh-stat-card {
-  background: rgba(255, 255, 255, 0.75);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: #ffffff;
+  backdrop-filter: blur(0);
+  -webkit-backdrop-filter: blur(0);
+  border: 1px solid #e2e8f0;
   border-radius: 16px;
   padding: 20px 24px;
-  box-shadow: 0 4px 20px rgba(27, 54, 93, 0.04);
+  box-shadow: 0 4px 20px rgba(27, 54, 93, 0.08);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -976,8 +972,8 @@
 
 .arh-stat-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 30px rgba(27, 54, 93, 0.08);
-  border-color: rgba(26, 54, 93, 0.15);
+  box-shadow: 0 8px 30px rgba(27, 54, 93, 0.12);
+  border-color: #cbd5e1;
 }
 
 .arh-stat-card__header {
@@ -1063,8 +1059,8 @@
 
 /* Custom Red-Themed Health Card */
 .arh-detail-card--health-alert {
-  background: rgba(250, 219, 219, 0.25) !important;
-  border: 1px solid rgba(186, 26, 26, 0.12) !important;
+  background: #fef2f2 !important;
+  border: 1px solid #fecaca !important;
 }
 
 .arh-detail-card--health-alert .arh-drawer__section-title {
@@ -1073,8 +1069,8 @@
 
 /* Custom Green-Themed Appointment Card */
 .arh-detail-card--appointment {
-  background: rgba(240, 253, 244, 0.45) !important;
-  border: 1px solid rgba(45, 106, 79, 0.12) !important;
+  background: #f0fdf4 !important;
+  border: 1px solid #bbf7d0 !important;
   border-left: 4px solid #2D6A4F !important;
 }
 

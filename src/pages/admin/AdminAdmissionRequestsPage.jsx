@@ -1099,7 +1099,7 @@ export default function AdminAdmissionRequestsPage() {
                           fontSize: '0.85rem',
                           color: '#334155',
                         }}>
-                          <div><strong>{t('admin.contractManagement.monthlyPrice', 'Giá theo tháng')}:</strong> {monthlyPrice.toLocaleString('vi-VN')} VND</div>
+                          <div><strong>{t('admin.contractManagement.monthlyPriceLabel', 'Giá theo tháng')}:</strong> {monthlyPrice.toLocaleString('vi-VN')} VND</div>
                           {months > 0 && totalAfterDiscount != null && (
                             <>
                               <div style={{ marginTop: 4 }}>

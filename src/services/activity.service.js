@@ -71,6 +71,11 @@ const getActivityStatisticsById = async (activityId) => {
   return response.data;
 };
 
+const bulkUpdateActivities = async (activityId, updateSeries) => {
+  const response = await axiosClient.patch(`/admin/activities/${activityId}/bulk`, { updateSeries });
+  return response.data;
+};
+
 export default {
   createActivity,
   getActivityList,
@@ -79,6 +84,7 @@ export default {
   deleteActivity,
   bulkDeleteActivities,
   bulkUpdateActivityStatus,
+  bulkUpdateActivities,
   updateActivityStatus,
   setParticipantList,
   registerResident,

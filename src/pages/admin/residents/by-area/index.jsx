@@ -13,10 +13,8 @@ import '../../../../styles/admin/residentActionIcons.css';
 import { getGenderLabel, getResidencyLabel } from '../_shared/residentLabels';
 import { formatResidentAreaLine, pickDrugAllergiesList } from '../../../../utils/residentArea';
 import {
-  exportResidentListToCSV,
   exportResidentListToPDF,
 } from '../../../../utils/residentListExport';
-import { useAuth } from '../../../../hooks/useAuth';
 import { useToast } from '../../../../hooks/useToast';
 
 function ResidentDetailModal({ loading, error, resident, onClose, t }) {
@@ -148,7 +146,6 @@ function ResidentDetailModal({ loading, error, resident, onClose, t }) {
 export default function ResidentsByAreaPage() {
   const { t } = useTranslation();
   const { showToast } = useToast();
-  const { user } = useAuth();
   const [buildings, setBuildings] = useState([]);
   const [buildingId, setBuildingId] = useState('');
   const [statusFilter, setStatusFilter] = useState('admitted');
@@ -300,7 +297,7 @@ export default function ResidentsByAreaPage() {
     return parts.join(' | ');
   };
 
-  const handleExport = async (format) => {
+  const handleExportPdf = async () => {
     if (!buildingId) {
       showToast(t('admin.residents.common.exportSelectBuilding'), 'error');
       return;
@@ -322,7 +319,6 @@ export default function ResidentsByAreaPage() {
       const meta = {
         title: t('admin.residents.byArea.export.listTitle'),
         filterSummary: buildExportFilterSummary(),
-        exportedBy: user?.fullName || user?.email || '—',
         buildingLabel: activeFilterLabel,
         buildingId,
         summaryStats: {
@@ -331,11 +327,7 @@ export default function ResidentsByAreaPage() {
           filteredCount: rows.length,
         },
       };
-      if (format === 'csv') {
-        exportResidentListToCSV(rows, meta);
-      } else {
-        exportResidentListToPDF(rows, meta, (msg) => showToast(msg, 'error'));
-      }
+      exportResidentListToPDF(rows, meta, (msg) => showToast(msg, 'error'));
     } catch (e) {
       console.error('Failed to export residents by area:', e);
       setListError(e.response?.data?.message || t('admin.residents.byArea.exportFailed'));
@@ -393,18 +385,8 @@ export default function ResidentsByAreaPage() {
           </button>
           <button
             type="button"
-            className="resident-page__button resident-page__button--export"
-            onClick={() => handleExport('csv')}
-            disabled={listLoading || exporting || !buildingId}
-            title={t('admin.residents.byArea.exportCsvTitle')}
-          >
-            <Download size={16} />
-            {exporting ? t('admin.residents.byArea.exporting') : t('admin.residents.byArea.exportExcel')}
-          </button>
-          <button
-            type="button"
             className="resident-page__button resident-page__button--export-pdf"
-            onClick={() => handleExport('pdf')}
+            onClick={handleExportPdf}
             disabled={listLoading || exporting || !buildingId}
             title={t('admin.residents.byArea.exportPdfTitle')}
           >

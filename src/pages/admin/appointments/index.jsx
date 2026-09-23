@@ -94,6 +94,17 @@ const formatTimeRange = (startStr, endStr) => {
   }
 };
 
+// Convert ISO UTC string (from backend) to "YYYY-MM-DDTHH:mm" in local time,
+// for filling an <input type="datetime-local">. Without this, slice(0,16)
+// returns the UTC portion, so a 9:00 ICT appointment displays as 02:00.
+const toLocalDateTimeInput = (isoStr) => {
+  if (!isoStr) return '';
+  const d = new Date(isoStr);
+  if (isNaN(d.getTime())) return '';
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
 export default function CareAppointmentsPage() {
   const { t } = useTranslation();
   const { user } = useAuth();
@@ -389,8 +400,8 @@ export default function CareAppointmentsPage() {
     setSelectedAppt(appt);
     setFormValues({
       residentId: appt.residentId?._id || appt.residentId || '',
-      scheduledStartAt: appt.scheduledStartAt ? appt.scheduledStartAt.slice(0, 16) : '',
-      scheduledEndAt: appt.scheduledEndAt ? appt.scheduledEndAt.slice(0, 16) : '',
+      scheduledStartAt: toLocalDateTimeInput(appt.scheduledStartAt),
+      scheduledEndAt: toLocalDateTimeInput(appt.scheduledEndAt),
       appointmentType: appt.appointmentType || 'Khám lâm sàng đầu vào',
       notes: appt.notes || '',
     });

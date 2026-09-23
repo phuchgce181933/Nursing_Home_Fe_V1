@@ -826,6 +826,58 @@ function UpdateShiftModal({ shift, templates, onSave, onClose }) {
   );
 }
 
+function CancelShiftModal({ shift, onConfirm, onClose }) {
+  const { t } = useTranslation();
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState('');
+
+  const targetLabel = shift
+    ? `${shift.name || 'Ca'} · ${(shift.workDate || '').slice(0, 10)}`
+    : '';
+
+  const handleSubmit = () => {
+    const trimmed = reason.trim();
+    if (!trimmed) {
+      setError(t(`${NS}.assignTab.cancelReasonPlaceholder`));
+      return;
+    }
+    onConfirm(trimmed);
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal modal--scroll" style={{ maxWidth: 520 }} onClick={(e) => e.stopPropagation()}>
+        <h2 className="modal__title">{t(`${NS}.assignTab.cancelModalTitle`)}</h2>
+        <p className="form-hint" style={{ marginBottom: 12 }}>
+          {t(`${NS}.assignTab.cancelModalDescription`, { target: targetLabel })}
+        </p>
+        {error && <p className="form-error">{error}</p>}
+        <div className="form-grid">
+          <div className="form-group form-grid--full">
+            <label>{t(`${NS}.assignTab.cancelReasonLabel`)}</label>
+            <textarea
+              rows={4}
+              value={reason}
+              onChange={(e) => {
+                setReason(e.target.value);
+                setError('');
+              }}
+              placeholder={t(`${NS}.assignTab.cancelReasonPlaceholder`)}
+              autoFocus
+            />
+          </div>
+        </div>
+        <div className="modal__actions">
+          <button className="btn-cancel" onClick={onClose}>{t(`${NS}.cancel`)}</button>
+          <button className="btn-save btn-danger" onClick={handleSubmit}>
+            {t(`${NS}.assignTab.cancelConfirm`)}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AssignTab() {
   const { t, i18n } = useTranslation();
   const { showToast } = useToast();
@@ -847,6 +899,7 @@ function AssignTab() {
   });
   const [showCreate, setShowCreate]       = useState(false);
   const [editShift, setEditShift]         = useState(null);
+  const [cancelShift, setCancelShift]     = useState(null);
   const [actionConflicts, setActConflicts] = useState([]);
   const [blockingTasks, setBlockingTasks] = useState([]);
 
@@ -924,11 +977,15 @@ function AssignTab() {
   };
 
   const handleCancel = async (s) => {
-    const reason = prompt(t(`${NS}.assignTab.cancelReasonPrompt`));
-    if (reason === null) return;
+    setCancelShift(s);
+  };
+
+  const confirmCancelShift = async (reason) => {
+    if (!cancelShift) return;
     setBlockingTasks([]);
     try {
-      await shiftService.cancelShift(s._id, reason);
+      await shiftService.cancelShift(cancelShift._id, reason);
+      setCancelShift(null);
       load();
     } catch (e) {
       const { message, blockingTasks: blocked } = getApiErrorPayload(e, t(`${NS}.assignTab.cancelFailed`));
@@ -1064,6 +1121,7 @@ function AssignTab() {
 
       {showCreate && <CreateShiftModal templates={templates} onSave={handleCreate} onClose={() => setShowCreate(false)} />}
       {editShift && <UpdateShiftModal shift={editShift} templates={templates} onSave={handleUpdate} onClose={() => setEditShift(null)} />}
+      {cancelShift && <CancelShiftModal shift={cancelShift} onConfirm={confirmCancelShift} onClose={() => setCancelShift(null)} />}
     </div>
   );
 }

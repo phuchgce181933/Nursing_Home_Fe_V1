@@ -159,6 +159,7 @@ export default function AdminContractManagementPage() {
   const [pendingCancelInvoice, setPendingCancelInvoice] = useState(null);
   const [cancelInvoiceReason, setCancelInvoiceReason] = useState('');
   const [cancellingInvoice, setCancellingInvoice] = useState(false);
+  const [cancelInvoiceError, setCancelInvoiceError] = useState(null);
   const [showMedicationModal, setShowMedicationModal] = useState(false);
   const [medPrescriptions, setMedPrescriptions] = useState([]);
   const [medLoading, setMedLoading] = useState(false);
@@ -452,9 +453,45 @@ export default function AdminContractManagementPage() {
   const refreshMedicationPrescriptions = async (residentId) => {
     try {
       setMedLoading(true);
-      const resp = await medicationService.listPrescriptions({ residentId, limit: 20 });
+      // Load cả đơn thuốc + hóa đơn của cư dân song song để xác định đơn nào đã có hóa đơn.
+      const [resp, invResp] = await Promise.all([
+        medicationService.listPrescriptions({ residentId, limit: 20 }),
+        paymentService.listInvoices(residentId).catch(() => []),
+      ]);
       const list = Array.isArray(resp) ? resp : resp?.data || [];
-      const validPrescriptions = list.filter(isPrescriptionInvoiceable);
+      const invList = Array.isArray(invResp) ? invResp : invResp?.data || [];
+
+      // Map prescriptionId → invoice (chỉ lấy hóa đơn thuốc chưa bị hủy để hiển thị)
+      const medInvoiceByPrescription = new Map();
+      for (const inv of invList) {
+        const invType = String(inv?.type || '').toUpperCase();
+        if (invType !== 'MEDICATION' && invType !== 'MEDICATIONS') continue;
+        if (String(inv?.status || '').toLowerCase() === 'cancelled') continue;
+        const pId = inv?.prescriptionId?._id || inv?.prescriptionId;
+        if (!pId) continue;
+        medInvoiceByPrescription.set(String(pId), inv);
+      }
+
+      // Enrich mỗi đơn thuốc với thông tin hóa đơn (nếu có)
+      const enriched = list.map((p) => {
+        const pid = String(p._id || p.id || '');
+        const linkedInvoice = medInvoiceByPrescription.get(pid) || null;
+        return {
+          ...p,
+          existingInvoice: linkedInvoice
+            ? {
+                _id: linkedInvoice._id,
+                invoiceNumber: linkedInvoice.invoiceNumber,
+                status: linkedInvoice.status,
+                totalAmount: Number(linkedInvoice.totalAmount || linkedInvoice.total || 0),
+                paidAmount: Number(linkedInvoice.paidAmount || 0),
+                remainingAmount: Number(linkedInvoice.remainingAmount ?? linkedInvoice.totalAmount ?? 0),
+              }
+            : null,
+        };
+      });
+
+      const validPrescriptions = enriched.filter(isPrescriptionInvoiceable);
       setMedPrescriptions(validPrescriptions);
       setMedError('');
     } catch (err) {
@@ -846,12 +883,10 @@ export default function AdminContractManagementPage() {
     setRecalculatingInvoices(true);
     try {
       const result = await contractService.recalculateContractInvoices(contract.contractId || contract.id);
-      // eslint-disable-next-line no-alert
-      alert(result?.message || 'Đã tính lại giá hóa đơn.');
+      showToast(result?.message || 'Đã tính lại giá hóa đơn.', 'success');
       await fetchContractInvoices(contract);
     } catch (err) {
-      // eslint-disable-next-line no-alert
-      alert(err?.response?.data?.message || err?.message || 'Không thể tính lại giá hóa đơn.');
+      showToast(err?.response?.data?.message || err?.message || 'Không thể tính lại giá hóa đơn.', 'error');
     } finally {
       setRecalculatingInvoices(false);
     }
@@ -873,11 +908,11 @@ export default function AdminContractManagementPage() {
           console.log('🔄 [EXPORT] transition result', transitionResult);
         } catch (transErr) {
           console.error('🔄 [EXPORT] transition failed, export aborted', transErr);
-          // eslint-disable-next-line no-alert
-          alert(
+          showToast(
             transErr?.response?.data?.message ||
             transErr?.message ||
-            'Không thể chuyển trạng thái hóa đơn từ Nháp sang Đã xuất.'
+            'Không thể chuyển trạng thái hóa đơn từ Nháp sang Đã xuất.',
+            'error'
           );
           return;
         }
@@ -903,12 +938,12 @@ export default function AdminContractManagementPage() {
         await fetchContractInvoices(selectedContract);
       }
     } catch (err) {
-      // eslint-disable-next-line no-alert
-      alert(
+      showToast(
         err?.response?.data?.message ||
         err?.message ||
         t('admin.contractManagement.exportInvoiceError') ||
-        'Không thể xuất hóa đơn.'
+        'Không thể xuất hóa đơn.',
+        'error'
       );
     } finally {
       setExportingInvoiceId(null);
@@ -966,25 +1001,27 @@ export default function AdminContractManagementPage() {
   const confirmCancelInvoice = async () => {
     if (!pendingCancelInvoice) return;
     const invoiceId = pendingCancelInvoice._id || pendingCancelInvoice.id;
+    const invoiceLabel = pendingCancelInvoice.invoiceNumber || `#${invoiceId}`;
     setCancellingInvoice(true);
     try {
       const result = await contractService.cancelInvoice(invoiceId, {
         reason: cancelInvoiceReason || '',
       });
-      // eslint-disable-next-line no-alert
-      alert(result?.message || t('admin.contractManagement.cancelInvoiceSuccess') || 'Đã dừng hóa đơn.');
+      showToast(
+        result?.message || t('admin.contractManagement.cancelInvoiceSuccess') || `Đã dừng hóa đơn ${invoiceLabel}.`,
+        'success'
+      );
       setPendingCancelInvoice(null);
       if (selectedContract) {
         await fetchContractInvoices(selectedContract);
       }
     } catch (err) {
-      // eslint-disable-next-line no-alert
-      alert(
+      const errorMsg =
         err?.response?.data?.message ||
         err?.message ||
         t('admin.contractManagement.cancelInvoiceError') ||
-        'Không thể dừng hóa đơn.'
-      );
+        'Không thể dừng hóa đơn.';
+      setCancelInvoiceError({ title: 'Dừng hóa đơn thất bại', message: errorMsg });
     } finally {
       setCancellingInvoice(false);
     }
@@ -1005,19 +1042,21 @@ export default function AdminContractManagementPage() {
       payload.reason = editInvoiceForm.reason || '';
 
       const result = await contractService.updateInvoice(invoiceId, payload);
-      // eslint-disable-next-line no-alert
-      alert(result?.message || t('admin.contractManagement.editInvoiceSuccess') || 'Đã cập nhật hóa đơn.');
+      showToast(
+        result?.message || t('admin.contractManagement.editInvoiceSuccess') || 'Đã cập nhật hóa đơn.',
+        'success'
+      );
       setEditingInvoice(null);
       if (selectedContract) {
         await fetchContractInvoices(selectedContract);
       }
     } catch (err) {
-      // eslint-disable-next-line no-alert
-      alert(
+      showToast(
         err?.response?.data?.message ||
         err?.message ||
         t('admin.contractManagement.editInvoiceError') ||
-        'Không thể cập nhật hóa đơn.'
+        'Không thể cập nhật hóa đơn.',
+        'error'
       );
     } finally {
       setSavingInvoice(false);
@@ -1376,9 +1415,29 @@ export default function AdminContractManagementPage() {
                       className="form-select"
                     >
                       <option value="">{t('admin.contractManagement.choosePlaceholder')}</option>
-                      {medPrescriptions.map((p) => (
-                        <option key={p._id || p.id} value={p._id || p.id}>{`${p.prescriptionDate ? formatDate(p.prescriptionDate) : '---'} — ${p.doctorId?.fullName || t('admin.contractManagement.defaultDoctor')}`}</option>
-                      ))}
+                      {medPrescriptions.map((p) => {
+                        const dateText = p.prescriptionDate ? formatDate(p.prescriptionDate) : '---';
+                        const doctorText = p.doctorId?.fullName || t('admin.contractManagement.defaultDoctor');
+                        // Hiển thị trạng thái hóa đơn ngay trong option (nếu có)
+                        const inv = p.existingInvoice;
+                        let invBadge = '';
+                        if (inv) {
+                          const invStatus = String(inv.status || '').toUpperCase();
+                          const invStatusText = invStatus === 'PAID'
+                            ? t('admin.contractManagement.invoiceStatusPaid')
+                            : invStatus === 'PARTIALLY_PAID'
+                              ? t('admin.contractManagement.invoiceStatusPartiallyPaid')
+                              : t('admin.contractManagement.invoiceStatusUnpaid');
+                          invBadge = ` — ${invStatusText} (${inv.invoiceNumber || inv._id})`;
+                        } else {
+                          invBadge = ` — ${t('admin.contractManagement.noInvoice') || 'Chưa có hóa đơn'}`;
+                        }
+                        return (
+                          <option key={p._id || p.id} value={p._id || p.id}>
+                            {`${dateText} — ${doctorText}${invBadge}`}
+                          </option>
+                        );
+                      })}
                     </select>
                   </div>
 
@@ -1398,6 +1457,45 @@ export default function AdminContractManagementPage() {
                             <strong>{t('admin.contractManagement.warningLabel')}</strong> {t('admin.contractManagement.prescriptionExpiredMsg', { date: formatDate(selectedPrx.validUntil) })}
                           </div>
                         )}
+
+                        {/* Existing Invoice Alert — hiển thị rõ khi đơn này đã có hóa đơn */}
+                        {selectedPrx.existingInvoice && (() => {
+                          const linkedInv = selectedPrx.existingInvoice;
+                          const linkedStatus = String(linkedInv.status || '').toUpperCase();
+                          const isPaid = linkedStatus === 'PAID';
+                          const isCancelled = linkedStatus === 'CANCELLED';
+                          const bg = isPaid ? '#dcfce7' : isCancelled ? '#e2e8f0' : '#fef3c7';
+                          const border = isPaid ? '#16a34a' : isCancelled ? '#64748b' : '#d97706';
+                          const icon = isPaid ? '✓' : isCancelled ? '⊘' : '⚠';
+                          const statusText = isPaid
+                            ? t('admin.contractManagement.invoiceStatusPaid')
+                            : linkedStatus === 'PARTIALLY_PAID'
+                              ? t('admin.contractManagement.invoiceStatusPartiallyPaid')
+                              : t('admin.contractManagement.invoiceStatusUnpaid');
+                          return (
+                            <div
+                              style={{
+                                marginBottom: '16px',
+                                padding: '12px 16px',
+                                background: bg,
+                                border: `1px solid ${border}`,
+                                borderRadius: '6px',
+                                fontSize: '14px',
+                                color: '#0f172a',
+                              }}
+                            >
+                              <strong>{icon} {t('admin.contractManagement.medInvoiceExistsLabel') || 'Đơn thuốc này đã có hóa đơn'}:</strong>{' '}
+                              <span style={{ fontWeight: 600 }}>{linkedInv.invoiceNumber || linkedInv._id}</span>
+                              {' — '}
+                              <span>{statusText}</span>
+                              {Number(linkedInv.totalAmount) > 0 && (
+                                <span style={{ marginLeft: 8, color: '#475569' }}>
+                                  ({Number(linkedInv.totalAmount).toLocaleString('vi-VN')}₫)
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })()}
 
                         {/* Prescription Status and Payment Info */}
                         <div className="form-group">
@@ -1573,7 +1671,12 @@ export default function AdminContractManagementPage() {
               <button
                 className="btn-submit"
                 onClick={handleCreateMedicationInvoice}
-                disabled={medCreatingInvoice || !medSelectedId || Boolean(medConflictMessage)}
+                disabled={
+                  medCreatingInvoice
+                  || !medSelectedId
+                  || Boolean(medConflictMessage)
+                  || Boolean(getSelectedPrescriptionDetails()?.existingInvoice)
+                }
               >
                 {medCreatingInvoice ? t('admin.contractManagement.creatingInvoice') : t('admin.contractManagement.createInvoiceButton')}
               </button>
@@ -2750,6 +2853,32 @@ export default function AdminContractManagementPage() {
                   ? (t('common.confirming') || 'Đang xử lý…')
                   : (t('admin.contractManagement.cancelInvoiceConfirmBtn') || 'Dừng hóa đơn')
                 }
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ Result popup: lỗi khi dừng hóa đơn ═══ */}
+      {cancelInvoiceError && (
+        <div
+          className="confirm-dialog-overlay"
+          onClick={(e) => { if (e.target === e.currentTarget) setCancelInvoiceError(null); }}
+        >
+          <div className="confirm-dialog" role="alertdialog" aria-modal="true">
+            <div className="confirm-dialog__title" style={{ color: '#b91c1c' }}>
+              ⚠ {cancelInvoiceError.title}
+            </div>
+            <div style={{ fontSize: 14, color: 'var(--nh-text-secondary)', lineHeight: 1.5, margin: '0 0 16px' }}>
+              {cancelInvoiceError.message}
+            </div>
+            <div className="confirm-dialog__actions">
+              <button
+                type="button"
+                className="confirm-dialog__btn confirm-dialog__btn--primary"
+                onClick={() => setCancelInvoiceError(null)}
+              >
+                {t('common.close') || 'Đóng'}
               </button>
             </div>
           </div>

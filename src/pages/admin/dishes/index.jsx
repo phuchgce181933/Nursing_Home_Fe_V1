@@ -11,6 +11,7 @@ import { validateDishForm, parseDishIngredients } from '../../../utils/dishValid
 import { resolveApiError } from '../../../utils/apiMessage';
 import DishTable from './DishTable';
 import DishFormModal from './DishFormModal';
+import ConfirmDialog from '../../../components/ui/ConfirmDialog';
 import './dishes.css';
 
 const EMPTY_FORM = {
@@ -40,6 +41,7 @@ export default function AdminDishesPage() {
   const [modalError, setModalError] = useState('');
   const [modalSuccess, setModalSuccess] = useState('');
   const [formData, setFormData] = useState(EMPTY_FORM);
+  const [confirmDialog, setConfirmDialog] = useState({ open: false, onConfirm: null });
 
   const loadDishes = useCallback(async () => {
     try {
@@ -157,16 +159,25 @@ export default function AdminDishesPage() {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm(t(`${NS}.confirmDelete`))) return;
-    try {
-      setPageError('');
-      await dishService.deleteDish(id);
-      setSuccess(t(`${NS}.deleteSuccess`));
-      await loadDishes();
-      setTimeout(() => setSuccess(''), 1500);
-    } catch (err) {
-      setPageError(resolveApiError(err, t, `${NS}.deleteFailed`));
-    }
+    setConfirmDialog({
+      open: true,
+      title: t(`${NS}.confirmDeleteTitle`),
+      message: t(`${NS}.confirmDelete`),
+      onConfirm: async () => {
+        setConfirmDialog((d) => ({ ...d, loading: true }));
+        try {
+          setPageError('');
+          await dishService.deleteDish(id);
+          setSuccess(t(`${NS}.deleteSuccess`));
+          await loadDishes();
+          setTimeout(() => setSuccess(''), 1500);
+        } catch (err) {
+          setPageError(resolveApiError(err, t, `${NS}.deleteFailed`));
+        } finally {
+          setConfirmDialog({ open: false, onConfirm: null });
+        }
+      },
+    });
   };
 
   return (
@@ -270,6 +281,16 @@ export default function AdminDishesPage() {
           submitting={submitting}
         />
       )}
+
+      <ConfirmDialog
+        open={confirmDialog.open}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        danger
+        loading={confirmDialog.loading}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => setConfirmDialog({ open: false, onConfirm: null })}
+      />
     </AdminPageShell>
   );
 }

@@ -17,6 +17,90 @@ import { X, FileText, Edit3, Check, AlertCircle, Download, Printer } from 'lucid
  *  - admission: admission info
  *  - isCreating: state đang submit
  */
+
+// Bảng dịch quan hệ sang tiếng Việt (không phân biệt hoa/thường)
+const RELATIONSHIP_VI_MAP = {
+  // Con
+  child: 'Con',
+  children: 'Con',
+  son: 'Con trai',
+  daughter: 'Con gái',
+  'con': 'Con',
+  'con trai': 'Con trai',
+  'con gái': 'Con gái',
+  'con gai': 'Con gái',
+  // Vợ/Chồng
+  spouse: 'Vợ/Chồng',
+  husband: 'Chồng',
+  wife: 'Vợ',
+  'vợ/chồng': 'Vợ/Chồng',
+  'vo/chong': 'Vợ/Chồng',
+  'vợ': 'Vợ',
+  'vo': 'Vợ',
+  'chồng': 'Chồng',
+  'chong': 'Chồng',
+  // Cha/Mẹ
+  parent: 'Cha/Mẹ',
+  parents: 'Cha/Mẹ',
+  father: 'Cha',
+  mother: 'Mẹ',
+  dad: 'Cha',
+  mom: 'Mẹ',
+  'cha/mẹ': 'Cha/Mẹ',
+  'cha/me': 'Cha/Mẹ',
+  'cha': 'Cha',
+  'bố': 'Cha',
+  'bo': 'Cha',
+  'mẹ': 'Mẹ',
+  'me': 'Mẹ',
+  // Anh/Chị/Em
+  sibling: 'Anh/Chị/Em',
+  siblings: 'Anh/Chị/Em',
+  brother: 'Anh/Em trai',
+  sister: 'Chị/Em gái',
+  'anh/chị/em': 'Anh/Chị/Em',
+  'anh/chi/em': 'Anh/Chị/Em',
+  'anh': 'Anh',
+  'chị': 'Chị',
+  'chi': 'Chị',
+  'em': 'Em',
+  // Cháu
+  grandchild: 'Cháu',
+  grandson: 'Cháu trai',
+  granddaughter: 'Cháu gái',
+  'cháu': 'Cháu',
+  'chau': 'Cháu',
+  // Ông/Bà
+  grandparent: 'Ông/Bà',
+  grandfather: 'Ông',
+  grandmother: 'Bà',
+  'ông/bà': 'Ông/Bà',
+  'ong/ba': 'Ông/Bà',
+  'ông': 'Ông',
+  'ong': 'Ông',
+  'bà': 'Bà',
+  'ba': 'Bà',
+  // Khác
+  relative: 'Họ hàng',
+  friend: 'Bạn',
+  guardian: 'Người giám hộ',
+  'người giám hộ': 'Người giám hộ',
+  'nguoi giam ho': 'Người giám hộ',
+  'họ hàng': 'Họ hàng',
+  'ho hang': 'Họ hàng',
+  'khác': 'Khác',
+  'other': 'Khác',
+};
+
+const fmtRelationshipVi = (rel) => {
+  if (!rel) return '—';
+  const trimmed = rel.trim();
+  if (!trimmed) return '—';
+  const lower = trimmed.toLowerCase();
+  if (RELATIONSHIP_VI_MAP[lower]) return RELATIONSHIP_VI_MAP[lower];
+  if (RELATIONSHIP_VI_MAP[trimmed]) return RELATIONSHIP_VI_MAP[trimmed];
+  return trimmed;
+};
 export default function ContractPreviewModal({
   open,
   onClose,
@@ -98,7 +182,7 @@ export default function ContractPreviewModal({
         {/* Quick summary */}
         <div className="cpm-summary">
           <SummaryItem label="Người đại diện" value={rep.fullName || '—'} />
-          <SummaryItem label="Quan hệ" value={rep.relationship || '—'} />
+          <SummaryItem label="Quan hệ" value={fmtRelationshipVi(rep.relationship)} />
           <SummaryItem label="Gói dịch vụ" value={pkg.name || '—'} />
           <SummaryItem
             label="Phí"

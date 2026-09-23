@@ -432,7 +432,7 @@ function ProfilePage() {
                   </div>
                 </section>
 
-                {user.staffProfile && (
+                {user.staffProfile && !['family'].includes(user.role) && (
                   <section className="ap-section">
                     <h2 className="ap-section__title">{t('profile.staffProfileTitle')}</h2>
                     <div className="ap-info-grid">

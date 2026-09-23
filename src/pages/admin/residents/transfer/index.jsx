@@ -35,6 +35,19 @@ const floorText = (floor, t) => {
   return floor.name || (floor.floorNumber != null ? `${t('admin.residents.common.floor')} ${floor.floorNumber}` : floor.label || '—');
 };
 
+const roomTypeText = (roomType, t) => {
+  if (!roomType) return '—';
+  const translationKeys = {
+    standard: 'facilities.roomTypeStandard',
+    premium: 'facilities.roomTypePremium',
+    icu: 'facilities.roomTypeIcu',
+    isolation: 'facilities.roomTypeIsolation',
+  };
+  return translationKeys[String(roomType).toLowerCase()]
+    ? t(translationKeys[String(roomType).toLowerCase()])
+    : roomType;
+};
+
 const formatDateLocale = (value, language) => {
   if (!value) return '—';
   const d = new Date(value);
@@ -71,7 +84,7 @@ function LocationBlock({ assignment, area, t }) {
     <DetailRow label={t('admin.residents.common.floor')} value={floorText(floor, t)} />
     <DetailRow label={t('admin.residents.common.room')} value={roomText(room, t)} />
     <DetailRow label={t('admin.residents.common.bed')} value={bedText(bed)} />
-    {room?.roomType && <DetailRow label={t('admin.residents.common.roomType')} value={room.roomType} />}
+    {room?.roomType && <DetailRow label={t('admin.residents.common.roomType')} value={roomTypeText(room.roomType, t)} />}
   </>
   );
 }

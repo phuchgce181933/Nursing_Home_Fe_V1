@@ -420,6 +420,38 @@
   background: #7c3aed;
 }
 
+.al-action-target {
+  color: var(--nh-text-secondary, #64748b);
+  font-size: 0.85em;
+}
+
+.al-contact-values {
+  display: grid;
+  gap: 8px;
+  min-width: 220px;
+}
+
+.al-contact-value {
+  display: grid;
+  gap: 3px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #f8fafc;
+}
+
+.al-contact-value__row {
+  display: flex;
+  gap: 6px;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.al-contact-value__label {
+  flex: 0 0 auto;
+  color: #64748b;
+  font-weight: 600;
+}
+
 /* Actor cell */
 .al-actor {
   display: flex;
@@ -1114,4 +1146,150 @@
   .al-technical__row {
     grid-template-columns: 1fr;
   }
+}
+
+/* Changes section */
+.al-changes {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.al-changes-empty {
+  color: var(--nh-text-secondary, #64748b);
+  font-style: italic;
+  padding: 12px 0;
+}
+
+.al-change-item {
+  background: #f8fafc;
+  border-radius: 8px;
+  padding: 12px 16px;
+  border-left: 3px solid var(--nh-primary, #3b82f6);
+}
+
+.al-change-item__field {
+  font-weight: 600;
+  color: var(--nh-text, #1e293b);
+  margin-bottom: 6px;
+  font-size: 14px;
+}
+
+.al-change-item__values {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 13px;
+}
+
+.al-change-value-group {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.al-change-value-group__label {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.8;
+  text-transform: uppercase;
+}
+
+.al-change-item__before {
+  background: #fef2f2;
+  color: #dc2626;
+  padding: 4px 8px;
+  border-radius: 4px;
+  text-decoration: line-through;
+  opacity: 0.8;
+  white-space: pre-line;
+  max-width: 320px;
+  display: inline-block;
+  vertical-align: top;
+}
+
+.al-change-item__arrow {
+  color: var(--nh-text-secondary, #64748b);
+  font-weight: bold;
+}
+
+.al-change-item__after {
+  background: #ecfdf5;
+  color: #059669;
+  padding: 4px 8px;
+  border-radius: 4px;
+  white-space: pre-line;
+  max-width: 320px;
+  display: inline-block;
+  vertical-align: top;
+}
+
+/* Clinical service fields list */
+.al-field-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.al-field-list__item {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px 14px;
+}
+
+.al-field-list__title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
+  line-height: 1.5;
+}
+
+.al-field-list__type {
+  color: #0f766e;
+  font-weight: 500;
+}
+
+.al-field-list__code {
+  font-size: 12px;
+}
+
+.al-field-list__code code {
+  background: #f1f5f9;
+  color: #475569;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.al-field-list__unit {
+  color: #64748b;
+  font-style: italic;
+}
+
+.al-field-list__required {
+  color: #dc2626;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.al-field-list__thresholds {
+  font-size: 12px;
+  color: #d97706;
+  margin-top: 4px;
+  padding: 4px 8px;
+  background: #fffbeb;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.al-field-list__options {
+  font-size: 12px;
+  color: #7c3aed;
+  margin-top: 4px;
 }

@@ -350,6 +350,11 @@
   color: #475569;
 }
 
+.resident-page__status--unsub {
+  background: rgba(239, 68, 68, 0.15);
+  color: #dc2626;
+}
+
 .resident-page__action {
   border: none;
   background: rgba(15, 118, 110, 0.12);
@@ -559,37 +564,110 @@
   font-weight: 600;
 }
 
+/* Detail Card Avatar */
+.resident-detail-card .resident-avatar {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.resident-detail-card .resident-avatar img {
+  width: 80px;
+  height: 80px;
+  border-radius: 16px;
+  object-fit: cover;
+  border: 3px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.resident-detail-card .resident-avatar__upload {
+  position: absolute;
+  bottom: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.resident-detail-card .resident-avatar__upload .button {
+  font-size: 11px;
+  padding: 4px 8px;
+  background: rgba(15, 118, 110, 0.9);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
 .resident-detail-card {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 12px;
-  background: #0f172a;
+  grid-template-columns: auto 1fr 1fr 1fr;
+  gap: 16px 24px;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
   color: #f8fafc;
   border-radius: 18px;
-  padding: 16px;
+  padding: 20px;
+  align-items: center;
 }
 
-.resident-detail-card h3 {
+.resident-detail-card__identity {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.resident-detail-card__identity > div:last-child {
+  min-width: 0;
+}
+
+.resident-detail-card__identity h3 {
   margin: 0;
   font-family: inherit;
+  font-size: 18px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.resident-detail-card p {
-  margin-top: 6px;
-  color: rgba(248, 250, 252, 0.7);
+.resident-detail-card__identity p {
+  margin-top: 4px;
+  color: rgba(248, 250, 252, 0.6);
+  font-size: 13px;
 }
 
 .resident-detail-card span {
-  font-size: 12px;
+  font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: rgba(248, 250, 252, 0.6);
+  color: rgba(248, 250, 252, 0.5);
+  font-weight: 600;
 }
 
 .resident-detail-card strong {
   display: block;
   font-size: 15px;
-  margin-top: 6px;
+  margin-top: 4px;
+  font-weight: 600;
+}
+
+.resident-detail-card__status {
+  display: flex;
+  flex-direction: column;
+}
+
+.resident-detail-card__status > span:first-child {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(248, 250, 252, 0.5);
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.resident-detail-card__status .resident-page__status {
+  font-size: 13px;
+  padding: 6px 14px;
+  align-self: flex-start;
+  margin-top: 0;
 }
 
 /* Split list + detail panel (family, health sub-pages) */

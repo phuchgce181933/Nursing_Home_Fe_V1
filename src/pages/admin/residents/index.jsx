@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Search,
-  Plus,
   RefreshCw,
   Eye,
   X,
@@ -44,6 +43,7 @@ const BLOOD_TYPES = [
 const RESIDENCY_STATUSES = [
   { value: '', i18nKey: 'adminResidents.residencyStatuses.allStatuses' },
   { value: 'pending', i18nKey: 'adminResidents.residencyStatuses.pending' },
+  { value: 'unsub', i18nKey: 'adminResidents.residencyStatuses.unsub' },
   { value: 'admitted', i18nKey: 'adminResidents.residencyStatuses.admitted' },
   { value: 'discharged', i18nKey: 'adminResidents.residencyStatuses.discharged' },
   { value: 'transferred', i18nKey: 'adminResidents.residencyStatuses.transferred' },
@@ -144,7 +144,6 @@ const emptyPersonalForm = {
   gender: 'unknown',
   citizenId: '',
   insuranceNumber: '',
-  bloodType: 'unknown',
   personalAddress: '',
   allergies: '',
   chronicConditions: '',
@@ -233,7 +232,6 @@ function ResidentPage({ defaultMode = '' }) {
       };
 
       const res = await residentService.getResidentList(params);
-      // DEBUG: log first resident to verify avatarUrl is present (remove in production)
       // eslint-disable-next-line no-console
       console.debug('admin resident list sample:', res?.data?.[0]);
       setResidents(res?.data || []);
@@ -274,7 +272,6 @@ function ResidentPage({ defaultMode = '' }) {
           gender: resident?.gender || 'unknown',
           citizenId: resident?.citizenId || '',
           insuranceNumber: resident?.insuranceNumber || '',
-          bloodType: resident?.bloodType || 'unknown',
           personalAddress: resident?.personalAddress || '',
           allergies: (resident?.allergies || []).join('\n'),
           chronicConditions: (resident?.chronicConditions || []).join('\n'),
@@ -418,9 +415,7 @@ function ResidentPage({ defaultMode = '' }) {
       insuranceNumber: createForm.insuranceNumber.trim() || undefined,
       bloodType: createForm.bloodType || undefined,
       personalAddress: createForm.personalAddress.trim() || undefined,
-      allergies: createForm.allergies ? splitList(createForm.allergies) : [],
-      chronicConditions: createForm.chronicConditions ? splitList(createForm.chronicConditions) : [],
-      initialHealthCondition: createForm.initialHealthCondition.trim() || undefined,
+      // Hidden fields: allergies, chronicConditions, initialHealthCondition
       residencyStatus: createForm.residencyStatus || undefined,
       admittedAt: createForm.admittedAt || undefined,
       dischargedAt: createForm.dischargedAt || undefined,
@@ -478,13 +473,8 @@ function ResidentPage({ defaultMode = '' }) {
         gender: personalForm.gender || undefined,
         citizenId: personalForm.citizenId.trim(),
         insuranceNumber: personalForm.insuranceNumber.trim(),
-        bloodType: personalForm.bloodType || undefined,
         personalAddress: personalForm.personalAddress.trim(),
-        allergies: personalForm.allergies ? splitList(personalForm.allergies) : [],
-        chronicConditions: personalForm.chronicConditions
-          ? splitList(personalForm.chronicConditions)
-          : [],
-        initialHealthCondition: personalForm.initialHealthCondition.trim(),
+        // Hidden fields: allergies, chronicConditions, initialHealthCondition
       };
 
       const res = await residentService.updateResidentPersonalInfo(selectedResidentId, payload);
@@ -568,15 +558,6 @@ function ResidentPage({ defaultMode = '' }) {
             <RefreshCw size={16} className={loading ? 'spin' : ''} />
             {t('adminResidents.refreshButton')}
           </button>
-          {canManageResidents && (
-            <button
-              className="resident-page__button resident-page__button--primary"
-              onClick={handleOpenCreate}
-            >
-              <Plus size={16} />
-              {t('adminResidents.addResidentButton')}
-            </button>
-          )}
         </div>
       </div>
 
@@ -758,7 +739,7 @@ function ResidentPage({ defaultMode = '' }) {
                         resident.residencyStatus || 'pending'
                       }`}
                     >
-                      {resident.residencyStatus || 'pending'}
+                      {t(`adminResidents.residencyStatuses.${resident.residencyStatus || 'pending'}`)}
                     </span>
                   </td>
                   <td>{resident.room?.roomNumber || t('adminResidents.table.unassigned')}</td>
@@ -944,6 +925,8 @@ function ResidentPage({ defaultMode = '' }) {
                     }
                   />
                 </label>
+                {/* Hidden: allergies, chronicConditions, initialHealthCondition */}
+                {/*
                 <label className="full">
                   {t('adminResidents.createModal.allergiesLabel')}
                   <textarea
@@ -974,6 +957,7 @@ function ResidentPage({ defaultMode = '' }) {
                     }
                   />
                 </label>
+                */}
               </div>
 
               <div className="resident-form-section">
@@ -1126,9 +1110,15 @@ function ResidentPage({ defaultMode = '' }) {
                       <p>{selectedResident.residentCode}</p>
                     </div>
                   </div>
-                  <div>
+                  <div className="resident-detail-card__status">
                     <span>{t('adminResidents.detailModal.statusLabel')}</span>
-                    <strong>{selectedResident.residencyStatus}</strong>
+                    <span
+                      className={`resident-page__status resident-page__status--${
+                        selectedResident.residencyStatus || 'pending'
+                      }`}
+                    >
+                      {t(`adminResidents.residencyStatuses.${selectedResident.residencyStatus || 'pending'}`)}
+                    </span>
                   </div>
                   <div>
                     <span>{t('adminResidents.detailModal.roomBedLabel')}</span>
@@ -1213,21 +1203,6 @@ function ResidentPage({ defaultMode = '' }) {
                         }
                       />
                     </label>
-                    <label>
-                      {t('adminResidents.personalInfo.bloodTypeLabel')}
-                      <select
-                        value={personalForm.bloodType}
-                        onChange={(e) =>
-                          setPersonalForm((prev) => ({ ...prev, bloodType: e.target.value }))
-                        }
-                      >
-                        {BLOOD_TYPES.filter((option) => option.value !== '').map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {t(option.i18nKey)}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
                     <label className="full">
                       {t('adminResidents.personalInfo.addressLabel')}
                       <input
@@ -1238,6 +1213,8 @@ function ResidentPage({ defaultMode = '' }) {
                         }
                       />
                     </label>
+                    {/* Hidden: allergies, chronicConditions, initialHealthCondition */}
+                    {/*
                     <label className="full">
                       {t('adminResidents.personalInfo.allergiesLabel')}
                       <textarea
@@ -1268,11 +1245,14 @@ function ResidentPage({ defaultMode = '' }) {
                         }
                       />
                     </label>
+                    */}
                   </div>
                   </fieldset>
                   {personalError && <p className="resident-form-error">{personalError}</p>}
                 </form>
 
+                {/* Family Info Section - Hidden */}
+                {/*
                 <form className="resident-form-section" onSubmit={handleSaveFamilyInfo}>
                   <div className="resident-form-section__header">
                     <h3>{t('adminResidents.familyInfo.sectionTitle')}</h3>
@@ -1376,6 +1356,7 @@ function ResidentPage({ defaultMode = '' }) {
 
                   {familyError && <p className="resident-form-error">{familyError}</p>}
                 </form>
+                */}
               </div>
             )}
           </div>

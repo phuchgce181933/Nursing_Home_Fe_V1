@@ -1,8 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import {
   filterDishCaloriesInput,
-  filterDishIngredientsInput,
-  filterDishNameInput,
 } from '../../../utils/dishValidation';
 
 export default function DishFormModal({
@@ -38,7 +36,7 @@ export default function DishFormModal({
               id="dish-name"
               type="text"
               value={formData.name}
-              onChange={(e) => onChange({ ...formData, name: filterDishNameInput(e.target.value) })}
+              onChange={(e) => onChange({ ...formData, name: e.target.value })}
             />
           </div>
           <div className="form-group">
@@ -59,9 +57,7 @@ export default function DishFormModal({
               type="text"
               placeholder={t(`${ns}.ingredientsPlaceholder`)}
               value={formData.ingredients}
-              onChange={(e) =>
-                onChange({ ...formData, ingredients: filterDishIngredientsInput(e.target.value) })
-              }
+              onChange={(e) => onChange({ ...formData, ingredients: e.target.value })}
             />
           </div>
           <div className="form-grid--full dish-form-modal__active-row">
