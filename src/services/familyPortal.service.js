@@ -20,6 +20,16 @@ const generateWalletTopupUrl = async (amount) => {
   return response.data.data || response.data;
 };
 
+// Unified financial ledger for the logged-in family (scope is derived server-side from the
+// session — no userId/walletId is ever sent from the client). Returns { data, total, page,
+// limit, totalPages, summary }. Wallet top-ups, wallet invoice payments and direct PayOS
+// invoice settlements all live here; they are distinguished by direction/walletAffected,
+// not by absence of a row.
+const getWalletTransactions = async (params = {}) => {
+  const response = await axiosClient.get('/family/wallet/transactions', { params });
+  return response.data;
+};
+
 const getResidentInvoices = async (residentId, params = {}) => {
   const response = await axiosClient.get(`/family/residents/${residentId}/invoices`, { params });
   return response.data;
@@ -110,6 +120,7 @@ export default {
   getResidentBillingSummary,
   getWalletBalance,
   generateWalletTopupUrl,
+  getWalletTransactions,
   getResidentInvoices,
   createInvoice,
   payInvoice,
