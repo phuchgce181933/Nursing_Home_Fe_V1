@@ -398,6 +398,18 @@ function ResidentPage({ defaultMode = '' }) {
       }
     }
 
+    // Client-side duplicate citizenId check (immediate feedback for visible records)
+    if (createForm.citizenId.trim()) {
+      const citizenIdClean = createForm.citizenId.trim().toLowerCase();
+      const duplicate = residents.find(
+        (r) => r.citizenId && r.citizenId.trim().toLowerCase() === citizenIdClean
+      );
+      if (duplicate) {
+        setCreateError(t('adminResidents.validation.citizenIdExists', { residentCode: duplicate.residentCode }));
+        return;
+      }
+    }
+
     const { contacts, error: contactsError } = buildContactsPayload(createContacts, t);
     if (contactsError) {
       setCreateError(contactsError);
@@ -458,6 +470,21 @@ function ResidentPage({ defaultMode = '' }) {
       }
       if (age < 50 || age > 110) {
         setPersonalError(t('adminResidents.validation.ageRange'));
+        return;
+      }
+    }
+
+    // Client-side duplicate citizenId check (exclude the current resident)
+    if (personalForm.citizenId.trim()) {
+      const citizenIdClean = personalForm.citizenId.trim().toLowerCase();
+      const duplicate = residents.find(
+        (r) =>
+          String(r._id) !== String(selectedResidentId) &&
+          r.citizenId &&
+          r.citizenId.trim().toLowerCase() === citizenIdClean
+      );
+      if (duplicate) {
+        setPersonalError(t('adminResidents.validation.citizenIdExists', { residentCode: duplicate.residentCode }));
         return;
       }
     }

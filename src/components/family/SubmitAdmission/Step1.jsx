@@ -1,6 +1,6 @@
-import { User, AlertCircle } from 'lucide-react';
+import { User, AlertCircle, Loader2 } from 'lucide-react';
 
-export default function Step1({ data = {}, onChange, errors = {}, touched = {}, onBlur }) {
+export default function Step1({ data = {}, onChange, errors = {}, touched = {}, onBlur, checkingCitizenId }) {
   const field = (name) => ({
     value: data[name] === 'INVALID_DATE' ? '' : (data[name] ?? ''),
     onChange: (e) => {
@@ -73,7 +73,26 @@ export default function Step1({ data = {}, onChange, errors = {}, touched = {}, 
         </div>
         <div className="sap-field">
           <label className="sap-label">Số CCCD / Hộ chiếu</label>
-          <input placeholder="Nhập số định danh" {...field('idNumber')} />
+          <div style={{ position: 'relative' }}>
+            <input
+              placeholder="Nhập số định danh"
+              {...field('idNumber')}
+              style={{ paddingRight: checkingCitizenId ? '36px' : undefined }}
+            />
+            {checkingCitizenId && (
+              <Loader2
+                size={16}
+                style={{
+                  position: 'absolute',
+                  right: '12px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  animation: 'spin 1s linear infinite',
+                  color: '#666',
+                }}
+              />
+            )}
+          </div>
           {touched.idNumber && errors.idNumber && (
             <div className="sap-field__error-message">
               <AlertCircle size={12} />

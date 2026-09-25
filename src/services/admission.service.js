@@ -101,6 +101,43 @@ const cancelAdmissionRequest = async (admissionId, body = {}) => {
   return response.data;
 };
 
+/**
+ * UC-6.1 | Re-submit Previous Admission Request (Family)
+ * Gửi lại yêu cầu nhập viện cho cùng một cư dân sau khi hợp đồng cũ đã kết thúc
+ * (cư dân đã xuất viện hoặc hợp đồng bị hủy). Hệ thống tái sử dụng admission cũ
+ * (giữ nguyên residentId, applicant, familyAccountId) và reset workflow để đi lại:
+ * new_request → admin duyệt → bác sĩ khám → tạo hợp đồng mới.
+ *
+ * @param {string} admissionId - ID của yêu cầu nhập viện cũ
+ * @param {object} [body]
+ * @param {string} [body.reason] - Lý do gửi lại (tùy chọn, tối đa 500 ký tự)
+ * @returns {object} { message, admission }
+ */
+const resubmitAdmissionRequest = async (admissionId, body = {}) => {
+  const response = await axiosClient.post(
+    `/family/admission-requests/${admissionId}/resubmit`,
+    body
+  );
+  return response.data;
+};
+
+/**
+ * Real-time check for duplicate citizenId
+ * Kiểm tra xem CCCD/Hộ chiếu đã được sử dụng chưa (cả trong admissions lẫn residents)
+ *
+ * @param {string} citizenId - Số CCCD/Hộ chiếu cần kiểm tra
+ * @returns {object} { duplicate: boolean, source: 'admission'|'resident'|null }
+ */
+const checkCitizenIdDuplicate = async (citizenId) => {
+  if (!citizenId || !citizenId.trim()) {
+    return { duplicate: false, source: null };
+  }
+  const response = await axiosClient.get('/family/admission-requests/check-citizen-id', {
+    params: { citizenId: citizenId.trim() },
+  });
+  return response.data;
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // ADMIN - Admission Requests (/api/admin/admission-requests)
 // Quyền: admin | manager
@@ -385,6 +422,8 @@ export default {
   getAdmissionHistory,
   getAdmissionDetail,
   cancelAdmissionRequest,
+  resubmitAdmissionRequest,
+  checkCitizenIdDuplicate,
   // Admin / Manager
   adminCreateWalkInAdmission,
   adminGetAdmissionList,

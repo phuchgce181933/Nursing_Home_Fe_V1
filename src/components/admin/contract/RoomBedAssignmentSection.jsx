@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Loader2, Building2, Layers, DoorOpen, BedDouble } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Loader2, Building2, Layers, DoorOpen, BedDouble, UserCheck } from 'lucide-react';
 import facilityService from '../../../services/facility.service';
 
 /**
@@ -8,9 +8,13 @@ import facilityService from '../../../services/facility.service';
  * Component cascade dropdown: Tòa nhà → Tầng → Phòng → Giường
  *
  * Props:
- *  - value: { buildingId, buildingName, floorId, floorName, roomId, roomName, bedId, bedName, roomType }
+ *  - value: { buildingId, buildingName, floorId, floorName, roomId, roomName,
+ *             bedId, bedName, roomType, responsibleStaff }
  *  - onChange: callback nhận object mới
  *  - allowedRoomTypes: mảng loại phòng được phép (lọc theo gói dịch vụ, optional)
+ *  - staffByRoom: map { [roomId]: [{ _id, fullName, role, staffProfile, ... }] }
+ *                 — Pre-built ở parent để tránh gọi API mỗi lần đổi phòng. Khi
+ *                 không truyền prop này thì chỉ hiển thị phòng mà KHÔNG show staff.
  *  - disabled: vô hiệu hóa
  */
 const ROOM_TYPE_LABELS = {
@@ -21,10 +25,20 @@ const ROOM_TYPE_LABELS = {
   isolation: 'Phòng Cách ly',
 };
 
+const labelViRole = (role) => {
+  switch (role) {
+    case 'doctor': return 'Bác sĩ';
+    case 'nurse': return 'Điều dưỡng';
+    case 'caregiver': return 'Hộ lý';
+    default: return role || '';
+  }
+};
+
 export default function RoomBedAssignmentSection({
   value = {},
   onChange,
   allowedRoomTypes,
+  staffByRoom,
   disabled = false,
 }) {
   const [buildings, setBuildings] = useState([]);
@@ -33,6 +47,14 @@ export default function RoomBedAssignmentSection({
   const [beds, setBeds] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  // Nhân viên phụ trách phòng hiện tại (lookup từ map parent truyền vào).
+  // Trả về mảng các staff có roomId nằm trong responsibleRoomIds của profile.
+  const responsibleStaff = useMemo(() => {
+    if (!staffByRoom || !value.roomId) return [];
+    const key = String(value.roomId);
+    return staffByRoom[key] || [];
+  }, [staffByRoom, value.roomId]);
 
   // Load tòa nhà + tất cả tầng (để filter nhanh) khi mount
   useEffect(() => {
@@ -86,8 +108,10 @@ export default function RoomBedAssignmentSection({
       floorName: '',
       roomId: '',
       roomName: '',
+      roomType: '',
       bedId: '',
       bedName: '',
+      responsibleStaff: [],
     });
     // Reload floors theo building
     try {
@@ -107,8 +131,10 @@ export default function RoomBedAssignmentSection({
       floorName: floor?.name || '',
       roomId: '',
       roomName: '',
+      roomType: '',
       bedId: '',
       bedName: '',
+      responsibleStaff: [],
     });
     try {
       const rRes = await facilityService.listRoomsByFloor(floorId);
@@ -122,12 +148,23 @@ export default function RoomBedAssignmentSection({
 
   const handleRoomChange = async (roomId) => {
     const room = rooms.find((r) => r._id === roomId);
+    // Tìm nhân viên phụ trách phòng vừa chọn (từ map parent đã load sẵn).
+    const roomStaff = (staffByRoom && roomId)
+      ? (staffByRoom[String(roomId)] || [])
+      : [];
+    // Helper: build danh sách { id, fullName, role } gọn để parent xài khi tạo HĐ.
+    const responsibleStaffCompact = roomStaff.map((s) => ({
+      id: s._id || s.id,
+      fullName: s.fullName || s.userId?.fullName || s.username || '',
+      role: s.role || '',
+    }));
     update({
       roomId,
       roomName: room?.roomNumber || '',
       roomType: room?.roomType || '',
       bedId: '',
       bedName: '',
+      responsibleStaff: responsibleStaffCompact,
     });
     try {
       // Lấy TẤT CẢ giường trong phòng để hiển thị đầy đủ trạng thái (trống / có người / bảo trì).
@@ -243,6 +280,27 @@ export default function RoomBedAssignmentSection({
             <span className="text-xs text-amber-600 mt-1 block">
               Tầng này không có phòng phù hợp{value.roomType ? ` loại "${ROOM_TYPE_LABELS[value.roomType] || value.roomType}"` : ''}.
             </span>
+          )}
+              {/* Hiển thị nhân viên phụ trách phòng đang chọn hoặc thông báo chưa phân công. */}
+          {value.roomId && staffByRoom && (
+            <div className="ctc-room-staff-hint" style={{ marginTop: 6, fontSize: '0.82rem' }}>
+              {responsibleStaff.length > 0 ? (
+                <span style={{ color: '#047857', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <UserCheck size={13} />
+                  <strong>Nhân viên phụ trách:</strong>
+                  <span style={{ marginLeft: 4 }}>
+                    {responsibleStaff
+                      .map((s) => `${s.fullName}${s.role ? ` (${labelViRole(s.role)})` : ''}`)
+                      .join(', ')}
+                  </span>
+                </span>
+              ) : (
+                <span style={{ color: '#b45309', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <UserCheck size={13} />
+                  Phòng này chưa được phân công nhân viên phụ trách.
+                </span>
+              )}
+            </div>
           )}
         </div>
 

@@ -169,16 +169,39 @@ const fmtServicePackageLine = (pkg) => {
   return `${price}${desc ? ` – ${desc}` : ''}`;
 };
 
+/**
+ * Format danh sách tất cả gói dịch vụ đang hoạt động cho Điều 6.
+ * Gói được chọn sẽ có dấu "✓" và "(đã chọn)" ở cuối.
+ *
+ * @param {Array}  allPackages        - Mảng các service package từ hệ thống
+ * @param {string|ObjectId} selectedId - ID gói đã được chọn (so sánh string)
+ * @returns {string} Khối text nhiều dòng, mỗi dòng 1 gói
+ */
+const fmtAllPackagesList = (allPackages, selectedId) => {
+  const selIdStr = selectedId != null ? String(selectedId) : null;
+  if (!Array.isArray(allPackages) || allPackages.length === 0) {
+    // Fallback khi hệ thống chưa load xong danh sách
+    return '- (Đang tải danh sách gói dịch vụ …)';
+  }
+  return allPackages
+    .map((pkg) => {
+      const isSelected = selIdStr != null && String(pkg._id || pkg.id) === selIdStr;
+      const marker = isSelected ? '  ✓ (đã chọn)' : '';
+      return `- ${fmtText(pkg.name)}${pkg.monthlyPrice ? `: ${Number(pkg.monthlyPrice).toLocaleString('vi-VN')} VNĐ/tháng` : ''}${marker}`;
+    })
+    .join('\n');
+};
+
 /** Format emergency contact list for Appendix 04 */
 const fmtEmergencyContacts = (contacts) => {
   if (!contacts || contacts.length === 0) {
-    return `1. ………………… – Quan hệ: ………… – SĐT: ………… – Địa chỉ: ………… – Ghi chú: …………
-2. ………………… – Quan hệ: ………… – SĐT: ………… – Địa chỉ: ………… – Ghi chú: …………
-3. ………………… – Quan hệ: ………… – SĐT: ………… – Địa chỉ: ………… – Ghi chú: …………`;
+    return `1. ………………… – Quan hệ: ………… – SĐT: ………… – Địa chỉ: …………
+2. ………………… – Quan hệ: ………… – SĐT: ………… – Địa chỉ: …………
+3. ………………… – Quan hệ: ………… – SĐT: ………… – Địa chỉ: …………`;
   }
   return contacts
     .slice(0, 3)
-    .map((c, i) => `${i + 1}. ${fmtText(c.fullName)} – Quan hệ: ${fmtText(c.relationship)} – SĐT: ${fmtPhone(c.phone)} – Địa chỉ: ${fmtText(c.address)} – Ghi chú: …………`)
+    .map((c, i) => `${i + 1}. ${fmtText(c.fullName)} – Quan hệ: ${fmtText(c.relationship)} – SĐT: ${fmtPhone(c.phone)} – Địa chỉ: ${fmtText(c.address)}`)
     .join('\n');
 };
 
@@ -259,9 +282,13 @@ const fmtSelfReliance = (admission) => {
  * @param {string} startDate - Contract start date (YYYY-MM-DD)
  * @param {string} endDate - Contract end date (YYYY-MM-DD)
  * @param {Object} resident - Resident document if already checked-in (optional)
+ * @param {Array}  allServicePackages - List of all active service packages (for Điều 6)
+ * @param {string} selectedPackageId  - ID of the package chosen for this contract
+ * @param {string} contractNumber     - Số hợp đồng (filled into header)
+ * @param {string} roomType           - Loại phòng thực tế của phòng đã phân bổ (cho Điều 7)
  * @returns {string} Filled contract terms string
  */
-export function buildContractTerms(admission, servicePackage, startDate, endDate, resident) {
+export function buildContractTerms(admission, servicePackage, startDate, endDate, resident, allServicePackages, selectedPackageId, contractNumber, roomType) {
   if (!admission) return CONTRACT_TERMS_TEMPLATE;
 
   const applicant = admission.applicant || {};
@@ -313,12 +340,18 @@ export function buildContractTerms(admission, servicePackage, startDate, endDate
       ? `${Number(servicePackage.monthlyPrice).toLocaleString('vi-VN')} VNĐ/tháng`
       : '……… VNĐ/tháng',
     '{PKG_ROOM_TYPE}': fmtRoomType(servicePackage?.roomType),
+    // Loại phòng thực tế của phòng đã phân bổ cho Người cao tuổi (Điều 7).
+    // Ưu tiên roomType từ phòng đã chọn (roomBedAssignment), fallback về servicePackage.
+    '{ROOM_TYPE}': fmtRoomType(roomType || servicePackage?.roomType),
+    // Danh sách tất cả gói dịch vụ trong hệ thống (Điều 6)
+    '{ALL_PACKAGES}': fmtAllPackagesList(allServicePackages, selectedPackageId),
 
     // Contract dates (Điều 9)
     '{CONTRACT_START}': fmtContractDate(startDate),
     '{CONTRACT_END}': fmtContractDate(endDate),
     '{CONTRACT_START_ISO}': startDate || '……/……/20……',
     '{CONTRACT_END_ISO}': endDate || '……/……/20……',
+    '{CONTRACT_NUMBER}': fmtText(contractNumber, '…………………………………'),
   };
 
   // Apply replacements
@@ -336,8 +369,18 @@ export default buildContractTerms;
 // Build contract terms from structured form data
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/** Build contract terms from structured form (used by ContractEditor) */
-export function buildContractTermsFromForm(form, admission, startDate, endDate) {
+/** Build contract terms from structured form (used by ContractEditor)
+ *
+ * @param {Object} form            - Dữ liệu form (đại diện, sức khỏe, gói, liên hệ khẩn cấp)
+ * @param {Object} admission       - Admission document (fallback)
+ * @param {string} startDate       - Contract start (YYYY-MM-DD)
+ * @param {string} endDate         - Contract end (YYYY-MM-DD)
+ * @param {Array}  allServicePackages - Danh sách TẤT CẢ gói dịch vụ đang hoạt động (cho Điều 6)
+ * @param {string} selectedPackageId  - ID gói đã được chọn cho hợp đồng này
+ * @param {string} contractNumber     - Số hợp đồng (fill vào header)
+ * @param {string} roomType           - Loại phòng thực tế đã phân bổ (cho Điều 7)
+ */
+export function buildContractTermsFromForm(form, admission, startDate, endDate, allServicePackages, selectedPackageId, contractNumber, roomType) {
   if (!form) return CONTRACT_TERMS_TEMPLATE;
 
   const rep = form.representative || {};
@@ -380,13 +423,13 @@ export function buildContractTermsFromForm(form, admission, startDate, endDate) 
 
   // ── Emergency contacts ─────────────────────────────────────
   const fmtContact = (c, i) =>
-    `${i + 1}. ${fmtF(c.fullName)} – Quan hệ: ${fmtRelationship(c.relationship)} – SĐT: ${fmtF(c.phone)} – Địa chỉ: ${fmtF(c.address)} – Ghi chú: …………`;
+    `${i + 1}. ${fmtF(c.fullName)} – Quan hệ: ${fmtRelationship(c.relationship)} – SĐT: ${fmtF(c.phone)} – Địa chỉ: ${fmtF(c.address)}`;
 
   const emergencyContactsText = contacts.length > 0
     ? contacts.map((c, i) => fmtContact(c, i)).join('\n')
-    : `1. ………………… – Quan hệ: ………… – SĐT: ………… – Địa chỉ: ………… – Ghi chú: …………
-2. ………………… – Quan hệ: ………… – SĐT: ………… – Địa chỉ: ………… – Ghi chú: …………
-3. ………………… – Quan hệ: ………… – SĐT: ………… – Địa chỉ: ………… – Ghi chú: …………`;
+    : `1. ………………… – Quan hệ: ………… – SĐT: ………… – Địa chỉ: …………
+2. ………………… – Quan hệ: ………… – SĐT: ………… – Địa chỉ: …………
+3. ………………… – Quan hệ: ………… – SĐT: ………… – Địa chỉ: …………`;
 
   // ── Health info (Appendix 05) ───────────────────────────────
   const healthMedHistory = fmtF(health.medicalHistory || applicant.chronicConditions?.join('; '));
@@ -434,10 +477,18 @@ export function buildContractTermsFromForm(form, admission, startDate, endDate) 
     '{PKG_PRICE}': pkgPrice,
     '{PKG_PRICE_FULL}': pkgPriceFull,
     '{PKG_ROOM_TYPE}': pkgRoom || '……',
+    // Loại phòng thực tế của phòng đã phân bổ cho Người cao tuổi (Điều 7).
+    // Ưu tiên roomType từ phòng đã chọn (roomBedAssignment), fallback về form.package.
+    '{ROOM_TYPE}': fmtRoomType(roomType || pkg.roomType),
+    // Danh sách gói dịch vụ (Điều 6)
+    '{ALL_PACKAGES}': fmtAllPackagesList(allServicePackages, selectedPackageId),
 
     // Contract dates
     '{CONTRACT_START}': fmtD(startDate),
     '{CONTRACT_END}': fmtD(endDate),
+
+    // Số hợp đồng (header)
+    '{CONTRACT_NUMBER}': fmtText(contractNumber, '…………………………………'),
   };
 
   let text = CONTRACT_TERMS_TEMPLATE;

@@ -45,9 +45,9 @@ export default function BulkEditActivityModal({
           </button>
         </div>
         <p className="form-hint" style={{ marginBottom: '16px' }}>
-          {t('adminActivities.bulkEditDescription', { title: bulkEditActivity.title || '', seriesId: seriesId.toString() })}
+          {t('adminActivities.bulkEditDescription', { title: typeof bulkEditActivity.title === 'string' ? bulkEditActivity.title : '', seriesId: typeof seriesId === 'string' || typeof seriesId === 'number' ? seriesId.toString() : '' })}
         </p>
-        {bulkEditError && <p className="form-error" style={{ marginBottom: '12px' }}>{bulkEditError}</p>}
+        {typeof bulkEditError === 'string' && <p className="form-error" style={{ marginBottom: '12px' }}>{bulkEditError}</p>}
         <div className="form-grid">
           <div className="form-group form-grid--full">
             <label>{t('adminActivities.fieldTitle')}</label>

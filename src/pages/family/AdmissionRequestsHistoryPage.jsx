@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, Eye, Inbox, Loader2, Calendar, ChevronLeft, ChevronRight, Clock, CheckCircle } from 'lucide-react';
+import { Search, Plus, Eye, Inbox, Loader2, Calendar, ChevronLeft, ChevronRight, Clock, CheckCircle, RotateCcw, Send, AlertCircle, X } from 'lucide-react';
 import admissionService from '../../services/admission.service';
+import { useToast } from '../../hooks/useToast';
 import AdmissionDetailDrawer from '../../components/family/SubmitAdmission/AdmissionDetailDrawer';
 
 const formatEnglishDate = (dateStr) => {
@@ -68,6 +69,7 @@ const ELIGIBILITY_I18N = {
 export default function AdmissionRequestsHistoryPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const { showToast } = useToast();
 
   // Filters & Pagination states
   const [admissions, setAdmissions] = useState([]);
@@ -165,6 +167,81 @@ export default function AdmissionRequestsHistoryPage() {
     // Reload table list and stats instantly when request is cancelled
     loadData();
     loadStats();
+  };
+
+  // Determine if a row can be re-submitted (contract ended or admission cancelled).
+  // Matches the same logic in AdmissionDetailDrawer so the buttons stay in sync.
+  const isRowResubmittable = (adm) => {
+    if (!adm) return false;
+    const contractEndDate = adm.contractEndDate ? new Date(adm.contractEndDate) : null;
+    const naturallyExpired =
+      adm.contractStatus === 'active' &&
+      contractEndDate &&
+      contractEndDate.getTime() < Date.now();
+    const contractEnded =
+      adm.contractStatus === 'cancelled' ||
+      adm.contractStatus === 'terminated' ||
+      adm.contractStatus === 'expired' ||
+      naturallyExpired;
+    return contractEnded || adm.status === 'cancelled';
+  };
+
+  const [resubmittingId, setResubmittingId] = useState(null);
+
+  // Resubmit modal state
+  const [showResubmitModal, setShowResubmitModal] = useState(false);
+  const [pendingResubmit, setPendingResubmit] = useState(null); // admission being resubmitted
+  const [resubmitReason, setResubmitReason] = useState('');
+  const [resubmitPreferredDate, setResubmitPreferredDate] = useState('');
+
+  const openResubmitModal = (adm, e) => {
+    e?.stopPropagation?.();
+    if (!adm || !adm._id) return;
+    setPendingResubmit(adm);
+    setResubmitReason('');
+    // Prefill with existing preferredAdmissionDate (if any) so family can re-use or change it.
+    setResubmitPreferredDate(
+      adm.preferredAdmissionDate ? adm.preferredAdmissionDate.substring(0, 10) : ''
+    );
+    setShowResubmitModal(true);
+  };
+
+  const closeResubmitModal = () => {
+    if (resubmittingId) return;
+    setShowResubmitModal(false);
+    setPendingResubmit(null);
+    setResubmitReason('');
+    setResubmitPreferredDate('');
+  };
+
+  const handleQuickResubmit = async () => {
+    if (!pendingResubmit || !pendingResubmit._id) return;
+    try {
+      setResubmittingId(pendingResubmit._id);
+      const result = await admissionService.resubmitAdmissionRequest(
+        pendingResubmit._id,
+        {
+          reason: resubmitReason.trim() || undefined,
+          preferredAdmissionDate: resubmitPreferredDate
+            ? new Date(resubmitPreferredDate).toISOString()
+            : undefined,
+        }
+      );
+      showToast(
+        result?.message || t('admissionHistory.resubmitSuccess', 'Đã gửi lại yêu cầu nhập viện.'),
+        'success'
+      );
+      closeResubmitModal();
+      handleCancelSuccess();
+    } catch (err) {
+      console.error('Failed to resubmit admission:', err);
+      showToast(
+        err?.response?.data?.message || t('admissionHistory.resubmitFailed', 'Không thể gửi lại yêu cầu.'),
+        'error'
+      );
+    } finally {
+      setResubmittingId(null);
+    }
   };
 
   // Generate page numbers array
@@ -357,13 +434,33 @@ export default function AdmissionRequestsHistoryPage() {
                           </span>
                         </td>
                         <td className="text-center" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            className="arh-btn--action"
-                            onClick={() => handleOpenDetail(adm._id || adm.id)}
-                            title={t('admissionHistory.viewDetail')}
-                          >
-                            <Eye size={18} />
-                          </button>
+                          <div className="flex items-center justify-center gap-2">
+                            {isRowResubmittable(adm) && (
+                              <button
+                                className="arh-btn--action"
+                                style={{
+                                  background: 'linear-gradient(135deg, #0f766e 0%, #115e59 100%)',
+                                  color: '#fff',
+                                }}
+                                onClick={(e) => openResubmitModal(adm, e)}
+                                disabled={resubmittingId === (adm._id || adm.id)}
+                                title={t('admissionHistory.resubmitTitle', 'Gửi yêu cầu nhập viện lại')}
+                              >
+                                {resubmittingId === (adm._id || adm.id) ? (
+                                  <Loader2 className="animate-spin" size={18} />
+                                ) : (
+                                  <RotateCcw size={18} />
+                                )}
+                              </button>
+                            )}
+                            <button
+                              className="arh-btn--action"
+                              onClick={() => handleOpenDetail(adm._id || adm.id)}
+                              title={t('admissionHistory.viewDetail')}
+                            >
+                              <Eye size={18} />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -420,6 +517,104 @@ export default function AdmissionRequestsHistoryPage() {
         admissionId={selectedId}
         onCancelSuccess={handleCancelSuccess}
       />
+
+      {/* Resubmit Confirmation Modal (Family — gửi lại yêu cầu nhập viện) */}
+      {showResubmitModal && pendingResubmit && (
+        <div
+          className="arh-modal-backdrop"
+          onClick={closeResubmitModal}
+        >
+          <div
+            className="arh-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between mb-2">
+              <h4 className="arh-modal__title">
+                {t('admissionHistory.resubmitTitle', 'Gửi yêu cầu nhập viện lại')}
+              </h4>
+              <button
+                type="button"
+                onClick={closeResubmitModal}
+                disabled={!!resubmittingId}
+                className="text-slate-400 hover:text-slate-700 transition-colors"
+                aria-label="close"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <p className="arh-modal__text">
+              {t(
+                'admissionHistory.resubmitConfirm',
+                { name: pendingResubmit.applicant?.fullName || t('admissionHistory.relative', 'người thân') },
+                `Bạn có chắc muốn gửi lại yêu cầu nhập viện cho {{name}}? Yêu cầu sẽ được Admin xem xét và chuyển sang bác sĩ khám lại.`
+              )}
+            </p>
+            <div className="bg-amber-50 border border-amber-200 text-amber-800 p-3 rounded-lg text-xs mb-3">
+              <AlertCircle size={14} className="inline mr-1" />
+              <strong>Lưu ý:</strong> Sau khi gửi lại, bác sĩ sẽ khám và đánh giá lại điều kiện sức khỏe
+              trước khi có thể tạo hợp đồng mới.
+            </div>
+            <label className="block text-[12px] font-semibold text-slate-700 mb-1">
+              {t('admissionHistory.resubmitPreferredDateLabel', 'Ngày nhập viện mong muốn (tuỳ chọn)')}
+            </label>
+            <input
+              type="date"
+              className="arh-modal__input"
+              min={new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().substring(0, 10)}
+              value={resubmitPreferredDate}
+              onChange={(e) => setResubmitPreferredDate(e.target.value)}
+            />
+            <div className="text-[10px] text-slate-400 mt-1 mb-2">
+              {t(
+                'admissionHistory.resubmitPreferredDateHint',
+                'Để trống nếu muốn hệ thống tự đặt lịch khám mặc định (ngày mai, 8:00).'
+              )}
+            </div>
+            <label className="block text-[12px] font-semibold text-slate-700 mb-1">
+              {t('admissionHistory.resubmitReasonLabel', 'Lý do gửi lại (tuỳ chọn)')}
+            </label>
+            <textarea
+              className="arh-modal__textarea"
+              placeholder={t(
+                'admissionHistory.resubmitReasonPlaceholder',
+                'Ví dụ: Cả gia đình đã sẵn sàng cho cụ nhập viện lại...'
+              )}
+              value={resubmitReason}
+              onChange={(e) => setResubmitReason(e.target.value)}
+              maxLength={500}
+            />
+            <div className="text-[10px] text-slate-400 text-right mt-1 mb-2">
+              {resubmitReason.length}/500
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                className="arh-drawer__btn"
+                style={{ background: '#f1f5f9', color: '#475569' }}
+                onClick={closeResubmitModal}
+                disabled={!!resubmittingId}
+              >
+                {t('common.cancel', 'Quay lại')}
+              </button>
+              <button
+                type="button"
+                className="arh-drawer__btn"
+                style={{
+                  background: 'linear-gradient(135deg, #0f766e 0%, #115e59 100%)',
+                  color: '#fff',
+                  flex: 1,
+                }}
+                onClick={handleQuickResubmit}
+                disabled={!!resubmittingId}
+              >
+                {!!resubmittingId && <Loader2 className="animate-spin mr-1" size={13} />}
+                <Send size={14} className="inline mr-1" />
+                {t('admissionHistory.resubmitConfirmBtn', 'Xác nhận gửi lại')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

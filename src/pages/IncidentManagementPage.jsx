@@ -168,6 +168,9 @@ function IncidentManagementPage() {
     return `${name}${role}${email}`;
   };
 
+  const isFamilyAccount = (staff) =>
+    String(staff?.role || staff?.userId?.role || '').toLowerCase() === 'family';
+
   const getTodayLocalDateString = () => {
     const now = new Date();
     const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
@@ -261,6 +264,7 @@ function IncidentManagementPage() {
       staff?.staffProfile?._id
       || staff?.staffProfile?.id
       || staff?.userId?._id
+      || staff?.userId?.id
       || staff?.userId
       || staff?.id
       || staff?._id
@@ -684,7 +688,8 @@ function IncidentManagementPage() {
         ]);
         if (!active) return;
         setResidents(Array.isArray(residentResponse) ? residentResponse : residentResponse?.data || []);
-        setStaffAccounts(Array.isArray(staffResponse) ? staffResponse : staffResponse?.data || []);
+        const availableStaff = Array.isArray(staffResponse) ? staffResponse : staffResponse?.data || [];
+        setStaffAccounts(availableStaff.filter((staff) => !isFamilyAccount(staff)));
         setFloors(Array.isArray(floorResponse) ? floorResponse : []);
       } catch (error) {
         if (!active) return;
@@ -705,7 +710,8 @@ function IncidentManagementPage() {
     else if (form.incidentType.trim().length > MAX_SHORT_TEXT_LENGTH) errors.incidentType = t('incidents.form.errTooLong', { max: MAX_SHORT_TEXT_LENGTH, defaultValue: `Must not exceed ${MAX_SHORT_TEXT_LENGTH} characters` });
     if (!form.incidentAt) errors.incidentAt = t('incidents.form.errRequired', 'This field is required');
     else if (new Date(form.incidentAt).getTime() > Date.now() + 60000) errors.incidentAt = t('incidents.form.errFutureDate', 'Cannot be in the future');
-    if (form.location && form.location.length > MAX_SHORT_TEXT_LENGTH) errors.location = t('incidents.form.errTooLong', { max: MAX_SHORT_TEXT_LENGTH, defaultValue: `Must not exceed ${MAX_SHORT_TEXT_LENGTH} characters` });
+    if (!form.location.trim()) errors.location = t('incidents.form.errRequired', 'This field is required');
+    else if (form.location.trim().length > MAX_SHORT_TEXT_LENGTH) errors.location = t('incidents.form.errTooLong', { max: MAX_SHORT_TEXT_LENGTH, defaultValue: `Must not exceed ${MAX_SHORT_TEXT_LENGTH} characters` });
     if (!form.description.trim()) errors.description = t('incidents.form.errRequired', 'This field is required');
     else if (form.description.trim().length > MAX_TEXT_LENGTH) errors.description = t('incidents.form.errTooLong', { max: MAX_TEXT_LENGTH, defaultValue: `Must not exceed ${MAX_TEXT_LENGTH} characters` });
     setFieldErrors(errors);
@@ -1698,11 +1704,12 @@ function IncidentManagementPage() {
                 </div>
 
                 <div className="ic-field">
-                  <label className="ic-field__label">{t('incidents.form.location')}</label>
+                  <label className="ic-field__label">{t('incidents.form.location')} *</label>
                   <input
                     className="ic-field__input"
                     value={form.location}
                     maxLength={MAX_SHORT_TEXT_LENGTH}
+                    required
                     onChange={(e) => { setForm((c) => ({ ...c, location: e.target.value })); setFieldErrors((p) => ({ ...p, location: undefined })); }}
                   />
                   {fieldErrors.location && <span className="ic-field__error">{fieldErrors.location}</span>}

@@ -90,6 +90,26 @@ export default function RoomsPage() {
     try {
       setSubmitting(true);
       setFormError(null);
+
+      // Debug: log what we're sending
+      console.log('[DEBUG] Creating room:', {
+        buildingId: formRoomBuildingId,
+        floorId: formRoomFloorId,
+        roomNumber: formRoomNumber.trim(),
+      });
+      const selectedFloor = floors.find(f => f._id === formRoomFloorId);
+      console.log('[DEBUG] Selected floor:', selectedFloor);
+      if (selectedFloor) {
+        const floorBuildingId = selectedFloor.buildingId?._id || selectedFloor.buildingId;
+        console.log('[DEBUG] Floor buildingId (raw):', floorBuildingId, 'formRoomBuildingId:', formRoomBuildingId);
+        console.log('[DEBUG] Comparison:', String(floorBuildingId), '===', String(formRoomBuildingId), '?', String(floorBuildingId) === String(formRoomBuildingId));
+        if (String(floorBuildingId) !== String(formRoomBuildingId)) {
+          setFormError(t('rooms.errFloorBuildingMismatch'));
+          setSubmitting(false);
+          return;
+        }
+      }
+
       await facilityService.createRoom({
         buildingId: formRoomBuildingId,
         floorId: formRoomFloorId,
@@ -343,8 +363,8 @@ export default function RoomsPage() {
                     value={formRoomBuildingId}
                     onChange={(e) => {
                       setFormRoomBuildingId(e.target.value);
-                      const relatedFloors = floors.filter(f => f.buildingId === e.target.value || f.buildingId?._id === e.target.value);
-                      setFormRoomFloorId(relatedFloors[0]?._id || '');
+                      // Clear floor when building changes to prevent mismatch
+                      setFormRoomFloorId('');
                     }}
                     required
                   >

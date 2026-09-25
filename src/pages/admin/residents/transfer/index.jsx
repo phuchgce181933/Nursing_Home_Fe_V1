@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { usePortalPrefix } from '../../../../hooks/usePortalPrefix';
 import facilityService from '../../../../services/facility.service';
 import residentService, { RESIDENT_TRANSFER_ROUTE_HINT } from '../../../../services/resident.service';
+import staffService from '../../../../services/staff.service';
 import { formatStaffAreasSyncedSummary } from '../../../../utils/staffAreasSynced';
 import { resolveApiError, resolveApiSuccess } from '../../../../utils/apiMessage';
 import { FaEye, FaPen } from 'react-icons/fa';
@@ -132,6 +133,12 @@ export default function TransferResidentPage() {
   const [viewError, setViewError] = useState('');
   const [editPopup, setEditPopup] = useState(false);
 
+  // Map phòng → nhân viên phụ trách (build 1 lần lúc mount) — dùng để hoán đổi
+  // assignedResidentIds giữa staff phòng cũ ↔ staff phòng mới sau khi
+  // transferResidentToRoom thành công (workaround cho BE auto-assign).
+  // Shape: { [roomId: string]: Array<{ _id, fullName, role }> }
+  const [staffByRoom, setStaffByRoom] = useState({});
+
   const portalPrefix = usePortalPrefix();
   const assignmentsPath = `${portalPrefix}/staff/assignments`;
 
@@ -165,6 +172,40 @@ export default function TransferResidentPage() {
   useEffect(() => {
     loadList();
   }, [loadList]);
+
+  // Load staff list 1 lần lúc mount → build map phòng → staff (dựa trên
+  // staffProfile.responsibleRoomIds) dùng để lookup nhân viên phụ trách khi
+  // hoán đổi assignedResidentIds giữa phòng cũ / phòng mới.
+  useEffect(() => {
+    let mounted = true;
+    staffService.getAll({ limit: 200 })
+      .then((res) => {
+        if (!mounted) return;
+        const list = res?.data || res || [];
+        const byRoom = {};
+        for (const s of list) {
+          if (!s) continue;
+          const profile = s.staffProfile || {};
+          const rooms = profile.responsibleRoomIds || [];
+          const fullName = s.fullName || s.userId?.fullName || s.username || '';
+          for (const roomRef of rooms) {
+            const id = typeof roomRef === 'object' ? (roomRef?._id || roomRef?.id) : roomRef;
+            if (!id) continue;
+            const key = String(id);
+            if (!byRoom[key]) byRoom[key] = [];
+            if (!byRoom[key].some((x) => String(x._id) === String(s._id))) {
+              byRoom[key].push({ ...s, fullName });
+            }
+          }
+        }
+        setStaffByRoom(byRoom);
+      })
+      .catch((err) => {
+        console.warn('Failed to load staff list for transfer-room swap:', err);
+        if (mounted) setStaffByRoom({});
+      });
+    return () => { mounted = false; };
+  }, []);
 
   useEffect(() => {
     const loadFacilities = async () => {
@@ -356,6 +397,12 @@ export default function TransferResidentPage() {
     setSaving(true);
     setSubmitError('');
     clearTransferFeedback();
+    // Capture thông tin phòng hiện tại TRƯỚC khi gọi API để dùng cho bước hoán đổi
+    // assignedResidentIds giữa staff phòng cũ ↔ staff phòng mới.
+    const oldRoomId = targetsData?.currentAssignment?.room?._id
+      || targetsData?.currentAssignment?.room
+      || '';
+    const residentIdStr = selectedId ? String(selectedId) : null;
     try {
       const res = await residentService.transferResidentToRoom(selectedId, {
         targetRoomId,
@@ -376,6 +423,23 @@ export default function TransferResidentPage() {
         setStaffSyncEmptyNote(true);
       }
 
+      // Hoán đổi assignedResidentIds giữa staff phòng cũ ↔ phòng mới.
+      // Mục đích: Khi cư dân chuyển sang phòng mới, các nhân viên phụ trách
+      // phòng cũ phải ĐƯỢC GỠ cư dân khỏi assignedResidentIds, và các nhân
+      // viên phòng mới phải ĐƯỢC THÊM cư dân (nếu chưa có). Đây là workaround
+      // cho hành vi auto-assign của backend ở các endpoint assignDoctor /
+      // assignNurse / contract — flow transfer-room hiện không được BE chủ
+      // động đồng bộ assignedResidentIds. Best-effort.
+      try {
+        await swapResidentAssignedToRoomStaff({
+          residentId: residentIdStr,
+          oldRoomId: oldRoomId ? String(oldRoomId) : null,
+          newRoomId: targetRoomId ? String(targetRoomId) : null,
+        });
+      } catch (swapErr) {
+        console.warn('Swap resident to room staff failed (best-effort):', swapErr);
+      }
+
       await refreshAfterTransfer();
     } catch (e) {
       const status = e?.response?.status;
@@ -383,6 +447,64 @@ export default function TransferResidentPage() {
       if (status === 404 || status === 400) setShowRouteHint(true);
     } finally {
       setSaving(false);
+    }
+  };
+
+  /**
+   * Hoán đổi resident giữa staff phụ trách phòng cũ / phòng mới:
+   *  - Với mỗi staff phòng cũ: gỡ resident khỏi assignedResidentIds (nếu có).
+   *  - Với mỗi staff phòng mới: thêm resident vào assignedResidentIds (nếu chưa có).
+   *  - Staff nào vừa thuộc phòng cũ vừa thuộc phòng mới → bỏ qua (no-op).
+   * Best-effort: lỗi 1 staff không ảnh hưởng các staff khác, không throw ra ngoài.
+   */
+  const swapResidentAssignedToRoomStaff = async ({ residentId, oldRoomId, newRoomId }) => {
+    if (!residentId) return;
+    if (!oldRoomId && !newRoomId) return;
+    const oldStaff = (oldRoomId && staffByRoom[oldRoomId]) || [];
+    const newStaff = (newRoomId && staffByRoom[newRoomId]) || [];
+    const oldStaffIds = oldStaff.map((s) => String(s._id || s.id));
+    const newStaffIds = newStaff.map((s) => String(s._id || s.id));
+    // Lọc trùng trong trường hợp staff vừa phòng cũ vừa phòng mới
+    // (ví dụ phòng sáp nhập) → bỏ qua staff đó.
+    const onlyOld = oldStaffIds.filter((id) => !newStaffIds.includes(id));
+    const onlyNew = newStaffIds.filter((id) => !oldStaffIds.includes(id));
+    const affectedIds = Array.from(new Set([...onlyOld, ...onlyNew]));
+    if (affectedIds.length === 0) return;
+
+    // Helper: lấy danh sách resident IDs hiện tại của một staff. Trả về [] nếu lỗi.
+    const fetchCurrentIds = async (staffId) => {
+      try {
+        const res = await staffService.listAssignedResidents(staffId);
+        const list = Array.isArray(res) ? res : (res?.data || []);
+        return list.map((r) => String(r?._id || r?.id || r));
+      } catch (err) {
+        console.warn('listAssignedResidents failed for staff', staffId, err);
+        return [];
+      }
+    };
+
+    // Bước 1: GỠ resident khỏi assignedResidentIds của staff phòng cũ.
+    for (const staffId of onlyOld) {
+      const current = await fetchCurrentIds(staffId);
+      if (!current.includes(residentId)) continue;
+      const next = current.filter((id) => id !== residentId);
+      try {
+        await staffService.assignResidents(staffId, { residentIds: next });
+      } catch (err) {
+        console.error('Failed to remove resident from old-room staff', staffId, err);
+      }
+    }
+
+    // Bước 2: THÊM resident vào assignedResidentIds của staff phòng mới.
+    for (const staffId of onlyNew) {
+      const current = await fetchCurrentIds(staffId);
+      if (current.includes(residentId)) continue;
+      const next = Array.from(new Set([...current, residentId]));
+      try {
+        await staffService.assignResidents(staffId, { residentIds: next });
+      } catch (err) {
+        console.error('Failed to add resident to new-room staff', staffId, err);
+      }
     }
   };
 

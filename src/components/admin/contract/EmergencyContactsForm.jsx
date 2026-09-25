@@ -309,7 +309,7 @@ export default function EmergencyContactsForm({
             </span>
           )}
           <span className="ctc-sync-hint">
-            Lưu các liên hệ này vào <code>resident.emergencyContacts</code> (trang Quản lý thân nhân)
+            Lưu các liên hệ này vào hồ sơ người cao tuổi (trang Quản lý thân nhân)
           </span>
         </div>
       )}

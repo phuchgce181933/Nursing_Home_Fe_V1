@@ -100,11 +100,6 @@ export const roleSidebarData = {
       path: '/caregiver/daily-behaviors',
     },
     {
-      title: 'sidebar.careNotes',
-      icon: Activity,
-      path: '/caregiver/care-notes',
-    },
-    {
       title: 'sidebar.messages',
       icon: MessageSquare,
       path: '/caregiver/messages',

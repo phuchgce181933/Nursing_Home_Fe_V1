@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Search, RefreshCw, Eye, ChevronLeft, ChevronRight, DollarSign } from 'lucide-react';
+import { Search, RefreshCw, Eye, ChevronLeft, ChevronRight, DollarSign, RotateCcw } from 'lucide-react';
 import adminInvoiceService from '../../services/adminInvoice.service';
 import residentService from '../../services/resident.service';
 import { resolveApiError } from '../../utils/apiMessage';
+import '../../styles/admin/AdminInvoiceManagementPage.css';
 
 export default function AdminInvoiceManagementPage() {
   const { t } = useTranslation();
@@ -152,23 +153,17 @@ export default function AdminInvoiceManagementPage() {
           </h1>
           <p>{t('adminInvoices.subtitle')}</p>
         </div>
-        <div className="adm-header__buttons">
-          <button type="button" className="adm-btn-secondary" onClick={handleResetFilters}>
-            {t('adminInvoices.resetFilters')}
-          </button>
-          <button type="button" className="adm-btn-refresh" onClick={loadInvoices}>
-            <RefreshCw size={18} /> {t('common.refresh')}
-          </button>
-        </div>
       </div>
 
       <div className="adm-filter-panel">
-        <div className="adm-filter-grid">
-          <div className="adm-filter-group">
+        {/* Row 1: search, resident, status */}
+        <div className="adm-filter-row">
+          <div className="adm-filter-group adm-filter-group--wide">
             <label>{t('adminInvoices.invoiceNumberLabel')}</label>
             <div className="adm-filter-input-wrapper">
-              <Search size={16} className="adm-filter-input-icon" />
+              <Search size={15} className="adm-filter-input-icon" />
               <input
+                className="adm-filter-input"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder={t('adminInvoices.searchPlaceholder')}
@@ -179,23 +174,51 @@ export default function AdminInvoiceManagementPage() {
           <div className="adm-filter-group">
             <label>{t('common.resident')}</label>
             <select
+              className="adm-filter-select"
               value={residentId}
               onChange={(e) => setResidentId(e.target.value)}
             >
               <option value="">{t('adminInvoices.allResidents')}</option>
+              {residentsLoading && <option disabled>{t('adminInvoices.loadingResidents')}</option>}
               {residents.map((resident) => (
                 <option key={resident._id} value={resident._id}>
                   {resident.fullName || resident.name || resident._id}
                 </option>
               ))}
             </select>
-            {residentsLoading && <div className="adm-filter-loading">{t('adminInvoices.loadingResidents')}</div>}
           </div>
 
+          <div className="adm-filter-group">
+            <label>{t('common.status')}</label>
+            <select className="adm-filter-select" value={status} onChange={(e) => setStatus(e.target.value)}>
+              <option value="">{t('common.all')}</option>
+              <option value="draft">{t('adminInvoices.statusDraft', 'Chưa xuất')}</option>
+              <option value="issued">{t('adminInvoices.statusIssued')}</option>
+              <option value="partially_paid">{t('adminInvoices.statusPartiallyPaid')}</option>
+              <option value="paid">{t('adminInvoices.statusPaid')}</option>
+              <option value="overdue">{t('adminInvoices.statusOverdue')}</option>
+              <option value="cancelled">{t('adminInvoices.statusCancelled')}</option>
+            </select>
+          </div>
+
+          <div className="adm-filter-group adm-filter-checkbox">
+            <input
+              type="checkbox"
+              id="overdueOnly"
+              checked={isOverdue}
+              onChange={(e) => setIsOverdue(e.target.checked)}
+            />
+            <label htmlFor="overdueOnly">{t('adminInvoices.overdueOnlyLabel')}</label>
+          </div>
+        </div>
+
+        {/* Row 2: date ranges */}
+        <div className="adm-filter-row">
           <div className="adm-filter-group">
             <label>{t('adminInvoices.issueDateFromLabel')}</label>
             <input
               type="date"
+              className="adm-filter-date"
               value={issueFrom}
               onChange={(e) => setIssueFrom(e.target.value)}
             />
@@ -205,6 +228,7 @@ export default function AdminInvoiceManagementPage() {
             <label>{t('adminInvoices.issueDateToLabel')}</label>
             <input
               type="date"
+              className="adm-filter-date"
               value={issueTo}
               onChange={(e) => setIssueTo(e.target.value)}
             />
@@ -214,6 +238,7 @@ export default function AdminInvoiceManagementPage() {
             <label>{t('adminInvoices.dueDateFromLabel')}</label>
             <input
               type="date"
+              className="adm-filter-date"
               value={dueFrom}
               onChange={(e) => setDueFrom(e.target.value)}
             />
@@ -223,16 +248,20 @@ export default function AdminInvoiceManagementPage() {
             <label>{t('adminInvoices.dueDateToLabel')}</label>
             <input
               type="date"
+              className="adm-filter-date"
               value={dueTo}
               onChange={(e) => setDueTo(e.target.value)}
             />
           </div>
+
+          <div className="adm-filter-divider" />
 
           <div className="adm-filter-group">
             <label>{t('adminInvoices.minAmountLabel')}</label>
             <input
               type="number"
               min="0"
+              className="adm-filter-input"
               value={minAmount}
               onChange={(e) => setMinAmount(e.target.value)}
               placeholder="0"
@@ -244,52 +273,42 @@ export default function AdminInvoiceManagementPage() {
             <input
               type="number"
               min="0"
+              className="adm-filter-input"
               value={maxAmount}
               onChange={(e) => setMaxAmount(e.target.value)}
               placeholder="0"
             />
           </div>
+        </div>
 
-          <div className="adm-filter-group adm-filter-group-checkbox">
-            <label>
-              <input
-                type="checkbox"
-                checked={isOverdue}
-                onChange={(e) => setIsOverdue(e.target.checked)}
-              />
-              {t('adminInvoices.overdueOnlyLabel')}
-            </label>
-          </div>
+        {/* Row 3: sort + actions */}
+        <div className="adm-filter-row adm-filter-row--actions">
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div className="adm-filter-group" style={{ maxWidth: '180px', minWidth: '140px' }}>
+              <label>{t('adminInvoices.sortByLabel')}</label>
+              <select className="adm-filter-select" value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+                <option value="issuedAt">{t('adminInvoices.issuedAtLabel')}</option>
+                <option value="dueDate">{t('adminInvoices.dueDateLabel')}</option>
+                <option value="totalAmount">{t('adminInvoices.totalAmountLabel')}</option>
+                <option value="invoiceNumber">{t('adminInvoices.invoiceNumberLabel')}</option>
+              </select>
+            </div>
 
-          <div className="adm-filter-group">
-            <label>{t('adminInvoices.sortByLabel')}</label>
-            <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
-              <option value="issuedAt">{t('adminInvoices.issuedAtLabel')}</option>
-              <option value="dueDate">{t('adminInvoices.dueDateLabel')}</option>
-              <option value="totalAmount">{t('adminInvoices.totalAmountLabel')}</option>
-              <option value="invoiceNumber">{t('adminInvoices.invoiceNumberLabel')}</option>
-            </select>
-          </div>
+            <div className="adm-filter-group" style={{ maxWidth: '160px', minWidth: '120px' }}>
+              <label>{t('adminInvoices.sortOrderLabel')}</label>
+              <select className="adm-filter-select" value={sortOrder} onChange={(e) => setSortOrder(e.target.value)}>
+                <option value="desc">{t('adminInvoices.sortDesc')}</option>
+                <option value="asc">{t('adminInvoices.sortAsc')}</option>
+              </select>
+            </div>
 
-          <div className="adm-filter-group">
-            <label>{t('adminInvoices.sortOrderLabel')}</label>
-            <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)}>
-              <option value="desc">{t('adminInvoices.sortDesc')}</option>
-              <option value="asc">{t('adminInvoices.sortAsc')}</option>
-            </select>
-          </div>
+            <button type="button" className="adm-btn-secondary" onClick={handleResetFilters}>
+              <RotateCcw size={14} /> {t('adminInvoices.resetFilters')}
+            </button>
 
-          <div className="adm-filter-group">
-            <label>{t('common.status')}</label>
-            <select value={status} onChange={(e) => setStatus(e.target.value)}>
-              <option value="">{t('common.all')}</option>
-              <option value="draft">{t('adminInvoices.statusDraft', 'Chưa xuất')}</option>
-              <option value="issued">{t('adminInvoices.statusIssued')}</option>
-              <option value="partially_paid">{t('adminInvoices.statusPartiallyPaid')}</option>
-              <option value="paid">{t('adminInvoices.statusPaid')}</option>
-              <option value="overdue">{t('adminInvoices.statusOverdue')}</option>
-              <option value="cancelled">{t('adminInvoices.statusCancelled')}</option>
-            </select>
+            <button type="button" className="adm-btn-refresh" onClick={loadInvoices}>
+              <RefreshCw size={14} /> {t('common.refresh')}
+            </button>
           </div>
         </div>
       </div>

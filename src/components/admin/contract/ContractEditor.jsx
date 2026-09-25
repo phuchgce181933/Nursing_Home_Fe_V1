@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { User, FileText, Heart, Users, RotateCcw, Save, Check, Eye, Edit3 } from 'lucide-react';
 import RepresentativeForm from './RepresentativeForm';
 import HealthInfoForm from './HealthInfoForm';
@@ -144,6 +144,7 @@ export default function ContractEditor({
                 onSave={() => handleSaveSection(tab.id)}
                 onEdit={() => handleEditSection(tab.id)}
                 validateFn={() => validateSection(tab.id)}
+                validationSignature={JSON.stringify(form[tab.id === 'contacts' ? 'contacts' : tab.id] || {})}
               />
 
               <div className={isSaved ? 'ctc-section-readonly' : ''}>
@@ -209,8 +210,12 @@ export default function ContractEditor({
 }
 
 // ── Section header with save/edit toggle ─────────────────────
-function SectionSaveHeader({ tab, isSaved, lastSavedAt, onSave, onEdit, validateFn }) {
+function SectionSaveHeader({ tab, isSaved, lastSavedAt, onSave, onEdit, validateFn, validationSignature }) {
   const [validationErrors, setValidationErrors] = useState([]);
+
+  useEffect(() => {
+    if (validationErrors.length > 0) setValidationErrors([]);
+  }, [validationSignature]);
 
   const handleSave = () => {
     const result = onSave();

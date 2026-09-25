@@ -25,7 +25,6 @@ import {
   Loader2,
   RotateCcw,
   EyeOff,
-  Wallet,
   CreditCard,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -33,6 +32,7 @@ import admissionService from '../../services/admission.service';
 import contractService from '../../services/contract.service';
 import residentService from '../../services/resident.service';
 import servicePackageService from '../../services/servicePackage.service';
+import staffService from '../../services/staff.service';
 import CONTRACT_TERMS_TEMPLATE from '../../constants/contractTermsTemplate';
 import { buildContractTerms, buildContractTermsFromForm } from '../../utils/contractTermsUtils';
 import ContractEditor from '../../components/admin/contract/ContractEditor';
@@ -188,7 +188,7 @@ export default function AdminAdmissionRequestsPage() {
     endDate: '',
     durationMonths: 12,
     discountPercent: 0,
-    // Hình thức thanh toán: FULL = thanh toán tất cả, HALF_NOW = thanh toán 50%, MONTHLY = thanh toán theo tháng
+    // Hình thức thanh toán: MONTHLY = thanh toán theo tháng (chỉ hỗ trợ phương án này)
     paymentPlan: 'MONTHLY',
     terms: '',
     notes: '',
@@ -268,7 +268,16 @@ export default function AdminAdmissionRequestsPage() {
     roomType: '',
     bedId: '',
     bedName: '',
+    // Mảng staff phụ trách phòng hiện tại: [{ id, fullName, role }]
+    // Được fill tự động bởi RoomBedAssignmentSection khi admin chọn phòng,
+    // dựa vào staffProfile.responsibleRoomIds.
+    responsibleStaff: [],
   });
+  // Map phòng → nhân viên phụ trách, build 1 lần khi mở modal tạo hợp đồng
+  // để lookup nhanh khi admin đổi phòng (tránh gọi staff API mỗi lần đổi).
+  // Shape: { [roomId: string]: Array<staff> }
+  const [staffByRoom, setStaffByRoom] = useState({});
+  const [responsibleStaffLoading, setResponsibleStaffLoading] = useState(false);
   const [emergencyContactsSyncStatus, setEmergencyContactsSyncStatus] = useState('idle'); // idle | saving | success | error
   const [isCreatingContract, setIsCreatingContract] = useState(false);
   const [showTermsPreview, setShowTermsPreview] = useState(false);
@@ -411,9 +420,39 @@ export default function AdminAdmissionRequestsPage() {
         mealPlan: admission.servicePackageId?.mealPlan || '',
         description: admission.servicePackageId?.description || '',
       },
+      // Liên hệ khẩn cấp: lấy từ resident.emergencyContacts (single source of truth).
+      // Nếu resident chưa có → để [] để admin nhập mới. Resident emergencyContacts là
+      // nơi duy nhất lưu trữ liên hệ khẩn cấp — không lưu riêng ở admission.
       contacts: [],
       terms: '',
     };
+
+    // Fetch resident để pre-fill emergencyContacts (nếu resident đã được tạo hồ sơ
+    // từ admission trước đó hoặc từ admission này đã được approveAdmission tạo sẵn).
+    // Không fetch khi admission chưa có residentId → user sẽ tự nhập.
+    const admissionResidentId = admission.residentId?._id || admission.residentId;
+    if (admissionResidentId) {
+      try {
+        const residentResp = await residentService.getResidentDetail(admissionResidentId);
+        const resident = residentResp?.resident || residentResp;
+        const existingContacts = Array.isArray(resident?.emergencyContacts) ? resident.emergencyContacts : [];
+        if (existingContacts.length > 0) {
+          // Chuẩn hóa về shape form expect; giữ _id để tránh duplicate khi sync lại
+          initialEditorForm.contacts = existingContacts.map((c) => ({
+            _id: c._id || undefined,
+            fullName: c.fullName || '',
+            relationship: c.relationship || '',
+            phone: c.phone || '',
+            email: c.email || '',
+            address: c.address || '',
+            isPrimary: Boolean(c.isPrimary),
+          }));
+        }
+      } catch (err) {
+        console.warn('[openCreateContractModal] Failed to load resident for emergencyContacts pre-fill:', err);
+        // Không block modal — để contacts = [] cho admin tự nhập
+      }
+    }
 
     // Pre-select service package: ưu tiên gói đã gán trên admission; nếu chưa có
     // thì để trống để admin chọn từ dropdown.
@@ -424,15 +463,18 @@ export default function AdminAdmissionRequestsPage() {
     // Fetch danh sách gói dịch vụ đang hoạt động để admin chọn.
     // Đợi danh sách load xong rồi mới mở modal để dropdown sẵn sàng ngay.
     setServicePackagesLoading(true);
+    let loadedPackages = [];
+    let preselectedPkg = null;
     try {
       const res = await servicePackageService.getServicePackageList({
         isActive: true,
         limit: 100,
       });
-      const list = res?.data || [];
-      setAvailableServicePackages(list);
-      // Đảm bảo selected id hợp lệ; nếu admission chưa có gói thì chọn gói đầu tiên
-      const existsInList = list.some((p) => String(p._id) === preSelectedPkgId);
+      loadedPackages = res?.data || [];
+      setAvailableServicePackages(loadedPackages);
+      // Đảm bảo selected id hợp lý; nếu admission chưa có gói thì để trống
+      const existsInList = loadedPackages.some((p) => String(p._id) === preSelectedPkgId);
+      preselectedPkg = loadedPackages.find((p) => String(p._id) === preSelectedPkgId) || null;
       setSelectedServicePackageId(existsInList ? preSelectedPkgId : '');
     } catch (err) {
       console.error('Failed to load service packages:', err);
@@ -446,8 +488,35 @@ export default function AdminAdmissionRequestsPage() {
       setServicePackagesLoading(false);
     }
 
-    // Build full terms text from structured form
-    const terms = buildContractTermsFromForm(initialEditorForm, admission, start, endStr);
+    // Sync thông tin gói pre-select từ dữ liệu thật vừa load (name, monthlyPrice,
+    // description, mealPlan, roomType mặc định). Nếu admission có servicePackageId
+    // nhưng assignedServicePackage (string cũ) trống, ta lấy name từ package doc
+    // để preview hiển thị đúng tên gói (không phải dấu "—").
+    if (preselectedPkg) {
+      initialEditorForm.package = {
+        ...(initialEditorForm.package || {}),
+        _id: String(preselectedPkg._id),
+        name: preselectedPkg.name || initialEditorForm.package?.name || '',
+        monthlyPrice: preselectedPkg.monthlyPrice ?? initialEditorForm.package?.monthlyPrice ?? '',
+        description: preselectedPkg.description || '',
+        mealPlan: preselectedPkg.mealPlan || '',
+        roomType: preselectedPkg.allowedRoomTypes?.[0] || initialEditorForm.package?.roomType || '',
+      };
+    }
+
+    // Build full terms text from structured form, sau khi đã có danh sách gói
+    // dịch vụ để fill vào Điều 6.
+    const terms = buildContractTermsFromForm(
+      initialEditorForm,
+      admission,
+      start,
+      endStr,
+      loadedPackages,
+      preSelectedPkgId,
+      '',
+      // Loại phòng lấy từ phòng đã được phân bổ sẵn trong admission (nếu có).
+      admission.assignedRoomId?.roomType || ''
+    );
 
     setCreateContractAdmission(admission);
     setCreateContractForm({
@@ -471,9 +540,55 @@ export default function AdminAdmissionRequestsPage() {
       roomType: admission.assignedRoomId?.roomType || '',
       bedId: admission.assignedBedId?._id || admission.assignedBedId || '',
       bedName: admission.assignedBedId?.bedCode || '',
+      // Nếu đã có phòng phân bổ sẵn → load nhân viên phụ trách từ staffByRoom (xem bên dưới).
+      // Trước khi staffByRoom load xong thì để [].
+      responsibleStaff: [],
     });
     setEmergencyContactsSyncStatus('idle');
     setIsCreateContractModalOpen(true);
+
+    // Load staff list 1 lần (song song với service packages ở try/catch trên)
+    // để build map staffByRoom. RoomBedAssignmentSection sẽ lookup map này
+    // để hiển thị nhân viên phụ trách khi admin chọn phòng.
+    setResponsibleStaffLoading(true);
+    staffService.getAll({ limit: 200 })
+      .then((res) => {
+        const list = res?.data || res || [];
+        const byRoom = {};
+        for (const staff of list) {
+          if (!staff) continue;
+          const profile = staff.staffProfile || {};
+          const rooms = profile.responsibleRoomIds || [];
+          for (const roomRef of rooms) {
+            const id = typeof roomRef === 'object' ? (roomRef?._id || roomRef?.id) : roomRef;
+            if (!id) continue;
+            const key = String(id);
+            if (!byRoom[key]) byRoom[key] = [];
+            const fullName = staff.fullName || staff.userId?.fullName || staff.username || '';
+            if (!byRoom[key].some((s) => String(s._id) === String(staff._id))) {
+              byRoom[key].push({ ...staff, fullName });
+            }
+          }
+        }
+        setStaffByRoom(byRoom);
+        // Nếu admission đã có phòng assigned sẵn → fill responsibleStaff luôn
+        const preselectedRoomId = String(
+          admission.assignedRoomId?._id || admission.assignedRoomId || ''
+        );
+        if (preselectedRoomId && byRoom[preselectedRoomId]) {
+          const compact = byRoom[preselectedRoomId].map((s) => ({
+            id: s._id || s.id,
+            fullName: s.fullName || '',
+            role: s.role || '',
+          }));
+          setRoomBedAssignment((prev) => ({ ...prev, responsibleStaff: compact }));
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to load staff list for room responsibility:', err);
+        setStaffByRoom({});
+      })
+      .finally(() => setResponsibleStaffLoading(false));
   };
 
   const handleResetTermsTemplate = () => {
@@ -481,7 +596,11 @@ export default function AdminAdmissionRequestsPage() {
       contractEditorForm,
       createContractAdmission,
       createContractForm.startDate,
-      createContractForm.endDate
+      createContractForm.endDate,
+      availableServicePackages,
+      selectedServicePackageId,
+      '',
+      roomBedAssignment.roomType || ''
     );
     setCreateContractForm((prev) => ({ ...prev, terms }));
     setContractEditorForm((prev) => ({ ...prev, terms }));
@@ -501,21 +620,37 @@ export default function AdminAdmissionRequestsPage() {
     try {
       setEmergencyContactsSyncStatus('saving');
       const contacts = contractEditorForm.contacts || [];
-      // POST each contact (or replace all with PUT if backend supports)
+      // Phân biệt add (POST) vs update (PUT) dựa trên `_id` đã được pre-fill từ
+      // resident.emergencyContacts ở openCreateContractModal. Tránh tạo trùng khi
+      // admin mở lại modal, không sửa gì mà bấm "Đồng bộ" lần nữa.
+      let added = 0;
+      let updated = 0;
       for (const contact of contacts) {
-        await residentService.addEmergencyContact(residentId, {
+        const payload = {
           fullName: contact.fullName,
           relationship: contact.relationship,
           phone: contact.phone,
           email: contact.email || undefined,
           address: contact.address || undefined,
           isPrimary: Boolean(contact.isPrimary),
-        });
+        };
+        if (contact._id) {
+          await residentService.updateEmergencyContact(residentId, contact._id, payload);
+          updated += 1;
+        } else {
+          await residentService.addEmergencyContact(residentId, payload);
+          added += 1;
+        }
       }
       setEmergencyContactsSyncStatus('success');
+      const summary = [];
+      if (added > 0) summary.push(`thêm ${added}`);
+      if (updated > 0) summary.push(`cập nhật ${updated}`);
       showToast(
-        `Đã lưu ${contacts.length} liên hệ khẩn cấp vào hồ sơ người cao tuổi`,
-        'success'
+        summary.length
+          ? `Đã đồng bộ liên hệ khẩn cấp (${summary.join(', ')}) vào hồ sơ người cao tuổi`
+          : 'Không có liên hệ nào để đồng bộ',
+        summary.length ? 'success' : 'info'
       );
     } catch (err) {
       setEmergencyContactsSyncStatus('error');
@@ -532,11 +667,42 @@ export default function AdminAdmissionRequestsPage() {
       newEditorForm,
       createContractAdmission,
       createContractForm.startDate,
-      createContractForm.endDate
+      createContractForm.endDate,
+      availableServicePackages,
+      selectedServicePackageId,
+      '',
+      roomBedAssignment.roomType || ''
     );
     setContractEditorForm(newEditorForm);
     setCreateContractForm((prev) => ({ ...prev, terms }));
   };
+
+  // Khi admin chọn phòng → cập nhật roomType vào form.package.roomType (Điều 7) và
+  // rebuild lại terms để preview phản ánh ngay. Tránh phải bấm "Reset mẫu" thủ công.
+  useEffect(() => {
+    if (!isCreateContractModalOpen || !roomBedAssignment?.roomType) return;
+    setContractEditorForm((prev) => {
+      const nextRoomType = roomBedAssignment.roomType;
+      if (prev?.package?.roomType === nextRoomType) return prev;
+      const next = {
+        ...prev,
+        package: { ...(prev.package || {}), roomType: nextRoomType },
+      };
+      const terms = buildContractTermsFromForm(
+        next,
+        createContractAdmission,
+        createContractForm.startDate,
+        createContractForm.endDate,
+        availableServicePackages,
+        selectedServicePackageId,
+        '',
+        nextRoomType
+      );
+      setCreateContractForm((prevForm) => ({ ...prevForm, terms }));
+      return next;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roomBedAssignment.roomType, isCreateContractModalOpen]);
 
   const handleCreateContract = async () => {
     if (!createContractAdmission) return;
@@ -582,10 +748,21 @@ export default function AdminAdmissionRequestsPage() {
         t('admin.admissionRequests.contractCreatedSuccess', 'Đã tạo hợp đồng. Bây giờ bạn có thể xuất hóa đơn ở trang Quản lý Hợp đồng.'),
         'success'
       );
+      // Sau khi tạo hợp đồng thành công → gán resident vào staff phụ trách phòng
+      // (nếu có staff có roomId nằm trong staffProfile.responsibleRoomIds).
+      // Theo yêu cầu: contract tạo xong MỚI add resident vào assignedResidentIds,
+      // không tự động add khi phân lịch khám hay lúc chọn phòng. Lỗi ở bước này
+      // không rollback hợp đồng (best-effort).
+      try {
+        await assignResidentToRoomStaff();
+      } catch (assignErr) {
+        console.warn('Assign resident to room staff failed:', assignErr);
+      }
       setIsCreateContractModalOpen(false);
       setCreateContractAdmission(null);
       setSelectedServicePackageId('');
       setAvailableServicePackages([]);
+      setStaffByRoom({});
       setRoomBedAssignment({
         buildingId: '',
         buildingName: '',
@@ -596,6 +773,7 @@ export default function AdminAdmissionRequestsPage() {
         roomType: '',
         bedId: '',
         bedName: '',
+        responsibleStaff: [],
       });
       await fetchRequests();
     } catch (err) {
@@ -606,6 +784,57 @@ export default function AdminAdmissionRequestsPage() {
       );
     } finally {
       setIsCreatingContract(false);
+    }
+  };
+
+  /**
+   * Add resident của admission vào assignedResidentIds của nhân viên phụ trách
+   * phòng đã chọn. Lấy danh sách staff đã được lưu trong roomBedAssignment.responsibleStaff
+   * (đã fill sẵn ở handleOpenCreateContractModal hoặc bởi RoomBedAssignmentSection
+   * khi admin đổi phòng). Best-effort: bỏ qua nếu không có residentId chưa có.
+   */
+  const assignResidentToRoomStaff = async () => {
+    // Cư dân của admission có thể đã tồn tại (residentId) hoặc được tạo mới sau khi
+    // hợp đồng được approve. Tra residentId từ admission hoặc từ contract vừa tạo.
+    const residentIdRaw =
+      createContractAdmission?.residentId?._id
+      || createContractAdmission?.residentId;
+    // Đợi 1 nhịp: nếu admission vừa được tạo resident thì cần re-fetch admission
+    // để có residentId; tuy nhiên, đa số case residentId đã có sẵn.
+    const residentId = residentIdRaw ? String(residentIdRaw) : null;
+    if (!residentId) return;
+
+    const staffList = Array.isArray(roomBedAssignment?.responsibleStaff)
+      ? roomBedAssignment.responsibleStaff
+      : [];
+    if (staffList.length === 0) {
+      console.info('No responsible staff found for the chosen room; skip assignResidents.');
+      return;
+    }
+
+    // Gọi PUT /api/staff/:id/residents cho từng staff — backend sẽ merge (không ghi đè).
+    // Theo tài liệu staff.service.js, residentIds gửi lên sẽ được set là assignedResidentIds
+    // của staff đó (PUT thay thế). Để tránh xóa các resident đã có, ta gọi trước
+    // GET /api/staff/:id/residents/assigned để lấy danh sách hiện tại, hợp nhất,
+    // rồi PUT lại.
+    for (const staff of staffList) {
+      const staffId = staff?.id || staff?._id;
+      if (!staffId) continue;
+      try {
+        const assignedRes = await staffService
+          .listAssignedResidents(staffId)
+          .catch(() => null);
+        const existingIds = Array.isArray(assignedRes)
+          ? assignedRes.map((r) => (r?._id || r?.id || r))
+          : (assignedRes?.data || []).map((r) => (r?._id || r?.id || r));
+        const merged = Array.from(new Set(
+          [...(existingIds || []).map((x) => String(x)), residentId]
+        ));
+        await staffService.assignResidents(staffId, { residentIds: merged });
+      } catch (err) {
+        // Ghi log và tiếp tục với staff khác — không throw để best-effort.
+        console.error('Failed to assign resident to staff', staffId, err);
+      }
     }
   };
 
@@ -628,14 +857,6 @@ export default function AdminAdmissionRequestsPage() {
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button
-            onClick={() => setIsCreateModalOpen(true)}
-            className="adm-btn-refresh"
-            style={{ backgroundColor: '#0f766e' }}
-          >
-            <UserPlus className="h-4 w-4" />
-            {t('admin.admissionRequests.createWalkIn')}
-          </button>
           <button
             onClick={fetchRequests}
             disabled={loading}
@@ -990,7 +1211,9 @@ export default function AdminAdmissionRequestsPage() {
                     roomType: '',
                     bedId: '',
                     bedName: '',
+                    responsibleStaff: [],
                   });
+                  setStaffByRoom({});
                 }}
                 className="adm-modal-close"
                 aria-label="Đóng"
@@ -1054,18 +1277,36 @@ export default function AdminAdmissionRequestsPage() {
                         // với preview hợp đồng (đã bỏ tab "Gói dịch vụ" trong ContractEditor).
                         const sel = availableServicePackages.find((p) => String(p._id) === newId);
                         const defaultRoomType = sel?.allowedRoomTypes?.[0] || '';
-                        setContractEditorForm((prev) => ({
-                          ...prev,
-                          package: {
-                            ...(prev.package || {}),
-                            _id: newId,
-                            name: sel?.name || '',
-                            monthlyPrice: sel?.monthlyPrice ?? '',
-                            description: sel?.description || '',
-                            mealPlan: sel?.mealPlan || '',
-                            roomType: defaultRoomType,
-                          },
-                        }));
+                        // Tính form kế tiếp NGAY tại đây từ state hiện tại (closure),
+                        // tránh nested setState (setCreateContractForm bên trong
+                        // updater của setContractEditorForm) — React Strict sẽ cảnh báo
+                        // và dễ gây sai state khi admin click nhanh nhiều lần.
+                        const nextPackage = {
+                          ...(contractEditorForm?.package || {}),
+                          _id: newId,
+                          name: sel?.name || '',
+                          monthlyPrice: sel?.monthlyPrice ?? '',
+                          description: sel?.description || '',
+                          mealPlan: sel?.mealPlan || '',
+                          roomType: defaultRoomType,
+                        };
+                        const nextForm = {
+                          ...(contractEditorForm || {}),
+                          package: nextPackage,
+                        };
+                        // Rebuild lại terms NGAY để preview phản ánh gói mới.
+                        const terms = buildContractTermsFromForm(
+                          nextForm,
+                          createContractAdmission,
+                          createContractForm.startDate,
+                          createContractForm.endDate,
+                          availableServicePackages,
+                          newId,
+                          '',
+                          roomBedAssignment.roomType || defaultRoomType
+                        );
+                        setContractEditorForm(nextForm);
+                        setCreateContractForm((prev) => ({ ...prev, terms }));
                       }}
                       required
                     >
@@ -1115,17 +1356,7 @@ export default function AdminAdmissionRequestsPage() {
                                                   </span>
                                 )}
                               </div>
-                              {createContractForm.paymentPlan === 'HALF_NOW' && (
-                                <div style={{ marginTop: 4, color: '#b45309' }}>
-                                  {t('admin.contractManagement.paymentPlanHalfNow', 'Thanh toán 50% trước')}: {(totalAfterDiscount / 2).toLocaleString('vi-VN')} VND
-                                </div>
-                              )}
                             </>
-                          )}
-                          {createContractForm.paymentPlan === 'HALF_NOW' && months > 0 && grossPerMonth > 0 && (
-                            <div style={{ marginTop: 4 }}>
-                              <strong>Đơn giá mỗi hóa đơn tháng:</strong> {grossPerMonth.toLocaleString('vi-VN')} VND
-                            </div>
                           )}
                         </div>
                       );
@@ -1143,7 +1374,8 @@ export default function AdminAdmissionRequestsPage() {
                     ? (availableServicePackages.find((p) => String(p._id) === selectedServicePackageId)?.allowedRoomTypes)
                     : null)
                 }
-                disabled={isCreatingContract}
+                staffByRoom={staffByRoom}
+                disabled={isCreatingContract || responsibleStaffLoading}
               />
 
               {/* Date range */}
@@ -1215,36 +1447,6 @@ export default function AdminAdmissionRequestsPage() {
                   <button
                     type="button"
                     role="radio"
-                    aria-checked={createContractForm.paymentPlan === 'FULL'}
-                    className={`adm-payment-plan-option${createContractForm.paymentPlan === 'FULL' ? ' adm-payment-plan-option--active' : ''}`}
-                    onClick={() => setCreateContractForm({ ...createContractForm, paymentPlan: 'FULL' })}
-                  >
-                    <Wallet size={16} className="adm-payment-plan-icon" />
-                    <span className="adm-payment-plan-title">
-                      {t('admin.admissionRequests.paymentPlanFullTitle', 'Thanh toán tất cả')}
-                    </span>
-                    <span className="adm-payment-plan-desc">
-                      {t('admin.admissionRequests.paymentPlanFullDesc', 'Trả toàn bộ phí dịch vụ một lần')}
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    role="radio"
-                    aria-checked={createContractForm.paymentPlan === 'HALF_NOW'}
-                    className={`adm-payment-plan-option${createContractForm.paymentPlan === 'HALF_NOW' ? ' adm-payment-plan-option--active' : ''}`}
-                    onClick={() => setCreateContractForm({ ...createContractForm, paymentPlan: 'HALF_NOW' })}
-                  >
-                    <Percent size={16} className="adm-payment-plan-icon" />
-                    <span className="adm-payment-plan-title">
-                      {t('admin.admissionRequests.paymentPlanHalfTitle', 'Thanh toán 50%')}
-                    </span>
-                    <span className="adm-payment-plan-desc">
-                      {t('admin.admissionRequests.paymentPlanHalfDesc', 'Trả 50% ngay, 50% còn lại sau')}
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    role="radio"
                     aria-checked={createContractForm.paymentPlan === 'MONTHLY'}
                     className={`adm-payment-plan-option${createContractForm.paymentPlan === 'MONTHLY' ? ' adm-payment-plan-option--active' : ''}`}
                     onClick={() => setCreateContractForm({ ...createContractForm, paymentPlan: 'MONTHLY' })}
@@ -1259,9 +1461,7 @@ export default function AdminAdmissionRequestsPage() {
                   </button>
                 </div>
                 <p className="adm-form-hint">
-                  {createContractForm.paymentPlan === 'FULL' && t('admin.admissionRequests.paymentPlanHintFull', 'Tất cả hóa đơn được tạo ở trạng thái "Chưa xuất" — chỉ Admin thấy. Sau khi Admin bấm "Xuất hóa đơn", gia đình mới thấy và thanh toán được.')}
-                  {createContractForm.paymentPlan === 'HALF_NOW' && t('admin.admissionRequests.paymentPlanHintHalf', 'Mỗi hóa đơn tháng ghi 50% phí; 50% còn lại ghi nhận remainingAmount. Hóa đơn khởi tạo ở trạng thái "Chưa xuất".')}
-                  {createContractForm.paymentPlan === 'MONTHLY' && t('admin.admissionRequests.paymentPlanHintMonthly', 'Mỗi tháng một hóa đơn, thanh toán theo từng kỳ. Hóa đơn khởi tạo ở trạng thái "Chưa xuất" — chỉ Admin thấy cho đến khi bấm "Xuất hóa đơn".')}
+                  {t('admin.admissionRequests.paymentPlanHintMonthly', 'Mỗi tháng một hóa đơn, thanh toán theo từng kỳ. Hóa đơn khởi tạo ở trạng thái "Chưa xuất" — chỉ Admin thấy cho đến khi bấm "Xuất hóa đơn".')}
                 </p>
               </div>
 

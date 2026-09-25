@@ -478,7 +478,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--nh-table-header-text);
+  color: #334155;
   border-bottom: 1px solid var(--nh-border);
   white-space: nowrap;
 }

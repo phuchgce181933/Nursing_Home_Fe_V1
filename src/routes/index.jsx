@@ -32,6 +32,7 @@ import ResidentAssignmentDetailPage from '../pages/admin/staff/assignments/Resid
 import EmergencyAvailabilityPage from '../pages/admin/staff/emergency';
 import LeaveRequestAdminPage from '../pages/admin/staff/leave-requests';
 import LeaveRequestDetailPage from '../pages/admin/staff/leave-requests/LeaveRequestDetailPage';
+import StaffManagementPage from '../pages/admin/staff/profiles';
 import LeaveRequestPage from '../pages/shared/LeaveRequestPage';
 import MyShiftsPage from '../pages/shared/MyShiftsPage';
 import AdminProfile from '../pages/admin/AdminProfile';
@@ -151,6 +152,7 @@ function AppRoutes() {
         <Route path="equipment" element={<EquipmentPage />} />
         <Route path="staff/profiles" element={<StaffProfilesPage />} />
         <Route path="staff/shifts" element={<ShiftManagementPage />} />
+        <Route path="staff/profiles" element={<StaffManagementPage />} />
         <Route path="staff/assignments" element={<StaffAssignmentPage />} />
         <Route path="staff/assignments/area/:staffId" element={<AreaAssignmentDetailPage />} />
         <Route path="staff/assignments/residents/:staffId" element={<ResidentAssignmentDetailPage />} />
@@ -208,7 +210,6 @@ function AppRoutes() {
         <Route path="assigned-residents/:id" element={<DoctorAssignedResidentDetailPage />} />
         <Route path="residents/drug-allergies" element={<DoctorDrugAllergiesPage />} />
         <Route path="medications" element={<DoctorMedicationPage />} />
-        <Route path="care-notes" element={<CareNotesPage />} />
         <Route path="my-shifts" element={<MyShiftsPage />} />
         <Route path="care-tasks" element={<DailyCareSchedulePage />} />
         <Route path="activity-schedule" element={<ActivitySchedulePage />} />

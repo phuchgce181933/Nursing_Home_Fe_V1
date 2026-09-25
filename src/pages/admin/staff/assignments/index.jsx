@@ -98,7 +98,7 @@ function careResidentOptionLabel(r, t) {
   return residentPickerLabel(r, t);
 }
 
-function CareTaskTab({ staff }) {
+function CareTaskTab({ staff, assignmentDate }) {
   const { t } = useTranslation();
   const { showToast } = useToast();
   const [tasks, setTasks]               = useState([]);
@@ -121,7 +121,7 @@ function CareTaskTab({ staff }) {
     totalPages: taskTotalPages,
     total: taskTotal,
   } = useClientPagination(filteredTasks);
-  const [filterDate, setFilterDate]     = useState(() => todayVN());
+  const [filterDate, setFilterDate]     = useState(() => assignmentDate || todayVN());
   const [showForm, setShowForm]         = useState(false);
   const [form, setForm]                 = useState(() => emptyTaskForm(todayVN()));
   const [saveError, setSaveErr]         = useState('');
@@ -229,6 +229,7 @@ function CareTaskTab({ staff }) {
   };
 
   const loadTasks = async () => {
+    if (!filterDate) return;
     setLoading(true);
     setError('');
     try {
@@ -236,6 +237,9 @@ function CareTaskTab({ staff }) {
       setTasks(Array.isArray(raw) ? raw : (raw?.data || []));
     } catch (e) {
       if (e.response?.status === 404) {
+        setTasks([]);
+        setError('');
+      } else if (e.response?.status === 400) {
         setTasks([]);
         setError('');
       } else {
@@ -815,7 +819,7 @@ export default function StaffAssignmentPage() {
           />
         )}
         {activeTab === 'tasks'     && (
-          <CareTaskTab staff={allStaff} />
+          <CareTaskTab staff={allStaff} assignmentDate={assignmentDate} />
         )}
       </div>
     </AdminPageShell>
