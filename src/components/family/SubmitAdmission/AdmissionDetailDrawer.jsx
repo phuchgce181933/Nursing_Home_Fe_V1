@@ -17,6 +17,8 @@ import {
   UserCheck,
   Eye,
   FileText,
+  RotateCcw,
+  Send,
 } from 'lucide-react';
 import { useAuth } from '../../../hooks/useAuth';
 import { useToast } from '../../../hooks/useToast';
@@ -308,6 +310,11 @@ export default function AdmissionDetailDrawer({
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancellationReason, setCancellationReason] = useState('');
   const [cancelling, setCancelling] = useState(false);
+
+  const [showResubmitModal, setShowResubmitModal] = useState(false);
+  const [resubmitReason, setResubmitReason] = useState('');
+  const [resubmitPreferredDate, setResubmitPreferredDate] = useState('');
+  const [resubmitting, setResubmitting] = useState(false);
 
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [packages, setPackages] = useState([]);
@@ -722,6 +729,37 @@ export default function AdmissionDetailDrawer({
     }
   };
 
+  const handleResubmit = async () => {
+    if (!admissionId) return;
+    try {
+      setResubmitting(true);
+      const result = await admissionService.resubmitAdmissionRequest(admissionId, {
+        reason: resubmitReason.trim() || undefined,
+        preferredAdmissionDate: resubmitPreferredDate
+          ? new Date(resubmitPreferredDate).toISOString()
+          : undefined,
+      });
+      setShowResubmitModal(false);
+      setResubmitReason('');
+      setResubmitPreferredDate('');
+      showToast(
+        result?.message || 'Đã gửi lại yêu cầu nhập viện. Admin sẽ xem xét và chuyển sang bác sĩ khám lại.',
+        'success'
+      );
+      if (onCancelSuccess) onCancelSuccess();
+      const res = await admissionService.getAdmissionDetail(admissionId);
+      setAdmission(res?.admission || null);
+    } catch (err) {
+      console.error('Failed to resubmit admission request:', err);
+      showToast(
+        err?.response?.data?.message || 'Đã xảy ra lỗi khi gửi lại yêu cầu. Vui lòng thử lại.',
+        'error'
+      );
+    } finally {
+      setResubmitting(false);
+    }
+  };
+
   const handleApproveRequest = async () => {
     if (!admissionId) return;
     try {
@@ -889,7 +927,7 @@ export default function AdmissionDetailDrawer({
 
     try {
       setCreatingContract(true);
-      await admissionService.adminCreateContract(admissionId, {
+      const result = await admissionService.adminCreateContract(admissionId, {
         contractNumber: contractNum.trim() || undefined,
         contractStartDate: contractStart ? new Date(contractStart).toISOString() : undefined,
         contractEndDate: contractEnd ? new Date(contractEnd).toISOString() : undefined,
@@ -912,6 +950,19 @@ export default function AdmissionDetailDrawer({
       if (onCancelSuccess) onCancelSuccess();
       const res = await admissionService.adminGetAdmissionDetail(admissionId);
       setAdmission(res?.admission || null);
+      // Phản hồi từ backend: nếu đã đủ điều kiện + có gói dịch vụ, hệ thống sẽ tự tạo
+      // Contract document + sinh hóa đơn. Thông báo rõ cho admin biết đã có hóa đơn chưa.
+      if (result?.contract) {
+        showToast(
+          `Đã tạo hợp đồng ${result.contract.contractNumber} và sinh hóa đơn tự động. Vào "Quản lý Hợp đồng" để xuất hóa đơn cho gia đình.`,
+          'success'
+        );
+      } else if (result?.invoiceWarning) {
+        showToast(
+          `Đã lưu thông tin hợp đồng, nhưng không thể tự sinh hóa đơn: ${result.invoiceWarning}`,
+          'warning'
+        );
+      }
     } catch (err) {
       console.error('Failed to create contract:', err);
       setModalError(err.response?.data?.message || 'Đã xảy ra lỗi khi tạo hợp đồng.');
@@ -1163,6 +1214,25 @@ export default function AdmissionDetailDrawer({
     admission &&
     ['new_request', 'consulting', 'assessing', 'contracting'].includes(admission.status) &&
     !intakeApptCompleted;
+
+  // Determine if request is re-submittable (family mode)
+  // Available when the contract has ended (cancelled/terminated/expired) or the admission
+  // itself is cancelled. Reuses the existing admission record — the same resident will be
+  // re-admitted without creating a new request, so the system keeps their stored info.
+  const contractEndDate = admission?.contractEndDate ? new Date(admission.contractEndDate) : null;
+  const contractNaturallyExpired =
+    admission?.contractStatus === 'active' &&
+    contractEndDate &&
+    contractEndDate.getTime() < Date.now();
+  const isContractEnded =
+    admission?.contractStatus === 'cancelled' ||
+    admission?.contractStatus === 'terminated' ||
+    admission?.contractStatus === 'expired' ||
+    contractNaturallyExpired;
+  const isResubmittable =
+    !isAdmin &&
+    admission &&
+    (isContractEnded || admission.status === 'cancelled');
 
   // Determine if request is approvable/rejectable (admin mode)
   // Only approvable if: admin role, status is new_request or consulting, AND not yet approved before
@@ -1776,31 +1846,6 @@ const getStepIcon = (key) => {
                       </button>
                     )}
 
-                    {/* 5. Create Admission Contract (Admin/Manager role) - Combine service package + contract in one step */}
-                    {isAdminRole && admission.status === 'contracting' && !admission.contractNumber && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          // Pre-fill contract number
-                          const year = new Date().getFullYear();
-                          const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-                          setContractNum(`HĐ-${year}-${randomSuffix}`);
-                          setContractStart(admission.contractStartDate ? admission.contractStartDate.split('T')[0] : '');
-                          setContractEnd(admission.contractEndDate ? admission.contractEndDate.split('T')[0] : '');
-                          setContractDurationMonths(admission.contractDurationMonths != null ? String(admission.contractDurationMonths) : '');
-                          setContractDiscountPercent(admission.contractDiscountPercent != null ? String(admission.contractDiscountPercent) : '');
-                          setContractTerms(admission.contractTerms || '');
-                          // Pre-fill selectedPackageId (nếu đã có package từ bước trước)
-                          setSelectedPackageId(admission.servicePackageId?._id || admission.servicePackageId || '');
-                          setShowContractModal(true);
-                        }}
-                        className="adm-btn-apply"
-                        style={{ padding: '8px 16px', fontSize: '12px', borderRadius: '10px', boxShadow: 'none', background: '#1B365D' }}
-                      >
-                        Tạo hợp đồng
-                      </button>
-                    )}
-
                     {/* 7. Check-in Resident (Admin/Manager role) - Only after contract is created */}
                     {isAdminRole && admission.status === 'contracting' && (admission.servicePackageId || admission.assignedServicePackage) && admission.contractNumber && (
                       <button
@@ -1861,6 +1906,38 @@ const getStepIcon = (key) => {
               <XCircle size={18} />
               Hủy yêu cầu tiếp nhận
             </button>
+          ) : isResubmittable ? (
+            <>
+              <button
+                className="arh-drawer__btn w-full"
+                style={{
+                  background: '#f1f5f9',
+                  color: '#475569',
+                }}
+                onClick={onClose}
+              >
+                Đóng chi tiết
+              </button>
+              <button
+                className="arh-drawer__btn w-full"
+                style={{
+                  background: 'linear-gradient(135deg, #0f766e 0%, #115e59 100%)',
+                  color: '#fff',
+                  marginTop: '8px',
+                }}
+                onClick={() => {
+                  setResubmitPreferredDate(
+                    admission?.preferredAdmissionDate
+                      ? String(admission.preferredAdmissionDate).substring(0, 10)
+                      : ''
+                  );
+                  setShowResubmitModal(true);
+                }}
+              >
+                <RotateCcw size={18} />
+                Gửi yêu cầu nhập viện lại
+              </button>
+            </>
           ) : (
             <button
               className="arh-drawer__btn arh-drawer__btn--primary w-full"
@@ -1919,6 +1996,88 @@ const getStepIcon = (key) => {
               >
                 {cancelling && <Loader2 className="animate-spin mr-1" size={13} />}
                 Xác nhận hủy
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Resubmit Confirmation Modal (Family — gửi lại yêu cầu nhập viện) */}
+      {showResubmitModal && (
+        <div
+          className="arh-modal-backdrop"
+          onClick={() => {
+            if (resubmitting) return;
+            setShowResubmitModal(false);
+            setResubmitReason('');
+            setResubmitPreferredDate('');
+          }}
+        >
+          <div
+            className="arh-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h4 className="arh-modal__title">Gửi yêu cầu nhập viện lại</h4>
+            <p className="arh-modal__text">
+              Yêu cầu tiếp nhận cho <strong className="text-slate-800">{admission?.applicant?.fullName}</strong> đã kết thúc (hợp đồng cũ đã hủy/xuất viện).
+              Bạn có thể gửi lại yêu cầu nhập viện cho cùng người thân — hệ thống sẽ giữ nguyên
+              thông tin cư dân đã lưu và chuyển sang bước Admin duyệt → Bác sĩ khám lại.
+            </p>
+            <div className="bg-amber-50 border border-amber-200 text-amber-800 p-3 rounded-lg text-xs mb-3">
+              <AlertCircle size={14} className="inline mr-1" />
+              <strong>Lưu ý:</strong> Sau khi gửi lại, bác sĩ sẽ khám và đánh giá lại điều kiện sức khỏe
+              trước khi có thể tạo hợp đồng mới.
+            </div>
+            <label className="block text-[12px] font-semibold text-slate-700 mb-1">
+              Ngày nhập viện mong muốn (tuỳ chọn)
+            </label>
+            <input
+              type="date"
+              className="arh-modal__input"
+              min={new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().substring(0, 10)}
+              value={resubmitPreferredDate}
+              onChange={(e) => setResubmitPreferredDate(e.target.value)}
+            />
+            <div className="text-[10px] text-slate-400 mt-1 mb-2">
+              Để trống nếu muốn hệ thống tự đặt lịch khám mặc định (ngày mai, 8:00).
+            </div>
+            <label className="block text-[12px] font-semibold text-slate-700 mb-1">
+              Lý do gửi lại (tuỳ chọn)
+            </label>
+            <textarea
+              className="arh-modal__textarea"
+              placeholder="Lý do gửi lại (ví dụ: Cả gia đình đã sẵn sàng cho cụ nhập viện lại...)"
+              value={resubmitReason}
+              onChange={(e) => setResubmitReason(e.target.value)}
+              maxLength={500}
+            />
+            <div className="text-[10px] text-slate-400 text-right mt-1 mb-2">{resubmitReason.length}/500</div>
+            <div className="flex gap-3 pt-2">
+              <button
+                className="arh-drawer__btn"
+                style={{ background: '#f1f5f9', color: '#475569' }}
+                onClick={() => {
+                  setShowResubmitModal(false);
+                  setResubmitReason('');
+                  setResubmitPreferredDate('');
+                }}
+                disabled={resubmitting}
+              >
+                Quay lại
+              </button>
+              <button
+                className="arh-drawer__btn"
+                style={{
+                  background: 'linear-gradient(135deg, #0f766e 0%, #115e59 100%)',
+                  color: '#fff',
+                  flex: 1,
+                }}
+                onClick={handleResubmit}
+                disabled={resubmitting}
+              >
+                {resubmitting && <Loader2 className="animate-spin mr-1" size={13} />}
+                <Send size={14} className="inline mr-1" />
+                Xác nhận gửi lại
               </button>
             </div>
           </div>

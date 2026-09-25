@@ -161,6 +161,97 @@ function Modal({ title, onClose, children, footer, size }) {
   );
 }
 
+/* ── Suspend Prescription Modal ── */
+function SuspendPrescriptionModal({ prescription, onClose, onConfirm }) {
+  const { t } = useTranslation();
+  const [reason, setReason] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [localError, setLocalError] = useState('');
+
+  const resident = prescription?.residentId;
+  const medicationSummary = useMemo(
+    () => {
+      const names = [...new Set((prescription?.items || []).map((it) => it.medicationName).filter(Boolean))];
+      return names.join(', ');
+    },
+    [prescription]
+  );
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!reason.trim() || reason.trim().length < 5) {
+      setLocalError(t('medication.suspendReasonRequired'));
+      return;
+    }
+    setLocalError('');
+    setSubmitting(true);
+    try {
+      await onConfirm(prescription._id, reason.trim());
+      onClose();
+    } catch (err) {
+      setLocalError(err.response?.data?.message || t('medication.suspendError'));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="med-modal-overlay" onClick={(e) => e.target === e.currentTarget && !submitting && onClose()}>
+      <div className="med-modal" style={{ maxWidth: 480 }}>
+        <div className="med-modal__header">
+          <h2 className="med-modal__title">{t('medication.suspendPrescription')}</h2>
+          <button className="med-modal__close" onClick={onClose} disabled={submitting}>&#10005;</button>
+        </div>
+        <div className="med-modal__body">
+          {resident && (
+            <div className="med-info-card" style={{ marginBottom: 16 }}>
+              <div className="med-info-card__row">
+                <span className="med-info-card__label">{t('medication.resident')}:</span>
+                <span className="med-info-card__value">{resident.fullName || resident.profile?.fullName || '—'}</span>
+              </div>
+              <div className="med-info-card__row">
+                <span className="med-info-card__label">{t('medication.colMedication')}:</span>
+                <span className="med-info-card__value">{medicationSummary || '—'}</span>
+              </div>
+              {prescription?.diagnosisNote && (
+                <div className="med-info-card__row">
+                  <span className="med-info-card__label">{t('medication.diagnosisNote')}:</span>
+                  <span className="med-info-card__value">{prescription.diagnosisNote}</span>
+                </div>
+              )}
+            </div>
+          )}
+          <form onSubmit={handleSubmit}>
+            <label className="med-form-label" htmlFor="suspend-reason">
+              {t('medication.suspendReasonPrompt')}
+              <span className="med-form-required-star"> *</span>
+            </label>
+            <textarea
+              id="suspend-reason"
+              className="med-form-textarea"
+              rows={3}
+              value={reason}
+              onChange={(e) => { setReason(e.target.value); setLocalError(''); }}
+              placeholder={t('medication.suspendReasonPrompt')}
+              disabled={submitting}
+              autoFocus
+            />
+            {localError && <p className="form-error">{localError}</p>}
+            <div className="med-modal__footer" style={{ marginTop: 16, padding: '16px 0 0', borderTop: 'none' }}>
+              <button type="submit" className="med-btn med-btn--danger" disabled={submitting}>
+                {submitting ? t('common.processing') : t('medication.suspendPrescription')}
+              </button>
+              <button type="button" className="med-btn med-btn--secondary" onClick={onClose} disabled={submitting}>
+                {t('common.cancel')}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ── Health Warning Panel — fetch đầy đủ hồ sơ sức khỏe khi chọn cư dân ── */
 function HealthWarningPanel({ residentId }) {
   const { t } = useTranslation();
@@ -456,15 +547,22 @@ function ItemRow({ item, idx, onChange, onRemove, t, canRemove, errors = {}, exc
                 if (med) {
                   updates.medicationId = med._id;
                   updates.unit = med.unit || '';
+                  updates.strength = med.strength || '';
                   updates.price = med.price ?? '';
+                  updates.availableQuantity = Number(med.availableQuantity) || 0;
                 } else {
                   updates.medicationId = '';
                   updates.unit = '';
+                  updates.strength = '';
                   updates.price = '';
+                  updates.availableQuantity = undefined;
                 }
                 onChange(idx, updates);
               }}
             />
+            {item.strength && (
+              <small className="cpf-hint">{t('medication.strength')}: {item.strength}</small>
+            )}
             {(errors[`item_${idx}_name`] || isDuplicate) && (
               <span className="cpf-error">{errors[`item_${idx}_name`] || t('medication.duplicateMedication')}</span>
             )}
@@ -504,6 +602,12 @@ function ItemRow({ item, idx, onChange, onRemove, t, canRemove, errors = {}, exc
               title={t('medication.quantityAutoHint') || 'Tự động tính: Liều lượng × Lần/ngày × Số ngày'}
             />
             <small className="cpf-hint">{t('medication.quantityAutoHint') || '= Liều × Lần/ngày × Ngày'}</small>
+            {item.medicationId && (
+              <small className="cpf-hint">
+                {t('medication.remainingStock')}: {item.availableQuantity ?? 0} {item.unit || ''}
+              </small>
+            )}
+            {errors[`item_${idx}_quantity`] && <span className="cpf-error">{errors[`item_${idx}_quantity`]}</span>}
           </div>
           <div className="cpf-field">
             <label className="cpf-label">{t('medication.frequencyLabel')}</label>
@@ -697,6 +801,19 @@ function CreatePrescriptionModal({ residents, onSave, onClose }) {
         if (Number.isNaN(dosageNum)) errs[`item_${i}_dosage`] = t('medication.dosageNotNumber');
         else if (dosageNum < 0) errs[`item_${i}_dosage`] = t('medication.dosageNegative');
         else if (dosageNum === 0) errs[`item_${i}_dosage`] = t('medication.dosageZero');
+      }
+
+      const requestedQuantity = Math.max(1, Math.round(
+        (Number(item.dosage) || 0) * (Number(item.frequency) || 0) * (Number(item.duration) || 0)
+      ));
+      if (
+        item.availableQuantity !== undefined &&
+        requestedQuantity > Number(item.availableQuantity)
+      ) {
+        errs[`item_${i}_quantity`] = t('medication.quantityExceedsStock', {
+          requested: requestedQuantity,
+          available: Number(item.availableQuantity),
+        });
       }
 
       // PRN items don't need schedule fields
@@ -1136,7 +1253,7 @@ function HistoryModal({ prescription, onClose }) {
 /* ════════════════════════════════════════
    Tab 1 — Prescriptions (2-column dashboard)
    ════════════════════════════════════════ */
-function PrescriptionsTab({ prescriptions, residents, loading, selectedResidentId, onResidentChange, onOpenCreate, onOpenHistory, onActivate, onSuspend, onResume }) {
+function PrescriptionsTab({ prescriptions, residents, loading, selectedResidentId, onResidentChange, onOpenCreate, onOpenHistory, onActivate, onOpenSuspend, onResume }) {
   const { t } = useTranslation();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ACTIVE');
@@ -1282,6 +1399,7 @@ function PrescriptionsTab({ prescriptions, residents, loading, selectedResidentI
                                         <th>{t('medication.frequencyLabel')}</th>
                                         <th>{t('medication.times')}</th>
                                         <th>{t('medication.startDate')}</th>
+                                        <th>{t('medication.duration')}</th>
                                       </tr>
                                     </thead>
                                     <tbody>
@@ -1298,6 +1416,7 @@ function PrescriptionsTab({ prescriptions, residents, loading, selectedResidentI
                                             </div>
                                           </td>
                                           <td>{it.startDate ? fmtDate(it.startDate) : '—'}</td>
+                                          <td>{it.duration ? `${it.duration} ${t('medication.day')}` : '—'}</td>
                                         </tr>
                                       ))}
                                     </tbody>
@@ -1311,8 +1430,8 @@ function PrescriptionsTab({ prescriptions, residents, loading, selectedResidentI
                                         {t('medication.activatePrescription')}
                                       </button>
                                     )}
-                                    {p.status === 'ACTIVE' && onSuspend && (
-                                      <button className="med-action-btn med-action-btn--suspend" onClick={() => onSuspend(p._id)}>
+                                    {p.status === 'ACTIVE' && onOpenSuspend && (
+                                      <button className="med-action-btn med-action-btn--suspend" onClick={() => onOpenSuspend(p)}>
                                         {t('medication.suspendPrescription')}
                                       </button>
                                     )}
@@ -1700,19 +1819,16 @@ function DoctorMedicationPage() {
     }
   };
 
-  const handleSuspend = async (id) => {
-    const reason = window.prompt(t('medication.suspendReasonPrompt'));
-    if (!reason || reason.trim().length < 5) {
-      showToast(t('medication.suspendReasonRequired'), 'error');
-      return;
-    }
-    try {
-      await medicationService.suspendPrescription(id, { reason: reason.trim() });
-      loadPrescriptions(selectedResidentId);
-      showToast(t('medication.suspendSuccess'), 'success');
-    } catch (err) {
-      showToast(err.response?.data?.message || t('medication.suspendError'), 'error');
-    }
+  const [suspendModal, setSuspendModal] = useState(null); // { prescription }
+
+  // ── suspend ──
+  const openSuspendModal = (prescription) => setSuspendModal({ prescription });
+  const closeSuspendModal = () => setSuspendModal(null);
+
+  const handleSuspend = async (id, reason) => {
+    await medicationService.suspendPrescription(id, { reason });
+    loadPrescriptions(selectedResidentId);
+    showToast(t('medication.suspendSuccess'), 'success');
   };
 
   const handleResume = async (id) => {
@@ -1780,7 +1896,7 @@ function DoctorMedicationPage() {
           onOpenCreate={() => setModal({ type: 'create', prescription: null })}
           onOpenHistory={(p) => setModal({ type: 'history', prescription: p })}
           onActivate={handleActivate}
-          onSuspend={handleSuspend}
+          onOpenSuspend={openSuspendModal}
           onResume={handleResume}
         />
       ) : (
@@ -1796,6 +1912,14 @@ function DoctorMedicationPage() {
       )}
       {modal.type === 'history' && (
         <HistoryModal prescription={modal.prescription} onClose={closeModal} />
+      )}
+
+      {suspendModal && (
+        <SuspendPrescriptionModal
+          prescription={suspendModal.prescription}
+          onClose={closeSuspendModal}
+          onConfirm={handleSuspend}
+        />
       )}
     </div>
   );

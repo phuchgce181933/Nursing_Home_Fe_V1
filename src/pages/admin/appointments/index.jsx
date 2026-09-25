@@ -338,10 +338,17 @@ export default function CareAppointmentsPage() {
   };
 
   // Handle Save Staff assignment (Doctor & Nurse)
+  // Lưu ý quan trọng: trang này chỉ set doctorStaffId / nurseStaffId trên chính
+  // appointment (care appointment), KHÔNG mutate staffProfile.assignedResidentIds
+  // của nhân viên y tế. Việc gán resident vào nhân viên phụ trách phòng
+  // (assignedResidentIds) chỉ được thực hiện ở flow tạo hợp đồng (admin/admissions)
+  // SAU KHI phòng/giường đã được phân bổ thành công — xem assignResidentToRoomStaff
+  // trong AdminAdmissionRequestsPage.jsx. Theo yêu cầu: phân lịch khám KHÔNG tự
+  // động phân cư dân phụ trách.
   const handleSaveAssignment = async (e) => {
     if (e) e.preventDefault();
     if (!selectedAppt) return;
-    
+
     if (!selectedDocId || !selectedNurId) {
       setAssignmentError(t('adminAppointments.assignBothRequired'));
       showToast(t('adminAppointments.assignBothRequired'), 'error');
@@ -362,6 +369,56 @@ export default function CareAppointmentsPage() {
       const currentNur = selectedAppt.nurseStaffId?._id || selectedAppt.nurseStaffId || '';
       if (selectedNurId !== currentNur) {
         await careAppointmentService.assignNurse(selectedAppt._id, selectedNurId || undefined);
+      }
+
+      // Workaround FE: Backend endpoint assign-doctor / assign-nurse tự động
+      // push residentId vào staffProfile.assignedResidentIds của staff phụ
+      // trách. Theo yêu cầu: phân lịch khám KHÔNG được auto-gán resident phụ
+      // trách cho bác sĩ / y tá. Sau khi backend add xong, ta gỡ ngay.
+      // Best-effort: lỗi 1 staff không rollback phân công, không throw ra ngoài.
+      try {
+        const residentIdStr = String(
+          selectedAppt.residentId?._id || selectedAppt.residentId || ''
+        );
+        if (residentIdStr) {
+          // Tập staff cần scrub: gồm cả staff cũ (đã bị BE add từ trước)
+          // và staff mới (vừa bị BE add do vừa gọi endpoint). Set để dedupe.
+          const involved = Array.from(new Set(
+            [selectedDocId, selectedNurId, currentDoc, currentNur]
+              .map((v) => (v ? String(v) : ''))
+              .filter(Boolean)
+          ));
+          for (const staffId of involved) {
+            try {
+              const res = await staffService.listAssignedResidents(staffId);
+              const assigned = Array.isArray(res?.data)
+                ? res.data
+                : Array.isArray(res)
+                  ? res
+                  : [];
+              const ids = assigned.map((r) =>
+                String(r?._id || r?.id || r)
+              );
+              if (!ids.includes(residentIdStr)) continue;
+              const next = ids.filter((id) => id !== residentIdStr);
+              await staffService.assignResidents(staffId, {
+                residentIds: next,
+              });
+            } catch (errStaff) {
+              // Log lỗi staff này nhưng tiếp tục các staff khác.
+              console.error(
+                'Failed to unassign resident from staff (assigned to appt)',
+                staffId,
+                errStaff
+              );
+            }
+          }
+        }
+      } catch (errScrub) {
+        console.warn(
+          'Resident-unassign workaround for appointment assignment failed (best-effort):',
+          errScrub
+        );
       }
 
       setShowAssignModal(false);
@@ -851,12 +908,6 @@ export default function CareAppointmentsPage() {
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             {t('careAppointments.refresh')}
           </button>
-          {isAdminRole && (
-            <button onClick={handleOpenCreate} className="cap-btn-primary">
-              <Plus size={16} />
-              {t('careAppointments.createAppointment')}
-            </button>
-          )}
         </div>
       </div>
 

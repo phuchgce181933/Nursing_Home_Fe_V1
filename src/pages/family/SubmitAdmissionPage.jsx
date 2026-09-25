@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -32,6 +32,8 @@ const BACKEND_FIELD_ERROR_MAP = [
   { test: /^notes/i, field: 'additionalNotes', step: 3 },
 ];
 
+const CITIZEN_ID_DUPLICATE_MESSAGE = 'submitAdmission.validation.citizenIdDuplicate';
+
 const STEP_KEYS = [
   { i18nKey: 'submitAdmission.steps.personalInfo', Icon: User },
   { i18nKey: 'submitAdmission.steps.healthRecord',   Icon: Stethoscope },
@@ -55,6 +57,10 @@ export default function SubmitAdmissionPage() {
   const [duplicateDetected, setDuplicateDetected] = useState(false);
   const [activeRequest, setActiveRequest] = useState(null);
   const [submittedData, setSubmittedData] = useState(null);
+
+  // Real-time citizenId duplicate checking state
+  const [checkingCitizenId, setCheckingCitizenId] = useState(false);
+  const citizenIdCheckTimerRef = useRef(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -91,6 +97,71 @@ export default function SubmitAdmissionPage() {
       return matchName && matchId && isActive;
     });
   };
+
+  // Real-time check for duplicate citizenId against backend (residents + active admissions)
+  const checkCitizenIdRealTime = useCallback(async (citizenId) => {
+    const cleanId = citizenId?.trim() || '';
+
+    // Clear previous timer
+    if (citizenIdCheckTimerRef.current) {
+      clearTimeout(citizenIdCheckTimerRef.current);
+    }
+
+    // Clear error if empty
+    if (!cleanId) {
+      setErrors((prev) => {
+        if (prev.idNumber === t(CITIZEN_ID_DUPLICATE_MESSAGE)) {
+          return { ...prev, idNumber: null };
+        }
+        return prev;
+      });
+      return;
+    }
+
+    // Only check if it passes basic format validation
+    const isCccd = /^\d{12}$/.test(cleanId);
+    const isPassport = /^[A-Z0-9]{8,12}$/i.test(cleanId);
+    if (!isCccd && !isPassport) {
+      return; // Let format validation handle it
+    }
+
+    // Debounce the API call (500ms delay)
+    citizenIdCheckTimerRef.current = setTimeout(async () => {
+      setCheckingCitizenId(true);
+      try {
+        const result = await admissionService.checkCitizenIdDuplicate(cleanId);
+        if (result?.duplicate) {
+          setErrors((prev) => ({ ...prev, idNumber: t(CITIZEN_ID_DUPLICATE_MESSAGE) }));
+          setTouched((prev) => ({ ...prev, idNumber: true }));
+        } else {
+          // Only clear if it was the duplicate error
+          setErrors((prev) => {
+            if (prev.idNumber === t(CITIZEN_ID_DUPLICATE_MESSAGE)) {
+              return { ...prev, idNumber: null };
+            }
+            return prev;
+          });
+        }
+      } catch (err) {
+        console.error('Failed to check citizenId duplicate:', err);
+      } finally {
+        setCheckingCitizenId(false);
+      }
+    }, 500);
+  }, [t]);
+
+  // Listen for idNumber changes to trigger real-time check
+  useEffect(() => {
+    // When idNumber changes and field has been touched, trigger real-time check
+    if (touched.idNumber) {
+      checkCitizenIdRealTime(formData.idNumber);
+    }
+    return () => {
+      if (citizenIdCheckTimerRef.current) {
+        clearTimeout(citizenIdCheckTimerRef.current);
+      }
+    };
+  }, [formData.idNumber, touched.idNumber, checkCitizenIdRealTime]);
 
   const validateField = (name, value) => {
     const val = typeof value === 'string' ? value.trim() : (value ?? '');
@@ -254,8 +325,26 @@ export default function SubmitAdmissionPage() {
     return isValid;
   };
 
-  const handleBeforeStepChange = (from, to) => {
+  const handleBeforeStepChange = async (from, to) => {
     if (to > from) {
+      // Check for duplicate citizenId before allowing to proceed
+      if (from === 1 && formData.idNumber?.trim()) {
+        const cleanId = formData.idNumber.trim();
+        const isCccd = /^\d{12}$/.test(cleanId);
+        const isPassport = /^[A-Z0-9]{8,12}$/i.test(cleanId);
+        if (isCccd || isPassport) {
+          try {
+            const result = await admissionService.checkCitizenIdDuplicate(cleanId);
+            if (result?.duplicate) {
+              setErrors((prev) => ({ ...prev, idNumber: t(CITIZEN_ID_DUPLICATE_MESSAGE) }));
+              setTouched((prev) => ({ ...prev, idNumber: true }));
+              return false;
+            }
+          } catch (err) {
+            console.error('Failed to check citizenId duplicate:', err);
+          }
+        }
+      }
       return validateStep(from);
     }
     return true;
@@ -265,7 +354,26 @@ export default function SubmitAdmissionPage() {
     setStep(newStep);
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
+    // Check for duplicate citizenId before proceeding
+    if (step === 1 && formData.idNumber?.trim()) {
+      const cleanId = formData.idNumber.trim();
+      const isCccd = /^\d{12}$/.test(cleanId);
+      const isPassport = /^[A-Z0-9]{8,12}$/i.test(cleanId);
+      if (isCccd || isPassport) {
+        try {
+          const result = await admissionService.checkCitizenIdDuplicate(cleanId);
+          if (result?.duplicate) {
+            setErrors((prev) => ({ ...prev, idNumber: t(CITIZEN_ID_DUPLICATE_MESSAGE) }));
+            setTouched((prev) => ({ ...prev, idNumber: true }));
+            return; // Don't proceed
+          }
+        } catch (err) {
+          console.error('Failed to check citizenId duplicate:', err);
+        }
+      }
+    }
+
     if (validateStep(step)) {
       if (step < STEP_KEYS.length) setStep(step + 1);
     }
@@ -443,7 +551,7 @@ export default function SubmitAdmissionPage() {
           contentClassName="sap-stepper-content"
         >
           <Step>
-            <Step1 data={formData} onChange={setField} errors={errors} touched={touched} onBlur={handleBlur} />
+            <Step1 data={formData} onChange={setField} errors={errors} touched={touched} onBlur={handleBlur} checkingCitizenId={checkingCitizenId} />
           </Step>
           <Step>
             <Step2 data={formData} onChange={setField} errors={errors} touched={touched} onBlur={handleBlur} />

@@ -87,6 +87,7 @@ export const sidebarData = [
     title: 'sidebar.staffManagement',
     icon: Briefcase,
     children: [
+      { title: 'sidebar.accounts', icon: UserPlus, path: '/admin/staff/profiles' },
       { title: 'sidebar.shifts', icon: Clock, path: '/admin/staff/shifts' },
       { title: 'sidebar.assignments', icon: MapPin, path: '/admin/staff/assignments' },
       { title: 'sidebar.emergencyAvailability', icon: AlertTriangleIcon, path: '/admin/staff/emergency' },

@@ -180,16 +180,47 @@ const humanizeAction = (value) => {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 };
 
+// Extract readable name from a user object or ID
+const resolveUserName = (val) => {
+  if (!val) return '—';
+  if (typeof val === 'string') return val;
+  if (typeof val === 'object') {
+    if (val.fullName) return val.fullName;
+    if (val.userId?.fullName) return val.userId.fullName;
+    if (val._id) return String(val._id);
+    return JSON.stringify(val);
+  }
+  return String(val);
+};
+
 const formatActionLabel = (actionKey, displayAction, t) => {
   if (!actionKey && !displayAction) return '—';
   const translationKey = actionKey ? `admin.auditLogs.actionNames.${actionKey}` : null;
   const translated = translationKey ? t(translationKey) : null;
+
+  // Medication logs previously stored English displayAction values. Prefer the
+  // current locale mapping for these actions so old and new logs are consistent.
+  const medicationActions = new Set([
+    'CREATE_MEDICATION',
+    'UPDATE_MEDICATION',
+    'UPDATE_SELLING_PRICE',
+    'ADD_MEDICATION_NOTE',
+    'CREATE_MEDICATION_STOCK',
+    'UPDATE_MEDICATION_STOCK',
+    'DISPENSE_MEDICATION',
+  ]);
+  if (medicationActions.has(actionKey) && translated && translated !== translationKey) return translated;
+  // Prioritize displayAction for other modules because it may contain specific context.
+  if (displayAction) return displayAction;
   if (translated && translated !== translationKey) return translated;
-  return displayAction || humanizeAction(actionKey);
+  return humanizeAction(actionKey);
 };
 
 const getDetailedActionMessage = (log, t, i18n) => {
-  const actor = log.performedBy || log.actorUserId || 'Người dùng';
+  // performedBy takes priority; fall back to actorUserId (string ID or populated object)
+  const rawActorId = log.actorUserId;
+  const actorNameFromId = rawActorId && typeof rawActorId === 'object' ? rawActorId.fullName : rawActorId;
+  const actor = log.performedBy || actorNameFromId || 'Người dùng';
   const target = log.targetName || '—';
   const action = log.action;
 
@@ -257,6 +288,90 @@ const getDetailedActionMessage = (log, t, i18n) => {
     return isVi
       ? `${actor} đã gửi nhắc nhở cho lịch hẹn chăm sóc của ${target}`
       : `${actor} sent reminder for care appointment ${target}`;
+  }
+
+  // Leave request actions
+  const translateLeaveType = (type) => {
+    if (!type) return '';
+    const mapVi = { annual: 'Nghỉ phép năm', sick: 'Nghỉ ốm', emergency: 'Nghỉ khẩn cấp', unpaid: 'Nghỉ không lương', other: 'Khác' };
+    const mapEn = { annual: 'Annual leave', sick: 'Sick leave', emergency: 'Emergency leave', unpaid: 'Unpaid leave', other: 'Other' };
+    return isVi ? (mapVi[type] || type) : (mapEn[type] || type);
+  };
+  const translateLeaveStatus = (status) => {
+    if (!status) return '';
+    const mapVi = { pending: 'Chờ duyệt', approved: 'Đã duyệt', rejected: 'Từ chối', cancelled: 'Đã hủy' };
+    const mapEn = { pending: 'Pending', approved: 'Approved', rejected: 'Rejected', cancelled: 'Cancelled' };
+    return isVi ? (mapVi[status] || status) : (mapEn[status] || status);
+  };
+  const leaveAfterData = log.afterData || {};
+  const leaveBeforeData = log.beforeData || {};
+  const leaveType = leaveAfterData.leaveType || leaveBeforeData.leaveType || '';
+  const leaveStartDate = leaveAfterData.startDate || leaveBeforeData.startDate;
+  const leaveEndDate = leaveAfterData.endDate || leaveBeforeData.endDate;
+  const leaveDays = leaveAfterData.daysRequested || leaveBeforeData.daysRequested;
+  const leaveReason = leaveAfterData.reason || leaveBeforeData.reason || log.description || '';
+  const leaveReviewNote = leaveAfterData.reviewNote || leaveBeforeData.reviewNote;
+  const leaveStatus = leaveAfterData.status || leaveBeforeData.status || '';
+  const formatLeaveDateRange = (start, end) => {
+    if (!start) return '';
+    const fmt = (d) => {
+      const date = new Date(d);
+      return date.toLocaleDateString(isVi ? 'vi-VN' : 'en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    };
+    return end ? `${fmt(start)} → ${fmt(end)}` : fmt(start);
+  };
+  const leaveTarget = leaveType
+    ? `${translateLeaveType(leaveType)}${leaveStartDate ? ` (${formatLeaveDateRange(leaveStartDate, leaveEndDate)})` : ''}`
+    : leaveStartDate ? formatLeaveDateRange(leaveStartDate, leaveEndDate) : target;
+
+  if (action === 'SUBMIT_LEAVE_REQUEST') {
+    return isVi
+      ? `${actor} đã gửi đơn xin nghỉ phép${leaveTarget !== '—' ? ` — ${leaveTarget}` : ''}${leaveDays ? ` (${leaveDays} ngày)` : ''}${leaveReason ? `\nLý do: ${leaveReason}` : ''}`
+      : `${actor} submitted leave request${leaveTarget !== '—' ? ` — ${leaveTarget}` : ''}${leaveDays ? ` (${leaveDays} day(s))` : ''}${leaveReason ? `\nReason: ${leaveReason}` : ''}`;
+  }
+  if (action === 'APPROVE_LEAVE_REQUEST') {
+    return isVi
+      ? `${actor} đã phê duyệt đơn nghỉ phép${leaveTarget !== '—' ? ` — ${leaveTarget}` : ''}${leaveReviewNote ? `\nGhi chú: ${leaveReviewNote}` : ''}`
+      : `${actor} approved leave request${leaveTarget !== '—' ? ` — ${leaveTarget}` : ''}${leaveReviewNote ? `\nNote: ${leaveReviewNote}` : ''}`;
+  }
+  if (action === 'REJECT_LEAVE_REQUEST') {
+    return isVi
+      ? `${actor} đã từ chối đơn nghỉ phép${leaveTarget !== '—' ? ` — ${leaveTarget}` : ''}${leaveReviewNote ? `\nLý do từ chối: ${leaveReviewNote}` : ''}`
+      : `${actor} rejected leave request${leaveTarget !== '—' ? ` — ${leaveTarget}` : ''}${leaveReviewNote ? `\nRejection reason: ${leaveReviewNote}` : ''}`;
+  }
+  if (action === 'CANCEL_LEAVE_REQUEST') {
+    return isVi
+      ? `${actor} đã hủy đơn nghỉ phép${leaveTarget !== '—' ? ` — ${leaveTarget}` : ''}`
+      : `${actor} cancelled leave request${leaveTarget !== '—' ? ` — ${leaveTarget}` : ''}`;
+  }
+
+  // CareNote actions
+  const noteTypeMapVi = { meal: 'Bữa ăn', activity: 'Hoạt động', daily_living: 'Sinh hoạt hàng ngày', health: 'Sức khỏe', general: 'Tổng quát' };
+  const noteTypeMapEn = { meal: 'Meal', activity: 'Activity', daily_living: 'Daily living', health: 'Health', general: 'General' };
+  const translateNoteType = (type) => isVi ? (noteTypeMapVi[type] || type) : (noteTypeMapEn[type] || type);
+
+  const noteData = log.afterData || log.beforeData || {};
+  const noteType = noteData.noteType || '';
+  const noteContent = noteData.content || '';
+  const noteAt = noteData.noteAt || noteData.createdAt;
+  const residentName = noteData.residentName || log.targetName?.split(' — ')[0] || '—';
+  const displayNoteType = translateNoteType(noteType);
+  const noteTarget = noteType ? `${residentName} — ${displayNoteType}` : (residentName !== '—' ? residentName : target);
+
+  if (action === 'CREATE' && log.module === 'CareNote') {
+    return isVi
+      ? `${actor} đã tạo ghi chú chăm sóc — ${noteTarget}${noteContent ? `\nNội dung: ${noteContent.slice(0, 100)}${noteContent.length > 100 ? '...' : ''}` : ''}`
+      : `${actor} created care note — ${noteTarget}${noteContent ? `\nContent: ${noteContent.slice(0, 100)}${noteContent.length > 100 ? '...' : ''}` : ''}`;
+  }
+  if (action === 'UPDATE' && log.module === 'CareNote') {
+    return isVi
+      ? `${actor} đã cập nhật ghi chú chăm sóc — ${noteTarget}`
+      : `${actor} updated care note — ${noteTarget}`;
+  }
+  if (action === 'DELETE' && log.module === 'CareNote') {
+    return isVi
+      ? `${actor} đã xóa ghi chú chăm sóc — ${noteTarget}`
+      : `${actor} deleted care note — ${noteTarget}`;
   }
 
   // Default: use the action label
@@ -380,9 +495,26 @@ const INCIDENT_ROOT_CAUSE_LABEL_MAP = {
   },
 };
 
-function summarizeArray(val, isVi) {
+function summarizeArray(val, isVi, field) {
   if (!Array.isArray(val)) return String(val);
   if (val.length === 0) return '—';
+  if (field === 'entries') {
+    const mealNames = [...new Set(val.map((item) => item?.mealName).filter(Boolean))];
+    const timeEntries = val.filter((item) => item?.breakfastTime || item?.lunchTime || item?.dinnerTime);
+    if (mealNames.length) return isVi ? `${val.length} mục món ăn: ${mealNames.join(', ')}` : `${val.length} meal item(s): ${mealNames.join(', ')}`;
+    if (timeEntries.length) {
+      const details = timeEntries.map((item) => {
+        const residentName = item?.residentId?.fullName || (typeof item?.residentId === 'string' ? item.residentId : (isVi ? 'Cư dân' : 'Resident'));
+        return `${residentName}: Sáng ${item.breakfastTime || '—'}, Trưa ${item.lunchTime || '—'}, Tối ${item.dinnerTime || '—'}`;
+      });
+      return isVi ? details.join('; ') : details.join('; ');
+    }
+  }
+  if (field === 'changeLog') {
+    const actionLabels = { created: 'Đã tạo', updated: 'Đã cập nhật', published: 'Đã xuất bản' };
+    const actions = val.map((item) => isVi ? (actionLabels[item?.action] || item?.action) : item?.action).filter(Boolean);
+    if (actions.length) return actions.join(', ');
+  }
   const labels = val
     .filter(f => f && f.label)
     .map(f => f.label)
@@ -398,6 +530,102 @@ function formatInvoiceItem(item, idx, isVi) {
   const amtStr = (amt !== undefined && amt !== null) ? formatCurrency(amt, 'vi-VN') : '—';
   return `${label}: ${desc} — ${amtStr}`;
 }
+
+// Translate care note metadata fields
+const METADATA_KEY_LABELS_VI = {
+  mealType: 'Bữa ăn',
+  intakeAmount: 'Lượng ăn',
+  appetite: 'Ngon miệng',
+  activityType: 'Loại hoạt động',
+  participationLevel: 'Mức độ tham gia',
+  mood: 'Tâm trạng',
+  duration: 'Thời gian (phút)',
+  assistanceLevel: 'Mức độ hỗ trợ',
+  completionStatus: 'Trạng thái hoàn thành',
+  consciousness: 'Tri giác',
+  fallRisk: 'Nguy cơ té ngã',
+  symptoms: 'Triệu chứng',
+  painLevel: 'Mức độ đau',
+  temperature: 'Nhiệt độ (°C)',
+  skinCondition: 'Tình trạng da',
+  observations: 'Quan sát',
+  priority: 'Ưu tiên',
+};
+const METADATA_KEY_LABELS_EN = {
+  mealType: 'Meal type',
+  intakeAmount: 'Intake amount',
+  appetite: 'Appetite',
+  activityType: 'Activity type',
+  participationLevel: 'Participation level',
+  mood: 'Mood',
+  duration: 'Duration (min)',
+  assistanceLevel: 'Assistance level',
+  completionStatus: 'Completion status',
+  consciousness: 'Consciousness',
+  fallRisk: 'Fall risk',
+  symptoms: 'Symptoms',
+  painLevel: 'Pain level',
+  temperature: 'Temperature (°C)',
+  skinCondition: 'Skin condition',
+  observations: 'Observations',
+  priority: 'Priority',
+};
+const METADATA_VALUE_LABELS_VI = {
+  // meal
+  breakfast: 'Sáng', lunch: 'Trưa', dinner: 'Tối', snack: 'Phụ',
+  none: 'Không ăn', little: 'Ít', half: 'Nửa', most: 'Hầu hết', all: 'Hết',
+  poor: 'Kém', fair: 'Bình thường', good: 'Tốt', excellent: 'Rất tốt',
+  // activity
+  walking: 'Đi bộ', exercise: 'Tập thể dục', physiotherapy: 'Vật lý trị liệu',
+  reading: 'Đọc sách', socializing: 'Giao lưu', entertainment: 'Giải trí', other: 'Khác',
+  refused: 'Từ chối', assisted: 'Cần hỗ trợ', supervised: 'Giám sát', independent: 'Tự lập',
+  // mood
+  happy: 'Vui vẻ', neutral: 'Bình thường', sad: 'Buồn', agitated: 'Bồn chồn', anxious: 'Lo lắng',
+  // daily living
+  bathing: 'Tắm rửa', grooming: 'Vệ sinh cá nhân', dressing: 'Mặc quần áo',
+  eating: 'Ăn uống', mobility: 'Di chuyển', toileting: 'Vệ sinh', sleeping: 'Ngủ nghỉ',
+  total_care: 'Chăm sóc toàn diện',
+  completed: 'Hoàn thành', partial: 'Một phần',
+  // health
+  alert: 'Tỉnh táo', confused: 'Lú lẫn', drowsy: 'Buồn ngủ', unresponsive: 'Không phản ứng',
+  low: 'Thấp', medium: 'Trung bình', high: 'Cao',
+};
+const METADATA_VALUE_LABELS_EN = {
+  breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', snack: 'Snack',
+  none: 'None', little: 'Little', half: 'Half', most: 'Most', all: 'All',
+  poor: 'Poor', fair: 'Fair', good: 'Good', excellent: 'Excellent',
+  walking: 'Walking', exercise: 'Exercise', physiotherapy: 'Physiotherapy',
+  reading: 'Reading', socializing: 'Socializing', entertainment: 'Entertainment', other: 'Other',
+  refused: 'Refused', assisted: 'Assisted', supervised: 'Supervised', independent: 'Independent',
+  happy: 'Happy', neutral: 'Neutral', sad: 'Sad', agitated: 'Agitated', anxious: 'Anxious',
+  bathing: 'Bathing', grooming: 'Grooming', dressing: 'Dressing',
+  eating: 'Eating', mobility: 'Mobility', toileting: 'Toileting', sleeping: 'Sleeping',
+  total_care: 'Total care',
+  completed: 'Completed', partial: 'Partial',
+  alert: 'Alert', confused: 'Confused', drowsy: 'Drowsy', unresponsive: 'Unresponsive',
+  low: 'Low', medium: 'Medium', high: 'High',
+};
+
+const renderCareNoteMetadata = (metadata, isVi) => {
+  if (!metadata || typeof metadata !== 'object') return String(metadata);
+  const keyLabels = isVi ? METADATA_KEY_LABELS_VI : METADATA_KEY_LABELS_EN;
+  const valueLabels = isVi ? METADATA_VALUE_LABELS_VI : METADATA_VALUE_LABELS_EN;
+  const translateVal = (v) => {
+    if (v === undefined || v === null) return '';
+    if (typeof v === 'string') return valueLabels[v] || v;
+    if (typeof v === 'number') return String(v);
+    if (Array.isArray(v)) return v.map(translateVal).join(', ');
+    return String(v);
+  };
+  return Object.entries(metadata)
+    .filter(([, v]) => v !== undefined && v !== null && v !== '')
+    .map(([k, v]) => {
+      const label = keyLabels[k] || k;
+      const displayVal = translateVal(v);
+      return `${label}: ${displayVal}`;
+    })
+    .join('\n');
+};
 
 function collectGenericChanges(beforeData, afterData, isVi) {
   if (!beforeData && !afterData) return [];
@@ -428,8 +656,8 @@ function collectGenericChanges(beforeData, afterData, isVi) {
       continue;
     }
 
-    const bStr = bVal !== undefined && bVal !== null ? (bIsArr ? summarizeArray(bVal, isVi) : (typeof bVal === 'object' ? JSON.stringify(bVal) : String(bVal))) : '';
-    const aStr = aVal !== undefined && aVal !== null ? (aIsArr ? summarizeArray(aVal, isVi) : (typeof aVal === 'object' ? JSON.stringify(aVal) : String(aVal))) : '';
+    const bStr = bVal !== undefined && bVal !== null ? (bIsArr ? summarizeArray(bVal, isVi, key) : (typeof bVal === 'object' ? resolveUserName(bVal) : String(bVal))) : '';
+    const aStr = aVal !== undefined && aVal !== null ? (aIsArr ? summarizeArray(aVal, isVi, key) : (typeof aVal === 'object' ? resolveUserName(aVal) : String(aVal))) : '';
     rows.push({ key, before: bStr, after: aStr, changed: bStr !== aStr });
   }
   return rows;
@@ -443,6 +671,21 @@ const FIELD_KEY_LABELS = {
   residentIds: 'Cư dân',
   serviceCode: 'Mã dịch vụ',
   serviceName: 'Tên dịch vụ',
+  medicationCode: 'Mã thuốc',
+  name: 'Tên thuốc',
+  form: 'Dạng thuốc',
+  strength: 'Hàm lượng',
+  unit: 'Đơn vị',
+  manufacturer: 'Nhà sản xuất',
+  minStockLevel: 'Mức tồn kho tối thiểu',
+  isActive: 'Đang hoạt động',
+  price: 'Giá bán',
+  sellingPrice: 'Giá bán',
+  batchNumber: 'Số lô',
+  lotNumber: 'Số lô',
+  expiryDate: 'Hạn sử dụng',
+  receivedDate: 'Ngày nhập',
+  costPerUnit: 'Đơn giá nhập',
   category: 'Danh mục',
   description: 'Mô tả',
   unitPrice: 'Đơn giá',
@@ -471,8 +714,27 @@ const FIELD_KEY_LABELS = {
   invoiceId: 'Mã hóa đơn',
   residentName: 'Tên cư dân',
   residentId: 'Mã cư dân',
+  workDate: 'Ngày làm việc',
   createdAt: 'Ngày tạo',
   updatedAt: 'Ngày cập nhật',
+  mealType: 'Bữa ăn',
+  intakeStatus: 'Tình trạng ăn',
+  portionPercent: 'Tỷ lệ ăn',
+  plannedMealName: 'Tên món ăn',
+  recordedByStaffId: 'Người ghi nhận',
+  recordedAt: 'Thời gian ghi nhận',
+  activityType: 'Loại hoạt động vệ sinh',
+  activityCategory: 'Nhóm hoạt động vệ sinh',
+  careStage: 'Giai đoạn chăm sóc',
+  title: 'Tên kế hoạch',
+  mealTimeScheduleDayId: 'Lịch giờ ăn',
+  entries: 'Danh sách giờ ăn',
+  changeLog: 'Lịch sử thay đổi',
+  observationCategory: 'Nhóm quan sát',
+  moodLevel: 'Mức tâm trạng',
+  behaviorType: 'Loại hành vi',
+  severity: 'Mức độ',
+  observedAt: 'Thời gian quan sát',
   // Additional invoice fields
   periodStart: 'Kỳ từ ngày',
   periodEnd: 'Kỳ đến ngày',
@@ -484,6 +746,28 @@ const FIELD_KEY_LABELS = {
   careServiceCost: 'Phí dịch vụ chăm sóc',
   otherCost: 'Chi phí khác',
   itemCount: 'Số chi phí',
+  // Leave request fields
+  leaveType: 'Loại nghỉ phép',
+  startDate: 'Ngày bắt đầu',
+  endDate: 'Ngày kết thúc',
+  daysRequested: 'Số ngày nghỉ',
+  reason: 'Lý do',
+  reviewNote: 'Ghi chú phê duyệt',
+  status: 'Trạng thái',
+  actualTimeTaken: 'Thời điểm dùng thuốc',
+  administrationTiming: 'Thời điểm dùng thuốc',
+  // CareNote fields
+  noteType: 'Loại ghi chú',
+  content: 'Nội dung',
+  noteAt: 'Thời gian ghi',
+  metadata: 'Dữ liệu bổ sung',
+  // Contract terminate fields
+  bedId: 'Giường',
+  cancellationReason: 'Lý do chấm dứt',
+  bedFreed: 'Giường đã giải phóng',
+  tasksCancelled: 'Công việc đã hủy',
+  terminatedAt: 'Thời gian chấm dứt',
+  eligibilityStatusReset: 'Đã reset trạng thái đủ điều kiện',
 };
 
 const FIELD_KEY_LABELS_EN = {
@@ -522,8 +806,27 @@ const FIELD_KEY_LABELS_EN = {
   invoiceId: 'Invoice ID',
   residentName: 'Resident Name',
   residentId: 'Resident ID',
+  workDate: 'Work date',
   createdAt: 'Created At',
   updatedAt: 'Updated At',
+  mealType: 'Meal type',
+  intakeStatus: 'Intake status',
+  portionPercent: 'Portion percentage',
+  plannedMealName: 'Planned meal name',
+  recordedByStaffId: 'Recorded by',
+  recordedAt: 'Recorded at',
+  activityType: 'Hygiene activity type',
+  activityCategory: 'Hygiene activity category',
+  careStage: 'Care stage',
+  title: 'Plan title',
+  mealTimeScheduleDayId: 'Meal time schedule',
+  entries: 'Meal entries',
+  changeLog: 'Change history',
+  observationCategory: 'Observation category',
+  moodLevel: 'Mood level',
+  behaviorType: 'Behavior type',
+  severity: 'Severity',
+  observedAt: 'Observed at',
   // Additional invoice fields
   periodStart: 'Period Start',
   periodEnd: 'Period End',
@@ -535,6 +838,28 @@ const FIELD_KEY_LABELS_EN = {
   careServiceCost: 'Care Service Cost',
   otherCost: 'Other Cost',
   itemCount: 'Number of Items',
+  // Leave request fields
+  leaveType: 'Leave Type',
+  startDate: 'Start Date',
+  endDate: 'End Date',
+  daysRequested: 'Days Requested',
+  reason: 'Reason',
+  reviewNote: 'Review Note',
+  status: 'Status',
+  actualTimeTaken: 'Medication time taken',
+  administrationTiming: 'Administration timing',
+  // CareNote fields
+  noteType: 'Note Type',
+  content: 'Content',
+  noteAt: 'Recorded At',
+  metadata: 'Additional Data',
+  // Contract terminate fields
+  bedId: 'Bed',
+  cancellationReason: 'Cancellation Reason',
+  bedFreed: 'Bed Freed',
+  tasksCancelled: 'Tasks Cancelled',
+  terminatedAt: 'Terminated At',
+  eligibilityStatusReset: 'Eligibility Status Reset',
 };
 
 const getFieldKeyLabel = (key, lang) => {
@@ -596,7 +921,7 @@ function GenericChangeDiff({ log, t, isVi }) {
             <span className="al-data-row__key">{getFieldKeyLabel(key, isVi ? 'vi' : 'en')}</span>
             <span className="al-data-row__val">
               {val !== null && val !== undefined
-                ? (Array.isArray(val) ? summarizeArray(val, isVi) : (typeof val === 'object' ? JSON.stringify(val) : String(val)))
+                ? (Array.isArray(val) ? summarizeArray(val, isVi, key) : (typeof val === 'object' ? (field === 'metadata' ? renderCareNoteMetadata(val, isVi) : resolveUserName(val)) : String(val)))
                 : '—'}
             </span>
           </div>
@@ -649,6 +974,20 @@ const formatFieldNameVi = (field) => {
     dob: 'Ngày sinh',
     birthDate: 'Ngày sinh',
     gender: 'Giới tính',
+    medicationCode: 'Mã thuốc',
+    name: 'Tên thuốc',
+    form: 'Dạng thuốc',
+    strength: 'Hàm lượng',
+    unit: 'Đơn vị',
+    manufacturer: 'Nhà sản xuất',
+    minStockLevel: 'Mức tồn kho tối thiểu',
+    isActive: 'Đang hoạt động',
+    price: 'Giá bán',
+    sellingPrice: 'Giá bán',
+    medicationId: 'Mã thuốc',
+    batchNumber: 'Số lô',
+    expiryDate: 'Hạn sử dụng',
+    quantity: 'Số lượng',
     allergies: 'Dị ứng',
     drugAllergies: 'Dị ứng thuốc',
     chronicConditions: 'Bệnh lý',
@@ -771,6 +1110,7 @@ const formatFieldNameVi = (field) => {
     isActive: 'Hoạt động',
     // Audit meta fields
     createdBy: 'Người tạo',
+    authorStaffId: 'Người tạo',
     updatedBy: 'Người cập nhật',
     // ClinicalService-related fields
     serviceCode: 'Mã dịch vụ',
@@ -900,6 +1240,10 @@ const formatFieldNameVi = (field) => {
     maxDailyDoses: 'Liều tối đa/ngày',
     prnReason: 'Lý do khi cần',
     itemCount: 'Số loại thuốc',
+    // CareNote fields
+    noteType: 'Loại ghi chú',
+    content: 'Nội dung',
+    noteAt: 'Thời gian ghi',
   };
   return fieldMap[field] || field;
 };
@@ -1052,6 +1396,7 @@ const formatFieldNameEn = (field) => {
     isActive: 'Active',
     // Audit meta fields
     createdBy: 'Created by',
+    authorStaffId: 'Created by',
     updatedBy: 'Updated by',
     // ClinicalService-related fields
     serviceCode: 'Service code',
@@ -1175,22 +1520,29 @@ const formatFieldNameEn = (field) => {
     maxDailyDoses: 'Max Daily Doses',
     prnReason: 'PRN Reason',
     itemCount: 'Item Count',
+    // CareNote fields
+    noteType: 'Note Type',
+    content: 'Content',
+    noteAt: 'Recorded At',
   };
   return fieldMap[field] || field;
 };
 
 const formatFieldName = (field, isVi) => isVi ? formatFieldNameVi(field) : formatFieldNameEn(field);
 
-const formatValue = (val, isVi = true) => {
+const formatValue = (val, field, isVi = true) => {
   const emptyLabel = isVi ? '(trống)' : '(empty)';
   if (val === undefined || val === null) return '—';
   if (val === '') return emptyLabel;
   if (Array.isArray(val)) {
     if (val.length === 0) return emptyLabel;
-    if (typeof val[0] === 'object') return summarizeArray(val, isVi);
+    if (typeof val[0] === 'object') return summarizeArray(val, isVi, field);
     return val.join(', ');
   }
-  if (typeof val === 'object') return JSON.stringify(val);
+  if (typeof val === 'object') {
+    if (field === 'metadata') return renderCareNoteMetadata(val, isVi);
+    return resolveUserName(val);
+  }
   return String(val);
 };
 
@@ -1394,6 +1746,126 @@ const translateActivityStatus = (val, isVi) => {
     cancelled: 'Cancelled',
   };
   return map[lower] || val;
+};
+
+const translateMedicationStatus = (val, isVi) => {
+  if (!val || typeof val !== 'string') return val;
+  const upper = val.toUpperCase();
+  const mapVi = {
+    PENDING: 'Chờ dùng',
+    TAKEN: 'Đã dùng',
+    LATE_TAKEN: 'Đã dùng muộn',
+    MISSED: 'Bỏ lỡ',
+    REFUSED: 'Từ chối dùng',
+    HELD: 'Đã giữ lại',
+    NOT_AVAILABLE: 'Không có thuốc',
+    OVERDUE: 'Quá giờ',
+    SKIPPED: 'Đã bỏ qua',
+  };
+  const mapEn = {
+    PENDING: 'Pending',
+    TAKEN: 'Taken',
+    LATE_TAKEN: 'Taken late',
+    MISSED: 'Missed',
+    REFUSED: 'Refused',
+    HELD: 'Held',
+    NOT_AVAILABLE: 'Not available',
+    OVERDUE: 'Overdue',
+    SKIPPED: 'Skipped',
+  };
+  return (isVi ? mapVi[upper] : mapEn[upper]) || val;
+};
+
+const translateAdministrationTiming = (val, isVi) => {
+  if (!val || typeof val !== 'string') return val;
+  const mapVi = { early: 'Sớm', late: 'Muộn', on_time: 'Đúng giờ' };
+  const mapEn = { early: 'Early', late: 'Late', on_time: 'On time' };
+  const key = val.toLowerCase();
+  return (isVi ? mapVi[key] : mapEn[key]) || val;
+};
+
+const translateMealIntakeValue = (val, field, isVi) => {
+  if (!val || typeof val !== 'string') return val;
+  const maps = {
+    mealType: {
+      vi: { breakfast: 'Sáng', lunch: 'Trưa', dinner: 'Tối' },
+      en: { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner' },
+    },
+    intakeStatus: {
+      vi: { full: 'Ăn hết', partial: 'Ăn một phần', refused: 'Từ chối ăn', assisted: 'Cần hỗ trợ' },
+      en: { full: 'Full', partial: 'Partial', refused: 'Refused', assisted: 'Assisted' },
+    },
+  };
+  const map = maps[field]?.[isVi ? 'vi' : 'en'];
+  return map?.[val.toLowerCase()] || val;
+};
+
+const translateHygieneValue = (val, field, isVi) => {
+  if (!val || typeof val !== 'string') return val;
+  const maps = {
+    activityType: {
+      vi: {
+        bathing: 'Tắm rửa', oral_care: 'Vệ sinh răng miệng', grooming: 'Chải chuốt',
+        toileting: 'Đi vệ sinh', diaper_change: 'Thay tã', room_tidy: 'Dọn phòng',
+        bathroom_clean: 'Vệ sinh phòng tắm', linen_change: 'Thay ga giường', laundry: 'Giặt đồ',
+      },
+      en: {
+        bathing: 'Bathing', oral_care: 'Oral care', grooming: 'Grooming',
+        toileting: 'Toileting', diaper_change: 'Diaper change', room_tidy: 'Room tidy',
+        bathroom_clean: 'Bathroom clean', linen_change: 'Linen change', laundry: 'Laundry',
+      },
+    },
+    activityCategory: {
+      vi: { personal: 'Cá nhân', environment: 'Môi trường' },
+      en: { personal: 'Personal', environment: 'Environment' },
+    },
+    completionStatus: {
+      vi: { completed: 'Hoàn thành', partial: 'Một phần', refused: 'Từ chối', assisted: 'Cần hỗ trợ' },
+      en: { completed: 'Completed', partial: 'Partial', refused: 'Refused', assisted: 'Assisted' },
+    },
+  };
+  const map = maps[field]?.[isVi ? 'vi' : 'en'];
+  return map?.[val.toLowerCase()] || val;
+};
+
+const translateBehaviorValue = (val, field, isVi) => {
+  if (!val || typeof val !== 'string') return val;
+  const maps = {
+    observationCategory: {
+      vi: { mood: 'Tâm trạng', behavior: 'Hành vi', abnormal: 'Bất thường' },
+      en: { mood: 'Mood', behavior: 'Behavior', abnormal: 'Abnormal' },
+    },
+    moodLevel: {
+      vi: { calm: 'Bình tĩnh', happy: 'Vui vẻ', neutral: 'Bình thường', anxious: 'Lo lắng', sad: 'Buồn', agitated: 'Kích động', confused: 'Lú lẫn', irritable: 'Cáu gắt' },
+      en: { calm: 'Calm', happy: 'Happy', neutral: 'Neutral', anxious: 'Anxious', sad: 'Sad', agitated: 'Agitated', confused: 'Confused', irritable: 'Irritable' },
+    },
+    behaviorType: {
+      vi: { cooperative: 'Hợp tác', withdrawn: 'Thu mình', restless: 'Bồn chồn', wandering: 'Đi lang thang', verbal_outburst: 'La hét/lời nói bộc phát', physical_resistance: 'Kháng cự', sleep_disturbance: 'Rối loạn giấc ngủ', appetite_change: 'Thay đổi cảm giác ăn uống', social_withdrawal: 'Xa cách xã hội', repetitive_behavior: 'Hành vi lặp lại', other: 'Khác' },
+      en: { cooperative: 'Cooperative', withdrawn: 'Withdrawn', restless: 'Restless', wandering: 'Wandering', verbal_outburst: 'Verbal outburst', physical_resistance: 'Physical resistance', sleep_disturbance: 'Sleep disturbance', appetite_change: 'Appetite change', social_withdrawal: 'Social withdrawal', repetitive_behavior: 'Repetitive behavior', other: 'Other' },
+    },
+    severity: {
+      vi: { normal: 'Bình thường', mild: 'Nhẹ', moderate: 'Vừa', urgent: 'Khẩn cấp' },
+      en: { normal: 'Normal', mild: 'Mild', moderate: 'Moderate', urgent: 'Urgent' },
+    },
+  };
+  const map = maps[field]?.[isVi ? 'vi' : 'en'];
+  return map?.[val.toLowerCase()] || val;
+};
+
+const translateMealPlanValue = (val, field, isVi) => {
+  if (!val || typeof val !== 'string') return val;
+  const maps = {
+    careStage: {
+      vi: { recovery: 'Phục hồi', maintenance: 'Duy trì', special_monitoring: 'Theo dõi đặc biệt' },
+      en: { recovery: 'Recovery', maintenance: 'Maintenance', special_monitoring: 'Special monitoring' },
+    },
+    status: {
+      vi: { draft: 'Bản nháp', published: 'Đã xuất bản' },
+      en: { draft: 'Draft', published: 'Published' },
+    },
+  };
+  const map = maps[field]?.[isVi ? 'vi' : 'en'];
+  return map?.[val.toLowerCase()] || val;
 };
 
 const translateEligibilityStatus = (val, isVi) => {
@@ -1692,7 +2164,7 @@ const renderValue = (val, field, isVi, dataContext) => {
         }).join('\n');
       }
 
-      return summarizeArray(val, isVi);
+      return summarizeArray(val, isVi, field);
     }
     return val.join(', ');
   }
@@ -1703,10 +2175,33 @@ const renderValue = (val, field, isVi, dataContext) => {
     if (['resident', 'building', 'floor', 'room', 'bed'].includes(field)) {
       return renderTransferObject(val, field, isVi);
     }
-    return JSON.stringify(val);
+    if (field === 'metadata') {
+      return renderCareNoteMetadata(val, isVi);
+    }
+    return resolveUserName(val);
   }
 
   const strVal = String(val);
+
+  if (field === 'mealType' || field === 'intakeStatus') {
+    return translateMealIntakeValue(strVal, field, isVi);
+  }
+
+  if (field === 'activityType' || field === 'activityCategory' || field === 'completionStatus') {
+    return translateHygieneValue(strVal, field, isVi);
+  }
+
+  if (field === 'observationCategory' || field === 'moodLevel' || field === 'behaviorType' || field === 'severity') {
+    return translateBehaviorValue(strVal, field, isVi);
+  }
+
+  if (field === 'careStage' || (field === 'status' && ['draft', 'published'].includes(strVal.toLowerCase()))) {
+    return translateMealPlanValue(strVal, field, isVi);
+  }
+
+  if (field === 'portionPercent' && isVi) {
+    return `${strVal}%`;
+  }
 
   // Translate gender values
   if (field === 'gender' || field === 'Giới tính' || field === 'Gender' || field === 'applicantGender') {
@@ -1714,7 +2209,7 @@ const renderValue = (val, field, isVi, dataContext) => {
   }
 
   // Date fields: format as locale datetime
-  if (['dueDate', 'issuedAt', 'paidAt', 'createdAt', 'updatedAt', 'completedAt', 'performedAt', 'confirmedAt', 'expiryDate', 'receivedDate', 'workDate', 'scheduledStartAt', 'scheduledEndAt', 'incidentAt'].includes(field)) {
+  if (['dueDate', 'issuedAt', 'paidAt', 'createdAt', 'updatedAt', 'completedAt', 'performedAt', 'confirmedAt', 'expiryDate', 'receivedDate', 'workDate', 'scheduledStartAt', 'scheduledEndAt', 'incidentAt', 'noteAt', 'actualTimeTaken', 'recordedAt'].includes(field)) {
     const date = new Date(strVal);
     if (!isNaN(date)) {
       return date.toLocaleString(isVi ? 'vi-VN' : 'en-US', {
@@ -1722,6 +2217,24 @@ const renderValue = (val, field, isVi, dataContext) => {
         hour: '2-digit', minute: '2-digit',
       });
     }
+  }
+
+  // Translate medication schedule status values before generic status handling.
+  if ((field === 'status' || field === 'Trạng thái' || field === 'Status') &&
+    ['PENDING', 'TAKEN', 'LATE_TAKEN', 'MISSED', 'REFUSED', 'HELD', 'NOT_AVAILABLE', 'OVERDUE', 'SKIPPED'].includes(strVal.toUpperCase())) {
+    return translateMedicationStatus(strVal, isVi);
+  }
+
+  if (field === 'administrationTiming' || field === 'Thời điểm dùng thuốc' || field === 'Administration timing') {
+    return translateAdministrationTiming(strVal, isVi);
+  }
+
+  // Translate prescription status values (before generic status check)
+  if ((field === 'status' || field === 'Trạng thái' || field === 'Status') &&
+    ['ACTIVE', 'DRAFT', 'SUSPENDED', 'COMPLETED', 'EXPIRED', 'CANCELLED'].includes(strVal.toUpperCase())) {
+    const mapVi = { ACTIVE: 'Hoạt động', DRAFT: 'Bản nháp', SUSPENDED: 'Tạm ngưng', COMPLETED: 'Hoàn thành', EXPIRED: 'Hết hạn', CANCELLED: 'Đã hủy' };
+    const mapEn = { ACTIVE: 'Active', DRAFT: 'Draft', SUSPENDED: 'Suspended', COMPLETED: 'Completed', EXPIRED: 'Expired', CANCELLED: 'Cancelled' };
+    return (isVi ? mapVi[strVal] : mapEn[strVal]) || strVal;
   }
 
   // Translate invoice status values (before generic status check)
@@ -1768,6 +2281,42 @@ const renderValue = (val, field, isVi, dataContext) => {
   // Translate clinical service category values
   if (field === 'category' || field === 'Danh mục' || field === 'Category') {
     return translateServiceCategory(strVal, isVi);
+  }
+
+  // Translate leave type values
+  if (field === 'leaveType' || field === 'Loại nghỉ phép' || field === 'Leave Type' || field === 'type') {
+    const mapVi = { annual: 'Nghỉ phép năm', sick: 'Nghỉ ốm', emergency: 'Nghỉ khẩn cấp', unpaid: 'Nghỉ không lương', other: 'Khác' };
+    const mapEn = { annual: 'Annual leave', sick: 'Sick leave', emergency: 'Emergency leave', unpaid: 'Unpaid leave', other: 'Other' };
+    return (isVi ? mapVi[strVal] : mapEn[strVal]) || strVal;
+  }
+
+  // Translate leave request status values
+  if ((field === 'status' || field === 'Trạng thái' || field === 'Status') &&
+    ['pending', 'approved', 'rejected', 'cancelled'].includes(strVal.toLowerCase())) {
+    const mapVi = { pending: 'Chờ duyệt', approved: 'Đã duyệt', rejected: 'Từ chối', cancelled: 'Đã hủy' };
+    const mapEn = { pending: 'Pending', approved: 'Approved', rejected: 'Rejected', cancelled: 'Cancelled' };
+    return (isVi ? mapVi[strVal] : mapEn[strVal]) || strVal;
+  }
+
+  // Format leave request date fields
+  if (['startDate', 'endDate', 'start', 'end'].includes(field)) {
+    const date = new Date(strVal);
+    if (!isNaN(date)) {
+      return date.toLocaleDateString(isVi ? 'vi-VN' : 'en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    }
+  }
+
+  // Translate daysRequested
+  if (field === 'daysRequested' || field === 'Số ngày nghỉ' || field === 'Days Requested') {
+    const n = Number(strVal);
+    return isVi ? `${n} ngày` : `${n} day(s)`;
+  }
+
+  // Translate care note type values
+  if (field === 'noteType' || field === 'Loại ghi chú' || field === 'Note Type') {
+    const mapVi = { meal: 'Bữa ăn', activity: 'Hoạt động', daily_living: 'Sinh hoạt hàng ngày', health: 'Sức khỏe', general: 'Tổng quát' };
+    const mapEn = { meal: 'Meal', activity: 'Activity', daily_living: 'Daily living', health: 'Health', general: 'General' };
+    return (isVi ? mapVi[strVal] : mapEn[strVal]) || strVal;
   }
 
   // Translate isActive / active boolean values
@@ -1929,16 +2478,64 @@ const ChangeDetails = ({ log, t, i18n }) => {
   // Build lookup for user names from metadata (backend sends createdByName/updatedByName)
   const metadata = log.metadata || {};
   const userNameLookup = {};
-  if (metadata.createdByName) userNameLookup[log.beforeData?.createdBy] = metadata.createdByName;
-  if (metadata.updatedByName) userNameLookup[log.afterData?.updatedBy] = metadata.updatedByName;
-  // Also use performedBy as fallback for last editor
-  if (log.performedBy) userNameLookup[log.afterData?.updatedBy] = log.performedBy;
+
+  // Helper to extract user ID from various formats (string, ObjectId, or populated object)
+  const extractUserId = (val) => {
+    if (!val) return null;
+    if (typeof val === 'string') return val;
+    if (typeof val === 'object') {
+      // Populated user shape: { _id, fullName, role } or { _id: ObjectId, fullName, role }
+      if (val._id) return val._id.toString();
+      if (val.id) return val.id.toString();
+    }
+    return String(val);
+  };
+
+  // Helper to resolve user ID to name, with fallback to embedded fullName if available
+  const resolveUserName = (val) => {
+    if (!val) return val;
+    // If already a populated object with fullName, use it directly
+    if (typeof val === 'object') {
+      if (val.fullName) return val.fullName;
+      if (val.userId && typeof val.userId === 'object' && val.userId.fullName) return val.userId.fullName;
+      // Otherwise extract ID and lookup
+      const id = extractUserId(val);
+      if (id) return userNameLookup[id] || id;
+      return val;
+    }
+    // String ID: lookup by ID
+    return userNameLookup[val] || val;
+  };
+
+  // Build the lookup table using creator name from metadata
+  if (metadata.createdByName) {
+    // Handle both 'createdBy' (meal plan, meal time schedule) and 'authorStaffId' (care note)
+    const beforeCreatedById = extractUserId(log.beforeData?.createdBy) || extractUserId(log.beforeData?.authorStaffId);
+    const afterCreatedById = extractUserId(log.afterData?.createdBy) || extractUserId(log.afterData?.authorStaffId);
+    if (beforeCreatedById) userNameLookup[beforeCreatedById] = metadata.createdByName;
+    if (afterCreatedById) userNameLookup[afterCreatedById] = metadata.createdByName;
+  }
+  // Handle updatedBy (name of last editor, not the creator)
+  if (metadata.updatedByName) {
+    const updatedById = extractUserId(log.afterData?.updatedBy);
+    if (updatedById) userNameLookup[updatedById] = metadata.updatedByName;
+  }
+  if (metadata.recordedByName) {
+    const beforeRecordedById = extractUserId(log.beforeData?.recordedByStaffId);
+    const afterRecordedById = extractUserId(log.afterData?.recordedByStaffId);
+    if (beforeRecordedById) userNameLookup[beforeRecordedById] = metadata.recordedByName;
+    if (afterRecordedById) userNameLookup[afterRecordedById] = metadata.recordedByName;
+  }
+  // Also use performedBy as fallback for last editor (keyed by updatedBy or creator ID)
+  if (log.performedBy) {
+    const updatedById = extractUserId(log.afterData?.updatedBy);
+    if (updatedById) userNameLookup[updatedById] = log.performedBy;
+  }
   // Map deletedById → tên (cho audit log dừng hóa đơn)
   if (log.afterData?.deletedById && log.performedBy) {
-    userNameLookup[log.afterData.deletedById] = log.performedBy;
+    const deletedById = extractUserId(log.afterData.deletedById);
+    if (deletedById) userNameLookup[deletedById] = log.performedBy;
   }
-
-  const resolveUserName = (id) => userNameLookup[id] || id;
 
   // Build resident / staff name lookups from metadata (incident logs include residentNames / assignedStaffNameList)
   const residentNameLookup = {};
@@ -2027,20 +2624,28 @@ const ChangeDetails = ({ log, t, i18n }) => {
     // Resolve resident / staff IDs to names for incident fields
     const isResidentIds = key === 'residentIds';
     const isStaffIds = key === 'assignedStaffIds';
+    // User fields: createdBy (meal plan/schedule), authorStaffId (care note), updatedBy, deletedBy, deletedById
+    const isUserField = ['createdBy', 'updatedBy', 'deletedBy', 'deletedById', 'authorStaffId', 'recordedByStaffId'].includes(key);
+    const recordedByName = metadata.recordedByName;
+    const entriesSummary = Array.isArray(metadata.entriesSummary) ? metadata.entriesSummary.join('; ') : null;
     const bVal = isResidentIds ? resolveIncidentArray(rawBeforeVal, false, key)
       : isStaffIds ? resolveIncidentArray(rawBeforeVal, true, key)
-      : ((key === 'createdBy' || key === 'updatedBy' || key === 'deletedBy' || key === 'deletedById') ? resolveUserName(rawBeforeVal) : rawBeforeVal);
+      : key === 'entries' && entriesSummary ? undefined
+      : key === 'recordedByStaffId' && recordedByName ? recordedByName
+      : (isUserField ? resolveUserName(rawBeforeVal) : rawBeforeVal);
     const aVal = isResidentIds ? resolveIncidentArray(rawAfterVal, false, key)
       : isStaffIds ? resolveIncidentArray(rawAfterVal, true, key)
-      : ((key === 'createdBy' || key === 'updatedBy' || key === 'deletedBy' || key === 'deletedById') ? resolveUserName(rawAfterVal) : rawAfterVal);
+      : key === 'entries' && entriesSummary ? entriesSummary
+      : key === 'recordedByStaffId' && recordedByName ? recordedByName
+      : (isUserField ? resolveUserName(rawAfterVal) : rawAfterVal);
 
-    const beforeStr = formatValue(bVal, isVi);
-    const afterStr = formatValue(aVal, isVi);
+    const beforeStr = formatValue(bVal, key, isVi);
+    const afterStr = formatValue(aVal, key, isVi);
 
     // Only show if values are different
     if (beforeStr !== afterStr) {
       changes.push({
-        field: formatFieldName(key, isVi),
+        field: getFieldKeyLabel(key, isVi ? 'vi' : 'en'),
         fieldKey: key,
         before: bVal,
         after: aVal,
@@ -2410,7 +3015,12 @@ export default function AuditLogsPage() {
                       <td>{formatBusinessModuleLabel(log.businessModule || log.module, t)}</td>
                       <td>
                         <div className="al-actor">
-                          <span className="al-actor__name">{log.performedBy || log.actorUserId || '—'}</span>
+                          <span className="al-actor__name">{(() => {
+                            const raw = log.actorUserId;
+                            return log.performedBy
+                              || (raw && typeof raw === 'object' ? raw.fullName : raw)
+                              || '—';
+                          })()}</span>
                           <RoleTag role={log.performedByRole || log.actorRole} />
                         </div>
                       </td>
@@ -2487,7 +3097,12 @@ export default function AuditLogsPage() {
                     <div className="al-detail-item">
                       <span className="al-detail-item__label">{t('admin.auditLogs.performedBy')}</span>
                       <span className="al-detail-item__value">
-                        {selectedLog.performedBy || selectedLog.actorUserId || '—'}
+                        {(() => {
+                          const raw = selectedLog.actorUserId;
+                          return selectedLog.performedBy
+                            || (raw && typeof raw === 'object' ? raw.fullName : raw)
+                            || '—';
+                        })()}
                       </span>
                     </div>
                     <div className="al-detail-item">

@@ -1,5 +1,5 @@
 import axiosClient from '../api/axiosClient';
-import residentService from './resident.service';
+import staffService from './staff.service';
 
 const unwrap = (r) => r.data?.data ?? r.data;
 
@@ -14,7 +14,7 @@ const getCaregiverResident = (id) =>
   axiosClient.get(`/caregiver/residents/${id}`).then(unwrap);
 
 const listStaffResidents = (params = {}) =>
-  residentService.getResidentList({ status: 'admitted', limit: 100, ...params }).then((r) => ({
+  staffService.listAssignedResidents(params.userId).then((r) => ({
     data: Array.isArray(r?.data) ? r.data : [],
     total: r?.total ?? 0,
     message: r?.message,

@@ -6,6 +6,7 @@ import AdminPageShell from '../../../components/admin/AdminPageShell';
 import ListPagination from '../../../components/ui/ListPagination';
 import useClientPagination from '../../../hooks/useClientPagination';
 import useDebouncedSearch from '../../../hooks/useDebouncedSearch';
+import { useAuth } from '../../../hooks/useAuth';
 import staffAssignedResidentService from '../../../services/staffAssignedResident.service';
 import { resolveApiError } from '../../../utils/apiMessage';
 import { formatResidentAreaLine } from '../../../utils/residentArea';
@@ -19,6 +20,7 @@ import '../../../styles/shared/AssignedResidentsPage.css';
 export default function AssignedResidentsListPage({ role, footer }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const ns = getAssignedResidentsI18nNs(role);
   const basePath = getAssignedResidentsBasePath(role);
 
@@ -37,10 +39,12 @@ export default function AssignedResidentsListPage({ role, footer }) {
   } = useClientPagination(residents);
 
   const loadResidents = useCallback(async () => {
+    if (!user?._id) return;
     setLoading(true);
     setError('');
     try {
       const res = await staffAssignedResidentService.listResidents(role, {
+        userId: user?._id,
         search: debouncedSearch || undefined,
       });
       setResidents(Array.isArray(res.data) ? res.data : []);
@@ -51,7 +55,7 @@ export default function AssignedResidentsListPage({ role, footer }) {
     } finally {
       setLoading(false);
     }
-  }, [role, debouncedSearch, t, ns]);
+  }, [role, debouncedSearch, t, ns, user?._id]);
 
   useEffect(() => {
     loadResidents();

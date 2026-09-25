@@ -15,17 +15,17 @@ import {
   LogOut,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import admissionService from '../../services/admission.service';
 import contractService from '../../services/contract.service';
 import medicationService from '../../services/medication.service';
 import paymentService from '../../services/payment.service';
 import residentService from '../../services/resident.service';
 import servicePackageService from '../../services/servicePackage.service';
-import facilityService from '../../services/facility.service';
 import { resolveApiError } from '../../utils/apiMessage';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
+import ContractPreviewModal from '../../components/admin/contract/ContractPreviewModal';
 import { useToast } from '../../hooks/useToast';
 import '../../styles/admin/AdminContractManagementPage.css';
+import '../../styles/admin/ContractEditor.css';
 
 // ── Resident cell helpers ─────────────────────────────────────────────────────────
 const AVATAR_COLORS = ['#0f766e', '#e64980', '#0ca678', '#f76707', '#7048e8', '#1098ad', '#d6336c', '#5c7cfa'];
@@ -54,7 +54,11 @@ const formatResidentDisplay = (contract) => {
 };
 
 const getContractStatusClass = (startDate, endDate, contractStatus) => {
-  if (contractStatus === 'cancelled') return 'contract-status-cancelled';
+  // 'cancelled' = admission cancel; 'terminated' = admin chấm dứt hợp đồng (sau khi
+  // hợp đồng đã active). Cả hai đều là trạng thái terminal — không còn hiệu lực.
+  if (contractStatus === 'cancelled' || contractStatus === 'terminated') {
+    return 'contract-status-cancelled';
+  }
   const now = new Date();
   const start = new Date(startDate);
   const end = new Date(endDate);
@@ -69,7 +73,12 @@ const getContractStatusClass = (startDate, endDate, contractStatus) => {
 };
 
 const getContractStatusLabel = (startDate, endDate, contractStatus) => {
-  if (contractStatus === 'cancelled') return 'cancelled';
+  // 'cancelled' và 'terminated' đều là terminal — hợp đồng không còn hiệu lực.
+  // Trước đây chỉ check 'cancelled' → hợp đồng bị terminateContract chấm dứt bị
+  // tính nhầm là 'active' dựa trên endDate (khiến UI hiển thị "Còn hiệu lực").
+  if (contractStatus === 'cancelled' || contractStatus === 'terminated') {
+    return 'cancelled';
+  }
   const now = new Date();
   const start = new Date(startDate);
   const end = new Date(endDate);
@@ -131,6 +140,122 @@ const formatDateShort = (d) => {
   return date.toLocaleDateString('vi-VN');
 };
 
+// ── Component hiển thị điều khoản hợp đồng (terms) trong modal chi tiết ───────
+// Mặc định thu gọn (preview ~480px) để không phá layout modal. Admin bấm "Mở rộng"
+// để xem toàn bộ. Có nút "Sao chép" để copy nguyên văn terms vào clipboard.
+function ContractTermsSection({ contract, t }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [copyState, setCopyState] = useState('idle'); // idle | success | error
+
+  const rawTerms = contract?.terms;
+  const hasTerms = typeof rawTerms === 'string' && rawTerms.trim().length > 0;
+
+  const handleCopy = async () => {
+    if (!hasTerms) return;
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(rawTerms);
+      } else {
+        // Fallback cho trình duyệt không hỗ trợ clipboard API
+        const ta = document.createElement('textarea');
+        ta.value = rawTerms;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      setCopyState('success');
+      setTimeout(() => setCopyState('idle'), 1800);
+    } catch (err) {
+      console.error('[ContractTermsSection] copy failed:', err);
+      setCopyState('error');
+      setTimeout(() => setCopyState('idle'), 1800);
+    }
+  };
+
+  return (
+    <div className="form-group">
+      <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <span>{t('admin.contractManagement.contractTermsLabel')}</span>
+        {hasTerms && (
+          <span style={{ display: 'inline-flex', gap: 6 }}>
+            <button
+              type="button"
+              onClick={() => setIsExpanded((v) => !v)}
+              style={{
+                background: '#e0f2fe',
+                color: '#075985',
+                border: 'none',
+                borderRadius: 4,
+                padding: '2px 10px',
+                fontSize: '0.78rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              {isExpanded
+                ? t('admin.contractManagement.contractTermsCollapse')
+                : t('admin.contractManagement.contractTermsExpand')}
+            </button>
+            <button
+              type="button"
+              onClick={handleCopy}
+              style={{
+                background: copyState === 'success' ? '#dcfce7' : '#f1f5f9',
+                color: copyState === 'success' ? '#15803d' : '#475569',
+                border: 'none',
+                borderRadius: 4,
+                padding: '2px 10px',
+                fontSize: '0.78rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'background 0.15s, color 0.15s',
+              }}
+              title={t('admin.contractManagement.copyTermsButton')}
+            >
+              {copyState === 'success' ? '✓' : copyState === 'error' ? '✗' : t('admin.contractManagement.copyTermsButton')}
+            </button>
+          </span>
+        )}
+      </label>
+      <div
+        className="form-input readonly"
+        style={{
+          padding: 0,
+          overflow: 'hidden',
+          background: '#f8fafc',
+        }}
+      >
+        {hasTerms ? (
+          <pre
+            style={{
+              margin: 0,
+              padding: '12px 14px',
+              maxHeight: isExpanded ? 'none' : 320,
+              overflowY: 'auto',
+              overflowX: 'auto',
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
+              fontFamily: 'inherit',
+              fontSize: '0.88rem',
+              lineHeight: 1.55,
+              color: '#0f172a',
+            }}
+          >
+            {rawTerms}
+          </pre>
+        ) : (
+          <div style={{ padding: '12px 14px', color: '#94a3b8', fontStyle: 'italic', fontSize: '0.9rem' }}>
+            {t('admin.contractManagement.contractTermsEmpty')}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function AdminContractManagementPage() {
   const { t, i18n } = useTranslation();
   const { showToast } = useToast();
@@ -138,11 +263,15 @@ export default function AdminContractManagementPage() {
   const [filteredContracts, setFilteredContracts] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [residentFilter, setResidentFilter] = useState('all');
+  const [residentOptions, setResidentOptions] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   const [showContractDetailModal, setShowContractDetailModal] = useState(false);
+  const [detailContract, setDetailContract] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
   const [showContractInvoicesModal, setShowContractInvoicesModal] = useState(false);
   const [selectedContract, setSelectedContract] = useState(null);
   const [contractInvoices, setContractInvoices] = useState([]);
@@ -174,29 +303,14 @@ export default function AdminContractManagementPage() {
     newEndDate: '',
     discountPercent: 0,
     selectedNewPackageId: '',
-    selectedNewBedId: '',
   });
   const [extensionPackageError, setExtensionPackageError] = useState('');
   const [extensionAvailablePackages, setExtensionAvailablePackages] = useState([]);
-  const [extensionAvailableBeds, setExtensionAvailableBeds] = useState([]);
   const [extensionPackageLoading, setExtensionPackageLoading] = useState(false);
-  const [extensionBedsLoading, setExtensionBedsLoading] = useState(false);
-  const [extensionBedsError, setExtensionBedsError] = useState('');
-  const [extensionFloors, setExtensionFloors] = useState([]);
-  const [extensionRooms, setExtensionRooms] = useState([]);
-  const [extensionSelectedFloorId, setExtensionSelectedFloorId] = useState('');
-  const [extensionSelectedRoomId, setExtensionSelectedRoomId] = useState('');
-  const [extensionSelectionError, setExtensionSelectionError] = useState('');
   const [isExtendingContract, setIsExtendingContract] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancellationReason, setCancellationReason] = useState('');
   const [isCancellingContract, setIsCancellingContract] = useState(false);
-  const [showPackageModal, setShowPackageModal] = useState(false);
-  const [availablePackages, setAvailablePackages] = useState([]);
-  const [selectedPackageId, setSelectedPackageId] = useState('');
-  const [packageLoading, setPackageLoading] = useState(false);
-  const [isChangingPackage, setIsChangingPackage] = useState(false);
-  const [packageError, setPackageError] = useState('');
   const [isReleasingResident, setIsReleasingResident] = useState(false);
   const [pendingReleaseContract, setPendingReleaseContract] = useState(null);
 
@@ -260,81 +374,161 @@ export default function AdminContractManagementPage() {
     setIsLoading(true);
     setError('');
     try {
-      // Use new contractService.listContracts API - direct from contracts collection
-      const response = await contractService.listContracts({
-        page: 1,
-        limit: 1000,
-      });
+      // 1. Fetch all contracts
+      const response = await contractService.listContracts({ page: 1, limit: 1000 });
+      const contractList = response?.data || [];
 
-      const data = response?.data || [];
+      // 2. Fetch all residents
+      const residentResp = await residentService.getResidentList({ page: 1, limit: 1000 });
+      const residentList = Array.isArray(residentResp) ? residentResp : residentResp?.data || [];
 
-      // Map contract records
-      const contractData = data.map((contract) => {
-        const admission = contract.admissionId || {};
-        // admission.residentId chỉ là ObjectId thuần (chưa populate sâu),
-        // còn contract.residentId mới được populate. Phải kiểm tra .fullName
-        // trước khi rơi vào ObjectId rỗng.
-        const residentFromAdmission = admission.residentId;
-        const resident = (residentFromAdmission && typeof residentFromAdmission === 'object' && residentFromAdmission.fullName)
-          ? residentFromAdmission
-          : (contract.residentId || {});
-        const servicePackage = contract.servicePackageId || {};
-        const latestInvoice = contract.latestInvoice || null;
+      // 3. Build residentId -> best contract map
+      // Mỗi cư dân có thể có NHIỀU hợp đồng (vd: hợp đồng cũ bị terminate rồi nhập
+      // viện lại → tạo hợp đồng mới). Backend trả về sort theo createdAt desc, nên
+      // nếu chỉ đơn giản Map.set() theo thứ tự, hợp đồng CŨ (terminated/cancelled)
+      // sẽ ghi đè hợp đồng MỚI (active) trên UI. Phải ưu tiên hợp đồng còn hiệu lực.
+      const TERMINAL_STATUSES = ['cancelled', 'terminated'];
+      const isTerminal = (c) => c && TERMINAL_STATUSES.includes(String(c.status || '').toLowerCase());
+      const contractByResident = new Map();
+      for (const c of contractList) {
+        const rid = c.residentId?._id || c.residentId;
+        if (!rid) continue;
+        const ridStr = String(rid);
+        const existing = contractByResident.get(ridStr);
+        if (!existing) {
+          contractByResident.set(ridStr, c);
+          continue;
+        }
+        const existingTerminal = isTerminal(existing);
+        const currentTerminal = isTerminal(c);
+        if (currentTerminal && !existingTerminal) {
+          // current = terminated, existing = active → giữ existing (active thắng)
+          continue;
+        }
+        if (!currentTerminal && existingTerminal) {
+          // current = active, existing = terminated → current thắng
+          contractByResident.set(ridStr, c);
+          continue;
+        }
+        // Cả hai cùng trạng thái (đều active hoặc đều terminated) → lấy hợp đồng
+        // mới hơn theo createdAt. Backend đã sort desc nên phần tử sau cùng cùng
+        // trạng thái là MỚI hơn → ghi đè là đúng.
+        contractByResident.set(ridStr, c);
+      }
 
-        const residentStatus = String(resident?.residencyStatus || '').toLowerCase();
-        const hasServicePackage = Boolean(contract.servicePackageId || servicePackage?.name);
-        const isReleased = residentStatus === 'pending' && !hasServicePackage;
+      // 4. Build table rows: all residents + placeholder contracts for those without
+      const rows = [];
 
-        return {
-          id: contract._id,
-          // Use contract._id for new endpoints, fallback to admissionId for legacy
-          contractId: contract._id,
-          admissionId: admission._id,
-          contractStatus: contract.status || 'active',
-          residentId: resident._id,
-          residentName: resident.fullName || '',
-          residentCode: resident.residentCode || '',
-          residentDateOfBirth: resident.dateOfBirth || null,
-          residentGender: resident.gender || '',
-          residentStatus,
-          contractNumber: contract.contractNumber,
-          startDate: contract.startDate,
-          endDate: contract.endDate,
-          terms: contract.terms,
-          signedAt: contract.signedAt,
-          status: getContractStatusLabel(contract.startDate, contract.endDate, contract.status),
-          servicePackageId: servicePackage._id || null,
-          servicePackageName: servicePackage.name || 'N/A',
-          servicePackagePrice: (() => {
-            const fromPackage = Number(servicePackage?.monthlyPrice);
-            if (Number.isFinite(fromPackage) && fromPackage > 0) return fromPackage;
-            const fromContract = Number(contract?.monthlyFee);
-            if (Number.isFinite(fromContract) && fromContract > 0) return fromContract;
-            // Fallback: derive from latest invoice service cost / months
-            const latestSvcCost = Number(latestInvoice?.careServiceCost || 0);
-            const months = Number(contract?.durationMonths || 1);
-            if (latestSvcCost > 0 && months > 0) {
-              return Math.round((latestSvcCost / months) * (1 - (Number(contract?.discountPercent || 0) / 100)));
-            }
-            return 0;
-          })(),
-          contractDurationMonths: contract.durationMonths || null,
-          contractDiscountPercent: contract.discountPercent || null,
-          latestInvoice,
-          latestInvoiceStatus: latestInvoice?.status?.toString().toLowerCase?.() || null,
-          latestInvoicePaymentPlan: latestInvoice?.paymentPlan || null,
-          latestInvoiceRemainingAmount: Number(latestInvoice?.remainingAmount || 0),
-          outstandingAmount: contract.outstandingAmount || Number(latestInvoice?.remainingAmount || 0),
-          paymentPlan: contract.paymentPlan || null,
-          latestInvoiceHasServiceCost: latestInvoice && ['SERVICE', 'COMBINED'].includes(latestInvoice.type)
-            && Number(latestInvoice.careServiceCost || 0) > 0,
-          isReleased,
-          isRenewal: contract.isRenewal,
-          previousContractId: contract.previousContractId,
-        };
-      });
+      for (const resident of residentList) {
+        const rid = String(resident._id);
+        const rawContract = contractByResident.get(rid);
 
-      setContracts(contractData);
+        if (rawContract) {
+          // Has contract — use existing mapping logic
+          const contract = rawContract;
+          const admission = contract.admissionId || {};
+          const residentFromAdmission = admission.residentId;
+          const residentObj = (residentFromAdmission && typeof residentFromAdmission === 'object' && residentFromAdmission.fullName)
+            ? residentFromAdmission
+            : (contract.residentId || {});
+          const servicePackage = contract.servicePackageId || {};
+          const latestInvoice = contract.latestInvoice || null;
+
+          const residentStatus = String(residentObj?.residencyStatus || resident.residencyStatus || '').toLowerCase();
+          const hasServicePackage = Boolean(contract.servicePackageId || servicePackage?.name);
+          const isReleased = residentStatus === 'pending' && !hasServicePackage;
+
+          rows.push({
+            id: contract._id,
+            contractId: contract._id,
+            admissionId: admission._id,
+            contractStatus: contract.status || 'active',
+            residentId: resident._id,
+            residentName: residentObj?.fullName || resident.fullName || '',
+            residentCode: residentObj?.residentCode || resident.residentCode || '',
+            residentDateOfBirth: residentObj?.dateOfBirth || resident.dateOfBirth || null,
+            residentGender: residentObj?.gender || resident.gender || '',
+            residentStatus,
+            contractNumber: contract.contractNumber,
+            startDate: contract.startDate,
+            endDate: contract.endDate,
+            terms: contract.terms,
+            signedAt: contract.signedAt,
+            status: getContractStatusLabel(contract.startDate, contract.endDate, contract.status),
+            servicePackageId: servicePackage._id || null,
+            servicePackageName: servicePackage.name || 'N/A',
+            servicePackagePrice: (() => {
+              const fromPackage = Number(servicePackage?.monthlyPrice);
+              if (Number.isFinite(fromPackage) && fromPackage > 0) return fromPackage;
+              const fromContract = Number(contract?.monthlyFee);
+              if (Number.isFinite(fromContract) && fromContract > 0) return fromContract;
+              const latestSvcCost = Number(latestInvoice?.careServiceCost || 0);
+              const months = Number(contract?.durationMonths || 1);
+              if (latestSvcCost > 0 && months > 0) {
+                return Math.round((latestSvcCost / months) * (1 - (Number(contract?.discountPercent || 0) / 100)));
+              }
+              return 0;
+            })(),
+            contractDurationMonths: contract.durationMonths || null,
+            contractDiscountPercent: contract.discountPercent || null,
+            latestInvoice,
+            latestInvoiceStatus: latestInvoice?.status?.toString().toLowerCase?.() || null,
+            latestInvoicePaymentPlan: latestInvoice?.paymentPlan || null,
+            latestInvoiceRemainingAmount: Number(latestInvoice?.remainingAmount || 0),
+            outstandingAmount: contract.outstandingAmount || Number(latestInvoice?.remainingAmount || 0),
+            paymentPlan: contract.paymentPlan || null,
+            latestInvoiceHasServiceCost: latestInvoice && ['SERVICE', 'COMBINED'].includes(latestInvoice.type)
+              && Number(latestInvoice.careServiceCost || 0) > 0,
+            isReleased,
+            isRenewal: contract.isRenewal,
+            previousContractId: contract.previousContractId,
+            hasContract: true,
+          });
+        } else {
+          // No contract — create placeholder row
+          rows.push({
+            id: `no-contract-${resident._id}`,
+            contractId: null,
+            admissionId: null,
+            contractStatus: null,
+            residentId: resident._id,
+            residentName: resident.fullName || '',
+            residentCode: resident.residentCode || '',
+            residentDateOfBirth: resident.dateOfBirth || null,
+            residentGender: resident.gender || '',
+            residentStatus: String(resident.residencyStatus || '').toLowerCase(),
+            contractNumber: null,
+            startDate: null,
+            endDate: null,
+            terms: null,
+            signedAt: null,
+            status: 'no_contract',
+            servicePackageId: null,
+            servicePackageName: 'N/A',
+            servicePackagePrice: null,
+            contractDurationMonths: null,
+            contractDiscountPercent: null,
+            latestInvoice: null,
+            latestInvoiceStatus: null,
+            latestInvoicePaymentPlan: null,
+            latestInvoiceRemainingAmount: null,
+            outstandingAmount: null,
+            paymentPlan: null,
+            latestInvoiceHasServiceCost: false,
+            isReleased: false,
+            isRenewal: false,
+            previousContractId: null,
+            hasContract: false,
+          });
+        }
+      }
+
+      setContracts(rows);
+      // Populate resident filter dropdown
+      const sortedResidents = [...residentList].sort((a, b) =>
+        (a.fullName || '').localeCompare(b.fullName || '')
+      );
+      setResidentOptions(sortedResidents);
     } catch (err) {
       setError(err.message || t('admin.contractManagement.loadContractsFailed'));
       console.error('Error fetching contracts:', err);
@@ -352,71 +546,62 @@ export default function AdminContractManagementPage() {
 
     // Status filter
     if (statusFilter !== 'all') {
-      filtered = filtered.filter((contract) => {
-        const status = getContractStatusLabel(contract.startDate, contract.endDate, contract.contractStatus);
-        return status.toLowerCase() === statusFilter.toLowerCase();
-      });
+      if (statusFilter === 'no_contract') {
+        filtered = filtered.filter((contract) => !contract.hasContract);
+      } else {
+        filtered = filtered.filter((contract) => {
+          if (!contract.hasContract) return false;
+          const status = getContractStatusLabel(contract.startDate, contract.endDate, contract.contractStatus);
+          return status.toLowerCase() === statusFilter.toLowerCase();
+        });
+      }
     }
 
     // Search filter
     if (searchTerm) {
       filtered = filtered.filter(
         (contract) =>
-          contract.contractNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (contract.contractNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
           (contract.residentName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
           (contract.residentCode || '').toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
 
+    // Resident filter
+    if (residentFilter !== 'all') {
+      filtered = filtered.filter(
+        (contract) =>
+          String(contract.residentId) === String(residentFilter) ||
+          contract.residentId?._id === residentFilter
+      );
+    }
+
     setFilteredContracts(filtered);
     setCurrentPage(1);
-  }, [contracts, searchTerm, statusFilter]);
+  }, [contracts, searchTerm, statusFilter, residentFilter]);
 
-  const openPackageChangeModal = async (contract) => {
-    setSelectedContract(contract);
-    setSelectedPackageId(contract.servicePackageId || '');
-    setPackageError('');
-    setShowPackageModal(true);
-    setPackageLoading(true);
-    try {
-      const response = await servicePackageService.getServicePackageList({ isActive: true, page: 1, limit: 100 }, 'admin');
-      setAvailablePackages(Array.isArray(response) ? response : response?.data || []);
-    } catch (err) {
-      setPackageError(err.response?.data?.message || t('admin.contractManagement.loadPackagesFailed'));
-    } finally {
-      setPackageLoading(false);
-    }
-  };
-
-  const handleChangeContractPackage = async () => {
-    if (!selectedContract || !selectedPackageId) {
-      setPackageError(t('admin.contractManagement.selectNewPackage'));
+  // Fetch full contract detail (đã populate admission + servicePackage) khi mở modal chi tiết
+  useEffect(() => {
+    if (!showContractDetailModal || !selectedContract?.contractId) {
       return;
     }
-    if (selectedPackageId === selectedContract.servicePackageId) {
-      setPackageError(t('admin.contractManagement.selectDifferentPackage'));
+    // Đã load cho đúng contract này rồi → bỏ qua
+    if (detailContract && String(detailContract._id) === String(selectedContract.contractId)) {
       return;
     }
-    try {
-      setIsChangingPackage(true);
-      // NEW FLOW: Chỉ update package trên contract, KHÔNG tự tạo invoice.
-      // Admin phải gọi POST /api/admin/contracts/:contractId/create-invoice riêng nếu muốn xuất HĐ mới.
-      await admissionService.adminChangeContractServicePackage(selectedContract.admissionId, {
-        servicePackageId: selectedPackageId,
-      });
-      showToast(
-        t('admin.contractManagement.packageUpdatedInvoiceNeeded'),
-        'info'
-      );
-      setShowPackageModal(false);
-      setSelectedContract(null);
-      await fetchContracts();
-    } catch (err) {
-      setPackageError(err.response?.data?.message || t('admin.contractManagement.changePackageFailed'));
-    } finally {
-      setIsChangingPackage(false);
-    }
-  };
+    setDetailLoading(true);
+    contractService.getContractDetails(selectedContract.contractId)
+      .then((result) => {
+        // result = { contract, invoices, outstandingAmount }
+        setDetailContract(result.contract || result);
+      })
+      .catch((err) => {
+        console.error('Failed to load contract details:', err);
+        showToast(resolveApiError(err) || 'Không thể tải chi tiết hợp đồng', 'error');
+        setShowContractDetailModal(false);
+      })
+      .finally(() => setDetailLoading(false));
+  }, [showContractDetailModal, selectedContract?.contractId]);
 
   const openCancelContractModal = (contract) => {
     setSelectedContract(contract);
@@ -430,9 +615,20 @@ export default function AdminContractManagementPage() {
     try {
       setIsCancellingContract(true);
       // NEW: Use contractService.terminateContract with contractId
-      await contractService.terminateContract(selectedContract.contractId || selectedContract.id, {
+      const result = await contractService.terminateContract(selectedContract.contractId || selectedContract.id, {
         reason,
       });
+      const bedMsg = result?.bedFreed ? t('admin.contractManagement.bedFreedNotice') : '';
+      const tasksMsg = result?.tasksCancelled > 0
+        ? t('admin.contractManagement.tasksCancelledNotice', { count: result.tasksCancelled })
+        : '';
+      const evalMsg = result?.eligibilityStatusReset
+        ? t('admin.contractManagement.eligibilityResetNotice')
+        : '';
+      const detail = [bedMsg, tasksMsg, evalMsg].filter(Boolean).join('. ');
+      const baseMsg = t('admin.contractManagement.cancelSuccess');
+      const toastMsg = detail ? `${baseMsg}. ${detail}` : baseMsg;
+      showToast(toastMsg, 'success');
       setShowCancelModal(false);
       setSelectedContract(null);
       setCancellationReason('');
@@ -442,6 +638,17 @@ export default function AdminContractManagementPage() {
     } finally {
       setIsCancellingContract(false);
     }
+  };
+
+  // Handle create contract for resident without a contract
+  const handleCreateContractForResident = async (residentRow) => {
+    if (!residentRow || residentRow.hasContract) return;
+    // For now, navigate to admission/contract creation page via a toast hint
+    // The contract detail modal is view-only; a create flow would be a separate modal/page
+    showToast(
+      t('admin.contractManagement.createContractHint', { name: residentRow.residentName }),
+      'info'
+    );
   };
 
   const totalPages = Math.ceil(filteredContracts.length / itemsPerPage);
@@ -587,92 +794,6 @@ export default function AdminContractManagementPage() {
     }
   };
 
-  const getAllowedRoomTypesForPackage = (pkg) => {
-    if (!pkg) return [];
-
-    const allowedRoomTypes = pkg.allowedRoomTypes || [];
-    if (Array.isArray(allowedRoomTypes) && allowedRoomTypes.length > 0) {
-      return allowedRoomTypes.map((type) => String(type).toLowerCase());
-    }
-
-    const tier = String(pkg.tier || '').toLowerCase();
-    if (tier === 'vip') return ['icu', 'isolation'];
-    if (tier === 'premium') return ['premium'];
-    return ['standard'];
-  };
-
-  const loadFloorsForExtension = async () => {
-    setExtensionBedsLoading(true);
-    setExtensionBedsError('');
-    try {
-      const floors = await facilityService.listFloors({ page: 1, limit: 100 });
-      const floorsList = Array.isArray(floors) ? floors : floors?.data || [];
-      setExtensionFloors(floorsList);
-    } catch (err) {
-      console.error('Failed to load floors:', err);
-      setExtensionBedsError(t('admin.contractManagement.loadFloorsFailed'));
-    } finally {
-      setExtensionBedsLoading(false);
-    }
-  };
-
-  const handleExtensionFloorChange = async (floorId) => {
-    setExtensionSelectedFloorId(floorId);
-    setExtensionSelectedRoomId('');
-    setExtensionAvailableBeds([]);
-    setExtensionSelectionError('');
-    
-    if (!floorId) {
-      setExtensionRooms([]);
-      return;
-    }
-
-    setExtensionBedsLoading(true);
-    setExtensionBedsError('');
-    try {
-      const rooms = await facilityService.listRoomsByFloor(floorId);
-      const roomsList = Array.isArray(rooms) ? rooms : rooms?.data || [];
-      const selectedPackage = extensionAvailablePackages.find((pkg) => pkg._id === extensionData.selectedNewPackageId);
-      const allowedRoomTypes = getAllowedRoomTypesForPackage(selectedPackage);
-      const filteredRooms = allowedRoomTypes.length
-        ? roomsList.filter((room) => allowedRoomTypes.includes(String(room.roomType || '').toLowerCase()))
-        : roomsList;
-
-      setExtensionRooms(filteredRooms);
-      if (filteredRooms.length === 0) {
-        setExtensionSelectionError(t('admin.contractManagement.noMatchingRooms'));
-      }
-    } catch (err) {
-      console.error('Failed to load rooms:', err);
-      setExtensionBedsError(t('admin.contractManagement.loadRoomsFailed'));
-    } finally {
-      setExtensionBedsLoading(false);
-    }
-  };
-
-  const handleExtensionRoomChange = async (roomId) => {
-    setExtensionSelectedRoomId(roomId);
-    setExtensionData({ ...extensionData, selectedNewBedId: '' });
-    
-    if (!roomId) {
-      setExtensionAvailableBeds([]);
-      return;
-    }
-
-    setExtensionBedsLoading(true);
-    setExtensionBedsError('');
-    try {
-      const beds = await facilityService.listAvailableBedsByRoom(roomId);
-      const bedsList = Array.isArray(beds) ? beds : beds?.data || [];
-      setExtensionAvailableBeds(bedsList);
-    } catch (err) {
-      console.error('Failed to load beds:', err);
-      setExtensionBedsError(t('admin.contractManagement.loadBedsFailed'));
-    } finally {
-      setExtensionBedsLoading(false);
-    }
-  };
-
   const handleOpenExtensionModal = async (contract) => {
     setSelectedContract(contract);
     setExtensionPackageError('');
@@ -689,30 +810,19 @@ export default function AdminContractManagementPage() {
     // Set contract start date to today
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
-    
+
     // Calculate new end date (1 year from today)
     const newEndDate = new Date(today);
     newEndDate.setFullYear(newEndDate.getFullYear() + 1);
-    
+
     const initialPackageId = contract.servicePackageId || '';
     setExtensionData({
       contractStartDate: todayStr,
       newEndDate: newEndDate.toISOString().split('T')[0],
       discountPercent: contract.contractDiscountPercent || 0,
       selectedNewPackageId: initialPackageId,
-      selectedNewBedId: contract.assignedBedId || '',
     });
-    
-    // Reset bed selection hierarchy
-    setExtensionSelectedFloorId('');
-    setExtensionSelectedRoomId('');
-    setExtensionFloors([]);
-    setExtensionRooms([]);
-    setExtensionAvailableBeds([]);
-    
-    // Load floors
-    await loadFloorsForExtension();
-    
+
     setShowExtensionModal(true);
   };
 
@@ -803,24 +913,15 @@ export default function AdminContractManagementPage() {
       const contractStartDate = extensionData.contractStartDate;
       const contractEndDate = endDate.toISOString();
 
-      // NEW FLOW: Renew contract first - tạo HĐ mới, HĐ cũ chuyển 'expired'
-      await contractService.renewContract(selectedContract.contractId || selectedContract.id, {
+      const contractId = selectedContract.contractId || selectedContract.id;
+
+      // Extend the existing contract (1-to-1: update, not create new)
+      const renewResult = await contractService.renewContract(contractId, {
         startDate: contractStartDate,
         endDate: contractEndDate.split('T')[0],
         servicePackageId: extensionData.selectedNewPackageId,
         durationMonths: monthsDiff,
         discountPercent,
-      }).then(async (renewResult) => {
-        // Sau khi gia hạn, tạo hóa đơn cho HĐ MỚI (bước 3 của luồng mới)
-        const newContractId = renewResult?.newContract?._id;
-        if (newContractId) {
-          await contractService.createInvoiceFromContract(newContractId, {
-            careServiceCost: finalServiceCost,
-            durationMonths: monthsDiff,
-            billingPeriodStart: contractStartDate,
-            billingPeriodEnd: contractEndDate.split('T')[0],
-          });
-        }
       });
 
       const discountText = discountPercent > 0 ? t('admin.contractManagement.discountTextFormat', { percent: discountPercent }) : '';
@@ -1015,6 +1116,7 @@ export default function AdminContractManagementPage() {
       if (selectedContract) {
         await fetchContractInvoices(selectedContract);
       }
+      await fetchContracts();
     } catch (err) {
       const errorMsg =
         err?.response?.data?.message ||
@@ -1050,6 +1152,7 @@ export default function AdminContractManagementPage() {
       if (selectedContract) {
         await fetchContractInvoices(selectedContract);
       }
+      await fetchContracts();
     } catch (err) {
       showToast(
         err?.response?.data?.message ||
@@ -1109,6 +1212,25 @@ export default function AdminContractManagementPage() {
             <option value="expired">{t('admin.contractManagement.statusExpired')}</option>
             <option value="upcoming">{t('admin.contractManagement.statusUpcoming')}</option>
             <option value="cancelled">{t('admin.contractManagement.statusCancelled')}</option>
+            <option value="no_contract">{t('admin.contractManagement.statusNoContract') || 'Chưa có hợp đồng'}</option>
+          </select>
+        </div>
+
+        <div className="filter-group">
+          <Filter className="w-5 h-5 text-gray-600" />
+          <select
+            value={residentFilter}
+            onChange={(e) => setResidentFilter(e.target.value)}
+            className="filter-select"
+          >
+            <option value="all">{t('admin.contractManagement.allResidents') ?? 'Tất cả cư dân'}</option>
+            {residentOptions
+              .filter(r => r._id !== 'all')
+              .map((r) => (
+              <option key={r._id} value={r._id}>
+                {r.fullName || r.residentCode || r._id}
+              </option>
+            ))}
           </select>
         </div>
 
@@ -1133,7 +1255,6 @@ export default function AdminContractManagementPage() {
                   <th>{t('admin.contractManagement.colResidentName')}</th>
                   <th>{t('admin.contractManagement.colStartDate')}</th>
                   <th>{t('admin.contractManagement.colEndDate')}</th>
-                  <th>{t('admin.contractManagement.colInvoiceStatus')}</th>
                   <th>{t('admin.contractManagement.colStatus')}</th>
                   <th>{t('admin.contractManagement.colSignedDate')}</th>
                   <th>{t('admin.contractManagement.colActions')}</th>
@@ -1142,7 +1263,9 @@ export default function AdminContractManagementPage() {
               <tbody>
                 {paginatedContracts.map((contract) => (
                   <tr key={contract.id}>
-                    <td className="font-semibold">{contract.contractNumber}</td>
+                    <td className="font-semibold">
+                      {contract.hasContract ? contract.contractNumber : '—'}
+                    </td>
                     <td>
                       {(() => {
                         const { displayName, subtitle } = formatResidentDisplay(contract);
@@ -1163,146 +1286,105 @@ export default function AdminContractManagementPage() {
                         );
                       })()}
                     </td>
-                    <td>{formatDate(contract.startDate)}</td>
-                    <td>{formatDate(contract.endDate)}</td>
+                    <td>{contract.hasContract ? formatDate(contract.startDate) : '—'}</td>
+                    <td>{contract.hasContract ? formatDate(contract.endDate) : '—'}</td>
                     <td>
-                      {(() => {
-                        const summary = contract.invoiceSummary || null;
-                        const paidCount = summary?.paidCount ?? 0;
-                        const issuedCount = summary?.issuedCount ?? 0;
-                        const draftCount = summary?.draftCount ?? 0;
-                        const totalCount = summary?.totalCount ?? 0;
-                        const outstanding = Number(contract.outstandingAmount || summary?.outstandingAmount || 0);
-
-                        if (totalCount === 0) {
-                          return (
-                            <div className="inline-block px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600">
-                              {t('admin.contractManagement.noInvoiceIssuedForContract') || 'Chưa có hóa đơn nào được xuất cho hợp đồng này'}
-                            </div>
-                          );
-                        }
-
-                        // Có ít nhất 1 hóa đơn (draft hoặc đã xuất)
-                        const allPaid = paidCount === totalCount;
-                        const progressLabel = t('admin.contractManagement.invoicePaidProgress', { paid: paidCount, total: totalCount })
-                          || `Đã thanh toán ${paidCount}/${totalCount} hóa đơn`;
-                        const progressBg = allPaid ? '#dcfce7' : (paidCount > 0 ? '#fef3c7' : '#fee2e2');
-                        const progressColor = allPaid ? '#15803d' : (paidCount > 0 ? '#b45309' : '#b91c1c');
-
-                        return (
-                          <div className="inline-flex flex-col gap-1">
-                            <div
-                              className="inline-block px-3 py-1 rounded-full text-xs font-semibold"
-                              style={{ background: progressBg, color: progressColor }}
-                              title={`Đã thanh toán ${paidCount}/${totalCount} • Còn nợ ${totalCount - paidCount}`}
-                            >
-                              {progressLabel}
-                            </div>
-                            {draftCount > 0 && (
-                              <div className="inline-block px-2 py-1 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-600">
-                                {t('admin.contractManagement.draftInvoiceCount', { count: draftCount })}
-                              </div>
-                            )}
-                            {outstanding > 0 && (
-                              <div className="inline-block px-2 py-1 rounded-full text-[11px] font-semibold bg-sky-100 text-sky-700">
-                                {t('admin.contractManagement.outstandingAmountRemaining', { amount: outstanding.toLocaleString('vi-VN') })}
-                              </div>
-                            )}
+                      {!contract.hasContract ? (
+                        <div className="inline-block px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
+                          {t('admin.contractManagement.noContract') || 'Chưa có hợp đồng'}
+                        </div>
+                      ) : (
+                        <div className={`status-badge ${getContractStatusClass(contract.startDate, contract.endDate, contract.contractStatus)}`}>
+                          <div className="flex items-center gap-2">
+                            {getContractStatusIcon(contract.startDate, contract.endDate, contract.contractStatus)}
+                            <span>{getStatusTranslation(getContractStatusLabel(contract.startDate, contract.endDate, contract.contractStatus), t)}</span>
                           </div>
-                        );
-                      })()}
-                      {isContractOverdueUnpaid(contract) && (
-                        <div className="inline-block mt-1 px-2 py-1 rounded-full text-[11px] font-semibold bg-red-100 text-red-700">
-                          {t('admin.contractManagement.overdueUnpaid')}
                         </div>
                       )}
                     </td>
-                    <td>
-                      <div className={`status-badge ${getContractStatusClass(contract.startDate, contract.endDate, contract.contractStatus)}`}>
-                        <div className="flex items-center gap-2">
-                          {getContractStatusIcon(contract.startDate, contract.endDate, contract.contractStatus)}
-                          <span>{getStatusTranslation(getContractStatusLabel(contract.startDate, contract.endDate, contract.contractStatus), t)}</span>
-                        </div>
-                      </div>
-                    </td>
-                    <td>{formatDate(contract.signedAt)}</td>
+                    <td>{contract.hasContract ? formatDate(contract.signedAt) : '—'}</td>
                     <td>
                       <div className="flex gap-2">
-                        <button className="btn-icon-primary" title={t('admin.contractManagement.viewDetails')} onClick={() => {
-                          setSelectedContract(contract);
-                          setShowContractDetailModal(true);
-                        }}>
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        <button
-                          className="btn-icon-secondary"
-                          title={t('admin.contractManagement.viewInvoicesTitle') || 'Xem hóa đơn'}
-                          onClick={() => {
-                            setSelectedContract(contract);
-                            setShowContractInvoicesModal(true);
-                            fetchContractInvoices(contract);
-                          }}
-                        >
-                          <FileText className="w-4 h-4" />
-                        </button>
-                        {!contract.isReleased && contract.contractStatus !== 'cancelled' && (
-                          <button
-                            className="btn-icon-secondary"
-                            title={t('admin.contractManagement.createMedInvoiceTitle')}
-                            onClick={() => openMedicationInvoiceModal(contract)}
-                          >
-                            🩺
-                          </button>
-                        )}
-                        {!contract.isReleased && contract.contractStatus !== 'cancelled' && (
-                          <>
-                            <button
-                              className="btn-icon-secondary"
-                              title={t('admin.contractManagement.changePackageTitle')}
-                              onClick={() => openPackageChangeModal(contract)}
-                            >
-                              <RefreshCw className="w-4 h-4" />
-                            </button>
-                            <button
-                              className="btn-icon-secondary"
-                              title={t('admin.contractManagement.cancelContractTitle')}
-                              onClick={() => openCancelContractModal(contract)}
-                              style={{ color: '#dc2626' }}
-                            >
-                              <XCircle className="w-4 h-4" />
-                            </button>
-                          </>
-                        )}
-                        {contract.isReleased && (
+                        {!contract.hasContract ? (
                           <button
                             className="btn-icon-primary"
-                            title={t('admin.contractManagement.renewContractTitle')}
-                            onClick={() => handleOpenExtensionModal(contract)}
-                            style={{ background: '#f59e0b', color: 'white' }}
-                          >
-                            ↻
-                          </button>
-                        )}
-                        {!contract.isReleased && isOverdueReleaseEligible(contract) && (
-                          <button
-                            className="btn-icon-secondary"
-                            title={t('admin.contractManagement.releaseRoomTitle')}
-                            onClick={() => handleReleaseResident(contract)}
-                            disabled={isReleasingResident}
-                            style={{ background: '#ef4444', color: 'white' }}
-                          >
-                            <LogOut className="w-4 h-4" />
-                          </button>
-                        )}
-                        {!contract.isReleased && getContractStatusLabel(contract.startDate, contract.endDate, contract.contractStatus) === 'expired' && contract.contractStatus !== 'cancelled' && (
-                          <button
-                            className="btn-icon-primary"
-                            title={t('admin.contractManagement.extendContractTitle')}
-                            onClick={() => handleOpenExtensionModal(contract)}
+                            title={t('admin.contractManagement.createContract') || 'Tạo hợp đồng'}
+                            onClick={() => handleCreateContractForResident(contract)}
                             style={{ background: '#0f766e', color: 'white' }}
                           >
-                            ↻
+                            📝
                           </button>
+                        ) : (
+                          <>
+                            <button className="btn-icon-primary" title={t('admin.contractManagement.viewDetails')} onClick={() => {
+                              setSelectedContract(contract);
+                              setDetailContract(null);
+                              setShowContractDetailModal(true);
+                            }}>
+                              <Eye className="w-4 h-4" />
+                            </button>
+                            <button
+                              className="btn-icon-secondary"
+                              title={t('admin.contractManagement.viewInvoicesTitle') || 'Xem hóa đơn'}
+                              onClick={() => {
+                                setSelectedContract(contract);
+                                setShowContractInvoicesModal(true);
+                                fetchContractInvoices(contract);
+                              }}
+                            >
+                              <FileText className="w-4 h-4" />
+                            </button>
+                            {!contract.isReleased && contract.contractStatus !== 'cancelled' && (
+                              <button
+                                className="btn-icon-secondary"
+                                title={t('admin.contractManagement.createMedInvoiceTitle')}
+                                onClick={() => openMedicationInvoiceModal(contract)}
+                              >
+                                🩺
+                              </button>
+                            )}
+                            {!contract.isReleased && contract.contractStatus !== 'cancelled' && (
+                              <button
+                                  className="btn-icon-secondary"
+                                  title={t('admin.contractManagement.cancelContractTitle')}
+                                  onClick={() => openCancelContractModal(contract)}
+                                  style={{ color: '#dc2626' }}
+                                >
+                                  <XCircle className="w-4 h-4" />
+                                </button>
+                            )}
+                            {contract.isReleased && (
+                              <button
+                                className="btn-icon-primary"
+                                title={t('admin.contractManagement.renewContractTitle')}
+                                onClick={() => handleOpenExtensionModal(contract)}
+                                style={{ background: '#f59e0b', color: 'white' }}
+                              >
+                                ↻
+                              </button>
+                            )}
+                            {!contract.isReleased && isOverdueReleaseEligible(contract) && (
+                              <button
+                                className="btn-icon-secondary"
+                                title={t('admin.contractManagement.releaseRoomTitle')}
+                                onClick={() => handleReleaseResident(contract)}
+                                disabled={isReleasingResident}
+                                style={{ background: '#ef4444', color: 'white' }}
+                              >
+                                <LogOut className="w-4 h-4" />
+                              </button>
+                            )}
+                            {!contract.isReleased && getContractStatusLabel(contract.startDate, contract.endDate, contract.contractStatus) === 'expired' && contract.contractStatus !== 'cancelled' && (
+                              <button
+                                className="btn-icon-primary"
+                                title={t('admin.contractManagement.extendContractTitle')}
+                                onClick={() => handleOpenExtensionModal(contract)}
+                                style={{ background: '#0f766e', color: 'white' }}
+                              >
+                                ↻
+                              </button>
+                            )}
+                          </>
                         )}
                       </div>
                     </td>
@@ -1685,55 +1767,6 @@ export default function AdminContractManagementPage() {
         </div>
       )}
 
-      {showPackageModal && (
-        <div className="modal-overlay" onClick={() => setShowPackageModal(false)}>
-          <div className="modal-content" onClick={(event) => event.stopPropagation()}>
-            <div className="modal-header">
-              <h2>{t('admin.contractManagement.changePackageModalTitle')}</h2>
-              <button className="modal-close" onClick={() => setShowPackageModal(false)}>
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="modal-body">
-              {selectedContract && (
-                <p className="form-note" style={{ marginBottom: '16px' }}>
-                  {t('admin.contractManagement.packageContractOf', { number: selectedContract.contractNumber, name: selectedContract.residentName })}
-                </p>
-              )}
-              {packageError && <div className="alert alert-error">{packageError}</div>}
-              <div className="form-group">
-                <label>{t('admin.contractManagement.newPackageLabel')}</label>
-                <p className="form-note" style={{ marginTop: '4px', marginBottom: '8px' }}>
-                  {t('admin.contractManagement.changePackageNote')}
-                </p>
-                {packageLoading ? (
-                  <div className="form-note">{t('admin.contractManagement.loadingPackages')}</div>
-                ) : (
-                  <select
-                    className="form-select"
-                    value={selectedPackageId}
-                    onChange={(event) => setSelectedPackageId(event.target.value)}
-                  >
-                    <option value="">{t('admin.contractManagement.choosePackagePlaceholder')}</option>
-                    {availablePackages.map((pkg) => (
-                      <option key={pkg._id} value={pkg._id}>
-                        {pkg.name || pkg.packageCode} - {(pkg.monthlyPrice || 0).toLocaleString('vi-VN')} {t('admin.contractManagement.vndPerMonth')}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button className="btn-cancel" onClick={() => setShowPackageModal(false)}>{t('admin.contractManagement.closeButton')}</button>
-              <button className="btn-submit" onClick={handleChangeContractPackage} disabled={packageLoading || isChangingPackage || !selectedPackageId}>
-                {isChangingPackage ? t('admin.contractManagement.updatingButton') : t('admin.contractManagement.savePackageButton')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {showCancelModal && (
         <div className="modal-overlay" onClick={() => setShowCancelModal(false)}>
           <div className="modal-content" onClick={(event) => event.stopPropagation()}>
@@ -1819,13 +1852,7 @@ export default function AdminContractManagementPage() {
                       <select
                         value={extensionData.selectedNewPackageId}
                         onChange={(e) => {
-                          const newPackageId = e.target.value;
-                          setExtensionData({ ...extensionData, selectedNewPackageId: newPackageId, selectedNewBedId: '' });
-                          setExtensionSelectedFloorId('');
-                          setExtensionSelectedRoomId('');
-                          setExtensionRooms([]);
-                          setExtensionAvailableBeds([]);
-                          setExtensionSelectionError('');
+                          setExtensionData({ ...extensionData, selectedNewPackageId: e.target.value });
                         }}
                         className="form-input"
                       >
@@ -1838,96 +1865,6 @@ export default function AdminContractManagementPage() {
                       </select>
                     )}
                   </div>
-
-                  {/* Bed Selection - Hierarchical */}
-                  {extensionData.selectedNewPackageId && (
-                    <>
-                      {/* Floor Selection */}
-                      <div className="form-group">
-                        <label>{t('admin.contractManagement.buildingLabel')}</label>
-                        {extensionBedsLoading && !extensionSelectedFloorId ? (
-                          <div className="form-input" style={{ color: '#999' }}>{t('admin.contractManagement.loadingLabel')}</div>
-                        ) : extensionBedsError && !extensionSelectedFloorId ? (
-                          <div style={{ color: '#dc2626', fontSize: '14px' }}>{extensionBedsError}</div>
-                        ) : (
-                          <select
-                            value={extensionSelectedFloorId}
-                            onChange={(e) => handleExtensionFloorChange(e.target.value)}
-                            className="form-input"
-                          >
-                            <option value="">{t('admin.contractManagement.chooseBuildingPlaceholder')}</option>
-                            {extensionFloors.map((floor) => {
-                              const floorLabel = floor.name || floor.label || t('admin.contractManagement.floorLabel', { number: floor.floorNumber || '' }).trim();
-                              return (
-                                <option key={floor._id} value={floor._id}>
-                                  {floorLabel}
-                                </option>
-                              );
-                            })}
-                          </select>
-                        )}
-                      </div>
-
-                      {/* Room Selection */}
-                      {extensionSelectedFloorId && (
-                        <div className="form-group">
-                          <label>{t('admin.contractManagement.roomLabel')}</label>
-                          {extensionBedsLoading && extensionSelectedFloorId && !extensionSelectedRoomId ? (
-                            <div className="form-input" style={{ color: '#999' }}>{t('admin.contractManagement.loadingLabel')}</div>
-                          ) : extensionBedsError && extensionSelectedFloorId && !extensionSelectedRoomId ? (
-                            <div style={{ color: '#dc2626', fontSize: '14px' }}>{extensionBedsError}</div>
-                          ) : (
-                            <select
-                              value={extensionSelectedRoomId}
-                              onChange={(e) => handleExtensionRoomChange(e.target.value)}
-                              className="form-input"
-                            >
-                              <option value="">{t('admin.contractManagement.chooseRoomPlaceholder')}</option>
-                              {extensionRooms.map((room) => {
-                                const roomLabel = room.label || room.roomNumber || room.name || t('admin.contractManagement.roomDefault', { id: room.roomNumber || room.number || room._id?.slice(-4) });
-                                return (
-                                  <option key={room._id} value={room._id}>
-                                    {roomLabel}
-                                  </option>
-                                );
-                              })}
-                            </select>
-                          )}
-                          {extensionSelectionError && (
-                            <div style={{ color: '#dc2626', fontSize: '14px', marginTop: '6px' }}>{extensionSelectionError}</div>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Bed Selection */}
-                      {extensionSelectedRoomId && (
-                        <div className="form-group">
-                          <label>{t('admin.contractManagement.bedLabel')}</label>
-                          {extensionBedsLoading && extensionSelectedRoomId ? (
-                            <div className="form-input" style={{ color: '#999' }}>{t('admin.contractManagement.loadingLabel')}</div>
-                          ) : extensionBedsError && extensionSelectedRoomId ? (
-                            <div style={{ color: '#dc2626', fontSize: '14px' }}>{extensionBedsError}</div>
-                          ) : (
-                            <select
-                              value={extensionData.selectedNewBedId}
-                              onChange={(e) => setExtensionData({ ...extensionData, selectedNewBedId: e.target.value })}
-                              className="form-input"
-                            >
-                              <option value="">{t('admin.contractManagement.keepCurrentBed')}</option>
-                              {extensionAvailableBeds.map((bed) => {
-                                const bedLabel = bed.label || bed.bedCode || bed.code || bed.bedNumber || t('admin.contractManagement.bedDefault', { id: bed.bedCode || bed._id?.slice(-4) });
-                                return (
-                                  <option key={bed._id} value={bed._id}>
-                                    {bedLabel}
-                                  </option>
-                                );
-                              })}
-                            </select>
-                          )}
-                        </div>
-                      )}
-                    </>
-                  )}
 
                   <div className="form-row">
                     <div className="form-group">
@@ -2074,99 +2011,24 @@ export default function AdminContractManagementPage() {
         </div>
       )}
 
-      {showContractDetailModal && selectedContract && (
-        <div className="modal-overlay" onClick={() => {
-          setShowContractDetailModal(false);
-          setContractInvoices([]);
-        }}>
-          <div className="modal-content" onClick={(event) => event.stopPropagation()}>
-            <div className="modal-header">
-              <h2>{t('admin.contractManagement.contractDetailModalTitle')}</h2>
-              <button className="modal-close" onClick={() => {
-                setShowContractDetailModal(false);
-                setContractInvoices([]);
-              }}>
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="modal-body">
-              <div className="form-group">
-                <label>{t('admin.contractManagement.contractNumberLabel')}</label>
-                <div className="form-input readonly">{selectedContract.contractNumber || '-'}</div>
-              </div>
-              <div className="form-group">
-                <label>{t('admin.contractManagement.residentLabel')}</label>
-                <div className="form-input readonly">{selectedContract.residentName || '-'}</div>
-              </div>
-              <div className="form-row">
-                <div className="form-group">
-                  <label>{t('admin.contractManagement.colStartDate')}</label>
-                  <div className="form-input readonly">{formatDate(selectedContract.startDate)}</div>
-                </div>
-                <div className="form-group">
-                  <label>{t('admin.contractManagement.endDateLabel')}</label>
-                  <div className="form-input readonly">{formatDate(selectedContract.endDate)}</div>
-                </div>
-              </div>
-              <div className="form-row">
-                <div className="form-group">
-                  <label>{t('admin.contractManagement.contractStatusLabel')}</label>
-                  <div className="form-input readonly">{getStatusTranslation(getContractStatusLabel(selectedContract.startDate, selectedContract.endDate, selectedContract.contractStatus), t)}</div>
-                </div>
-                <div className="form-group">
-                  <label>{t('admin.contractManagement.colSignedDate')}</label>
-                  <div className="form-input readonly">{formatDate(selectedContract.signedAt)}</div>
-                </div>
-              </div>
-              <div className="form-group">
-                <label>{t('admin.contractManagement.servicePackageLabel')}</label>
-                <div className="form-input readonly">{selectedContract.servicePackageName || '-'}</div>
-              </div>
-              <div className="form-row">
-                <div className="form-group">
-                  <label>{t('admin.contractManagement.servicePriceLabel')}</label>
-                  <div className="form-input readonly">
-                    {Number(selectedContract.servicePackagePrice) > 0
-                      ? formatCurrency(selectedContract.servicePackagePrice)
-                      : <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>—</span>}
-                  </div>
-                </div>
-                <div className="form-group">
-                  <label>{t('admin.contractManagement.contractDiscountLabel')}</label>
-                  <div className="form-input readonly">{selectedContract.contractDiscountPercent != null ? `${selectedContract.contractDiscountPercent}%` : '-'}</div>
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label>{t('admin.contractManagement.latestInvoiceLabel')}</label>
-                <div className="form-input readonly">
-                  {selectedContract.latestInvoice ? (
-                    <>
-                      <div>{selectedContract.latestInvoice.invoiceNumber || '—'}</div>
-                      <div style={{ marginTop: 8, fontSize: '0.95rem', color: '#475569' }}>
-                        {selectedContract.latestInvoiceStatus === 'paid' ? t('admin.contractManagement.paidLabel') : selectedContract.latestInvoiceStatus === 'partially_paid' ? t('admin.contractManagement.partiallyPaidLabel') : t('admin.contractManagement.unpaidLabel')}
-                      </div>
-                      {selectedContract.outstandingAmount > 0 && (
-                        <div style={{ marginTop: 6, fontSize: '0.92rem', color: '#0f172a' }}>
-                          {t('admin.contractManagement.totalOutstandingDebt', { amount: selectedContract.outstandingAmount.toLocaleString('vi-VN') })}
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    t('admin.contractManagement.noInvoiceSimple')
-                  )}
-                </div>
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button className="btn-submit" onClick={() => {
-                setShowContractDetailModal(false);
-              }}>
-                {t('admin.contractManagement.closeButton')}
-              </button>
+      {showContractDetailModal && (
+        detailLoading ? (
+          <div className="modal-overlay">
+            <div className="modal-content" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 320 }}>
+              <div className="spinner" />
             </div>
           </div>
-        </div>
+        ) : (
+          <ContractPreviewModal
+            open={true}
+            onClose={() => {
+              setShowContractDetailModal(false);
+              setDetailContract(null);
+            }}
+            contract={detailContract}
+            terms={detailContract?.terms || selectedContract?.terms || ''}
+          />
+        )
       )}
 
       {/* Contract Invoices Modal - popup riêng */}
@@ -2349,9 +2211,6 @@ export default function AdminContractManagementPage() {
                             <th style={{ padding: '12px 14px', textAlign: 'right', borderBottom: '2px solid #e2e8f0', fontWeight: 600, whiteSpace: 'nowrap', minWidth: 130, color: '#0f172a' }}>
                               {t('admin.contractManagement.colInvoiceTotal') || 'Tổng tiền'}
                             </th>
-                            <th style={{ padding: '12px 14px', textAlign: 'center', borderBottom: '2px solid #e2e8f0', fontWeight: 600, whiteSpace: 'nowrap', minWidth: 150, color: '#0f172a' }}>
-                              {t('admin.contractManagement.colInvoiceStatus') || 'Trạng thái'}
-                            </th>
                             <th style={{ padding: '12px 14px', textAlign: 'left', borderBottom: '2px solid #e2e8f0', fontWeight: 600, whiteSpace: 'nowrap', minWidth: 120, color: '#0f172a' }}>
                               {t('admin.contractManagement.colInvoicePeriodStart') || 'Ngày bắt đầu'}
                             </th>
@@ -2368,7 +2227,6 @@ export default function AdminContractManagementPage() {
                             const statusKey = String(inv.status || '').toLowerCase();
                             const totalAmount = Number(inv.totalAmount || inv.total || 0);
                             const remainingAmount = Number(inv.remainingAmount || 0);
-                            const isDraft = statusKey === 'draft';
                             const isZeroAmount = totalAmount === 0;
                             const isPaid = statusKey === 'paid' || remainingAmount <= 0;
                             // Ưu tiên dueDate; fallback sang billingPeriodEnd / periodEnd nếu chưa set dueDate
@@ -2378,21 +2236,6 @@ export default function AdminContractManagementPage() {
                             const dueDateObj = dueDateRaw ? new Date(dueDateRaw) : null;
                             const isOverdue = !isPaid && dueDateObj && !isNaN(dueDateObj.getTime())
                               && dueDateObj.getTime() < new Date(new Date().toDateString()).getTime();
-                            const statusBadge = (() => {
-                              if (statusKey === 'paid') {
-                                return { bg: '#dcfce7', color: '#15803d', label: t('admin.contractManagement.paidLabel') || 'Đã thanh toán' };
-                              }
-                              if (statusKey === 'partially_paid') {
-                                return { bg: '#fef3c7', color: '#b45309', label: t('admin.contractManagement.partiallyPaidLabel') || 'Thanh toán một phần' };
-                              }
-                              if (statusKey === 'cancelled') {
-                                return { bg: '#e2e8f0', color: '#475569', label: t('admin.contractManagement.statusCancelled') || 'Đã hủy' };
-                              }
-                              if (statusKey === 'draft') {
-                                return { bg: '#f1f5f9', color: '#475569', label: t('admin.contractManagement.draftLabel') || 'Nháp' };
-                              }
-                              return { bg: '#fee2e2', color: '#b91c1c', label: t('admin.contractManagement.unpaidLabel') || 'Chưa thanh toán' };
-                            })();
                             const typeLabel = (() => {
                               const typeKey = String(inv.type || '').toUpperCase();
                               if (typeKey === 'SERVICE') return t('admin.contractManagement.invoiceTypeService') || 'Dịch vụ';
@@ -2437,19 +2280,6 @@ export default function AdminContractManagementPage() {
                                   {isZeroAmount
                                     ? (t('admin.contractManagement.noPriceYet') || '(chưa có đơn giá)')
                                     : `${totalAmount.toLocaleString('vi-VN')} VND`}
-                                </td>
-                                <td style={{ padding: '12px 14px', borderBottom: '1px solid #f1f5f9', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                                  <span style={{
-                                    display: 'inline-block',
-                                    padding: '4px 12px',
-                                    borderRadius: 999,
-                                    fontSize: '0.78rem',
-                                    fontWeight: 600,
-                                    background: statusBadge.bg,
-                                    color: statusBadge.color,
-                                  }}>
-                                    {statusBadge.label}
-                                  </span>
                                 </td>
                                 <td
                                   style={{

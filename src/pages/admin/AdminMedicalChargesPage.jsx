@@ -20,7 +20,7 @@ export default function AdminMedicalChargesPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('PENDING');
+  const [statusFilter, setStatusFilter] = useState('');
   const [selectedCharges, setSelectedCharges] = useState(new Set());
   const [residents, setResidents] = useState({});
   const [generatingInvoice, setGeneratingInvoice] = useState(false);

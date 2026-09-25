@@ -7,6 +7,7 @@ import {
   staffCertificationValidationKey,
   validateStaffCertifications,
 } from '../../utils/staffCertificateValidation';
+import '../../styles/admin/StaffProfilesPage.css';
 
 const initialCreateForm = {
   fullName: '',
@@ -234,11 +235,11 @@ function AdminAccountsPage() {
   };
 
   return (
-    <div className="profile-page">
+    <div className="profile-page staff-page">
       <div className="profile-page__container">
-        <header className="profile-page__header">
-          <h1 className="profile-page__title">{t('adminAccounts.pageTitle')}</h1>
-          <p className="profile-page__subtitle">
+        <header className="profile-page__header staff-page__header">
+          <h1 className="profile-page__title staff-page__title">{t('adminAccounts.pageTitle')}</h1>
+          <p className="profile-page__subtitle staff-page__subtitle">
             {t('adminAccounts.pageSubtitle')}
           </p>
         </header>

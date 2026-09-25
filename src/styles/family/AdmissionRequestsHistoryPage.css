@@ -879,6 +879,25 @@
   box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.08);
 }
 
+.arh-modal__input {
+  width: 100%;
+  background: #f8fafc;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 9px 12px;
+  font-size: 13.5px;
+  color: #0f172a;
+  font-family: inherit;
+  outline: none;
+  transition: all 0.18s ease;
+}
+
+.arh-modal__input:focus {
+  border-color: #0f766e;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
+}
+
 .arh-modal__actions {
   display: flex;
   justify-content: flex-end;
