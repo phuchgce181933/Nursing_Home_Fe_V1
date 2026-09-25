@@ -458,7 +458,7 @@
   background: #ffffff;
   border: 1px solid var(--nh-border);
   border-radius: 16px;
-  overflow: visible;
+  overflow-x: auto;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04), 0 4px 12px rgba(15, 23, 42, 0.03);
 }
 
@@ -493,6 +493,22 @@
 }
 
 .med-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+.med-table th:last-child,
+.med-table td:last-child {
+  position: sticky;
+  right: 0;
+  z-index: 2;
+}
+.med-table th:last-child {
+  background: var(--nh-table-header-bg);
+}
+.med-table td:last-child {
+  background: #fff;
+}
+.med-table tbody tr:hover td:last-child {
   background: #f8fafc;
 }
 
@@ -2803,10 +2819,6 @@
 
   .med-drawer {
     max-width: 100%;
-  }
-
-  .med-table-wrap {
-    overflow-x: auto;
   }
 
   .med-action-group {

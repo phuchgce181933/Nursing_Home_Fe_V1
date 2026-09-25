@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AlertTriangle, CheckCircle, CreditCard, Package, Users, Wallet, PlusCircle, Search, ChevronDown, Eye, Printer, X } from 'lucide-react';
+import { AlertTriangle, CheckCircle, CreditCard, Package, Users, Wallet, PlusCircle, Search, ChevronDown, ChevronLeft, ChevronRight, Eye, Printer, X, ArrowDownCircle, ArrowUpCircle, Landmark, RotateCcw, History } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import residentService from '../../services/resident.service';
 import familyPortalService from '../../services/familyPortal.service';
@@ -11,6 +11,133 @@ const formatMoney = (value) =>
 
 const TOPUP_MIN = 10000;
 const TOPUP_MAX = 500000000;
+
+// ---------------------------------------------------------------------------
+// Wallet transaction presentation.
+//
+// Mirrors the Mobile app's single source of truth (src/utils/walletTxLabels.ts):
+// the backend keeps raw enum values (topup/payment/refund, credit/debit/none,
+// wallet/payos) and the UI NEVER shows them raw. The amount sign follows
+// `direction`, not `type` — a direct PayOS invoice payment (direction 'none',
+// walletAffected=false) does NOT move the wallet, so it gets NO +/- sign and is
+// never drawn as a wallet debit.
+// ---------------------------------------------------------------------------
+const TX_NS = 'familyDashboard.transactionHistory';
+
+// Dashboard compact view = newest 5; expanded history = server-paginated 10/page.
+const DASHBOARD_TX_PREVIEW = 5;
+const EXPANDED_PAGE_SIZE = 10;
+// UI filter → backend `direction`. "all" sends nothing, so direct-PayOS (direction 'none')
+// is only ever visible under "Tất cả" and never miscounted as money-out.
+const TX_FILTER_DIRECTION = { in: 'credit', out: 'debit' };
+
+// Compact page list with ellipsis, e.g. [1, '…', 4, 5, 6, '…', 12]. First & last always
+// shown; a one-page neighbourhood around the current page. Tokens are strings so React keys
+// stay stable and non-numeric entries render as a gap.
+const buildPageItems = (current, total) => {
+  if (total <= 1) return [1];
+  const items = [1];
+  const left = Math.max(2, current - 1);
+  const right = Math.min(total - 1, current + 1);
+  if (left > 2) items.push('ellipsis-left');
+  for (let i = left; i <= right; i += 1) items.push(i);
+  if (right < total - 1) items.push('ellipsis-right');
+  items.push(total);
+  return items;
+};
+
+const txAffectsWallet = (tx) => tx?.walletAffected !== false;
+
+const txAmountSign = (tx) => {
+  if (!txAffectsWallet(tx)) return '';
+  const dir = tx?.direction || (tx?.type === 'payment' ? 'debit' : 'credit');
+  if (dir === 'debit') return '-';
+  if (dir === 'credit') return '+';
+  return '';
+};
+
+const txTypeLabel = (t, tx) => {
+  if (tx?.type === 'payment' && !txAffectsWallet(tx)) return t(`${TX_NS}.typePayosPayment`);
+  switch (tx?.type) {
+    case 'topup': return t(`${TX_NS}.typeTopup`);
+    case 'payment': return t(`${TX_NS}.typeWalletPayment`);
+    case 'refund': return t(`${TX_NS}.typeRefund`);
+    default: return t(`${TX_NS}.typeOther`);
+  }
+};
+
+const txMethodLabel = (t, tx) => {
+  const method = tx?.paymentMethod || (txAffectsWallet(tx) ? 'wallet' : 'payos');
+  return method === 'wallet' ? t(`${TX_NS}.methodWallet`) : t(`${TX_NS}.methodPayos`);
+};
+
+// A 24-char hex token is a MongoDB ObjectId. Older wallet payments were recorded with a
+// description like "Thanh toán hóa đơn <_id>", so the raw string can leak an ObjectId into
+// the family UI. We never surface it: prefer the human-readable invoiceNumber, otherwise
+// strip the id and fall back to a safe generic label. Non-global for tests (avoids the
+// stateful lastIndex trap of a /g regex used with .test()); a separate /g for stripping.
+const OBJECT_ID_RE = /[0-9a-fA-F]{24}/;
+const OBJECT_ID_RE_GLOBAL = /[0-9a-fA-F]{24}/g;
+const isUnsafeDesc = (s) =>
+  !s || s === '[object Object]' || s === 'undefined' || s === 'null' || OBJECT_ID_RE.test(s);
+
+const txTypeFallbackDesc = (t, tx) => {
+  if (tx?.type === 'topup') return t(`${TX_NS}.defaultTopup`);
+  if (tx?.type === 'refund') return t(`${TX_NS}.defaultRefund`);
+  if (!txAffectsWallet(tx)) return t(`${TX_NS}.defaultPayosPayment`);
+  return t(`${TX_NS}.paymentGeneric`);
+};
+
+const txDescription = (t, tx) => {
+  const raw = typeof tx?.description === 'string' ? tx.description : '';
+  if (raw && !isUnsafeDesc(raw)) return raw;
+
+  // Description is empty, meaningless, or leaks an ObjectId → prefer invoiceNumber.
+  if (tx?.invoiceNumber) return t(`${TX_NS}.paymentWithInvoice`, { number: tx.invoiceNumber });
+
+  // No invoiceNumber: if the only problem was an embedded ObjectId, strip it and keep any
+  // remaining readable text; otherwise use a type-appropriate safe fallback.
+  if (raw && OBJECT_ID_RE.test(raw)) {
+    const cleaned = raw
+      .replace(OBJECT_ID_RE_GLOBAL, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim()
+      .replace(/[·:\-–—]\s*$/, '')
+      .trim();
+    if (cleaned && !OBJECT_ID_RE.test(cleaned)) return cleaned;
+  }
+  return txTypeFallbackDesc(t, tx);
+};
+
+const txStatusLabel = (t, status) => {
+  if (status === 'completed') return t(`${TX_NS}.statusCompleted`);
+  if (status === 'failed') return t(`${TX_NS}.statusFailed`);
+  return t(`${TX_NS}.statusPending`);
+};
+
+// "500.000 ₫" — integer VND, no decimals, sign from direction. Consistent with the
+// ₫ symbol used elsewhere on this dashboard (formatMoney).
+const formatSignedAmount = (tx) => {
+  const sign = txAmountSign(tx);
+  const n = Math.abs(Math.round(Number(tx?.amount) || 0)).toLocaleString('vi-VN');
+  return `${sign}${n} ₫`;
+};
+
+const formatTxDateTime = (iso) => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleString('vi-VN', {
+    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+  });
+};
+
+const TxIcon = ({ tx }) => {
+  if (tx?.type === 'refund') return <RotateCcw size={20} />;
+  if (tx?.type === 'topup') return <ArrowDownCircle size={20} />;
+  if (!txAffectsWallet(tx)) return <Landmark size={20} />; // direct PayOS — bank transfer
+  return <ArrowUpCircle size={20} />; // wallet debit
+};
 
 const PACKAGE_PRICES = {
   'Gói Cơ Bản': 8000000,
@@ -96,6 +223,15 @@ function FamilyDashboardPage() {
   const [walletError, setWalletError] = useState(null);
   const [topupAmount, setTopupAmount] = useState(500000);
   const [isTopupProcessing, setIsTopupProcessing] = useState(false);
+  const [transactions, setTransactions] = useState([]);
+  const [txLoading, setTxLoading] = useState(true);
+  const [txError, setTxError] = useState(null);
+  const [txFilter, setTxFilter] = useState('all'); // 'all' | 'in' | 'out'
+  const [txShowAll, setTxShowAll] = useState(false);
+  const [txPage, setTxPage] = useState(1); // 1-based; only meaningful in expanded mode
+  const [txTotal, setTxTotal] = useState(0);
+  const [txTotalPages, setTxTotalPages] = useState(1);
+  const [txReloadKey, setTxReloadKey] = useState(0); // bump to force a refetch (retry)
   const [isWalletPaymentProcessing, setIsWalletPaymentProcessing] = useState(false);
   const [showOtpModal, setShowOtpModal] = useState(false);
   const [otpId, setOtpId] = useState(null);
@@ -191,6 +327,66 @@ function FamilyDashboardPage() {
     loadWallet();
   }, []);
 
+  // Unified financial ledger for the logged-in family. Scope is derived entirely
+  // server-side from the session (no userId sent), so a family can only ever read its
+  // own records. We rely on the backend's own pagination + filtering — never fetch the
+  // whole ledger and slice it in the browser:
+  //   • compact mode  → newest 5 of the selected filter (limit=5, page ignored/=1)
+  //   • expanded mode → 10 per page (limit=10, page=txPage)
+  //   • filter "in"/"out" → direction=credit/debit; "all" sends no direction, so a
+  //     direct-PayOS payment (direction 'none') shows only under "Tất cả".
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      try {
+        setTxLoading(true);
+        setTxError(null);
+        const limit = txShowAll ? EXPANDED_PAGE_SIZE : DASHBOARD_TX_PREVIEW;
+        const page = txShowAll ? txPage : 1;
+        const params = { page, limit };
+        const direction = TX_FILTER_DIRECTION[txFilter];
+        if (direction) params.direction = direction;
+        const res = await familyPortalService.getWalletTransactions(params);
+        if (cancelled) return;
+        setTransactions(Array.isArray(res?.data) ? res.data : []);
+        setTxTotal(Number(res?.total) || 0);
+        setTxTotalPages(Math.max(1, Number(res?.totalPages) || 1));
+      } catch (err) {
+        if (cancelled) return;
+        setTransactions([]);
+        setTxError(err?.response?.data?.message || err.message || t('familyDashboard.transactionHistory.error'));
+      } finally {
+        if (!cancelled) setTxLoading(false);
+      }
+    };
+    run();
+    // The cancelled guard drops out-of-order responses from rapid filter/page changes,
+    // so the list can never show a stale page or duplicated rows.
+    return () => { cancelled = true; };
+  }, [txFilter, txShowAll, txPage, txReloadKey]);
+
+  // Filter change always returns to page 1 and refetches the correct filtered slice
+  // (never filters just the currently loaded page). Selected mode (compact/expanded) is
+  // preserved so filters and pagination work together.
+  const handleTxFilterChange = (value) => {
+    if (value === txFilter) return;
+    setTxFilter(value);
+    setTxPage(1);
+  };
+
+  // Toggling expand/collapse resets pagination state. Collapse returns to compact 5.
+  const handleTxToggleShowAll = () => {
+    setTxShowAll((prev) => !prev);
+    setTxPage(1);
+  };
+
+  const handleTxPageChange = (nextPage) => {
+    setTxPage((prev) => {
+      const clamped = Math.min(Math.max(1, nextPage), txTotalPages);
+      return clamped === prev ? prev : clamped;
+    });
+  };
+
   const handleOpenCheckout = async (residentId, invoiceId) => {
     if (!invoiceId) return;
     try {
@@ -215,7 +411,6 @@ function FamilyDashboardPage() {
       setPreviewLoading(true);
       setError(null);
       const invoiceDetail = await familyPortalService.getInvoiceDetail(residentId, invoiceId);
-      console.log('[DEBUG invoicePreview] invoiceDetail:', JSON.stringify(invoiceDetail?.prescriptionId?.items, null, 2));
       // Find the resident
       const resident = residents.find(r => r._id === residentId) || {};
       setPreviewInvoice({ invoice: invoiceDetail, resident });
@@ -310,7 +505,7 @@ function FamilyDashboardPage() {
       });
 
       setOtpId(payload.otpId);
-      setOtpMaskedPhone(payload.maskedPhone || '');
+      setOtpMaskedPhone(payload.maskedRecipient || '');
       setOtpCode('');
       setPendingWalletPayment({ residentId, invoiceIds: [invoiceId], amount });
       setShowOtpModal(true);
@@ -347,11 +542,16 @@ function FamilyDashboardPage() {
       }
       const updatedWallet = await familyPortalService.getWalletBalance();
       setWalletInfo(updatedWallet);
+      // A wallet debit was just written to the ledger — refresh the history so the
+      // new row appears without a full page reload.
+      loadTransactions();
       setShowOtpModal(false);
       setOtpId(null);
       setOtpMaskedPhone('');
       setOtpCode('');
       setPendingWalletPayment(null);
+      // Thanh toán theo lô: đóng luôn hộp thoại chọn hóa đơn sau khi trả xong.
+      if (showPaymentModal) closePaymentModal();
     } catch (err) {
       console.error('OTP verification failed:', err);
       setOtpError(err?.response?.data?.message || err.message || t('familyDashboard.otp.verifyError'));
@@ -371,7 +571,7 @@ function FamilyDashboardPage() {
         residentId: pendingWalletPayment.residentId,
       });
       setOtpId(payload.otpId);
-      setOtpMaskedPhone(payload.maskedPhone || '');
+      setOtpMaskedPhone(payload.maskedRecipient || '');
       setOtpCode('');
     } catch (err) {
       console.error('OTP resend failed:', err);
@@ -510,30 +710,19 @@ function FamilyDashboardPage() {
           closePaymentModal();
         }
       } else {
-        // For wallet payment - require OTP verification
-        try {
-          setWalletError(null);
-          setOtpError(null);
-          setIsWalletPaymentProcessing(true);
+        // Thanh toán bằng ví phải qua OTP: chỉ xin mã ở bước này, ví sẽ bị trừ
+        // sau khi người dùng nhập đúng mã trong hộp thoại xác thực.
+        const payload = await familyPortalService.initiateWalletPayment({
+          amount: totalAmount,
+          invoiceIds,
+        });
 
-          const payload = await familyPortalService.initiateWalletPayment({
-            amount: totalAmount,
-            invoiceIds,
-            residentId: resident._id,
-          });
-
-          setOtpId(payload.otpId);
-          setOtpMaskedPhone(payload.maskedRecipient || '');
-          setOtpCode('');
-          setPendingWalletPayment({ residentId: resident._id, invoiceIds, amount: totalAmount });
-          setShowOtpModal(true);
-          closePaymentModal();
-        } catch (err) {
-          console.error('Wallet payment initiate failed:', err);
-          setWalletError(err?.response?.data?.message || err.message || t('familyDashboard.wallet.paymentOtpError'));
-        } finally {
-          setIsWalletPaymentProcessing(false);
-        }
+        setOtpId(payload.otpId);
+        setOtpMaskedPhone(payload.maskedRecipient || '');
+        setOtpCode('');
+        setOtpError(null);
+        setPendingWalletPayment({ residentId: resident._id, invoiceIds, amount: totalAmount });
+        setShowOtpModal(true);
       }
     } catch (err) {
       console.error('Batch payment error:', err);
@@ -631,6 +820,21 @@ function FamilyDashboardPage() {
           </div>
         </div>
       </section>
+
+      <TransactionHistorySection
+        transactions={transactions}
+        loading={txLoading}
+        error={txError}
+        filter={txFilter}
+        onFilterChange={handleTxFilterChange}
+        showAll={txShowAll}
+        onToggleShowAll={handleTxToggleShowAll}
+        page={txPage}
+        totalPages={txTotalPages}
+        total={txTotal}
+        onPageChange={handleTxPageChange}
+        onRetry={() => setTxReloadKey((k) => k + 1)}
+      />
 
       {loading && (
         <div className="loading-state">{t('familyDashboard.resident.loading')}</div>
@@ -2563,6 +2767,195 @@ function TotalInvoicePreviewModal({ resident, invoices, onClose }) {
         </div>
       </div>
     </div>
+  );
+}
+
+// Family financial transaction history. Reads the real unified ledger returned by
+// GET /family/wallet/transactions (never mock data, never inferred from UI state).
+// Filters are limited to what the data genuinely supports: money-in (credit) vs
+// money-out (debit). Direct PayOS invoice payments (no wallet movement) carry no
+// sign and therefore appear only under "Tất cả".
+//
+// All slicing/filtering is done by the backend (page/limit/direction). This component
+// renders exactly the page it is handed and drives the server via the callbacks — it never
+// re-paginates or re-filters rows in the browser.
+function TransactionHistorySection({
+  transactions, loading, error, filter, onFilterChange, showAll, onToggleShowAll,
+  page, totalPages, total, onPageChange, onRetry,
+}) {
+  const { t } = useTranslation();
+  const sectionRef = useRef(null);
+
+  const FILTERS = [
+    { value: 'all', label: t('familyDashboard.transactionHistory.filterAll') },
+    { value: 'in', label: t('familyDashboard.transactionHistory.filterIn') },
+    { value: 'out', label: t('familyDashboard.transactionHistory.filterOut') },
+  ];
+
+  // Distinguish "family has no transactions at all" from "no rows for this filter".
+  const isTrulyEmpty = total === 0 && filter === 'all';
+  const isFilteredEmpty = transactions.length === 0 && !isTrulyEmpty;
+  const initialLoading = loading && transactions.length === 0;
+
+  // Expanded footer summary: which slice of the filtered total is on screen.
+  const rangeFrom = total === 0 ? 0 : (page - 1) * EXPANDED_PAGE_SIZE + 1;
+  const rangeTo = (page - 1) * EXPANDED_PAGE_SIZE + transactions.length;
+  const pageItems = buildPageItems(page, totalPages);
+
+  const goToPage = (nextPage) => {
+    if (nextPage < 1 || nextPage > totalPages || nextPage === page) return;
+    onPageChange(nextPage);
+    // Keep the card in view when the page swaps below the fold, without yanking the
+    // whole dashboard around on the first render.
+    sectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const showFilters = !error && !initialLoading && !isTrulyEmpty;
+
+  return (
+    <section className="wallet-history-card" ref={sectionRef}>
+      <div className="wallet-history-header">
+        <div className="wallet-history-title">
+          <History size={18} />
+          <h2>{t('familyDashboard.transactionHistory.title')}</h2>
+        </div>
+        {showFilters && (
+          <div className="wallet-history-filters" role="group" aria-label={t('familyDashboard.transactionHistory.title')}>
+            {FILTERS.map((f) => (
+              <button
+                key={f.value}
+                type="button"
+                className={`wallet-history-filter${filter === f.value ? ' is-active' : ''}`}
+                aria-pressed={filter === f.value}
+                onClick={() => onFilterChange(f.value)}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {initialLoading ? (
+        <div className="wallet-history-skeleton" aria-hidden="true">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="wallet-history-skeleton-row">
+              <span className="skeleton-dot" />
+              <span className="skeleton-line" />
+              <span className="skeleton-amount" />
+            </div>
+          ))}
+        </div>
+      ) : error ? (
+        <div className="wallet-history-state wallet-history-error">
+          <AlertTriangle size={18} />
+          <span>{error}</span>
+          <button type="button" className="button button-secondary" onClick={onRetry}>
+            {t('familyDashboard.transactionHistory.retry')}
+          </button>
+        </div>
+      ) : isTrulyEmpty ? (
+        <div className="wallet-history-state">{t('familyDashboard.transactionHistory.empty')}</div>
+      ) : isFilteredEmpty ? (
+        <div className="wallet-history-state">{t('familyDashboard.transactionHistory.noMatch')}</div>
+      ) : (
+        <>
+          {/* aria-busy dims the current page while the next one loads — the loading state
+              stays inside this section and never reloads the whole dashboard. */}
+          <ul className={`wallet-history-list${loading ? ' is-busy' : ''}`} aria-busy={loading}>
+            {transactions.map((tx) => {
+              const sign = txAmountSign(tx);
+              const amountClass = sign === '+' ? 'is-credit' : sign === '-' ? 'is-debit' : 'is-neutral';
+              const statusClass = tx.status === 'completed'
+                ? 'is-completed'
+                : tx.status === 'failed' ? 'is-failed' : 'is-pending';
+              return (
+                <li key={tx._id} className="wallet-history-item">
+                  <span className={`wallet-history-icon ${amountClass}`}>
+                    <TxIcon tx={tx} />
+                  </span>
+                  <div className="wallet-history-info">
+                    <span className="wallet-history-desc">{txDescription(t, tx)}</span>
+                    <span className="wallet-history-meta">
+                      {txMethodLabel(t, tx)} · {formatTxDateTime(tx.createdAt)}
+                    </span>
+                    {tx.invoiceNumber ? (
+                      <span className="wallet-history-sub">
+                        {t('familyDashboard.transactionHistory.invoiceNumber', { number: tx.invoiceNumber })}
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="wallet-history-right">
+                    <span className={`wallet-history-amount ${amountClass}`}>{formatSignedAmount(tx)}</span>
+                    <span className={`wallet-history-status ${statusClass}`}>{txStatusLabel(t, tx.status)}</span>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+
+          {showAll ? (
+            <div className="wallet-history-footer">
+              <span className="wallet-history-summary">
+                {t('familyDashboard.transactionHistory.showing', {
+                  from: rangeFrom, to: rangeTo, total,
+                })}
+              </span>
+              {totalPages > 1 && (
+                <nav className="wallet-history-pagination" aria-label={t('familyDashboard.transactionHistory.title')}>
+                  <button
+                    type="button"
+                    className="wallet-history-page-btn"
+                    onClick={() => goToPage(page - 1)}
+                    disabled={page <= 1 || loading}
+                  >
+                    <ChevronLeft size={15} />
+                    <span className="wallet-history-page-btn-label">{t('familyDashboard.transactionHistory.prev')}</span>
+                  </button>
+                  {pageItems.map((item) =>
+                    typeof item === 'number' ? (
+                      <button
+                        key={item}
+                        type="button"
+                        className={`wallet-history-page-num${item === page ? ' is-active' : ''}`}
+                        aria-current={item === page ? 'page' : undefined}
+                        aria-label={t('familyDashboard.transactionHistory.pageAria', { page: item })}
+                        onClick={() => goToPage(item)}
+                        disabled={loading}
+                      >
+                        {item}
+                      </button>
+                    ) : (
+                      <span key={item} className="wallet-history-page-ellipsis" aria-hidden="true">…</span>
+                    )
+                  )}
+                  <button
+                    type="button"
+                    className="wallet-history-page-btn"
+                    onClick={() => goToPage(page + 1)}
+                    disabled={page >= totalPages || loading}
+                  >
+                    <span className="wallet-history-page-btn-label">{t('familyDashboard.transactionHistory.next')}</span>
+                    <ChevronRight size={15} />
+                  </button>
+                </nav>
+              )}
+              <button type="button" className="wallet-history-viewall" onClick={onToggleShowAll}>
+                {t('familyDashboard.transactionHistory.collapse')}
+                <ChevronDown size={16} className="is-flipped" />
+              </button>
+            </div>
+          ) : (
+            total > DASHBOARD_TX_PREVIEW && (
+              <button type="button" className="wallet-history-viewall" onClick={onToggleShowAll}>
+                {t('familyDashboard.transactionHistory.viewAll')}
+                <ChevronDown size={16} />
+              </button>
+            )
+          )}
+        </>
+      )}
+    </section>
   );
 }
 

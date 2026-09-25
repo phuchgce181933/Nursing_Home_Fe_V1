@@ -1,5 +1,6 @@
 import axiosClient from '../api/axiosClient';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ? `${import.meta.env.VITE_API_BASE_URL.replace(/\/$/, '')}/api` : '/api';
 const ENDPOINT = '/nutrition/dishes';
 
 const dishService = {

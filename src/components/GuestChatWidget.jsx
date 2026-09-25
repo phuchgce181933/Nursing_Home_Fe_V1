@@ -16,8 +16,8 @@ const STORAGE_KEY = 'guest_chat_conversation';
 const SUGGESTION_DEFS = [
   { id: 'services', key: 'services', linkTo: '/services' },
   { id: 'pricing', key: 'pricing', linkTo: '/pricing' },
-  { id: 'tour', key: 'tour', linkTo: '/login' },
-  { id: 'admission', key: 'admission', linkTo: '/login' },
+  { id: 'tour', key: 'tour', linkTo: '/contact' },
+  { id: 'admission', key: 'admission', linkTo: '/contact' },
   { id: 'living', key: 'living', linkTo: '/living' },
 ];
 

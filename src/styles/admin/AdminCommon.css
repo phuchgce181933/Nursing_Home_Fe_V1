@@ -152,6 +152,22 @@
   border-bottom: 1px solid var(--nh-border);
 }
 
+.adm-table th:last-child,
+.adm-table td:last-child {
+  position: sticky;
+  right: 0;
+  z-index: 2;
+}
+.adm-table th:last-child {
+  background: var(--nh-table-header-bg);
+}
+.adm-table td:last-child {
+  background: #fff;
+}
+.adm-table tbody tr:hover td:last-child {
+  background: var(--nh-surface-hover);
+}
+
 .adm-table tbody tr {
   transition: background 0.2s ease;
 }

@@ -827,6 +827,22 @@
 
 .account-table tbody tr:hover { background: #f8fbff; }
 
+.account-table th:last-child,
+.account-table td:last-child {
+  position: sticky;
+  right: 0;
+  z-index: 2;
+}
+.account-table th:last-child {
+  background: var(--nh-table-header-bg);
+}
+.account-table td:last-child {
+  background: #fff;
+}
+.account-table tbody tr:hover td:last-child {
+  background: #f8fbff;
+}
+
 .account-chip {
   display: inline-flex;
   align-items: center;

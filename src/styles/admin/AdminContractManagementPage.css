@@ -234,6 +234,22 @@ table tbody tr:hover {
   background-color: rgba(239, 244, 255, 0.45);
 }
 
+.admin-page-table table th:last-child,
+.admin-page-table table td:last-child {
+  position: sticky;
+  right: 0;
+  z-index: 2;
+}
+.admin-page-table table th:last-child {
+  background: var(--nh-table-header-bg);
+}
+.admin-page-table table td:last-child {
+  background: #fff;
+}
+.admin-page-table table tbody tr:hover td:last-child {
+  background: #eff4ff;
+}
+
 table td {
   color: #334155;
   vertical-align: middle;

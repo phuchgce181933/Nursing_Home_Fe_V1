@@ -265,13 +265,11 @@ const cancelInvoice = async (invoiceId, body = {}) => {
  * @returns {object} { message, invoiceId, previousStatus, newStatus }
  */
 const transitionInvoice = async (invoiceId, body) => {
-  console.log('🔄 [TRANSITION_FE_SVC] PATCH /admin/contracts/invoices/:id/transition', { invoiceId, body });
   try {
     const response = await axiosClient.patch(
       `/admin/contracts/invoices/${invoiceId}/transition`,
       body
     );
-    console.log('🔄 [TRANSITION_FE_SVC] response', response.data);
     return response.data;
   } catch (err) {
     console.error('🔄 [TRANSITION_FE_SVC] error', err?.response?.status, err?.response?.data);

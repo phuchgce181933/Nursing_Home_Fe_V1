@@ -4,6 +4,7 @@
 @import './styles/shared/common.css';
 @import './styles/shared/animations.css';
 @import './styles/shared/LoginForm.css';
+@import './styles/shared/ForgotPasswordPage.css';
 @import './styles/shared/HomePage.css';
 @import './styles/shared/PublicPages.css';
 @import './styles/shared/IntroPage.css';

@@ -625,7 +625,6 @@ function IncidentManagementPage() {
           staffProfileIds,
         });
         if (!active) return;
-        console.debug('[DEBUG] assignmentConflicts response', response);
         setAssignmentConflicts(response?.conflicts || {});
       } catch (error) {
         if (active) setAssignmentConflicts({});

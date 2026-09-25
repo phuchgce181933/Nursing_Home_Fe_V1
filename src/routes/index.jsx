@@ -6,6 +6,7 @@ import ServicesPage from '../pages/ServicesPage';
 import ProfilePage from '../pages/ProfilePage';
 import PlaceholderPage from '../pages/PlaceholderPage';
 import NotificationsPage from '../pages/shared/NotificationsPage';
+import SupportRequestsPage from '../pages/shared/SupportRequestsPage';
 import ForgotPasswordPage from '../pages/ForgotPasswordPage';
 import ResetPasswordPage from '../pages/ResetPasswordPage';
 import AdminLayout from '../layouts/AdminLayout';
@@ -23,6 +24,7 @@ import InitialHealthPage from '../pages/admin/residents/initial-health';
 import PreExistingConditionsPage from '../pages/admin/residents/pre-existing-conditions';
 import DrugAllergiesPage from '../pages/admin/residents/drug-allergies';
 import TransferResidentPage from '../pages/admin/residents/transfer';
+import StaffProfilesPage from '../pages/admin/staff/profiles';
 import ShiftManagementPage from '../pages/admin/staff/shifts';
 import StaffAssignmentPage from '../pages/admin/staff/assignments';
 import AreaAssignmentDetailPage from '../pages/admin/staff/assignments/AreaAssignmentDetailPage';
@@ -38,10 +40,12 @@ import AdminAccountsPage from '../pages/admin/AdminAccountsPage';
 import AdminAdmissionRequestsPage from '../pages/admin/AdminAdmissionRequestsPage';
 import AdminConsultationRequestsPage from '../pages/admin/AdminConsultationRequestsPage';
 import AdminTourRequestsPage from '../pages/admin/AdminTourRequestsPage';
+import ResidentVisitRequestsPage from '../pages/admin/ResidentVisitRequestsPage';
 import ServicePackagesPage from '../pages/admin/ServicePackagesPage';
 import PharmacyPage from '../pages/pharmacist/PharmacyPage';
 import PharmacistProfile from '../pages/pharmacist/PharmacistProfile';
 import AdminActivitiesPage from '../pages/admin/AdminActivitiesPage';
+import AdminReportsPage from '../pages/admin/AdminReportsPage';
 import AuditLogsPage from '../pages/admin/AuditLogsPage';
 import ActivityStatisticsPage from '../pages/admin/ActivityStatisticsPage';
 import ActivityParticipationResultsPage from '../pages/admin/ActivityParticipationResultsPage';
@@ -78,6 +82,7 @@ import HygieneActivitiesPage from '../pages/caregiver/hygiene-activities/Hygiene
 import DailyBehaviorsPage from '../pages/caregiver/daily-behaviors/DailyBehaviorsPage';
 import DietPlansPage from '../pages/caregiver/diet-plans/DietPlansPage';
 import MealIntakeNotesPage from '../pages/caregiver/meal-intake/MealIntakeNotesPage';
+import CaregiverResidentPhotosPage from '../pages/caregiver/ResidentPhotosPage';
 import RehabilitationSchedulePage from '../pages/caregiver/rehabilitation-schedule/RehabilitationSchedulePage';
 
 import ActivitySchedulePage from '../pages/nurse/ActivitySchedulePage';
@@ -88,6 +93,9 @@ import SubmitAdmissionPage from '../pages/family/SubmitAdmissionPage';
 import AdmissionRequestsHistoryPage from '../pages/family/AdmissionRequestsHistoryPage';
 import SubmitFacilityTourPage from '../pages/family/SubmitFacilityTourPage';
 import FacilityTourHistoryPage from '../pages/family/FacilityTourHistoryPage';
+import SubmitResidentVisitPage from '../pages/family/SubmitResidentVisitPage';
+import ResidentVisitHistoryPage from '../pages/family/ResidentVisitHistoryPage';
+import ResidentPhotosPage from '../pages/family/ResidentPhotosPage';
 import FamilyActivityPage from '../pages/family/ActivityPage';
 import ResidentHealthPage from '../pages/family/ResidentHealthPage';
 import FamilyAppointmentsPage from '../pages/family/FamilyAppointmentsPage';
@@ -142,6 +150,7 @@ function AppRoutes() {
         <Route path="rooms" element={<RoomsPage />} />
         <Route path="beds" element={<BedsPage />} />
         <Route path="equipment" element={<EquipmentPage />} />
+        <Route path="staff/profiles" element={<StaffProfilesPage />} />
         <Route path="staff/shifts" element={<ShiftManagementPage />} />
         <Route path="staff/profiles" element={<StaffManagementPage />} />
         <Route path="staff/assignments" element={<StaffAssignmentPage />} />
@@ -154,16 +163,19 @@ function AppRoutes() {
         <Route path="profile" element={<AdminProfile />} />
         <Route path="messages" element={<MessagesPage />} />
         <Route path="notifications" element={<NotificationsPage role="admin" />} />
+        <Route path="support-requests" element={<SupportRequestsPage />} />
         <Route path="accounts" element={<AdminAccountsPage />} />
         <Route path="admission-requests" element={<AdminAdmissionRequestsPage />} />
         <Route path="consultation-requests" element={<AdminConsultationRequestsPage />} />
         <Route path="appointments" element={<CareAppointmentsPage />} />
         <Route path="tour-requests" element={<AdminTourRequestsPage />} />
+        <Route path="resident-visits" element={<ResidentVisitRequestsPage />} />
         <Route path="service-packages" element={<ServicePackagesPage />} />
         <Route path="medications" element={<PharmacyPage defaultTab="medications" />} />
         <Route path="activities" element={<AdminActivitiesPage />} />
         <Route path="activities/statistics" element={<ActivityStatisticsPage />} />
         <Route path="activities/participation-results" element={<ActivityParticipationResultsPage />} />
+        <Route path="reports" element={<AdminReportsPage />} />
         <Route path="audit-logs" element={<AuditLogsPage />} />
         <Route path="contracts" element={<AdminContractManagementPage />} />
         <Route path="invoices" element={<AdminInvoiceManagementPage />} />
@@ -236,6 +248,7 @@ function AppRoutes() {
         <Route path="leave" element={<LeaveRequestPage />} />
         <Route path="notifications" element={<NotificationsPage role="nurse" />} />
         <Route path="incidents" element={<IncidentManagementPage />} />
+        <Route path="resident-visits" element={<ResidentVisitRequestsPage />} />
       </Route>
 
       <Route
@@ -261,6 +274,7 @@ function AppRoutes() {
         <Route path="daily-behaviors" element={<DailyBehaviorsPage />} />
         <Route path="diet-plans" element={<DietPlansPage />} />
         <Route path="rehabilitation-schedule" element={<RehabilitationSchedulePage />} />
+        <Route path="resident-photos" element={<CaregiverResidentPhotosPage />} />
         <Route path="messages" element={<MessagesPage />} />
         <Route path="notifications" element={<NotificationsPage role="caregiver" />} />
         <Route path="incidents" element={<IncidentManagementPage />} />
@@ -309,6 +323,15 @@ function AppRoutes() {
       />
 
       <Route
+        path="/family/resident-visits/new"
+        element={
+          <ProtectedRoute requiredRole="family">
+            <SubmitResidentVisitPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
         path="/family/*"
         element={
           <ProtectedRoute requiredRole="family">
@@ -321,11 +344,14 @@ function AppRoutes() {
         <Route path="profile" element={<ProfilePage />} />
         <Route path="admission-requests" element={<AdmissionRequestsHistoryPage />} />
         <Route path="facility-tours" element={<FacilityTourHistoryPage />} />
+        <Route path="resident-visits" element={<ResidentVisitHistoryPage />} />
+        <Route path="resident-photos" element={<ResidentPhotosPage />} />
         <Route path="activities" element={<FamilyActivityPage />} />
         <Route path="resident" element={<ResidentHealthPage />} />
         <Route path="appointments" element={<FamilyAppointmentsPage />} />
         <Route path="notifications" element={<NotificationsPage role="family" />} />
         <Route path="messages" element={<MessagesPage />} />
+        <Route path="support-requests" element={<SupportRequestsPage />} />
       </Route>
 
       <Route path="/services" element={<ServicesPage />} />

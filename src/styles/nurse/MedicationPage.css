@@ -181,7 +181,8 @@
   background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 14px;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
 }
 
@@ -213,6 +214,22 @@
 }
 
 .med-table tbody tr:hover {
+  background: #eff6ff;
+}
+
+.med-table th:last-child,
+.med-table td:last-child {
+  position: sticky;
+  right: 0;
+  z-index: 2;
+}
+.med-table th:last-child {
+  background: #0f172a;
+}
+.med-table td:last-child {
+  background: #fff;
+}
+.med-table tbody tr:hover td:last-child {
   background: #eff6ff;
 }
 
