@@ -41,8 +41,14 @@ const changePassword = async (payload) => {
   return response.data;
 };
 
+/**
+ * `client: 'web'` nói rõ cho backend biết yêu cầu đến từ trình duyệt, nên email
+ * gửi đi là loại có nút "Đặt lại mật khẩu" dẫn về trang /reset-password. Ứng dụng
+ * di động gửi 'mobile' và nhận email chỉ có mã để copy. Gửi tường minh thay vì để
+ * backend đoán từ User-Agent — cùng một User-Agent có thể là WebView trong app.
+ */
 const forgotPassword = async (email) => {
-  const response = await axiosClient.post('/auth/forgot-password', { email });
+  const response = await axiosClient.post('/auth/forgot-password', { email, client: 'web' });
   return response.data;
 };
 

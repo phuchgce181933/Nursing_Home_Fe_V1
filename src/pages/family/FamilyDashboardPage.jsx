@@ -528,23 +528,25 @@ function FamilyDashboardPage() {
       return;
     }
 
+    // Mốc tài chính: khi verifyWalletPayment trả về thành công thì ví ĐÃ bị trừ
+    // và hóa đơn ĐÃ được ghi nhận thanh toán ở backend. Cờ này để phân biệt hai
+    // loại lỗi hoàn toàn khác nhau:
+    //   (A) chưa trừ tiền  -> là lỗi xác thực OTP, được phép nhập lại/gửi lại mã;
+    //   (B) đã trừ tiền    -> chỉ là lỗi làm mới giao diện. TUYỆT ĐỐI không báo
+    //       "xác thực thất bại" và không mời thanh toán lại, vì mỗi lần thử lại
+    //       là thêm một giao dịch trừ tiền thật.
+    let paymentCommitted = false;
+    const paidResidentId = pendingWalletPayment?.residentId;
+
     try {
       setOtpError(null);
       setIsOtpVerifying(true);
       await familyPortalService.verifyWalletPayment({ otpId, code: otpCode });
+      paymentCommitted = true;
 
-      if (pendingWalletPayment?.residentId) {
-        const updatedInvoices = await familyPortalService.getResidentInvoices(pendingWalletPayment.residentId);
-        setInvoicesList(prev => ({
-          ...prev,
-          [pendingWalletPayment.residentId]: Array.isArray(updatedInvoices) ? updatedInvoices : updatedInvoices?.data || [],
-        }));
-      }
-      const updatedWallet = await familyPortalService.getWalletBalance();
-      setWalletInfo(updatedWallet);
-      // A wallet debit was just written to the ledger — refresh the history so the
-      // new row appears without a full page reload.
-      loadTransactions();
+      // Đóng hộp thoại và xoá state OTP NGAY khi tiền đã trừ, trước các bước tải
+      // lại dữ liệu bên dưới: nếu một trong các request đó lỗi, người dùng vẫn
+      // thấy giao dịch đã hoàn tất chứ không bị kẹt ở ô nhập mã.
       setShowOtpModal(false);
       setOtpId(null);
       setOtpMaskedPhone('');
@@ -552,9 +554,29 @@ function FamilyDashboardPage() {
       setPendingWalletPayment(null);
       // Thanh toán theo lô: đóng luôn hộp thoại chọn hóa đơn sau khi trả xong.
       if (showPaymentModal) closePaymentModal();
+
+      if (paidResidentId) {
+        const updatedInvoices = await familyPortalService.getResidentInvoices(paidResidentId);
+        setInvoicesList(prev => ({
+          ...prev,
+          [paidResidentId]: Array.isArray(updatedInvoices) ? updatedInvoices : updatedInvoices?.data || [],
+        }));
+      }
+      const updatedWallet = await familyPortalService.getWalletBalance();
+      setWalletInfo(updatedWallet);
+      // Ví vừa bị ghi nợ trong sổ giao dịch — bump khoá để useEffect lịch sử
+      // giao dịch fetch lại, nhờ vậy số dư và lịch sử luôn khớp nhau.
+      setTxReloadKey((k) => k + 1);
     } catch (err) {
-      console.error('OTP verification failed:', err);
-      setOtpError(err?.response?.data?.message || err.message || t('familyDashboard.otp.verifyError'));
+      if (paymentCommitted) {
+        // Trường hợp (B): tiền đã trừ xong, chỉ có màn hình chưa cập nhật.
+        console.error('Wallet payment committed but refreshing the UI failed:', err);
+        setWalletError(t('familyDashboard.wallet.refreshAfterPaymentError'));
+      } else {
+        // Trường hợp (A): chưa trừ tiền, có thể thử lại an toàn.
+        console.error('OTP verification failed:', err);
+        setOtpError(err?.response?.data?.message || err.message || t('familyDashboard.otp.verifyError'));
+      }
     } finally {
       setIsOtpVerifying(false);
     }

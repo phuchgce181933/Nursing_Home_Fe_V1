@@ -5660,6 +5660,7 @@ const resources = {
           insufficientDetail: "Need {{need}}, have {{have}}",
           paymentOtpError: "Cannot send OTP verification request",
           batchError: "Cannot process batch payment",
+          refreshAfterPaymentError: "Payment succeeded and your wallet has been debited, but the screen could not be refreshed. Please reload the page — do NOT pay again.",
           selectPackage: "Please select at least one package to pay."
         },
         transactionHistory: {
@@ -12737,6 +12738,7 @@ const resources = {
           insufficientDetail: "Cần {{need}}, hiện có {{have}}",
           paymentOtpError: "Không thể gửi yêu cầu OTP xác thực",
           batchError: "Không thể thanh toán theo gói",
+          refreshAfterPaymentError: "Thanh toán đã thành công và ví đã bị trừ tiền, nhưng màn hình không tải lại được dữ liệu mới. Vui lòng tải lại trang — KHÔNG thanh toán lại.",
           selectPackage: "Vui lòng chọn ít nhất một gói để thanh toán."
         },
         transactionHistory: {
