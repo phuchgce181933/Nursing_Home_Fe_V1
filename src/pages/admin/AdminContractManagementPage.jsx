@@ -308,6 +308,11 @@ export default function AdminContractManagementPage() {
   const [extensionAvailablePackages, setExtensionAvailablePackages] = useState([]);
   const [extensionPackageLoading, setExtensionPackageLoading] = useState(false);
   const [isExtendingContract, setIsExtendingContract] = useState(false);
+  // Lịch sử hợp đồng của cư dân (active + cũ) — hiển thị trong modal chi tiết
+  const [contractHistory, setContractHistory] = useState([]);
+  const [contractHistoryLoading, setContractHistoryLoading] = useState(false);
+  const [historyContract, setHistoryContract] = useState(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancellationReason, setCancellationReason] = useState('');
   const [isCancellingContract, setIsCancellingContract] = useState(false);
@@ -602,6 +607,54 @@ export default function AdminContractManagementPage() {
       })
       .finally(() => setDetailLoading(false));
   }, [showContractDetailModal, selectedContract?.contractId]);
+
+  // Fetch lịch sử hợp đồng của cùng cư dân (active + cũ) khi mở modal chi tiết.
+  // Mục đích: cư dân có thể có nhiều hợp đồng (hợp đồng cũ đã chấm dứt + hợp
+  // đồng mới active). Bảng chính chỉ hiển thị 1 hàng/cư dân (hợp đồng mới nhất),
+  // nên admin không thấy được các hợp đồng cũ. Modal này sẽ liệt kê tất cả để
+  // admin click xem lại nội dung hợp đồng cũ.
+  useEffect(() => {
+    if (!showContractDetailModal || !selectedContract?.residentId) {
+      return;
+    }
+    const residentId = String(selectedContract.residentId);
+    setContractHistoryLoading(true);
+    contractService.getContractsByResident(residentId)
+      .then((resp) => {
+        const list = Array.isArray(resp?.data) ? resp.data : [];
+        setContractHistory(list);
+      })
+      .catch((err) => {
+        console.error('Failed to load contract history:', err);
+        // Không đóng modal — chỉ ẩn phần lịch sử, vẫn cho xem chi tiết
+        setContractHistory([]);
+      })
+      .finally(() => setContractHistoryLoading(false));
+  }, [showContractDetailModal, selectedContract?.residentId]);
+
+  // Handler: click vào 1 hợp đồng cũ trong sidebar lịch sử → load và hiển thị
+  const handleOpenHistoryContract = async (contractSummary) => {
+    const cid = contractSummary?._id;
+    if (!cid) return;
+    // Nếu click vào hợp đồng đang xem rồi → bỏ qua
+    if (detailContract && String(detailContract._id) === String(cid)) return;
+    setHistoryLoading(true);
+    setHistoryContract(null);
+    try {
+      const result = await contractService.getContractDetails(cid);
+      setHistoryContract(result.contract || result);
+    } catch (err) {
+      console.error('Failed to load history contract:', err);
+      showToast(resolveApiError(err) || 'Không thể tải hợp đồng', 'error');
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  // Handler: quay lại xem hợp đồng hiện tại (đóng hợp đồng cũ)
+  const handleBackToCurrentContract = () => {
+    setHistoryContract(null);
+  };
 
   const openCancelContractModal = (contract) => {
     setSelectedContract(contract);
@@ -2019,15 +2072,229 @@ export default function AdminContractManagementPage() {
             </div>
           </div>
         ) : (
-          <ContractPreviewModal
-            open={true}
-            onClose={() => {
-              setShowContractDetailModal(false);
-              setDetailContract(null);
-            }}
-            contract={detailContract}
-            terms={detailContract?.terms || selectedContract?.terms || ''}
-          />
+          (() => {
+            // Nếu đang xem 1 hợp đồng cũ (do click từ sidebar lịch sử),
+            // dùng historyContract thay cho detailContract.
+            const displayedContract = historyContract || detailContract;
+            return (
+              <div className="modal-overlay">
+                <div
+                  className="modal-content"
+                  style={{
+                    maxWidth: '1100px',
+                    width: '95vw',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    maxHeight: '90vh',
+                  }}
+                >
+                  <div className="modal-header">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <h2>
+                        {historyContract
+                          ? `Hợp đồng cũ — ${historyContract.contractNumber || ''}`
+                          : 'Chi tiết hợp đồng'}
+                      </h2>
+                      {historyContract && (
+                        <button
+                          type="button"
+                          onClick={handleBackToCurrentContract}
+                          style={{
+                            background: '#e0f2fe',
+                            color: '#075985',
+                            border: 'none',
+                            borderRadius: 4,
+                            padding: '4px 10px',
+                            fontSize: '0.78rem',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          ← Quay lại hợp đồng hiện tại
+                        </button>
+                      )}
+                    </div>
+                    <button
+                      className="modal-close"
+                      onClick={() => {
+                        setShowContractDetailModal(false);
+                        setDetailContract(null);
+                        setHistoryContract(null);
+                      }}
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'minmax(260px, 320px) 1fr',
+                      gap: 16,
+                      padding: '12px 16px',
+                      overflow: 'hidden',
+                      flex: 1,
+                      minHeight: 0,
+                    }}
+                  >
+                    {/* Sidebar: Lịch sử hợp đồng của cư dân */}
+                    <aside
+                      style={{
+                        background: '#f8fafc',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: 8,
+                        padding: 12,
+                        overflowY: 'auto',
+                        maxHeight: 'calc(90vh - 110px)',
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontWeight: 700,
+                          fontSize: '0.92rem',
+                          color: '#0f172a',
+                          marginBottom: 8,
+                        }}
+                      >
+                        Lịch sử hợp đồng
+                        {contractHistory.length > 0 && (
+                          <span
+                            style={{
+                              background: '#e0f2fe',
+                              color: '#075985',
+                              padding: '1px 8px',
+                              borderRadius: 999,
+                              fontSize: '0.72rem',
+                              fontWeight: 600,
+                            }}
+                          >
+                            {contractHistory.length}
+                          </span>
+                        )}
+                      </div>
+
+                      {contractHistoryLoading ? (
+                        <div
+                          style={{
+                            padding: 16,
+                            textAlign: 'center',
+                            color: '#64748b',
+                            fontSize: '0.85rem',
+                          }}
+                        >
+                          Đang tải…
+                        </div>
+                      ) : contractHistory.length === 0 ? (
+                        <div
+                          style={{
+                            padding: 16,
+                            textAlign: 'center',
+                            color: '#94a3b8',
+                            fontSize: '0.85rem',
+                            fontStyle: 'italic',
+                          }}
+                        >
+                          Chưa có hợp đồng nào
+                        </div>
+                      ) : (
+                        <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          {contractHistory.map((c) => {
+                            const cId = String(c._id);
+                            const isActiveView = !historyContract
+                              ? String(detailContract?._id) === cId
+                              : String(historyContract._id) === cId;
+                            const statusKey = getContractStatusLabel(c.startDate, c.endDate, c.status);
+                            const statusText = getStatusTranslation(statusKey, t);
+                            return (
+                              <li key={cId}>
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenHistoryContract(c)}
+                                  disabled={historyLoading}
+                                  style={{
+                                    width: '100%',
+                                    textAlign: 'left',
+                                    background: isActiveView ? '#dbeafe' : 'white',
+                                    border: isActiveView ? '1px solid #3b82f6' : '1px solid #e2e8f0',
+                                    borderRadius: 6,
+                                    padding: '8px 10px',
+                                    cursor: isActiveView ? 'default' : 'pointer',
+                                    transition: 'all 0.15s',
+                                  }}
+                                >
+                                  <div
+                                    style={{
+                                      display: 'flex',
+                                      justifyContent: 'space-between',
+                                      alignItems: 'center',
+                                      gap: 6,
+                                      marginBottom: 4,
+                                    }}
+                                  >
+                                    <span
+                                      style={{
+                                        fontWeight: 600,
+                                        fontSize: '0.82rem',
+                                        color: '#0f172a',
+                                      }}
+                                    >
+                                      {c.contractNumber || '—'}
+                                    </span>
+                                    <span
+                                      className={`status-badge ${getContractStatusClass(c.startDate, c.endDate, c.status)}`}
+                                      style={{ fontSize: '0.65rem', padding: '1px 6px' }}
+                                    >
+                                      {statusText}
+                                    </span>
+                                  </div>
+                                  <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                                    {formatDate(c.startDate)} → {formatDate(c.endDate)}
+                                  </div>
+                                  {c.servicePackageId && typeof c.servicePackageId === 'object' && c.servicePackageId.name && (
+                                    <div style={{ fontSize: '0.7rem', color: '#475569', marginTop: 2 }}>
+                                      {c.servicePackageId.name}
+                                    </div>
+                                  )}
+                                </button>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                    </aside>
+
+                    {/* Nội dung chính: chi tiết hợp đồng */}
+                    <div style={{ overflow: 'auto', minHeight: 0 }}>
+                      {historyLoading ? (
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            minHeight: 320,
+                          }}
+                        >
+                          <div className="spinner" />
+                        </div>
+                      ) : (
+                        <ContractPreviewModal
+                          open={true}
+                          embedded
+                          onClose={() => {
+                            setShowContractDetailModal(false);
+                            setDetailContract(null);
+                            setHistoryContract(null);
+                          }}
+                          contract={displayedContract}
+                          terms={displayedContract?.terms || selectedContract?.terms || ''}
+                        />
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()
         )
       )}
 

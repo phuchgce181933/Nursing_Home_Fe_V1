@@ -1,5 +1,6 @@
 import axiosClient from '../api/axiosClient';
 import staffService from './staff.service';
+import staffResidentService from './staffResident.service';
 
 const unwrap = (r) => r.data?.data ?? r.data;
 
@@ -21,8 +22,7 @@ const listStaffResidents = (params = {}) =>
   }));
 
 const getStaffResident = async (id) => {
-  const res = await residentService.getResidentDetail(id);
-  return res?.resident ?? res ?? null;
+  return staffResidentService.getResident(id);
 };
 
 const listResidents = (role, params = {}) => {

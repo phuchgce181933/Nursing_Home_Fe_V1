@@ -9,7 +9,6 @@ import useDebouncedSearch from '../../../hooks/useDebouncedSearch';
 import { useAuth } from '../../../hooks/useAuth';
 import staffAssignedResidentService from '../../../services/staffAssignedResident.service';
 import { resolveApiError } from '../../../utils/apiMessage';
-import { formatResidentAreaLine } from '../../../utils/residentArea';
 import {
   getAssignedResidentsBasePath,
   getAssignedResidentsI18nNs,
@@ -104,21 +103,20 @@ export default function AssignedResidentsListPage({ role, footer }) {
               <th>{t('common.colCode')}</th>
               <th>{t('common.colFullName')}</th>
               <th>{t('common.colGender')}</th>
-              <th>{t('common.colArea')}</th>
               <th>{t('common.colActions')}</th>
             </tr>
           </thead>
           <tbody>
             {loading && (
               <tr>
-                <td colSpan={5} className="empty-state">
+                <td colSpan={4} className="empty-state">
                   {t('common.loading')}
                 </td>
               </tr>
             )}
             {!loading && residents.length === 0 && (
               <tr>
-                <td colSpan={5} className="empty-state">
+                <td colSpan={4} className="empty-state">
                   {debouncedSearch ? t(`${ns}.emptyFiltered`) : t(`${ns}.emptyList`)}
                 </td>
               </tr>
@@ -140,7 +138,6 @@ export default function AssignedResidentsListPage({ role, footer }) {
                     </div>
                   </td>
                   <td>{t(`common.gender.${row.gender}`, { defaultValue: row.gender || '—' })}</td>
-                  <td className="ar-table__area">{formatResidentAreaLine(row, t) || '—'}</td>
                   <td className="ar-actions-cell" onClick={(e) => e.stopPropagation()}>
                     <button
                       type="button"

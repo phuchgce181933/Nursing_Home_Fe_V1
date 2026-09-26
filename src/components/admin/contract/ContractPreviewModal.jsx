@@ -124,6 +124,13 @@ export default function ContractPreviewModal({
   admission = {},
   contract = null,
   isCreating = false,
+  /**
+   * `embedded` (mặc định false): khi true, modal render KHÔNG có overlay/modal
+   * bao ngoài — chỉ trả thẳng nội dung (header + summary + terms + footer).
+   * Dùng khi nhúng modal vào một modal khác (vd: modal "Chi tiết hợp đồng" có
+   * sidebar "Lịch sử hợp đồng" bên trái) để tránh overlay lồng overlay.
+   */
+  embedded = false,
 }) {
   const [hasScrolledToEnd, setHasScrolledToEnd] = useState(false);
 
@@ -161,8 +168,11 @@ export default function ContractPreviewModal({
       fullName: requestedByName || '—',
       relationship: applicant.relationshipToRequester || '',
     };
-    // Hợp đồng đã lưu không có emergencyContacts → để 0
-    contacts = [];
+    // emergencyContacts có thể nằm trong admissionData (khi populate) hoặc trong
+    // contract gốc (nếu lưu kèm). Lấy từ admission trước, fallback về contract.
+    const rawContacts = admissionData.emergencyContacts
+      || (contract.emergencyContacts ?? []);
+    contacts = Array.isArray(rawContacts) ? rawContacts : [];
     termsText = contract.terms || terms;
     headerTitle = `Hợp đồng ${contract.contractNumber || ''}`.trim();
     headerSubtitle = applicant.fullName || '';
@@ -267,9 +277,11 @@ ${html}
 
   const previewHtml = renderTermsToHtml(termsText);
 
-  return (
-    <div className="cpm-overlay" onClick={!isCreating ? onClose : undefined}>
-      <div className="cpm-modal" onClick={(e) => e.stopPropagation()}>
+  // Nội dung modal (header + summary + terms + footer). Tách ra để có thể nhúng
+  // vào 1 modal khác khi `embedded=true` (vd: modal chi tiết có sidebar lịch sử
+  // hợp đồng bên trái) mà không bị overlay lồng overlay.
+  const modalBody = (
+    <div className="cpm-modal" onClick={(e) => e.stopPropagation()}>
         <header className="cpm-header">
           <div className="cpm-header-title">
             <FileText size={20} />
@@ -364,6 +376,13 @@ ${html}
           )}
         </footer>
       </div>
+  );
+
+  // `embedded=true`: chỉ trả phần thân modal (không có overlay bao ngoài) để nhúng
+  // vào modal khác. `embedded=false`: giữ nguyên overlay gốc với click-outside.
+  return embedded ? modalBody : (
+    <div className="cpm-overlay" onClick={!isCreating ? onClose : undefined}>
+      {modalBody}
     </div>
   );
 }

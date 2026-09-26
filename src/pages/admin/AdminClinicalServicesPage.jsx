@@ -663,14 +663,20 @@ export default function AdminClinicalServicesPage() {
                         <label className="adm-form-label">{t('adminClinicalServices.labelDropdownOptions')}</label>
                         <textarea
                           className="adm-form-input"
-                          rows={2}
-                          value={(Array.isArray(field.options) ? field.options : []).join(', ')}
+                          rows={3}
+                          spellCheck={false}
+                          value={(Array.isArray(field.options) ? field.options : []).join('\n')}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                              e.stopPropagation();
+                            }
+                          }}
                           onChange={(e) => {
                             const nextFields = [...formData.fields];
                             nextFields[idx] = {
                               ...nextFields[idx],
                               options: e.target.value
-                                .split(',')
+                                .split(/\r?\n|,/) 
                                 .map((opt) => opt.trim())
                                 .filter(Boolean),
                             };

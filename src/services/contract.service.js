@@ -165,6 +165,19 @@ const getContractHistory = async (admissionId) => {
   return response.data;
 };
 
+/**
+ * Lấy tất cả hợp đồng của một cư dân (gồm cả hợp đồng cũ đã chấm dứt/hết hạn/hủy).
+ * Dùng để hiển thị lịch sử hợp đồng trong modal chi tiết — admin có thể click
+ * vào một hợp đồng cũ để xem lại nội dung.
+ *
+ * @param {string} residentId - ID của cư dân
+ * @returns {object} { data: [...contracts], total }
+ */
+const getContractsByResident = async (residentId) => {
+  const response = await axiosClient.get(`/admin/contracts/by-resident/${residentId}`);
+  return response.data;
+};
+
 // ════════════════════════════════════════════════════════════════════════════
 // ISSUE INVOICES — flip DRAFT → ISSUED cho cả hợp đồng
 // ════════════════════════════════════════════════════════════════════════════
@@ -287,6 +300,7 @@ export default {
   terminateContract,
   createInvoiceFromContract,
   getContractHistory,
+  getContractsByResident,
   issueInvoices,
   recalculateContractInvoices,
   exportInvoice,

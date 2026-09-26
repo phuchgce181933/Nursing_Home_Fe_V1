@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AlertTriangle, CheckCircle, CreditCard, Package, Users, Wallet, PlusCircle, Search, ChevronDown, Eye, Printer, X } from 'lucide-react';
+import { AlertTriangle, CheckCircle, CreditCard, Package, Users, Wallet, PlusCircle, Search, ChevronDown, Eye, Printer, X, CalendarDays, History } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import residentService from '../../services/resident.service';
 import familyPortalService from '../../services/familyPortal.service';
@@ -117,6 +117,8 @@ function FamilyDashboardPage() {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [totalPreviewData, setTotalPreviewData] = useState(null); // { resident, invoices }
   const [totalPreviewLoading, setTotalPreviewLoading] = useState(false);
+  const [paymentScheduleModal, setPaymentScheduleModal] = useState(null); // { resident, data }
+  const [paymentScheduleLoading, setPaymentScheduleLoading] = useState(false);
   const navigate = useNavigate();
 
   const toggleResident = (residentId) => {
@@ -257,6 +259,25 @@ function FamilyDashboardPage() {
     } finally {
       setTotalPreviewLoading(false);
     }
+  };
+
+  const handleOpenPaymentHistory = async (residentId) => {
+    try {
+      setPaymentScheduleLoading(true);
+      setError(null);
+      const resident = residents.find(r => r._id === residentId) || {};
+      const data = await familyPortalService.getPaymentHistory(residentId);
+      setPaymentScheduleModal({ resident, data });
+    } catch (err) {
+      console.error('Failed to load payment history:', err);
+      setError(err?.response?.data?.message || err.message || 'Không thể tải lịch sử thanh toán');
+    } finally {
+      setPaymentScheduleLoading(false);
+    }
+  };
+
+  const closePaymentScheduleModal = () => {
+    setPaymentScheduleModal(null);
   };
 
   const closeTotalPreview = () => {
@@ -712,6 +733,7 @@ function FamilyDashboardPage() {
               onPayWithWallet={handlePayWithWallet}
               onCreateInvoice={handleCreateInvoice}
               onOpenPaymentModal={handleOpenPaymentModal}
+              onOpenPaymentHistory={() => handleOpenPaymentHistory(resident._id)}
               hasUnpaidServiceInvoice={hasUnpaidServiceInvoice}
               totalUnpaidCount={totalUnpaid}
               creatingInvoiceFor={creatingInvoiceFor}
@@ -796,6 +818,16 @@ function FamilyDashboardPage() {
           resident={totalPreviewData.resident}
           invoices={totalPreviewData.invoices}
           onClose={closeTotalPreview}
+        />
+      )}
+
+      {/* Modal: Lịch sử thanh toán */}
+      {paymentScheduleModal && (
+        <PaymentHistoryModal
+          resident={paymentScheduleModal.resident}
+          data={paymentScheduleModal.data}
+          loading={paymentScheduleLoading}
+          onClose={closePaymentScheduleModal}
         />
       )}
     </div>
@@ -1069,7 +1101,7 @@ function BatchPaymentModal({
 function ResidentListItem({
   resident, invoices, latestInvoice, hasServicePackage,
   isExpanded, onToggle, expandedInvoiceIds, onToggleInvoice,
-  onOpenCheckout, onOpenInvoicePreview, onPayWithWallet, onCreateInvoice, onOpenPaymentModal,
+  onOpenCheckout, onOpenInvoicePreview, onPayWithWallet, onCreateInvoice, onOpenPaymentModal, onOpenPaymentHistory,
   hasUnpaidServiceInvoice, totalUnpaidCount, creatingInvoiceFor, isWalletPaymentProcessing, walletLoading, checkoutLoadingInvoiceId,
   grandTotalAll, grandTotalUnpaid, onOpenTotalPreview,
 }) {
@@ -1135,6 +1167,18 @@ function ResidentListItem({
               </div>
             </div>
           )}
+
+          {/* Lịch sử thanh toán */}
+          <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={() => onOpenPaymentHistory && onOpenPaymentHistory()}
+              style={{ padding: '5px 10px', fontSize: 12, background: '#f59e0b', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+              title="Xem lịch sử thanh toán"
+            >
+              <CalendarDays size={13} /> Lịch sử thanh toán
+            </button>
+          </div>
 
           {invoices.length === 0 ? (
             <div className="info-row">
@@ -2567,3 +2611,151 @@ function TotalInvoicePreviewModal({ resident, invoices, onClose }) {
 }
 
 export default FamilyDashboardPage;
+
+/* ══════════════════════ Payment History Modal ══════════════════════ */
+
+const TX_TYPE_STYLE = {
+  topup:   { bg: '#dbeafe', color: '#1e40af', label: 'Nạp tiền ví' },
+  payment: { bg: '#dcfce7', color: '#166534', label: 'Thanh toán hóa đơn' },
+};
+
+function PaymentHistoryModal({ resident, data, loading, onClose }) {
+  const { t } = useTranslation();
+
+  return (
+    <div className="otp-modal-backdrop" onClick={onClose}>
+      <div
+        className="otp-modal"
+        onClick={(e) => e.stopPropagation()}
+        style={{ maxWidth: 700, width: '95%', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}
+      >
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <div>
+            <h3 style={{ margin: 0, color: '#0f172a' }}>
+              <History size={18} style={{ marginRight: 6, verticalAlign: 'middle' }} />
+              Lịch sử ví
+            </h3>
+            <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: '#64748b' }}>
+              {resident?.fullName || resident?.residentCode}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{ background: 'transparent', border: 'none', fontSize: 24, cursor: 'pointer', color: '#64748b', padding: 0, lineHeight: 1 }}
+          >
+            ×
+          </button>
+        </div>
+
+        {/* Body */}
+        <div style={{ overflowY: 'auto', flex: 1 }}>
+          {loading ? (
+            <div style={{ textAlign: 'center', padding: 32, color: '#64748b' }}>Đang tải lịch sử thanh toán…</div>
+          ) : !data ? (
+            <div style={{ textAlign: 'center', padding: 32, color: '#94a3b8' }}>Không có dữ liệu.</div>
+          ) : (
+            <>
+              {/* Summary card */}
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ padding: '12px 14px', background: '#eff6ff', borderRadius: 8, border: '1px solid #bfdbfe' }}>
+                  <div style={{ fontSize: 11, color: '#1e40af', marginBottom: 4 }}>Tổng số lần nạp ví</div>
+                  <div style={{ fontSize: 22, fontWeight: 700, color: '#1d4ed8' }}>{data.summary.totalTopupTransactions}</div>
+                  <div style={{ fontSize: 11, color: '#3b82f6', marginTop: 4 }}>{formatMoney(data.summary.totalTopupAmount)}</div>
+                </div>
+              </div>
+
+              {/* Transaction list */}
+              <div style={{ fontSize: 13 }}>
+                {/* Header */}
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: 8, padding: '8px 10px', background: '#f8fafc', borderRadius: 6, fontWeight: 700, color: '#475569', marginBottom: 6 }}>
+                  <span>Mô tả</span>
+                  <span style={{ textAlign: 'right' }}>Số tiền</span>
+                  <span style={{ textAlign: 'center' }}>Trạng thái</span>
+                  <span style={{ textAlign: 'right' }}>Ngày</span>
+                </div>
+
+                {(data.transactions || []).length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: 24, color: '#94a3b8' }}>Chưa có giao dịch nào.</div>
+                ) : (
+                  data.transactions.map((tx, idx) => {
+                    const style = TX_TYPE_STYLE[tx.transactionType] || TX_TYPE_STYLE.payment;
+                    const txDate = tx.paidAt || tx.createdAt;
+                    return (
+                      <div key={idx} style={{
+                        display: 'grid',
+                        gridTemplateColumns: '2fr 1fr 1fr 1fr',
+                        gap: 8,
+                        padding: '10px 10px',
+                        borderBottom: '1px solid #f1f5f9',
+                        alignItems: 'center',
+                      }}>
+                        {/* Description */}
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                            <span style={{
+                              fontSize: 10,
+                              fontWeight: 700,
+                              color: style.color,
+                              background: style.bg,
+                              padding: '2px 8px',
+                              borderRadius: 10,
+                              whiteSpace: 'nowrap',
+                            }}>
+                              {style.label}
+                            </span>
+                            <span style={{ fontWeight: 600, color: '#0f172a', fontSize: '0.85rem' }}>
+                              {tx.transactionType === 'topup' ? 'Nạp tiền vào ví' : (tx.periodLabel || tx.description || 'Thanh toán hóa đơn')}
+                            </span>
+                          </div>
+                          {tx.transactionType === 'payment' && tx.invoiceNumber && (
+                            <div style={{ fontSize: 11, color: '#94a3b8' }}>
+                              HĐ: {tx.invoiceNumber}
+                              {tx.paymentMethod && ` · ${tx.paymentMethod}`}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Amount */}
+                        <div style={{ textAlign: 'right', fontWeight: 700, color: tx.transactionType === 'topup' ? '#1d4ed8' : '#047857' }}>
+                          {tx.transactionType === 'topup' ? '+' : ''}{formatMoney(tx.amount)}
+                        </div>
+
+                        {/* Status */}
+                        <div style={{ textAlign: 'center' }}>
+                          <span style={{
+                            padding: '2px 8px',
+                            borderRadius: 12,
+                            fontSize: 11,
+                            fontWeight: 600,
+                            background: '#dcfce7',
+                            color: '#166534',
+                          }}>
+                            Thành công
+                          </span>
+                        </div>
+
+                        {/* Date */}
+                        <div style={{ textAlign: 'right', color: '#475569', fontSize: 12 }}>
+                          {txDate ? new Date(txDate).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16, paddingTop: 12, borderTop: '1px solid #e2e8f0' }}>
+          <button type="button" className="button button-secondary" onClick={onClose}>
+            Đóng
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

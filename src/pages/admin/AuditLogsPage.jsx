@@ -224,7 +224,7 @@ const getDetailedActionMessage = (log, t, i18n) => {
   const target = log.targetName || '—';
   const action = log.action;
 
-  const isVi = i18n?.language === 'vi';
+  const isVi = String(i18n?.language || '').toLowerCase().startsWith('vi');
 
   // Resident actions
   if (action === 'CREATE_RESIDENT_PROFILE') {
@@ -402,7 +402,7 @@ const formatTargetLabel = (targetName, targetEntityType, t) => {
 
 const IGNORED_DIFF_KEYS = new Set([
   '_id', '__v', 'createdAt', 'updatedAt',
-  'familyAccountId', 'residentId', 'attachmentsAdded',
+  'familyAccountId', 'residentId', 'chargeId', 'attachmentsAdded',
 ]);
 
 // Fields đã được hiển thị đầy đủ trong bảng "Danh sách thuốc trong hóa đơn"
@@ -714,6 +714,20 @@ const FIELD_KEY_LABELS = {
   invoiceId: 'Mã hóa đơn',
   residentName: 'Tên cư dân',
   residentId: 'Mã cư dân',
+  measuredAt: 'Thời gian đo',
+  bloodPressureSystolic: 'Huyết áp tâm thu',
+  bloodPressureDiastolic: 'Huyết áp tâm trương',
+  pulse: 'Mạch',
+  temperatureCelsius: 'Nhiệt độ',
+  oxygenSaturation: 'Độ bão hòa oxy',
+  bloodSugar: 'Đường huyết',
+  weightKg: 'Cân nặng',
+  heightCm: 'Chiều cao',
+  bloodType: 'Nhóm máu',
+  abnormalFlag: 'Chỉ số bất thường',
+  summary: 'Tóm tắt khám',
+  physicalExamination: 'Khám lâm sàng',
+  selectedServices: 'Dịch vụ lâm sàng',
   workDate: 'Ngày làm việc',
   createdAt: 'Ngày tạo',
   updatedAt: 'Ngày cập nhật',
@@ -806,6 +820,20 @@ const FIELD_KEY_LABELS_EN = {
   invoiceId: 'Invoice ID',
   residentName: 'Resident Name',
   residentId: 'Resident ID',
+  measuredAt: 'Measurement time',
+  bloodPressureSystolic: 'Systolic blood pressure',
+  bloodPressureDiastolic: 'Diastolic blood pressure',
+  pulse: 'Pulse',
+  temperatureCelsius: 'Temperature',
+  oxygenSaturation: 'Oxygen saturation',
+  bloodSugar: 'Blood sugar',
+  weightKg: 'Weight',
+  heightCm: 'Height',
+  bloodType: 'Blood type',
+  abnormalFlag: 'Abnormal readings',
+  summary: 'Examination summary',
+  physicalExamination: 'Physical examination',
+  selectedServices: 'Clinical services',
   workDate: 'Work date',
   createdAt: 'Created At',
   updatedAt: 'Updated At',
@@ -1004,22 +1032,8 @@ const formatFieldNameVi = (field) => {
     roomId: 'Phòng',
     room_id: 'Phòng',
     residentCode: 'Mã cư dân',
-        status: 'Trạng thái',
+      status: 'Trạng thái',
     statusLabel: 'Trạng thái',
-    closedAtLabel: 'Thời gian đóng',
-    packageCode: 'Mã gói dịch vụ',
-    tierLabel: 'Hạng gói',
-    monthlyPrice: 'Giá hàng tháng (VNĐ)',
-    allowedRoomTypes: 'Loại phòng áp dụng',
-    roomTypeLabels: 'Loại phòng áp dụng',
-    preferredDate: 'Ngày tham quan',
-    preferredTimeSlot: 'Khung giờ',
-    confirmedTimeSlot: 'Khung giờ xác nhận',
-    confirmedAt: 'Thời gian xác nhận',
-    completedAt: 'Thời gian hoàn thành',
-    cancellationReason: 'Lý do hủy',
-    rejectionReason: 'Lý do từ chối',
-    numberOfVisitors: 'Số người tham quan',
     contactName: 'Tên người liên hệ',
     contactPhone: 'SĐT liên hệ',
     contactEmail: 'Email liên hệ',
@@ -2471,7 +2485,7 @@ const MedicationInvoiceItems = ({ items, totals, invoiceNumber, t, isVi }) => {
 };
 
 const ChangeDetails = ({ log, t, i18n }) => {
-  const isVi = i18n?.language === 'vi';
+  const isVi = String(i18n?.language || '').toLowerCase().startsWith('vi');
   const isAddEmergencyContact = log.action === 'ADD_RESIDENT_EMERGENCY_CONTACT';
   const changes = [];
 

@@ -207,6 +207,13 @@
   transition: all 0.2s ease;
 }
 
+textarea.adm-form-input {
+  min-height: 96px;
+  resize: vertical;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
 .adm-filter-input:focus,
 .adm-filter-select:focus,
 .adm-form-input:focus {

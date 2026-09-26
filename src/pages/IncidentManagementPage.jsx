@@ -54,6 +54,69 @@ const getSeverityDisplay = (t) => ({
   critical: t('incidents.severity.critical'),
 });
 
+const cleanResolutionValue = (value) => {
+  let normalized = value;
+  for (let attempt = 0; attempt < 2 && typeof normalized === 'string'; attempt += 1) {
+    const trimmed = normalized.trim();
+    if (!trimmed) return '';
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (typeof parsed === 'string') {
+        normalized = parsed;
+        continue;
+      }
+    } catch {
+      // Legacy records may contain quoted values that are not valid JSON.
+    }
+    return trimmed.replace(/^['"]|['"]$/g, '').trim();
+  }
+  return typeof normalized === 'string' ? normalized.trim() : normalized;
+};
+
+const getResolutionRootCauseLabel = (value, t) => {
+  const rootCause = cleanResolutionValue(value);
+  const labels = {
+    'Wet Floor': 'incidents.resolution.causeWetFloor',
+    'Resident Lost Balance': 'incidents.resolution.causeResidentBalance',
+    'Equipment Failure': 'incidents.resolution.causeEquipmentFailure',
+    'Staff Error': 'incidents.resolution.causeStaffError',
+    Unknown: 'incidents.resolution.causeUnknown',
+    Other: 'incidents.resolution.causeOther',
+  };
+  return labels[rootCause] ? t(labels[rootCause]) : rootCause;
+};
+
+const getImmediateActionLabels = (actions, t) => {
+  const values = Array.isArray(actions) ? actions : [actions];
+  const labels = {
+    'Lau sàn': 'incidents.immediateAction.cleanFloor',
+    'Hỗ trợ cư dân': 'incidents.immediateAction.assistResident',
+    'Gọi bác sĩ': 'incidents.immediateAction.callDoctor',
+    'Liên hệ gia đình': 'incidents.immediateAction.contactFamily',
+    'Chuyển viện': 'incidents.immediateAction.transferHospital',
+    Khác: 'incidents.immediateAction.other',
+    'Clean floor': 'incidents.immediateAction.cleanFloor',
+    'Assist resident': 'incidents.immediateAction.assistResident',
+    'Call doctor': 'incidents.immediateAction.callDoctor',
+    'Contact family': 'incidents.immediateAction.contactFamily',
+    Transfer: 'incidents.immediateAction.transferHospital',
+    Other: 'incidents.immediateAction.other',
+  };
+  return values
+    .flatMap((value) => {
+      const cleaned = cleanResolutionValue(value);
+      try {
+        const parsed = JSON.parse(String(cleaned));
+        return Array.isArray(parsed) ? parsed : [cleaned];
+      } catch {
+        return [cleaned];
+      }
+    })
+    .map((value) => cleanResolutionValue(value))
+    .filter(Boolean)
+    .map((value) => labels[value] ? t(labels[value]) : value);
+};
+
 const getResolutionStatusLabel = (status, t) => {
   const normalized = String(status || '').trim().toLowerCase().replace(/[-\s]+/g, '_');
   const labels = t ? {
@@ -1552,20 +1615,19 @@ function IncidentManagementPage() {
                               <div style={{ marginBottom: 8 }}>
                                 <strong>{t('incidents.resolution.rootCause')}:</strong>
                                 <span style={{ marginLeft: 8, color: detailIncident.resolution.rootCause ? '#333' : '#ef4444', fontWeight: detailIncident.resolution.rootCause ? '400' : '600' }}>
-                                  {detailIncident.resolution.rootCause || 'Unknown'}
+                                  {getResolutionRootCauseLabel(detailIncident.resolution.rootCause || 'Unknown', t)}
                                 </span>
                               </div>
                               <div style={{ marginBottom: 8 }}>
                                 <strong>{t('incidents.resolution.immediateActions')}:</strong>
-                                <span style={{ marginLeft: 8, color: (detailIncident.resolution.immediateActions || []).length > 0 ? '#333' : '#9ca3af' }}>
-                                  {(detailIncident.resolution.immediateActions || []).length > 0 
-                                    ? (detailIncident.resolution.immediateActions || []).map((action, idx) => (
-                                        <span key={idx} style={{ display: 'inline-block', background: '#dbeafe', color: '#1e40af', padding: '2px 8px', borderRadius: 4, marginRight: 4, marginBottom: 4 }}>
+                                <span style={{ marginLeft: 8, display: 'inline-flex', flexWrap: 'wrap', gap: 4, color: (detailIncident.resolution.immediateActions || []).length > 0 ? '#333' : '#9ca3af' }}>
+                                  {getImmediateActionLabels(detailIncident.resolution.immediateActions, t).length > 0
+                                    ? getImmediateActionLabels(detailIncident.resolution.immediateActions, t).map((action, idx) => (
+                                        <span key={`${action}-${idx}`} style={{ display: 'inline-block', background: '#dbeafe', color: '#1e40af', padding: '3px 8px', borderRadius: 4 }}>
                                           {action}
                                         </span>
                                       ))
-                                    : '—'
-                                  }
+                                    : '—'}
                                 </span>
                               </div>
                               <div>
