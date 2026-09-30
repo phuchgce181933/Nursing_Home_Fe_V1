@@ -98,8 +98,9 @@ const DEFAULT_STRENGTHS_VN = [
   '5mg/ml',
   '10mg/ml',
   '100IU/ml',
-  'Khác',
 ];
+
+const OTHER_OPTION_VALUE = '__OTHER__';
 
 const toIsoDate = (value) => {
   if (!value) return undefined;
@@ -212,8 +213,11 @@ const emptyMedicationForm = {
   medicationCode: '',
   name: '',
   form: '',
+  formOther: false,
   strength: '',
   unit: '',
+  strengthOther: false,
+  unitOther: false,
   manufacturer: '',
   description: '',
   minStockLevel: 0,
@@ -817,12 +821,18 @@ function PharmacyPage({ defaultTab = 'overview' }) {
   const openMedicationModal = (medication) => {
     setEditingMedication(medication || null);
     if (medication) {
+      const formOptions = [...new Set([...DEFAULT_FORMS_VN, ...(medicationFormOptions.forms || [])])];
+      const strengthOptions = combinedStrengthOptions;
+      const unitOptions = combinedUnitOptions;
       setMedicationForm({
         medicationCode: medication.medicationCode || '',
         name: medication.name || '',
         form: medication.form || '',
+        formOther: Boolean(medication.form && !formOptions.includes(medication.form)),
         strength: medication.strength || '',
         unit: medication.unit || '',
+        strengthOther: Boolean(medication.strength && !strengthOptions.includes(medication.strength)),
+        unitOther: Boolean(medication.unit && !unitOptions.includes(medication.unit)),
         manufacturer: medication.manufacturer || '',
         description: medication.description || '',
         minStockLevel: medication.minStockLevel || 0,
@@ -1015,7 +1025,12 @@ function PharmacyPage({ defaultTab = 'overview' }) {
         (supKey || undefined);
 
       const selectedMedication = medicationOptions.find((med) => String(med._id) === String(resolvedMedicationId));
-      const payload = {
+      const payload = editingStock
+        ? {
+          expiryDate: stockForm.expiryDate ? toIsoDate(stockForm.expiryDate) : undefined,
+          costPerUnit: stockForm.costPerUnit ? Number(stockForm.costPerUnit) : undefined,
+        }
+        : {
         medicationId: resolvedMedicationId,
         supplierId: resolvedSupplierId || undefined,
         quantity: Number(stockForm.quantity),
@@ -2019,46 +2034,76 @@ function PharmacyPage({ defaultTab = 'overview' }) {
                 <label>
                   {t('pharmacyPage.formLabel')}
                   <select
-                    value={medicationForm.form}
-                    onChange={(event) =>
-                      setMedicationForm((prev) => ({ ...prev, form: event.target.value }))
-                    }
+                    value={medicationForm.formOther ? OTHER_OPTION_VALUE : medicationForm.form}
+                    onChange={(event) => setMedicationForm((prev) => ({
+                      ...prev,
+                      formOther: event.target.value === OTHER_OPTION_VALUE,
+                      form: event.target.value === OTHER_OPTION_VALUE ? '' : event.target.value,
+                    }))}
                   >
                     <option value="">{t('pharmacyPage.selectForm')}</option>
                     {[...new Set([...DEFAULT_FORMS_VN, ...(medicationFormOptions.forms || [])])].map((f) => (
                       <option key={f} value={f}>{f}</option>
                     ))}
+                    <option value={OTHER_OPTION_VALUE}>{t('pharmacyPage.otherOption')}</option>
                   </select>
+                  {medicationForm.formOther && (
+                    <input
+                      value={medicationForm.form}
+                      placeholder={t('pharmacyPage.otherFormPlaceholder')}
+                      onChange={(event) => setMedicationForm((prev) => ({ ...prev, form: event.target.value }))}
+                    />
+                  )}
                 </label>
 
                 <label>
                   {t('pharmacyPage.strengthLabel')}
                   <select
-                    value={medicationForm.strength}
-                    onChange={(event) =>
-                      setMedicationForm((prev) => ({ ...prev, strength: event.target.value }))
-                    }
+                    value={medicationForm.strengthOther ? OTHER_OPTION_VALUE : medicationForm.strength}
+                    onChange={(event) => setMedicationForm((prev) => ({
+                      ...prev,
+                      strengthOther: event.target.value === OTHER_OPTION_VALUE,
+                      strength: event.target.value === OTHER_OPTION_VALUE ? '' : event.target.value,
+                    }))}
                   >
                     <option value="">{t('pharmacyPage.selectStrength')}</option>
-                    {withFallbackOption(combinedStrengthOptions, medicationForm.strength).map((s) => (
+                    {withFallbackOption(combinedStrengthOptions, medicationForm.strengthOther ? '' : medicationForm.strength).map((s) => (
                       <option key={s} value={s}>{s}</option>
                     ))}
+                    <option value={OTHER_OPTION_VALUE}>{t('pharmacyPage.otherOption')}</option>
                   </select>
+                  {medicationForm.strengthOther && (
+                    <input
+                      value={medicationForm.strength}
+                      placeholder={t('pharmacyPage.otherStrengthPlaceholder')}
+                      onChange={(event) => setMedicationForm((prev) => ({ ...prev, strength: event.target.value }))}
+                    />
+                  )}
                 </label>
 
                 <label>
                   {t('pharmacyPage.unitLabel')}
                   <select
-                    value={medicationForm.unit}
-                    onChange={(event) =>
-                      setMedicationForm((prev) => ({ ...prev, unit: event.target.value }))
-                    }
+                    value={medicationForm.unitOther ? OTHER_OPTION_VALUE : medicationForm.unit}
+                    onChange={(event) => setMedicationForm((prev) => ({
+                      ...prev,
+                      unitOther: event.target.value === OTHER_OPTION_VALUE,
+                      unit: event.target.value === OTHER_OPTION_VALUE ? '' : event.target.value,
+                    }))}
                   >
                     <option value="">{t('pharmacyPage.selectUnit')}</option>
                     {combinedUnitOptions.map((u) => (
                       <option key={u} value={u}>{u}</option>
                     ))}
+                    <option value={OTHER_OPTION_VALUE}>{t('pharmacyPage.otherOption')}</option>
                   </select>
+                  {medicationForm.unitOther && (
+                    <input
+                      value={medicationForm.unit}
+                      placeholder={t('pharmacyPage.otherUnitPlaceholder')}
+                      onChange={(event) => setMedicationForm((prev) => ({ ...prev, unit: event.target.value }))}
+                    />
+                  )}
                 </label>
 
                 <label>
@@ -2245,6 +2290,7 @@ function PharmacyPage({ defaultTab = 'overview' }) {
                       <select
                         value={stockForm.medicationId}
                         onChange={handleStockMedicationChange}
+                        disabled={!!editingStock}
                       >
                         <option value="">{t('pharmacyPage.selectMedication')}</option>
                         {medicationOptions.map((med) => (
@@ -2310,6 +2356,7 @@ function PharmacyPage({ defaultTab = 'overview' }) {
                     onChange={(event) =>
                       setStockForm((prev) => ({ ...prev, receivedDate: event.target.value }))
                     }
+                    readOnly={!!editingStock}
                   />
                 </label>
 

@@ -38,6 +38,7 @@ const THRESHOLDS = {
   pulse:                  { min: 60,   max: 100,  unit: 'bpm' },
   temperatureCelsius:     { min: 35.0, max: 37.8, unit: '°C' },
   oxygenSaturation:       { min: 95,   max: 100,  unit: '%' },
+  bloodSugar:             { min: 3.9,  max: 5.5,  unit: 'mmol/L' },
 };
 
 // ─── Cấu hình biểu đồ ───
@@ -58,7 +59,7 @@ const VALID_RANGES = {
   pulse:                  { min: 30,  max: 220 },
   temperatureCelsius:     { min: 30,  max: 45 },
   oxygenSaturation:       { min: 0,   max: 100 },
-  bloodSugar:             { min: 20,  max: 800 },
+  bloodSugar:             { min: 0,   max: 50 },
   weightKg:               { min: 1,   max: 300 },
   heightCm:               { min: 30,  max: 250 },
 };

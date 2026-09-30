@@ -1,50 +1,32 @@
-import axios from 'axios';
-import { getAuthToken } from '../utils/auth';
+import axiosClient from '../api/axiosClient';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 const ENDPOINT = '/nutrition/dishes';
-
-const createHeaders = () => {
-  const token = getAuthToken();
-  return {
-    Authorization: `Bearer ${token}`,
-  };
-};
 
 const dishService = {
   listDishes: async (params = {}) => {
-    const response = await axios.get(`${API_BASE_URL}${ENDPOINT}`, {
+    const response = await axiosClient.get(ENDPOINT, {
       params,
-      headers: createHeaders(),
     });
     return response.data;
   },
 
   getDish: async (id) => {
-    const response = await axios.get(`${API_BASE_URL}${ENDPOINT}/${id}`, {
-      headers: createHeaders(),
-    });
+    const response = await axiosClient.get(`${ENDPOINT}/${id}`);
     return response.data;
   },
 
   createDish: async (data) => {
-    const response = await axios.post(`${API_BASE_URL}${ENDPOINT}`, data, {
-      headers: createHeaders(),
-    });
+    const response = await axiosClient.post(ENDPOINT, data);
     return response.data;
   },
 
   updateDish: async (id, data) => {
-    const response = await axios.put(`${API_BASE_URL}${ENDPOINT}/${id}`, data, {
-      headers: createHeaders(),
-    });
+    const response = await axiosClient.put(`${ENDPOINT}/${id}`, data);
     return response.data;
   },
 
   deleteDish: async (id) => {
-    const response = await axios.delete(`${API_BASE_URL}${ENDPOINT}/${id}`, {
-      headers: createHeaders(),
-    });
+    const response = await axiosClient.delete(`${ENDPOINT}/${id}`);
     return response.data;
   },
 };

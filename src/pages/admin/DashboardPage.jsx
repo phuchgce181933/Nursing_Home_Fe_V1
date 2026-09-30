@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Users,
@@ -11,6 +11,15 @@ import {
   ClipboardList,
   Loader2,
   RefreshCw,
+  Building2,
+  Layers,
+  BedDouble,
+  CheckCircle2,
+  XCircle,
+  AlertCircle,
+  UserCheck,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import {
   PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer,
@@ -18,6 +27,8 @@ import {
   AreaChart, Area,
 } from 'recharts';
 import reportService from '../../services/report.service';
+import facilityService from '../../services/facility.service';
+import staffService from '../../services/staff.service';
 import '../../styles/admin/DashboardPage.css';
 
 const COLORS = ['#1A365D', '#2D6A4F', '#E07A2F', '#B91C1C', '#7C3AED', '#0891B2', '#94A3B8'];
@@ -37,11 +48,26 @@ const CARE_TASK_COLORS = {
   missed: '#B91C1C',
 };
 
+const COVERAGE_STATUS = {
+  ASSIGNED: 'assigned',
+  PARTIAL: 'partial',
+  UNASSIGNED: 'unassigned',
+};
+
 const formatCurrency = (amount) => {
   if (amount >= 1_000_000) return `${(amount / 1_000_000).toFixed(1)}M`;
   if (amount >= 1_000) return `${(amount / 1_000).toFixed(0)}K`;
   return amount.toLocaleString('vi-VN');
 };
+
+const toIdString = (value) => {
+  if (!value) return '';
+  if (typeof value === 'string') return value;
+  if (value._id) return String(value._id);
+  return String(value);
+};
+
+const buildStaffKey = (id) => String(id || '');
 
 export default function DashboardPage() {
   const { t } = useTranslation();
@@ -52,6 +78,21 @@ export default function DashboardPage() {
   const [incidents, setIncidents] = useState(null);
   const [careActivity, setCareActivity] = useState(null);
   const [timeSeries, setTimeSeries] = useState(null);
+
+  // Coverage state
+  const [coverage, setCoverage] = useState({
+    buildings: [],
+    floorsByBuilding: {},
+    roomsByFloor: {},
+    assignedFloorIds: new Set(),
+    assignedRoomIds: new Set(),
+    staffByFloor: {},
+    staffByRoom: {},
+  });
+  const [coverageLoading, setCoverageLoading] = useState(true);
+  const [coverageError, setCoverageError] = useState(null);
+  const [coverageFilter, setCoverageFilter] = useState('all');
+  const [expandedBuildings, setExpandedBuildings] = useState({});
 
   const fetchData = async () => {
     setLoading(true);
@@ -76,7 +117,191 @@ export default function DashboardPage() {
     }
   };
 
-  useEffect(() => { fetchData(); }, []);
+  const fetchCoverage = async () => {
+    setCoverageLoading(true);
+    setCoverageError(null);
+    try {
+      const [buildings, floors, staffRes] = await Promise.all([
+        facilityService.listBuildings({ activeOnly: false }).catch(() => []),
+        facilityService.listFloors({ activeOnly: false }).catch(() => []),
+        staffService.getAll({ limit: 200 }).catch(() => ({ data: [] })),
+      ]);
+
+      const activeBuildings = (buildings || []).filter((b) => b.isActive !== false);
+      const activeFloors = (floors || []).filter((f) => f.isActive !== false);
+      const staffList = staffRes?.data || staffRes || [];
+
+      // Group floors by building
+      const floorsByBuilding = {};
+      for (const floor of activeFloors) {
+        const buildingId = toIdString(floor.buildingId);
+        if (!buildingId) continue;
+        if (!floorsByBuilding[buildingId]) floorsByBuilding[buildingId] = [];
+        floorsByBuilding[buildingId].push(floor);
+      }
+
+      // Fetch rooms for every active floor
+      const roomsByFloor = {};
+      const roomFetchResults = await Promise.all(
+        activeFloors.map((floor) =>
+          facilityService
+            .listRoomsByFloor(floor._id)
+            .then((rooms) => [floor._id, rooms || []])
+            .catch(() => [floor._id, []])
+        )
+      );
+      for (const [floorId, rooms] of roomFetchResults) {
+        roomsByFloor[floorId] = rooms;
+      }
+
+      // Build assigned maps from staff profiles
+      const assignedFloorIds = new Set();
+      const assignedRoomIds = new Set();
+      const staffByFloor = {};
+      const staffByRoom = {};
+
+      const addStaffRef = (map, key, staff) => {
+        if (!key) return;
+        const k = String(key);
+        if (!map[k]) map[k] = [];
+        if (!map[k].some((s) => buildStaffKey(s._id) === buildStaffKey(staff._id))) {
+          map[k].push(staff);
+        }
+      };
+
+      for (const staff of staffList) {
+        if (!staff) continue;
+        const profile = staff.staffProfile || {};
+        const areas = profile.responsibleAreaIds || [];
+        const rooms = profile.responsibleRoomIds || [];
+
+        for (const area of areas) {
+          const id = toIdString(area);
+          if (!id) continue;
+          assignedFloorIds.add(id);
+          addStaffRef(staffByFloor, id, staff);
+        }
+        for (const room of rooms) {
+          const id = toIdString(room);
+          if (!id) continue;
+          assignedRoomIds.add(id);
+          addStaffRef(staffByRoom, id, staff);
+        }
+      }
+
+      setCoverage({
+        buildings: activeBuildings,
+        floorsByBuilding,
+        roomsByFloor,
+        assignedFloorIds,
+        assignedRoomIds,
+        staffByFloor,
+        staffByRoom,
+      });
+    } catch (err) {
+      console.error('Coverage fetch failed:', err);
+      setCoverageError(t('dashboard.coverage.coverageError'));
+    } finally {
+      setCoverageLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+    fetchCoverage();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const coverageSummary = useMemo(() => {
+    const { buildings, floorsByBuilding, roomsByFloor, assignedFloorIds, assignedRoomIds } = coverage;
+
+    let totalFloors = 0;
+    let totalRooms = 0;
+    let assignedFloors = 0;
+    let assignedRooms = 0;
+    let assignedBuildings = 0;
+
+    const buildingBreakdown = buildings.map((building) => {
+      const buildingId = toIdString(building._id);
+      const buildingFloors = floorsByBuilding[buildingId] || [];
+      const buildingFloorCount = buildingFloors.length;
+      const buildingRoomCount = buildingFloors.reduce(
+        (sum, floor) => sum + ((roomsByFloor[floor._id] || []).length),
+        0
+      );
+      const assignedFloorCount = buildingFloors.filter((f) =>
+        assignedFloorIds.has(toIdString(f._id))
+      ).length;
+      let assignedRoomCount = 0;
+      for (const floor of buildingFloors) {
+        for (const room of roomsByFloor[floor._id] || []) {
+          if (assignedRoomIds.has(toIdString(room._id))) assignedRoomCount += 1;
+        }
+      }
+
+      totalFloors += buildingFloorCount;
+      totalRooms += buildingRoomCount;
+      assignedFloors += assignedFloorCount;
+      assignedRooms += assignedRoomCount;
+
+      const floorCoverageRatio =
+        buildingFloorCount > 0 ? assignedFloorCount / buildingFloorCount : 1;
+      const roomCoverageRatio =
+        buildingRoomCount > 0 ? assignedRoomCount / buildingRoomCount : 1;
+
+      let status;
+      if (buildingFloorCount === 0 && buildingRoomCount === 0) {
+        status = COVERAGE_STATUS.UNASSIGNED;
+      } else if (assignedFloorCount === buildingFloorCount && assignedRoomCount === buildingRoomCount) {
+        status = COVERAGE_STATUS.ASSIGNED;
+      } else if (assignedFloorCount > 0 || assignedRoomCount > 0) {
+        status = COVERAGE_STATUS.PARTIAL;
+      } else {
+        status = COVERAGE_STATUS.UNASSIGNED;
+      }
+
+      return {
+        building,
+        buildingId,
+        floors: buildingFloors,
+        floorCount: buildingFloorCount,
+        roomCount: buildingRoomCount,
+        assignedFloorCount,
+        assignedRoomCount,
+        floorCoverageRatio,
+        roomCoverageRatio,
+        status,
+      };
+    });
+
+    for (const b of buildingBreakdown) {
+      if (b.status !== COVERAGE_STATUS.UNASSIGNED) assignedBuildings += 1;
+    }
+
+    const floorPct = totalFloors > 0 ? Math.round((assignedFloors / totalFloors) * 100) : 100;
+    const roomPct = totalRooms > 0 ? Math.round((assignedRooms / totalRooms) * 100) : 100;
+    const buildingPct =
+      buildings.length > 0 ? Math.round((assignedBuildings / buildings.length) * 100) : 100;
+
+    const unassignedCount =
+      (buildings.length - assignedBuildings) +
+      (totalFloors - assignedFloors) +
+      (totalRooms - assignedRooms);
+
+    return {
+      buildingBreakdown,
+      totalBuildings: buildings.length,
+      totalFloors,
+      totalRooms,
+      assignedBuildings,
+      assignedFloors,
+      assignedRooms,
+      buildingPct,
+      floorPct,
+      roomPct,
+      unassignedCount,
+    };
+  }, [coverage]);
 
   if (loading) {
     return (
@@ -183,6 +408,15 @@ export default function DashboardPage() {
 
   const quantityLabel = t('dashboard.charts.quantity');
 
+  const handleRefresh = () => {
+    fetchData();
+    fetchCoverage();
+  };
+
+  const toggleBuilding = (buildingId) => {
+    setExpandedBuildings((prev) => ({ ...prev, [buildingId]: !prev[buildingId] }));
+  };
+
   return (
     <div className="dashboard-page">
       <div className="dashboard-page__header">
@@ -190,7 +424,7 @@ export default function DashboardPage() {
           <h1 className="dashboard-page__title">{t('dashboard.title')}</h1>
           <p className="dashboard-page__subtitle">{t('dashboard.subtitle')}</p>
         </div>
-        <button onClick={fetchData} className="dashboard-refresh-btn" title={t('dashboard.refresh')}>
+        <button onClick={handleRefresh} className="dashboard-refresh-btn" title={t('dashboard.refresh')}>
           <RefreshCw size={16} />
           {t('dashboard.refresh')}
         </button>
@@ -216,6 +450,129 @@ export default function DashboardPage() {
           );
         })}
       </div>
+
+      {/* ─── Manager Assignment Coverage Section ─── */}
+      <section className="dashboard-coverage">
+        <div className="dashboard-coverage__header">
+          <div>
+            <h2 className="dashboard-coverage__title">{t('dashboard.coverage.title')}</h2>
+            <p className="dashboard-coverage__subtitle">{t('dashboard.coverage.subtitle')}</p>
+          </div>
+        </div>
+
+        {coverageError && (
+          <div className="dashboard-coverage__error">
+            <AlertTriangle size={16} />
+            <span>{coverageError}</span>
+          </div>
+        )}
+
+        <div className="dashboard-coverage__kpis">
+          <CoverageKpi
+            icon={Building2}
+            label={t('dashboard.coverage.buildingsKpi')}
+            assigned={coverageSummary.assignedBuildings}
+            total={coverageSummary.totalBuildings}
+            percent={coverageSummary.buildingPct}
+            color="#1A365D"
+            bg="#EBF0F7"
+          />
+          <CoverageKpi
+            icon={Layers}
+            label={t('dashboard.coverage.floorsKpi')}
+            assigned={coverageSummary.assignedFloors}
+            total={coverageSummary.totalFloors}
+            percent={coverageSummary.floorPct}
+            color="#0891B2"
+            bg="#E0F2FE"
+          />
+          <CoverageKpi
+            icon={BedDouble}
+            label={t('dashboard.coverage.roomsKpi')}
+            assigned={coverageSummary.assignedRooms}
+            total={coverageSummary.totalRooms}
+            percent={coverageSummary.roomPct}
+            color="#2D6A4F"
+            bg="#ECFDF5"
+          />
+          <CoverageKpi
+            icon={UserCheck}
+            label={t('dashboard.coverage.unassignedKpi')}
+            assigned={Math.max(coverageSummary.unassignedCount, 0)}
+            total={coverageSummary.totalBuildings + coverageSummary.totalFloors + coverageSummary.totalRooms}
+            percent={
+              coverageSummary.unassignedCount === 0
+                ? 100
+                : Math.max(
+                    0,
+                    100 -
+                      Math.round(
+                        (coverageSummary.unassignedCount /
+                          Math.max(
+                            1,
+                            coverageSummary.totalBuildings + coverageSummary.totalFloors + coverageSummary.totalRooms
+                          )) * 100
+                      )
+                )
+            }
+            color="#B91C1C"
+            bg="#FEF2F2"
+            invertPercent
+          />
+        </div>
+
+        <div className="dashboard-coverage__panel">
+          <div className="dashboard-coverage__panel-header">
+            <h3 className="dashboard-coverage__panel-title">{t('dashboard.coverage.buildingHeading')}</h3>
+            <div className="dashboard-coverage__legend">
+              <span className="dashboard-coverage__legend-title">{t('dashboard.coverage.legendTitle')}:</span>
+              <span className="dashboard-coverage__legend-item">
+                <span className="dashboard-coverage__legend-dot" style={{ background: '#2D6A4F' }} />
+                {t('dashboard.coverage.assignedLabel')}
+              </span>
+              <span className="dashboard-coverage__legend-item">
+                <span className="dashboard-coverage__legend-dot" style={{ background: '#E07A2F' }} />
+                {t('dashboard.coverage.partialLabel')}
+              </span>
+              <span className="dashboard-coverage__legend-item">
+                <span className="dashboard-coverage__legend-dot" style={{ background: '#B91C1C' }} />
+                {t('dashboard.coverage.unassignedLabel')}
+              </span>
+            </div>
+          </div>
+
+          {coverageLoading && coverageSummary.totalBuildings === 0 ? (
+            <div className="dashboard-coverage__loading">
+              <Loader2 size={20} className="dashboard-loading__spinner" />
+              <span>{t('dashboard.loadingData')}</span>
+            </div>
+          ) : coverageSummary.buildingBreakdown.length === 0 ? (
+            <div className="dashboard-coverage__empty">{t('dashboard.coverage.noBuildings')}</div>
+          ) : (
+            <ul className="dashboard-coverage__building-list">
+              {coverageSummary.buildingBreakdown
+                .filter((entry) =>
+                  coverageFilter === 'unassigned'
+                    ? entry.status !== COVERAGE_STATUS.ASSIGNED
+                    : true
+                )
+                .map((entry) => {
+                  const isExpanded = !!expandedBuildings[entry.buildingId];
+                  return (
+                    <BuildingCoverageRow
+                      key={entry.buildingId}
+                      entry={entry}
+                      isExpanded={isExpanded}
+                      onToggle={() => toggleBuilding(entry.buildingId)}
+                      coverage={coverage}
+                      t={t}
+                    />
+                  );
+                })}
+            </ul>
+          )}
+        </div>
+      </section>
 
       {/* Charts Row 1 */}
       <div className="dashboard-charts-grid">
@@ -402,5 +759,255 @@ function SummaryItem({ icon: Icon, label, value, total, color, bg }) {
         </div>
       </div>
     </div>
+  );
+}
+
+function CoverageKpi({ icon: Icon, label, assigned, total, percent, color, bg, invertPercent }) {
+  const displayPercent = invertPercent ? Math.max(0, 100 - percent) : percent;
+  return (
+    <div className="dashboard-coverage-kpi">
+      <div className="dashboard-coverage-kpi__icon" style={{ background: bg, color }}>
+        <Icon size={22} />
+      </div>
+      <div className="dashboard-coverage-kpi__content">
+        <span className="dashboard-coverage-kpi__label">{label}</span>
+        <span className="dashboard-coverage-kpi__value" style={{ color }}>
+          {assigned} / {total}
+        </span>
+        <div className="dashboard-coverage-kpi__bar">
+          <div
+            className="dashboard-coverage-kpi__bar-fill"
+            style={{ width: `${Math.min(100, Math.max(0, displayPercent))}%`, background: color }}
+          />
+        </div>
+        <span className="dashboard-coverage-kpi__percent">{displayPercent}%</span>
+      </div>
+    </div>
+  );
+}
+
+function BuildingCoverageRow({ entry, isExpanded, onToggle, coverage, t }) {
+  const { building, buildingId, floorCount, roomCount, assignedFloorCount, assignedRoomCount, status, floors } = entry;
+  const { roomsByFloor, assignedFloorIds, assignedRoomIds, staffByFloor, staffByRoom } = coverage;
+
+  const statusMeta = (() => {
+    if (status === COVERAGE_STATUS.ASSIGNED) {
+      return {
+        label: t('dashboard.coverage.assignedLabel'),
+        color: '#2D6A4F',
+        bg: '#ECFDF5',
+        Icon: CheckCircle2,
+      };
+    }
+    if (status === COVERAGE_STATUS.PARTIAL) {
+      return {
+        label: t('dashboard.coverage.partialLabel'),
+        color: '#E07A2F',
+        bg: '#FFF7ED',
+        Icon: AlertCircle,
+      };
+    }
+    return {
+      label: t('dashboard.coverage.unassignedLabel'),
+      color: '#B91C1C',
+      bg: '#FEF2F2',
+      Icon: XCircle,
+    };
+  })();
+
+  const StatusIcon = statusMeta.Icon;
+
+  const floorPct = floorCount > 0 ? Math.round((assignedFloorCount / floorCount) * 100) : 100;
+  const roomPct = roomCount > 0 ? Math.round((assignedRoomCount / roomCount) * 100) : 100;
+
+  return (
+    <li className="dashboard-coverage__building">
+      <div className="dashboard-coverage__building-summary">
+        <button
+          type="button"
+          className="dashboard-coverage__building-toggle"
+          onClick={onToggle}
+          aria-expanded={isExpanded}
+          title={isExpanded ? t('common.close') : t('common.view')}
+        >
+          <span className="dashboard-coverage__building-info">
+            <span className="dashboard-coverage__building-code">{building.code}</span>
+            <span className="dashboard-coverage__building-name">{building.name}</span>
+          </span>
+          {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+        </button>
+
+        <div className="dashboard-coverage__building-stats">
+          <span className="dashboard-coverage__stat-chip">
+            <Layers size={14} />
+            {assignedFloorCount}/{floorCount} {t('dashboard.coverage.floorsKpi').toLowerCase()}
+          </span>
+          <span className="dashboard-coverage__stat-chip">
+            <BedDouble size={14} />
+            {assignedRoomCount}/{roomCount} {t('dashboard.coverage.roomsKpi').toLowerCase()}
+          </span>
+        </div>
+
+        <span
+          className="dashboard-coverage__status-badge"
+          style={{ color: statusMeta.color, background: statusMeta.bg }}
+        >
+          <StatusIcon size={14} />
+          {statusMeta.label}
+        </span>
+      </div>
+
+      {isExpanded && (
+        <div className="dashboard-coverage__building-detail">
+          <div className="dashboard-coverage__progress-row">
+            <div className="dashboard-coverage__progress">
+              <div className="dashboard-coverage__progress-label">
+                <span>{t('dashboard.coverage.floorsKpi')}</span>
+                <span>{floorPct}%</span>
+              </div>
+              <div className="dashboard-coverage__progress-bar">
+                <div
+                  className="dashboard-coverage__progress-fill"
+                  style={{ width: `${floorPct}%`, background: floorPct === 100 ? '#2D6A4F' : floorPct === 0 ? '#B91C1C' : '#E07A2F' }}
+                />
+              </div>
+            </div>
+            <div className="dashboard-coverage__progress">
+              <div className="dashboard-coverage__progress-label">
+                <span>{t('dashboard.coverage.roomsKpi')}</span>
+                <span>{roomPct}%</span>
+              </div>
+              <div className="dashboard-coverage__progress-bar">
+                <div
+                  className="dashboard-coverage__progress-fill"
+                  style={{ width: `${roomPct}%`, background: roomPct === 100 ? '#2D6A4F' : roomPct === 0 ? '#B91C1C' : '#E07A2F' }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {floors.length === 0 ? (
+            <div className="dashboard-coverage__empty-inline">{t('dashboard.coverage.noFloors')}</div>
+          ) : (
+            <ul className="dashboard-coverage__floor-list">
+              {floors.map((floor) => {
+                const floorId = toIdString(floor._id);
+                const floorRooms = roomsByFloor[floorId] || [];
+                const floorAssigned = assignedFloorIds.has(floorId);
+                const roomAssignedCount = floorRooms.filter((r) =>
+                  assignedRoomIds.has(toIdString(r._id))
+                ).length;
+                const floorStaff = staffByFloor[floorId] || [];
+                const floorStatus = floorAssigned
+                  ? COVERAGE_STATUS.ASSIGNED
+                  : roomAssignedCount > 0
+                  ? COVERAGE_STATUS.PARTIAL
+                  : COVERAGE_STATUS.UNASSIGNED;
+                const floorStatusMeta = {
+                  [COVERAGE_STATUS.ASSIGNED]: {
+                    color: '#2D6A4F',
+                    label: t('dashboard.coverage.assignedLabel'),
+                  },
+                  [COVERAGE_STATUS.PARTIAL]: {
+                    color: '#E07A2F',
+                    label: t('dashboard.coverage.partialLabel'),
+                  },
+                  [COVERAGE_STATUS.UNASSIGNED]: {
+                    color: '#B91C1C',
+                    label: t('dashboard.coverage.unassignedLabel'),
+                  },
+                }[floorStatus];
+
+                return (
+                  <li key={floorId} className="dashboard-coverage__floor">
+                    <div className="dashboard-coverage__floor-head">
+                      <div className="dashboard-coverage__floor-title">
+                        <Layers size={14} />
+                        <span>
+                          {floor.name ||
+                            t('dashboard.coverage.floorNameFallback', { number: floor.floorNumber })}
+                        </span>
+                      </div>
+                      <div className="dashboard-coverage__floor-meta">
+                        <span className="dashboard-coverage__floor-count">
+                          {roomAssignedCount}/{floorRooms.length} {t('dashboard.coverage.roomsKpi').toLowerCase()}
+                        </span>
+                        <span
+                          className="dashboard-coverage__status-badge dashboard-coverage__status-badge--sm"
+                          style={{ color: floorStatusMeta.color, background: '#F8FAFC' }}
+                        >
+                          {floorStatusMeta.label}
+                        </span>
+                      </div>
+                    </div>
+
+                    {floorStaff.length > 0 && (
+                      <div className="dashboard-coverage__floor-staff">
+                        <span className="dashboard-coverage__floor-staff-label">
+                          {t('dashboard.coverage.managersLabel')}:
+                        </span>
+                        {floorStaff.map((s) => (
+                          <span key={buildStaffKey(s._id)} className="dashboard-coverage__staff-chip">
+                            <UserCheck size={12} />
+                            {s.fullName || s.username || s.email}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {floorRooms.length === 0 ? (
+                      <div className="dashboard-coverage__empty-inline">{t('dashboard.coverage.noRooms')}</div>
+                    ) : (
+                      <ul className="dashboard-coverage__room-grid">
+                        {floorRooms.map((room) => {
+                          const roomId = toIdString(room._id);
+                          const roomAssigned = assignedRoomIds.has(roomId);
+                          const roomStaff = staffByRoom[roomId] || [];
+                          return (
+                            <li
+                              key={roomId}
+                              className={`dashboard-coverage__room ${
+                                roomAssigned
+                                  ? 'dashboard-coverage__room--assigned'
+                                  : 'dashboard-coverage__room--unassigned'
+                              }`}
+                              title={
+                                roomAssigned
+                                  ? `${t('dashboard.coverage.assignedLabel')}: ${roomStaff
+                                      .map((s) => s.fullName || s.username)
+                                      .join(', ')}`
+                                  : t('dashboard.coverage.noManager')
+                              }
+                            >
+                              <div className="dashboard-coverage__room-head">
+                                <BedDouble size={12} />
+                                <span className="dashboard-coverage__room-number">
+                                  {room.roomNumber}
+                                </span>
+                                {roomAssigned ? (
+                                  <CheckCircle2 size={12} className="dashboard-coverage__room-icon--ok" />
+                                ) : (
+                                  <XCircle size={12} className="dashboard-coverage__room-icon--bad" />
+                                )}
+                              </div>
+                              {roomStaff.length > 0 && (
+                                <div className="dashboard-coverage__room-staff">
+                                  {roomStaff[0].fullName || roomStaff[0].username}
+                                  {roomStaff.length > 1 && ` +${roomStaff.length - 1}`}
+                                </div>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      )}
+    </li>
   );
 }

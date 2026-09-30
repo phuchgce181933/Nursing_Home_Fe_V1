@@ -7,12 +7,45 @@
  *
  * Admin có thể chỉnh sửa trực tiếp trong modal trước khi tạo, hoặc bấm
  * nút "Khôi phục mẫu chuẩn" để reset về nội dung mặc định này.
+ *
+ * Markers đặc biệt trong nội dung hợp đồng:
+ *   [CENTER] ... [/CENTER] — khối văn bản sẽ được render căn giữa, in đậm
+ *       trong modal xem trước và bản in.
+ *   [LOGO]                — sẽ được thay bằng <img> logo Viện Dưỡng Lão An Nhiên
+ *       ở đầu trang hợp đồng (kích thước 120×120, căn giữa).
+ *   {ALL_PACKAGES}        — sẽ được thay bằng danh sách các gói dịch vụ
+ *       đang hoạt động trong hệ thống, kèm dấu "✓" bên cạnh gói đã chọn.
+ *   {CONTRACT_NUMBER}     — số hợp đồng (fill khi tạo hợp đồng).
+ *   {ROOM_TYPE}           — loại phòng thực tế đã phân bổ cho Người cao tuổi.
  */
 
-const CONTRACT_TERMS_TEMPLATE = `CĂN CỨ VÀ NGUYÊN TẮC KÝ KẾT
-Hợp đồng này được xây dựng theo định hướng hợp đồng dịch vụ chăm sóc người cao tuổi. Luật Người cao tuổi quy định người có nghĩa vụ và quyền phụng dưỡng có thể ủy nhiệm cho cá nhân hoặc tổ chức cung ứng dịch vụ chăm sóc bằng hợp đồng dịch vụ; cơ sở chăm sóc người cao tuổi bao gồm cơ sở tư vấn, dịch vụ chăm sóc và các cơ sở chăm sóc khác. Người cao tuổi cũng có quyền được bảo đảm các nhu cầu cơ bản về ăn, mặc, ở, đi lại và chăm sóc sức khỏe.
-Đối với hợp đồng giao kết với người tiêu dùng, nội dung cần rõ ràng, dễ hiểu; không nên sử dụng các điều khoản loại trừ trách nhiệm trái pháp luật, hạn chế quyền khiếu nại/khởi kiện hoặc cho phép bên kinh doanh đơn phương thay đổi các điều kiện đã thỏa thuận theo cách bất lợi cho người tiêu dùng.
-Thông tin sức khỏe cần được quản lý đặc biệt vì thuộc nhóm dữ liệu cá nhân nhạy cảm theo quy định về bảo vệ dữ liệu cá nhân.
+const CONTRACT_TERMS_TEMPLATE = `[CENTER]
+[LOGO]
+HỢP ĐỒNG
+DỊCH VỤ CHĂM SÓC NGƯỜI CAO TUỔI
+TẠI CƠ SỞ DƯỠNG LÃO
+[/CENTER]
+[CENTER]
+GIỮA
+BÊN A: VIỆN DƯỠNG LÃO AN NHIÊN
+VÀ
+BÊN B: NGƯỜI SỬ DỤNG DỊCH VỤ / NGƯỜI ĐẠI DIỆN
+[/CENTER]
+[CENTER]
+Số HĐ: {CONTRACT_NUMBER}
+[Địa điểm], ngày ..... tháng ..... năm ........
+CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM
+Độc lập – Tự do – Hạnh phúc
+———————————————
+HỢP ĐỒNG DỊCH VỤ CHĂM SÓC NGƯỜI CAO TUỔI TẠI CƠ SỞ DƯỠNG LÃO
+Số hợp đồng: {CONTRACT_NUMBER}
+[/CENTER]
+
+• Căn cứ Bộ luật Dân sự hiện hành và các quy định pháp luật có liên quan;
+• Căn cứ nhu cầu sử dụng dịch vụ chăm sóc người cao tuổi của Bên B;
+• Căn cứ khả năng cung cấp dịch vụ của Bên A;
+• Căn cứ sự tự nguyện và thỏa thuận của các Bên.
+Hôm nay, ngày ..... tháng ..... năm ........, tại [Địa điểm ký hợp đồng], các Bên gồm:
 
 ĐIỀU 1. GIẢI THÍCH THUẬT NGỮ
 1. "Viện" là Viện Dưỡng Lão An Nhiên – bên cung cấp dịch vụ theo Hợp đồng.
@@ -25,21 +58,31 @@ Thông tin sức khỏe cần được quản lý đặc biệt vì thuộc nhó
 8. "Trường hợp khẩn cấp" là tình huống cần xử lý ngay để bảo vệ tính mạng, sức khỏe hoặc an toàn của Người cao tuổi, trong phạm vi pháp luật và chuyên môn cho phép.
 
 ĐIỀU 2. THÔNG TIN CÁC BÊN
-- Bên cung cấp: VIỆN DƯỠNG LÃO AN NHIÊN
+
+BÊN A – BÊN CUNG CẤP DỊCH VỤ
+- Tên đơn vị: VIỆN DƯỠNG LÃO AN NHIÊN
 - Địa chỉ: Số 47, đường D17, Khu dân cư Hồng Loan, phường Hưng Phú, Cần Thơ
 - Mã số doanh nghiệp/đơn vị: 492043000050
-- Người đại diện: Ông/Bà: Huỳnh Gia Phúc Chức vụ: Giám đốc Bệnh viện
-- Điện thoại/Email: phuchgce181933@fpt.edu.vn / 0905087335
-- Người đại diện Người cao tuổi: Ông/Bà: {REP_NAME} Quan hệ: {REP_RELATION}
+- Người đại diện: Ông/Bà: Huỳnh Gia Phúc
+- Chức vụ: Giám đốc Bệnh viện
+- Điện thoại: 0905087335
+- Email: phuchgce181933@fpt.edu.vn
+
+BÊN B – NGƯỜI SỬ DỤNG DỊCH VỤ / NGƯỜI ĐẠI DIỆN
+- Họ và tên Người đại diện: {REP_NAME}
+- Quan hệ với Người cao tuổi: {REP_RELATION}
 - CCCD/Hộ chiếu: {REP_CITIZEN_ID}
 - Điện thoại: {REP_PHONE}
+- Email: {REP_EMAIL}
 - Địa chỉ liên hệ: {REP_ADDRESS}
 
-ĐIỀU 3. THÔNG TIN NGƯỜI CAO TUỔI
+NGƯỜI CAO TUỔI ĐƯỢC CHĂM SÓC (là chủ thể nhận dịch vụ theo Hợp đồng)
 - Họ và tên: {ELDERLY_NAME}
 - Ngày sinh: {ELDERLY_DOB}
 - CCCD/Hộ chiếu: {ELDERLY_CITIZEN_ID}
 - Địa chỉ trước khi vào Viện: {ELDERLY_ADDRESS}
+
+ĐIỀU 3. THÔNG TIN CHĂM SÓC NGƯỜI CAO TUỔI
 - Tình trạng sức khỏe ban đầu: {ELDERLY_HEALTH}
 - Mức độ tự lập: {ELDERLY_SELF_RELIANCE}
 - Dị ứng: {ELDERLY_ALLERGIES}
@@ -60,13 +103,13 @@ Thông tin sức khỏe cần được quản lý đặc biệt vì thuộc nhó
 4. Viện có quyền từ chối hoặc tạm hoãn tiếp nhận nếu nhu cầu của Người cao tuổi vượt quá phạm vi chuyên môn/điều kiện mà Viện được phép cung cấp; việc từ chối phải được thông báo rõ lý do.
 
 ĐIỀU 6. GÓI DỊCH VỤ HÀNG THÁNG
-- Gói Cơ bản: ………… VNĐ – Lưu trú, ăn uống, vệ sinh, sinh hoạt chung, hỗ trợ cơ bản
-- Gói Chăm sóc: ………… VNĐ – Gói Cơ bản + hỗ trợ sinh hoạt/chăm sóc tăng cường
-- Gói Chăm sóc đặc biệt: ………… VNĐ – Dịch vụ theo nhu cầu chăm sóc đã đánh giá
-- Gói Người cao tuổi lựa chọn: {PKG_NAME}; Phí: {PKG_PRICE_FULL}
+Các gói dịch vụ hiện có tại Viện (trong hệ thống):
+{ALL_PACKAGES}
+
+Gói Người cao tuổi đăng ký sử dụng theo Hợp đồng này: {PKG_NAME}; Phí: {PKG_PRICE_FULL}.
 
 ĐIỀU 7. DỊCH VỤ ĐƯỢC BAO GỒM TRONG GÓI
-1. Chi phí lưu trú tại loại phòng: {PKG_ROOM_TYPE}
+1. Chi phí lưu trú tại loại phòng: {ROOM_TYPE}.
 2. Chi phí vệ sinh và hỗ trợ sinh hoạt trong phạm vi Gói.
 3. Hoạt động sinh hoạt, giải trí hoặc vận động phù hợp theo chương trình của Viện.
 4. Theo dõi và ghi nhận tình trạng Người cao tuổi trong phạm vi dịch vụ được cung cấp.
@@ -85,7 +128,7 @@ Các khoản sau chỉ được tính khi có căn cứ theo Bảng giá, thỏa
 ĐIỀU 9. PHÍ DỊCH VỤ VÀ KỲ THANH TOÁN
 1. Phí Gói dịch vụ: {PKG_PRICE} VNĐ/tháng.
 2. Ngày bắt đầu tính phí: {CONTRACT_START}.
-3. Ngày đến hạn thanh toán: ngày …… của mỗi kỳ.
+3. Thời hạn thanh toán: thanh toán trước ngày kết thúc của hóa đơn (Hóa đơn được lập theo kỳ tháng; Người đại diện thanh toán trước ngày kết thúc kỳ ghi trên hóa đơn).
 4. Phí được thanh toán bằng tiền mặt, chuyển khoản hoặc phương thức điện tử được Viện chấp nhận.
 5. Viện cung cấp thông tin về khoản phải thanh toán và chứng từ phù hợp.
 6. Nếu Người cao tuổi vào/ra Viện giữa kỳ, việc tính phí theo ngày, theo tháng hoặc theo chính sách hoàn phí phải được ghi rõ tại Phụ lục giá; không áp dụng công thức chưa được thỏa thuận.
@@ -109,68 +152,49 @@ Các khoản sau chỉ được tính khi có căn cứ theo Bảng giá, thỏa
 3. Nếu giao dịch bị lỗi hoặc ghi nhận sai, Viện có trách nhiệm kiểm tra và điều chỉnh theo chứng từ.
 4. Người đại diện có thể yêu cầu lịch sử nạp tiền và chứng từ liên quan.
 
-ĐIỀU 13. QUY ĐỊNH TRỪ TIỀN TỪ VÍ
-- Đã nằm trong bảng giá và được ủy quyền (Giặt ủi, đồ dùng cá nhân): Theo cơ chế đã công bố
-- Cần xác nhận (Dịch vụ ngoài Gói có giá trị từ ……… VNĐ): Phải xác nhận trước
-- Theo yêu cầu Người đại diện (Mua vật dụng/dịch vụ riêng): Có yêu cầu/ghi nhận
-- Khẩn cấp (Khoản cần thiết để xử lý tình huống khẩn cấp): Xử lý trong phạm vi hợp pháp; thông báo sớm nhất
-- Viện không được tự ý trừ Ví cho khoản không có căn cứ nêu trên.
-- Giao dịch bị ghi nhận sai phải được điều chỉnh và lưu vết, không được xóa lịch sử giao dịch.
-
-ĐIỀU 14. XÁC NHẬN KHOẢN PHÁT SINH
-1. Đối với khoản phải xác nhận, Viện thông báo nội dung, lý do, đơn giá, số lượng và tổng tiền dự kiến.
-2. Người đại diện có thể xác nhận bằng chữ ký, xác nhận trên hệ thống hoặc phương thức hợp lệ khác được hai bên thỏa thuận.
-3. Nếu Người đại diện từ chối, Viện không thực hiện dịch vụ không khẩn cấp đó.
-4. Trường hợp khẩn cấp, việc xử lý được thực hiện theo Điều 17 và phải có ghi nhận lý do, thời điểm, nội dung xử lý và thông báo cho Người đại diện.
-
-ĐIỀU 15. CẢNH BÁO SỐ DƯ VÍ
-1. Mức cảnh báo thấp: …………… VNĐ.
-2. Khi số dư xuống dưới mức cảnh báo, hệ thống/Viện có thể thông báo cho Người đại diện.
-3. Mức cảnh báo không phải là nghĩa vụ bắt buộc phải nạp thêm tiền nếu Người đại diện không có nhu cầu, trừ trường hợp hai bên đã thỏa thuận cụ thể.
-
-ĐIỀU 16. ĐỐI SOÁT VÍ
+ĐIỀU 13. ĐỐI SOÁT VÍ
 1. Người đại diện có quyền yêu cầu đối soát số dư và giao dịch.
 2. Viện thực hiện đối soát khi có yêu cầu hoặc định kỳ: □ Hàng tháng □ Hàng quý □ Khi chấm dứt Hợp đồng.
 3. Bảng đối soát tối thiểu gồm số dư đầu kỳ, tiền nạp, khoản trừ, khoản hoàn/điều chỉnh và số dư cuối kỳ.
 4. Nếu có tranh chấp về một giao dịch, hai bên kiểm tra chứng từ, lịch sử hệ thống và tài liệu liên quan.
 
-ĐIỀU 17. TRƯỜNG HỢP KHẨN CẤP VÀ CHI PHÍ KHẨN CẤP
+ĐIỀU 14. TRƯỜNG HỢP KHẨN CẤP VÀ CHI PHÍ KHẨN CẤP
 1. Khi Người cao tuổi có dấu hiệu nguy hiểm đến tính mạng, sức khỏe hoặc an toàn, Viện được thực hiện biện pháp cần thiết trong phạm vi chuyên môn và điều kiện hoạt động hợp pháp.
 2. Viện liên hệ người thân/người đại diện theo danh sách ưu tiên.
 3. Nếu cần liên hệ cơ sở khám chữa bệnh hoặc đơn vị vận chuyển cấp cứu, Viện thực hiện theo quy trình phù hợp.
 4. Chi phí phát sinh được xử lý theo pháp luật, thỏa thuận và Bảng giá; nếu có thể, Viện thông báo trước. Nếu không thể thông báo trước do tính chất khẩn cấp, Viện thông báo ngay khi điều kiện cho phép.
 5. Viện lập ghi nhận sự kiện gồm thời gian, tình trạng, biện pháp đã thực hiện, đơn vị liên quan và thông báo cho Người đại diện.
 
-ĐIỀU 18. CHĂM SÓC SỨC KHỎE
+ĐIỀU 15. CHĂM SÓC SỨC KHỎE
 1. Người đại diện cung cấp thông tin chính xác về bệnh sử, dị ứng, thuốc, chế độ ăn và các yêu cầu chăm sóc.
 2. Viện quản lý hồ sơ chăm sóc theo phạm vi cần thiết để cung cấp dịch vụ.
 3. Viện không được hiểu Hợp đồng này là giấy phép thực hiện hoạt động khám bệnh, chữa bệnh ngoài phạm vi pháp luật cho phép.
 4. Khi có thay đổi đáng kể về sức khỏe hoặc nhu cầu chăm sóc, Viện thông báo cho Người đại diện và thống nhất phương án tiếp theo.
 
-ĐIỀU 19. QUẢN LÝ VÀ HỖ TRỢ SỬ DỤNG THUỐC
+ĐIỀU 16. QUẢN LÝ VÀ HỖ TRỢ SỬ DỤNG THUỐC
 1. Người đại diện cung cấp thông tin thuốc đang sử dụng và tài liệu/chỉ định liên quan khi cần.
 2. Thuốc được quản lý theo quy trình của Viện trong phạm vi được phép.
 3. Việc thay đổi thuốc, liều dùng hoặc chỉ định phải dựa trên căn cứ chuyên môn phù hợp.
 4. Viện ghi nhận các sự kiện liên quan đến thuốc theo quy trình quản lý.
 
-ĐIỀU 20. KHÁM BỆNH, CHỮA BỆNH VÀ CHUYỂN CƠ SỞ Y TẾ
+ĐIỀU 17. KHÁM BỆNH, CHỮA BỆNH VÀ CHUYỂN CƠ SỞ Y TẾ
 1. Khi Người cao tuổi cần được đánh giá hoặc điều trị ngoài phạm vi dịch vụ của Viện, Viện thông báo cho Người đại diện và phối hợp theo quy trình.
 2. Người đại diện phối hợp cung cấp giấy tờ, thông tin và phương án liên hệ.
 3. Chi phí của cơ sở y tế bên ngoài do bên có nghĩa vụ thanh toán theo thỏa thuận và quy định pháp luật.
 
-ĐIỀU 21. THĂM NOM
-1. Thời gian thăm: từ …… giờ đến …… giờ, các ngày ………………………
+ĐIỀU 18. THĂM NOM
+1. Thời gian thăm: 8 giờ sáng đến 5 giờ chiều các ngày trong tuần.
 2. Khách thăm thực hiện đăng ký theo quy định của Viện.
 3. Khách thăm phải giữ trật tự, tôn trọng quyền riêng tư của Người cao tuổi khác và tuân thủ yêu cầu an toàn.
 4. Viện có thể tạm thời điều chỉnh/hạn chế thăm trong trường hợp có căn cứ về an toàn, sức khỏe hoặc yêu cầu của cơ quan có thẩm quyền; việc điều chỉnh phải được thông báo phù hợp.
 
-ĐIỀU 22. ĐƯA NGƯỜI CAO TUỔI RA KHỎI VIỆN
+ĐIỀU 19. ĐƯA NGƯỜI CAO TUỔI RA KHỎI VIỆN
 1. Người đưa Người cao tuổi ra ngoài phải thuộc danh sách người được phép hoặc có xác nhận/ủy quyền hợp lệ.
 2. Trước khi rời Viện phải ghi nhận thời gian đi, người đi cùng, địa điểm đến và thời gian dự kiến trở lại.
 3. Khi trở lại, Viện ghi nhận thời gian tiếp nhận và tình trạng cần lưu ý.
 4. Nếu người đưa đón không có tên trong danh sách, Viện có quyền yêu cầu xác minh trước khi bàn giao để bảo đảm an toàn.
 
-ĐIỀU 23. NỘI QUY SINH HOẠT
+ĐIỀU 20. NỘI QUY SINH HOẠT
 1. Tuân thủ thời gian ăn uống, nghỉ ngơi và hoạt động chung.
 2. Tôn trọng Người cao tuổi khác, nhân viên và khách thăm.
 3. Giữ vệ sinh phòng ở và khu vực chung.
@@ -179,24 +203,24 @@ Các khoản sau chỉ được tính khi có căn cứ theo Bảng giá, thỏa
 6. Không mang vào Viện vật dụng bị cấm theo Nội quy hoặc có nguy cơ gây mất an toàn.
 7. Người đại diện và khách thăm chịu trách nhiệm phối hợp để Người cao tuổi tuân thủ các quy định phù hợp với tình trạng thực tế.
 
-ĐIỀU 24. TÀI SẢN, TIỀN VÀ TƯ TRANG
+ĐIỀU 21. TÀI SẢN, TIỀN VÀ TƯ TRANG
 1. Tài sản được Viện nhận quản lý phải được lập biên bản, ghi rõ số lượng, tình trạng và đặc điểm nhận dạng.
 2. Tài sản Người cao tuổi tự quản lý mà Viện không nhận bàn giao được xác định theo thỏa thuận và quy định pháp luật.
 3. Tiền mặt/tài sản có giá trị nếu gửi Viện phải có biên bản hoặc sổ theo dõi riêng.
 4. Khi chấm dứt Hợp đồng, tài sản được bàn giao lại theo danh sách đã lập.
 
-ĐIỀU 25. BẢO VỆ THÔNG TIN CÁ NHÂN
+ĐIỀU 22. BẢO VỆ THÔNG TIN CÁ NHÂN
 1. Viện thu thập dữ liệu trong phạm vi cần thiết cho tiếp nhận, chăm sóc, quản lý, thanh toán, liên hệ và thực hiện nghĩa vụ pháp lý.
 2. Dữ liệu sức khỏe và các dữ liệu nhạy cảm được quản lý với biện pháp bảo vệ phù hợp.
 3. Viện xác định người được phép truy cập dữ liệu theo chức năng công việc.
 4. Việc cung cấp dữ liệu cho bên thứ ba phải có căn cứ pháp lý phù hợp hoặc sự đồng ý hợp lệ, tùy trường hợp.
 5. Người đại diện được thông báo về mục đích xử lý dữ liệu và các quyền liên quan theo quy định pháp luật.
 
-ĐIỀU 26. HÌNH ẢNH VÀ TRUYỀN THÔNG
+ĐIỀU 23. HÌNH ẢNH VÀ TRUYỀN THÔNG
 1. Việc sử dụng hình ảnh Người cao tuổi cho mục đích truyền thông, quảng cáo hoặc công bố công khai phải được xử lý theo quy định pháp luật và sự đồng ý phù hợp.
 2. Việc sử dụng hình ảnh cho mục đích quản lý nội bộ/an toàn của Viện được thực hiện theo chính sách và căn cứ pháp lý phù hợp.
 
-ĐIỀU 27. QUYỀN VÀ NGHĨA VỤ CỦA VIỆN
+ĐIỀU 24. QUYỀN VÀ NGHĨA VỤ CỦA VIỆN
 1. Cung cấp dịch vụ đúng nội dung đã cam kết.
 2. Thông báo minh bạch về giá, phí và khoản phát sinh.
 3. Quản lý Ví và giao dịch minh bạch, có thể kiểm tra.
@@ -204,7 +228,7 @@ Các khoản sau chỉ được tính khi có căn cứ theo Bảng giá, thỏa
 5. Tiếp nhận và xử lý phản ánh.
 6. Thông báo các sự kiện quan trọng liên quan đến Người cao tuổi theo quy trình.
 
-ĐIỀU 28. QUYỀN VÀ NGHĨA VỤ CỦA NGƯỜI ĐẠI DIỆN
+ĐIỀU 25. QUYỀN VÀ NGHĨA VỤ CỦA NGƯỜI ĐẠI DIỆN
 1. Cung cấp thông tin trung thực và cập nhật.
 2. Thanh toán đúng hạn.
 3. Phối hợp khi có vấn đề sức khỏe, cấp cứu hoặc thay đổi nhu cầu chăm sóc.
@@ -212,18 +236,18 @@ Các khoản sau chỉ được tính khi có căn cứ theo Bảng giá, thỏa
 5. Có quyền xem thông tin dịch vụ, phí, giao dịch Ví và yêu cầu đối soát.
 6. Có quyền phản ánh hoặc khiếu nại khi cho rằng dịch vụ không đúng thỏa thuận.
 
-ĐIỀU 29. XỬ LÝ VI PHẠM NỘI QUY
+ĐIỀU 26. XỬ LÝ VI PHẠM NỘI QUY
 1. Vi phạm nội quy được xem xét dựa trên tính chất, mức độ, hậu quả và tình trạng thực tế của Người cao tuổi.
 2. Viện ưu tiên nhắc nhở, trao đổi và phối hợp với Người đại diện.
 3. Trường hợp có nguy cơ ảnh hưởng đến an toàn, Viện có thể áp dụng biện pháp cần thiết, phù hợp và thông báo cho Người đại diện.
 4. Việc chấm dứt Hợp đồng do vi phạm phải có căn cứ cụ thể trong Hợp đồng và pháp luật; không áp dụng một cách tùy tiện.
 
-ĐIỀU 30. ĐIỀU CHỈNH GIÁ VÀ THAY ĐỔI QUY ĐỊNH
+ĐIỀU 27. ĐIỀU CHỈNH GIÁ VÀ THAY ĐỔI QUY ĐỊNH
 1. Mức giá và nội dung Gói được xác định tại thời điểm ký.
 2. Nếu cần thay đổi giá hoặc nội dung dịch vụ, Viện phải thông báo theo thời hạn và phương thức đã thỏa thuận, đồng thời bảo đảm quyền của Người đại diện theo pháp luật.
 3. Không sử dụng điều khoản chung để cho phép Viện tự ý thay đổi các nghĩa vụ cơ bản hoặc giá đã thỏa thuận mà không có cơ chế thông báo/quyền lựa chọn phù hợp.
 
-ĐIỀU 31. CHẤM DỨT HỢP ĐỒNG
+ĐIỀU 28. CHẤM DỨT HỢP ĐỒNG
 1. Hợp đồng hết thời hạn và không gia hạn.
 2. Hai bên thỏa thuận chấm dứt.
 3. Người đại diện yêu cầu chấm dứt theo điều kiện Hợp đồng.
@@ -231,12 +255,12 @@ Các khoản sau chỉ được tính khi có căn cứ theo Bảng giá, thỏa
 5. Người cao tuổi chuyển sang cơ sở khác hoặc không còn nhu cầu sử dụng dịch vụ.
 6. Các trường hợp khác theo quy định pháp luật.
 
-ĐIỀU 32. THỜI HẠN BÁO TRƯỚC
-- Người đại diện yêu cầu chấm dứt: …… ngày (Trừ trường hợp pháp luật/thỏa thuận cho phép khác)
-- Viện yêu cầu chấm dứt: …… ngày (Phải có căn cứ và thông báo phù hợp)
-- Tình huống khẩn cấp: Không áp dụng như thông thường (Xử lý an toàn trước, thông báo sau)
+ĐIỀU 29. THỜI HẠN BÁO TRƯỚC
+- Người đại diện yêu cầu chấm dứt: phải thông báo trước 30 ngày (Trừ trường hợp pháp luật/thỏa thuận cho phép khác).
+- Viện yêu cầu chấm dứt: phải thông báo trước 30 ngày (Phải có căn cứ và thông báo phù hợp).
+- Tình huống khẩn cấp: Không áp dụng như thông thường (Xử lý an toàn trước, thông báo sau).
 
-ĐIỀU 33. THANH LÝ VÀ BÀN GIAO
+ĐIỀU 30. THANH LÝ VÀ BÀN GIAO
 1. Hai bên xác nhận ngày chấm dứt.
 2. Bàn giao Người cao tuổi cho người có thẩm quyền.
 3. Bàn giao tài sản, tư trang và giấy tờ.
@@ -245,25 +269,19 @@ Các khoản sau chỉ được tính khi có căn cứ theo Bảng giá, thỏa
 6. Hoàn số dư Ví còn lại sau khi khấu trừ các khoản hợp lệ.
 7. Ký Biên bản thanh lý.
 
-ĐIỀU 34. HOÀN TIỀN GÓI VÀ SỐ DƯ VÍ
-1. Số dư Ví được tính theo: Số dư đầu kỳ + tiền nạp – giao dịch chi hợp lệ + giao dịch hoàn/điều chỉnh.
-2. Khi thanh lý, khoản tiền còn lại trong Ví sau đối soát được hoàn theo phương thức: …………………………………… trong thời hạn ……… ngày làm việc.
-3. Phí Gói đã thanh toán trước được hoàn/không hoàn/hoàn theo tỷ lệ như sau: …………………………………………………………………. Quy định cụ thể phải được thể hiện rõ trong Phụ lục giá.
-4. Các khoản chi đã phát sinh hợp lệ trước ngày chấm dứt vẫn phải được thanh toán.
-
-ĐIỀU 35. KHIẾU NẠI VÀ GIẢI QUYẾT TRANH CHẤP
+ĐIỀU 31. KHIẾU NẠI VÀ GIẢI QUYẾT TRANH CHẤP
 1. Người đại diện có thể phản ánh trực tiếp, bằng văn bản hoặc qua kênh điện tử được Viện công bố.
 2. Viện xác nhận tiếp nhận trong thời hạn ……… giờ/ngày làm việc.
 3. Viện cung cấp kết quả xử lý hoặc giải thích trong thời hạn ……… ngày làm việc, trừ vụ việc cần xác minh thêm.
 4. Các bên ưu tiên thương lượng, hòa giải.
 5. Nếu không giải quyết được, tranh chấp được giải quyết tại cơ quan có thẩm quyền theo pháp luật Việt Nam.
 
-ĐIỀU 36. BẤT KHẢ KHÁNG
+ĐIỀU 32. BẤT KHẢ KHÁNG
 1. Sự kiện bất khả kháng được xử lý theo quy định pháp luật và mức độ ảnh hưởng thực tế.
 2. Bên bị ảnh hưởng phải thông báo cho bên còn lại trong thời gian hợp lý.
 3. Bất khả kháng không mặc nhiên miễn mọi nghĩa vụ thanh toán đã phát sinh trước thời điểm sự kiện.
 
-ĐIỀU 37. HIỆU LỰC HỢP ĐỒNG
+ĐIỀU 33. HIỆU LỰC HỢP ĐỒNG
 1. Hợp đồng có hiệu lực từ ngày ……/……/20…… hoặc ngày ký.
 2. Các Phụ lục là bộ phận không tách rời của Hợp đồng.
 3. Nếu một điều khoản bị xác định là không có hiệu lực, các phần còn lại được tiếp tục thực hiện trong phạm vi pháp luật cho phép.
@@ -272,90 +290,12 @@ Các khoản sau chỉ được tính khi có căn cứ theo Bảng giá, thỏa
 XÁC NHẬN CỦA CÁC BÊN
 Các bên xác nhận đã đọc, được giải thích, hiểu rõ nội dung Hợp đồng, các khoản phí, cơ chế Ví dịch vụ, quyền và nghĩa vụ của mình; đồng ý ký kết trên cơ sở tự nguyện.
 
-ĐẠI DIỆN VIỆN                                              NGƯỜI ĐẠI DIỆN NGƯỜI CAO TUỔI
+[CENTER]
+ĐẠI DIỆN BÊN A                                              ĐẠI DIỆN BÊN B
 (Ký, ghi rõ họ tên)                                       (Ký, ghi rõ họ tên)
 Chức vụ: ………………………                                        Quan hệ: ………………………
 Ngày ……/……/20……                                       Ngày ……/……/20……
-
-──────────────────────────────────────────────────────────
-PHỤ LỤC 01 – BẢNG CHI TIẾT GÓI DỊCH VỤ
-- Lưu trú: ✓ (Cả 3 gói) – Loại phòng: …………
-- Ăn uống: ✓ (Cả 3 gói) – Định mức/chế độ: …………
-- Vệ sinh cá nhân: Theo Gói / ✓ / ✓
-- Hỗ trợ sinh hoạt: Cơ bản / Tăng cường / Theo đánh giá
-- Hoạt động chung: ✓ (Cả 3 gói)
-- Theo dõi/chăm sóc: Cơ bản / Tăng cường / Theo hồ sơ
-- Dịch vụ khác: — / Theo phụ lục / Theo phụ lục
-
-PHỤ LỤC 02 – BẢNG GIÁ DỊCH VỤ PHÁT SINH
-1. Giặt ủi (kg/lần): ………… – Tự động trừ Ví: □ Có □ Không – Cần xác nhận: □ Có □ Không
-2. Đồ dùng cá nhân (món): ………… – Tự động trừ Ví: □ Có □ Không – Cần xác nhận: □ Có □ Không
-3. Vận chuyển (lần): ………… – Tự động trừ Ví: □ Có □ Không – Cần xác nhận: □ Có □ Không
-4. Dịch vụ chăm sóc bổ sung (giờ/lần): ………… – Tự động trừ Ví: □ Có □ Không – Cần xác nhận: □ Có □ Không
-5. Dịch vụ bên ngoài (lần): ………… – Tự động trừ Ví: □ Có □ Không – Cần xác nhận: □ Có □ Không
-6. Khoản khác: ………… – Tự động trừ Ví: □ Có □ Không – Cần xác nhận: □ Có □ Không
-
-PHỤ LỤC 03 – QUY TẮC VÍ DỊCH VỤ
-- Số dư đầu kỳ: …………………… VNĐ
-- Mức cảnh báo: …………………… VNĐ
-- Phương thức nạp: Tiền mặt / Chuyển khoản / Điện tử
-- Người được phép yêu cầu giao dịch: ……………………
-- Người được phép phê duyệt khoản cần xác nhận: ……………………
-- Chu kỳ đối soát: Tháng / Quý / Khi thanh lý
-- Thời hạn xử lý yêu cầu đối soát: …… ngày làm việc
-
-PHỤ LỤC 04 – DANH SÁCH NGƯỜI LIÊN HỆ KHẨN CẤP
-{EMERGENCY_CONTACTS}
-
-PHỤ LỤC 05 – PHIẾU THÔNG TIN SỨC KHỎE BAN ĐẦU
-- Tiền sử bệnh: {HEALTH_MEDICAL_HISTORY}
-- Dị ứng: {HEALTH_ALLERGIES}
-- Thông tin khác: {HEALTH_OTHER}
-
-PHỤ LỤC 06 – QUY TRÌNH THĂM NOM
-1. Khách thăm xuất trình/đăng ký thông tin theo quy định của Viện.
-2. Viện xác nhận người được phép thăm nếu có danh sách hạn chế.
-3. Khách thăm tuân thủ khu vực và thời gian thăm.
-4. Khách thăm không tự ý đưa Người cao tuổi ra ngoài.
-5. Trường hợp có yêu cầu đặc biệt, thực hiện theo hướng dẫn của Viện.
-
-PHỤ LỤC 08 – PHIẾU BÀN GIAO KHI NGƯỜI CAO TUỔI RA NGOÀI
-- Họ tên Người cao tuổi: ………………………………
-- Người đưa đi: ………………………………
-- Quan hệ: ………………………………
-- Số điện thoại: ………………………………
-- Địa điểm đến: ………………………………
-- Thời gian rời Viện: ……:…… ngày ……/……/20……
-- Dự kiến trở lại: ……:…… ngày ……/……/20……
-- Tình trạng khi bàn giao: ………………………………
-- Thời gian thực tế trở lại: ………………………………
-- Xác nhận của Viện: ………………………………
-
-PHỤ LỤC 09 – BIÊN BẢN BÀN GIAO TÀI SẢN
-1. Tài sản: …………………… – SL: …… – Tình trạng: ………… – Vĩ nhận QL: □ Có □ Không – Ghi chú: …………
-2. Tài sản: …………………… – SL: …… – Tình trạng: ………… – Vĩ nhận QL: □ Có □ Không – Ghi chú: …………
-3. Tài sản: …………………… – SL: …… – Tình trạng: ………… – Vĩ nhận QL: □ Có □ Không – Ghi chú: …………
-4. Tài sản: …………………… – SL: …… – Tình trạng: ………… – Vĩ nhận QL: □ Có □ Không – Ghi chú: …………
-
-PHỤ LỤC 10 – BIÊN BẢN ĐỐI SOÁT VÍ KHI THANH LÝ
-- Số dư Ví đầu kỳ/hiện tại: ………… VNĐ
-- Tổng tiền đã nạp: ………… VNĐ
-- Tổng giao dịch chi hợp lệ: - ………… VNĐ
-- Tổng giao dịch hoàn/điều chỉnh: ± ………… VNĐ
-- Công nợ Gói dịch vụ: - ………… VNĐ
-- Khoản phải thu khác: - ………… VNĐ
-- Số tiền cuối cùng hoàn lại: ………… VNĐ
-- Phương thức hoàn: □ Chuyển khoản  □ Tiền mặt  □ Khác: …………………
-
-PHỤ LỤC 11 – NỘI QUY VIỆN
-1. Tuân thủ quy định về giờ ăn, giờ nghỉ, sinh hoạt và hoạt động chung.
-2. Giữ vệ sinh phòng ở và khu vực chung.
-3. Tôn trọng quyền riêng tư, danh dự và tài sản của người khác.
-4. Không tự ý vào khu vực hạn chế.
-5. Không tự ý đưa Người cao tuổi ra khỏi Viện.
-6. Khách thăm tuân thủ quy định đăng ký.
-7. Không mang vào Viện vật dụng bị cấm hoặc có nguy cơ gây mất an toàn.
-8. Phối hợp với nhân viên khi có tình huống khẩn cấp.
-9. Các quy định cụ thể khác được công bố hợp lệ phải được thông báo rõ ràng.`;
+[/CENTER]
+`;
 
 export default CONTRACT_TERMS_TEMPLATE;

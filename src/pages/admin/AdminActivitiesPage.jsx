@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Search, RefreshCw, Plus, Edit3, Trash2, Filter, CalendarDays, AlertTriangle, Eye, X } from 'lucide-react';
 import activityService from '../../services/activity.service';
@@ -6,7 +6,10 @@ import authService from '../../services/auth.service';
 import residentService from '../../services/resident.service';
 import medicalRecordService from '../../services/medicalRecord.service';
 import { useToast } from '../../hooks/useToast';
+import BulkEditActivityModal from '../../components/admin/BulkEditActivityModal';
+import ConfirmModal from '../../components/common/ConfirmModal';
 import '../../styles/admin/AdminAdmissionRequestsPage.css';
+import '../../styles/admin/ConfirmModal.css';
 
 const STATUS_OPTIONS = [
   { value: '', i18nKey: 'adminActivities.statusAll' },
@@ -17,7 +20,39 @@ const STATUS_OPTIONS = [
   { value: 'cancelled', i18nKey: 'adminActivities.statusCancelled' },
 ];
 
-const getStatusOptionsForForm = (currentStatus) => {
+// Statuses that cannot be deleted (BE enforces the same rule).
+const NON_DELETABLE_STATUSES = ['completed', 'ongoing'];
+// Statuses that cannot be edited (single edit + bulk edit) on BE.
+const NON_EDITABLE_STATUSES = ['completed', 'ongoing'];
+// Bulk status change can only target draft / scheduled.
+const BULK_STATUS_TARGET_OPTIONS = STATUS_OPTIONS.filter(
+  (item) => item.value === 'draft' || item.value === 'scheduled',
+);
+
+const getActivityStartMs = (activity) => {
+  const raw = activity?.scheduledAt || activity?.startAt;
+  if (!raw) return null;
+  const ms = new Date(raw).getTime();
+  return Number.isNaN(ms) ? null : ms;
+};
+
+const isActivityInPast = (activity) => {
+  const ms = getActivityStartMs(activity);
+  return ms != null && ms < Date.now();
+};
+
+const isActivityLocked = (activity) =>
+  NON_EDITABLE_STATUSES.includes(String(activity?.status || '').toLowerCase()) || isActivityInPast(activity);
+
+const isActivityDeletable = (activity) =>
+  !NON_DELETABLE_STATUSES.includes(String(activity?.status || '').toLowerCase());
+
+const getStatusOptionsForForm = (currentStatus, isEditing = false) => {
+  // Create flow: only draft / scheduled are valid initial statuses (BE enforces).
+  // Edit flow: keep the current value visible, but block 'ongoing' (auto-managed).
+  if (!isEditing) {
+    return STATUS_OPTIONS.filter((item) => !item.value || ['draft', 'scheduled'].includes(item.value));
+  }
   if (currentStatus === 'ongoing') {
     return STATUS_OPTIONS;
   }
@@ -82,6 +117,28 @@ const formatDurationLabel = (durationMinutes, t) => {
   return parts.join(' ');
 };
 
+const toDisplayText = (value, fallback = '') => {
+  if (typeof value === 'function') {
+    console.debug('[AdminActivities] function value blocked from React child', { valueName: value.name || '(anonymous)' });
+    return fallback;
+  }
+  if (value === null || value === undefined) return fallback;
+  if (typeof value === 'string' || typeof value === 'number') return String(value);
+  return fallback;
+};
+
+const findFunctionPaths = (value, path = 'activity', seen = new Set()) => {
+  if (!value || typeof value !== 'object' || seen.has(value)) return [];
+  seen.add(value);
+  const paths = [];
+  Object.entries(value).forEach(([key, child]) => {
+    const childPath = `${path}.${key}`;
+    if (typeof child === 'function') paths.push(childPath);
+    else if (child && typeof child === 'object') paths.push(...findFunctionPaths(child, childPath, seen));
+  });
+  return paths;
+};
+
 const getMinDateTimeLocal = () => {
   const now = new Date();
   const tzOffset = now.getTimezoneOffset();
@@ -118,7 +175,8 @@ const isActivityStaff = (staff) => {
 };
 
 export default function AdminActivitiesPage() {
-  const { t } = useTranslation();
+  const { t: translate } = useTranslation();
+  const t = useCallback((...args) => toDisplayText(translate(...args), ''), [translate]);
   const { showToast } = useToast();
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -130,9 +188,10 @@ export default function AdminActivitiesPage() {
 
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
+  const [category, setCategory] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
-  const [appliedFilters, setAppliedFilters] = useState({ search: '', status: '', from: '', to: '' });
+  const [appliedFilters, setAppliedFilters] = useState({ search: '', status: '', category: '', from: '', to: '' });
   const [bulkStatus, setBulkStatus] = useState('scheduled');
 
   const [residents, setResidents] = useState([]);
@@ -145,6 +204,20 @@ export default function AdminActivitiesPage() {
   const [isCreating, setIsCreating] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [selectedActivityId, setSelectedActivityId] = useState(null);
+  const [detailActivity, setDetailActivity] = useState(null);
+  const [bulkEditActivity, setBulkEditActivity] = useState(null);
+  const [bulkEditForm, setBulkEditForm] = useState({
+    title: '',
+    category: '',
+    categoryOther: '',
+    location: '',
+    organizerStaffIds: [],
+    supportStaffIds: [],
+    participantResidentIds: [],
+    status: '',
+  });
+  const [bulkEditError, setBulkEditError] = useState(null);
+  const [bulkSubmitting, setBulkSubmitting] = useState(false);
   const [form, setForm] = useState({
     title: '',
     category: '',
@@ -163,17 +236,38 @@ export default function AdminActivitiesPage() {
   const [formError, setFormError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
+  // Confirm modal state — replaces window.confirm() for delete / bulk actions.
+  const [confirmModal, setConfirmModal] = useState(null);
+  // confirmModal shape: { tone, title, message, details, confirmLabel, cancelLabel, busy, run }
+
+  const closeConfirmModal = () => {
+    setConfirmModal((prev) => (prev ? { ...prev, busy: false } : prev));
+    setConfirmModal(null);
+  };
+
   const fetchActivities = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
+      // Convert date-only inputs (YYYY-MM-DD) to full ISO at day boundaries so the
+      // BE can apply timezone-aware comparisons.
+      const dateOnlyToIso = (value, endOfDay) => {
+        if (!value) return undefined;
+        if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+          return endOfDay
+            ? `${value}T23:59:59.999+07:00`
+            : `${value}T00:00:00+07:00`;
+        }
+        return value;
+      };
       const params = {
         page,
         limit,
         search: appliedFilters.search || undefined,
         status: appliedFilters.status || undefined,
-        from: appliedFilters.from || undefined,
-        to: appliedFilters.to || undefined,
+        category: appliedFilters.category || undefined,
+        from: dateOnlyToIso(appliedFilters.from, false),
+        to: dateOnlyToIso(appliedFilters.to, true),
       };
       const res = await activityService.getActivityList(params);
       setActivities(res?.data || []);
@@ -190,6 +284,37 @@ export default function AdminActivitiesPage() {
   useEffect(() => {
     fetchActivities();
   }, [fetchActivities]);
+
+  useEffect(() => {
+    if (!selectedActivityId) {
+      setDetailActivity(null);
+      return;
+    }
+    const activity = activities.find((a) => a._id === selectedActivityId);
+    if (activity) {
+      console.debug('[AdminActivities] detail from list', {
+        id: selectedActivityId,
+        functionPaths: findFunctionPaths(activity),
+        fieldTypes: Object.fromEntries(Object.entries(activity).map(([key, value]) => [key, typeof value])),
+      });
+      setDetailActivity(activity);
+    } else {
+      activityService.getActivityById(selectedActivityId).then((data) => {
+        const detail = data?.data && typeof data.data === 'object' ? data.data : data;
+        console.debug('[AdminActivities] detail from API', {
+          raw: data,
+          functionPaths: findFunctionPaths(detail),
+          fieldTypes: detail && typeof detail === 'object'
+            ? Object.fromEntries(Object.entries(detail).map(([key, value]) => [key, typeof value]))
+            : typeof detail,
+        });
+        setDetailActivity(detail);
+      }).catch((err) => {
+        console.error('Failed to fetch activity detail:', err);
+        setDetailActivity(null);
+      });
+    }
+  }, [selectedActivityId, activities]);
 
   useEffect(() => {
     let active = true;
@@ -314,15 +439,33 @@ export default function AdminActivitiesPage() {
     setFormError(null);
   };
 
-  const getSelectedActivity = () => {
-    return activities.find((a) => a._id === selectedActivityId);
-  };
-
   const handleApplyFilters = (e) => {
     if (e) e.preventDefault();
     setPage(1);
-    setAppliedFilters({ search, status, from, to });
+    setAppliedFilters({ search, status, category, from, to });
   };
+
+  // Auto-apply on change so filters feel reactive, like the user expects.
+  // `search` is debounced; the rest apply immediately.
+  const searchDebounceRef = useRef(null);
+  useEffect(() => {
+    const trimmedSearch = search;
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = setTimeout(() => {
+      setPage(1);
+      setAppliedFilters((prev) => {
+        if (prev.search === trimmedSearch && prev.status === status
+          && prev.category === category && prev.from === from && prev.to === to) {
+          return prev;
+        }
+        return { search: trimmedSearch, status, category, from, to };
+      });
+    }, 300);
+    return () => {
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search, status, category, from, to]);
 
   const toggleParticipant = (residentId) => {
     setForm((prevForm) => {
@@ -368,14 +511,15 @@ export default function AdminActivitiesPage() {
   const handleResetFilters = () => {
     setSearch('');
     setStatus('');
+    setCategory('');
     setFrom('');
     setTo('');
     setPage(1);
-    setAppliedFilters({ search: '', status: '', from: '', to: '' });
+    setAppliedFilters({ search: '', status: '', category: '', from: '', to: '' });
   };
 
   const handleEdit = (activity) => {
-    setEditingId(activity._id);
+    setEditingId(activity?._id || activity?.id || null);
     setIsCreating(true);
     setForm({
       title: activity.title || '',
@@ -400,18 +544,90 @@ export default function AdminActivitiesPage() {
     });
   };
 
-  const handleDelete = async (activityId) => {
-    if (!window.confirm(t('adminActivities.confirmDeleteActivity'))) return;
+  const handleBulkEdit = (activity) => {
+    setBulkEditActivity(activity);
+    setBulkEditForm({
+      title: activity.title || '',
+      category: activity.category && !ACTIVITY_CATEGORY_OPTIONS.some((opt) => opt.value === activity.category) ? 'Khác' : (activity.category || ''),
+      categoryOther: activity.category && !ACTIVITY_CATEGORY_OPTIONS.includes(activity.category) ? activity.category : '',
+      location: activity.location || '',
+      organizerStaffIds: Array.isArray(activity.organizerStaffIds)
+        ? activity.organizerStaffIds.map((staff) => staff?._id || staff).filter(Boolean)
+        : (activity.organizerStaffId ? [activity.organizerStaffId?._id || activity.organizerStaffId] : []),
+      supportStaffIds: Array.isArray(activity.supportStaffIds)
+        ? activity.supportStaffIds.map((staff) => staff?._id || staff).filter(Boolean)
+        : (activity.supportStaffId ? [activity.supportStaffId?._id || activity.supportStaffId] : []),
+      participantResidentIds: Array.isArray(activity.participantResidentIds)
+        ? activity.participantResidentIds.map((id) => id.toString())
+        : [],
+      status: activity.status || '',
+    });
+    setBulkEditError(null);
+  };
+
+  const handleBulkSave = async () => {
+    const { title, category, categoryOther, location, organizerStaffIds, supportStaffIds, participantResidentIds, status } = bulkEditForm;
+    const updateSeries = {};
+
+    if (title !== (bulkEditActivity?.title || '')) updateSeries.title = title;
+    if (category || categoryOther) {
+      updateSeries.category = category === 'Khác' ? categoryOther : category;
+    }
+    if (location !== (bulkEditActivity?.location || '')) updateSeries.location = location;
+    if (JSON.stringify(organizerStaffIds.sort()) !== JSON.stringify([...(bulkEditActivity?.organizerStaffIds || []).map((s) => s?._id || s).sort()])) {
+      updateSeries.organizerStaffIds = organizerStaffIds;
+    }
+    if (JSON.stringify(supportStaffIds.sort()) !== JSON.stringify([...(bulkEditActivity?.supportStaffIds || []).map((s) => s?._id || s).sort()])) {
+      updateSeries.supportStaffIds = supportStaffIds;
+    }
+    if (JSON.stringify(participantResidentIds.sort()) !== JSON.stringify([...(bulkEditActivity?.participantResidentIds || []).map((id) => String(id)).sort()])) {
+      updateSeries.participantResidentIds = participantResidentIds;
+    }
+    if (status && status !== (bulkEditActivity?.status || '')) updateSeries.status = status;
+
+    if (Object.keys(updateSeries).length === 0) {
+      setBulkEditError(t('adminActivities.bulkNoChange'));
+      return;
+    }
+
+    setBulkSubmitting(true);
     try {
-      setLoading(true);
-      await activityService.deleteActivity(activityId);
+      await activityService.bulkUpdateActivities(bulkEditActivity._id, updateSeries);
+      setBulkEditActivity(null);
       fetchActivities();
     } catch (err) {
-      console.error('Delete failed:', err);
-      showToast(err.response?.data?.message || t('adminActivities.errDeleteActivity'), 'error');
+      setBulkEditError(err.response?.data?.message || t('adminActivities.bulkSaveFailed'));
     } finally {
-      setLoading(false);
+      setBulkSubmitting(false);
     }
+  };
+
+  const handleDelete = (activityId) => {
+    setConfirmModal({
+      tone: 'danger',
+      title: t('adminActivities.confirmDeleteTitle', { defaultValue: 'Xóa hoạt động?' }),
+      message: t('adminActivities.confirmDeleteActivity'),
+      details: t('adminActivities.confirmDeleteDetails', { defaultValue: 'Hành động này không thể hoàn tác.' }),
+      confirmLabel: t('adminActivities.btnDeleteConfirm', { defaultValue: 'Xóa' }),
+      cancelLabel: t('adminActivities.btnCancelConfirm', { defaultValue: 'Hủy' }),
+      busy: false,
+      run: async () => {
+        setConfirmModal((prev) => ({ ...prev, busy: true }));
+        try {
+          setLoading(true);
+          await activityService.deleteActivity(activityId);
+          await fetchActivities();
+        } catch (err) {
+          console.error('Delete failed:', err);
+          showToast(err.response?.data?.message || t('adminActivities.errDeleteActivity'), 'error');
+          setConfirmModal((prev) => ({ ...prev, busy: false }));
+          throw err;
+        } finally {
+          setLoading(false);
+        }
+        closeConfirmModal();
+      },
+    });
   };
 
   const getParticipantDisplay = (activity) => {
@@ -419,13 +635,46 @@ export default function AdminActivitiesPage() {
       .map((residentId) => {
         const resident = residents.find((item) => item._id === residentId);
         if (!resident) return null;
-        return resident.fullName || resident.residentCode || t('adminActivities.residentFallback');
+        return toDisplayText(resident.fullName || resident.residentCode, t('adminActivities.residentFallback'));
       })
       .filter(Boolean);
 
     if (names.length === 0) return t('adminActivities.zeroResidents');
     if (names.length <= 2) return names.join(', ');
     return `${names.slice(0, 2).join(', ')} +${names.length - 2}`;
+  };
+
+  const detailText = (...args) => toDisplayText(t(...args), '-');
+
+  const getReferenceId = (value) => {
+    if (typeof value === 'string' || typeof value === 'number') return String(value);
+    return value?._id || value?.id || value?.userId?._id || value?.userId?.id || '';
+  };
+
+  const getDetailStaffNames = (activity, pluralField, singularField) => {
+    const references = Array.isArray(activity?.[pluralField])
+      ? activity[pluralField]
+      : activity?.[singularField]
+        ? [activity[singularField]]
+        : [];
+    return references.map((reference) => {
+      const referenceId = getReferenceId(reference);
+      const staff = staffOptions.find((item) => getReferenceId(item) === referenceId);
+      return toDisplayText(
+        reference?.fullName || reference?.userId?.fullName || reference?.email || reference?.userId?.email
+          || staff?.fullName || staff?.email,
+        '',
+      );
+    }).filter(Boolean).join(', ') || '-';
+  };
+
+  const getDetailResidentNames = (activity) => {
+    const references = Array.isArray(activity?.participantResidentIds) ? activity.participantResidentIds : [];
+    return references.map((reference) => {
+      const referenceId = getReferenceId(reference);
+      const resident = residents.find((item) => getReferenceId(item) === referenceId);
+      return toDisplayText(reference?.fullName || reference?.residentCode || resident?.fullName || resident?.residentCode, '');
+    }).filter(Boolean).join(', ') || '-';
   };
 
   const handleStatusChange = async (activity, newStatus) => {
@@ -441,62 +690,105 @@ export default function AdminActivitiesPage() {
     }
   };
 
-  const handleBulkDelete = async () => {
-    const targetLabel = appliedFilters.search || appliedFilters.status || appliedFilters.from || appliedFilters.to
+  const openBulkDeleteConfirm = () => {
+    const hasFilter = appliedFilters.search || appliedFilters.status || appliedFilters.category || appliedFilters.from || appliedFilters.to;
+    const targetLabel = hasFilter
       ? t('adminActivities.bulkTargetFilter')
       : t('adminActivities.bulkTargetAll');
 
-    if (!window.confirm(t('adminActivities.confirmBulkDelete', { target: targetLabel }))) return;
-
-    try {
-      setLoading(true);
-      await activityService.bulkDeleteActivities(appliedFilters);
-      await fetchActivities();
-      showToast(t('adminActivities.successBulkDelete'), 'success');
-    } catch (err) {
-      console.error('Bulk delete failed:', err);
-      showToast(err.response?.data?.message || t('adminActivities.errBulkDelete'), 'error');
-    } finally {
-      setLoading(false);
-    }
+    setConfirmModal({
+      tone: 'danger',
+      title: t('adminActivities.confirmBulkDeleteTitle', { defaultValue: 'Xóa nhiều hoạt động?' }),
+      message: t('adminActivities.confirmBulkDelete', { target: targetLabel }),
+      details: t('adminActivities.confirmBulkDeleteDetails', { defaultValue: 'Toàn bộ hoạt động phù hợp với bộ lọc hiện tại sẽ bị xóa vĩnh viễn.' }),
+      confirmLabel: t('adminActivities.btnDeleteConfirm', { defaultValue: 'Xóa tất cả' }),
+      cancelLabel: t('adminActivities.btnCancelConfirm', { defaultValue: 'Hủy' }),
+      busy: false,
+      run: async () => {
+        setConfirmModal((prev) => ({ ...prev, busy: true }));
+        try {
+          setLoading(true);
+          const filters = { ...appliedFilters };
+          if (filters.status === '') delete filters.status;
+          if (filters.category === '') delete filters.category;
+          await activityService.bulkDeleteActivities(filters);
+          await fetchActivities();
+          showToast(t('adminActivities.successBulkDelete'), 'success');
+        } catch (err) {
+          console.error('Bulk delete failed:', err);
+          showToast(err.response?.data?.message || t('adminActivities.errBulkDelete'), 'error');
+          setConfirmModal((prev) => ({ ...prev, busy: false }));
+          throw err;
+        } finally {
+          setLoading(false);
+        }
+        closeConfirmModal();
+      },
+    });
   };
 
-  const handleBulkStatusChange = async () => {
+  const handleBulkDelete = openBulkDeleteConfirm;
+
+  const openBulkStatusConfirm = () => {
     if (!bulkStatus) return;
 
-    const targetLabel = appliedFilters.search || appliedFilters.status || appliedFilters.from || appliedFilters.to
+    const hasFilter = appliedFilters.search || appliedFilters.status || appliedFilters.category || appliedFilters.from || appliedFilters.to;
+    const targetLabel = hasFilter
       ? t('adminActivities.bulkTargetFilter')
       : t('adminActivities.bulkTargetAll');
 
     const foundOption = STATUS_OPTIONS.find((item) => item.value === bulkStatus);
     const statusLabel = foundOption ? t(foundOption.i18nKey) : bulkStatus;
 
-    if (!window.confirm(t('adminActivities.confirmBulkStatus', { target: targetLabel, status: statusLabel }))) return;
-
-    try {
-      setLoading(true);
-      const filters = { ...appliedFilters };
-      if (filters.status === '') {
-        delete filters.status;
-      }
-      await activityService.bulkUpdateActivityStatus({ ...filters, status: bulkStatus });
-      await fetchActivities();
-      showToast(t('adminActivities.successBulkStatus'), 'success');
-    } catch (err) {
-      console.error('Bulk status update failed:', err);
-      showToast(err.response?.data?.message || t('adminActivities.errBulkStatus'), 'error');
-    } finally {
-      setLoading(false);
-    }
+    setConfirmModal({
+      tone: 'warning',
+      title: t('adminActivities.confirmBulkStatusTitle', { defaultValue: 'Đổi trạng thái hàng loạt?' }),
+      message: t('adminActivities.confirmBulkStatus', { target: targetLabel, status: statusLabel }),
+      details: t('adminActivities.confirmBulkStatusDetails', { defaultValue: 'Các hoạt động phù hợp với bộ lọc hiện tại sẽ được chuyển sang trạng thái đã chọn.' }),
+      confirmLabel: t('adminActivities.confirmApplyLabel', { defaultValue: 'Đồng ý' }),
+      cancelLabel: t('adminActivities.btnCancelConfirm', { defaultValue: 'Hủy' }),
+      busy: false,
+      run: async () => {
+        setConfirmModal((prev) => ({ ...prev, busy: true }));
+        try {
+          setLoading(true);
+          const filters = { ...appliedFilters };
+          if (filters.status === '') delete filters.status;
+          if (filters.category === '') delete filters.category;
+          await activityService.bulkUpdateActivityStatus({ ...filters, status: bulkStatus });
+          await fetchActivities();
+          showToast(t('adminActivities.successBulkStatus'), 'success');
+        } catch (err) {
+          console.error('Bulk status update failed:', err);
+          showToast(err.response?.data?.message || t('adminActivities.errBulkStatus'), 'error');
+          setConfirmModal((prev) => ({ ...prev, busy: false }));
+          throw err;
+        } finally {
+          setLoading(false);
+        }
+        closeConfirmModal();
+      },
+    });
   };
+
+  const handleBulkStatusChange = openBulkStatusConfirm;
 
   const toggleStaffSelection = (field, staffId) => {
     setForm((prevForm) => {
       const currentIds = Array.isArray(prevForm[field]) ? [...prevForm[field]] : [];
-      const nextIds = currentIds.includes(staffId)
-        ? currentIds.filter((id) => id !== staffId)
-        : [...currentIds, staffId];
-      return { ...prevForm, [field]: nextIds };
+      const isAdding = !currentIds.includes(staffId);
+      const nextIds = isAdding ? [...currentIds, staffId] : currentIds.filter((id) => id !== staffId);
+      const nextForm = { ...prevForm, [field]: nextIds };
+
+      // Keep organizer and support sets disjoint
+      if (field === 'organizerStaffIds' && isAdding && Array.isArray(nextForm.supportStaffIds) && nextForm.supportStaffIds.includes(staffId)) {
+        nextForm.supportStaffIds = nextForm.supportStaffIds.filter((id) => id !== staffId);
+      }
+      if (field === 'supportStaffIds' && isAdding && Array.isArray(nextForm.organizerStaffIds) && nextForm.organizerStaffIds.includes(staffId)) {
+        nextForm.organizerStaffIds = nextForm.organizerStaffIds.filter((id) => id !== staffId);
+      }
+
+      return nextForm;
     });
   };
 
@@ -548,7 +840,7 @@ export default function AdminActivitiesPage() {
       setFormError(t('adminActivities.validStartDateInvalid'));
       return;
     }
-    if (startDate < new Date()) {
+    if (editingId == null && startDate < new Date()) {
       setFormError(t('adminActivities.validStartDatePast'));
       return;
     }
@@ -564,6 +856,11 @@ export default function AdminActivitiesPage() {
     }
     if (computedDurationMinutes <= 0) {
       setFormError(t('adminActivities.validEndAfterStart'));
+      return;
+    }
+    const dailyDuration = Number(form.dailyDurationMinutes) || 0;
+    if (dailyDuration > 0 && computedDurationMinutes < dailyDuration) {
+      setFormError(t('adminActivities.validDurationMinDaily'));
       return;
     }
 
@@ -656,9 +953,9 @@ export default function AdminActivitiesPage() {
         </button>
       </div>
 
-      <div className="adm-filter-panel">
-        <form onSubmit={handleApplyFilters} className="adm-filter-grid">
-          <div>
+      <div className="adm-filter-panel" style={{ marginBottom: '16px' }}>
+        <div className="flex items-end gap-3" style={{ marginBottom: '12px', flexWrap: 'wrap' }}>
+          <div style={{ flex: '1 1 120px', minWidth: 0 }}>
             <label className="text-sm font-semibold">{t('adminActivities.filterSearch')}</label>
             <div className="adm-filter-input-wrapper">
               <Search className="adm-filter-input-icon" size={14} />
@@ -672,7 +969,7 @@ export default function AdminActivitiesPage() {
             </div>
           </div>
 
-          <div>
+          <div style={{ flex: '0 0 140px' }}>
             <label className="text-sm font-semibold">{t('adminActivities.filterStatus')}</label>
             <select
               className="adm-filter-select"
@@ -687,7 +984,21 @@ export default function AdminActivitiesPage() {
             </select>
           </div>
 
-          <div>
+          <div style={{ flex: '0 0 160px' }}>
+            <label className="text-sm font-semibold">{t('adminActivities.filterCategory')}</label>
+            <select
+              className="adm-filter-select"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+            >
+              <option value="">{t('adminActivities.filterCategoryAll', { defaultValue: '— Tất cả —' })}</option>
+              {ACTIVITY_CATEGORY_OPTIONS.map((item) => (
+                <option key={item.value} value={item.value}>{t(item.i18nKey)}</option>
+              ))}
+            </select>
+          </div>
+
+          <div style={{ flex: '0 0 140px' }}>
             <label className="text-sm font-semibold">{t('adminActivities.filterFrom')}</label>
             <input
               type="date"
@@ -697,7 +1008,7 @@ export default function AdminActivitiesPage() {
             />
           </div>
 
-          <div>
+          <div style={{ flex: '0 0 140px' }}>
             <label className="text-sm font-semibold">{t('adminActivities.filterTo')}</label>
             <input
               type="date"
@@ -707,24 +1018,25 @@ export default function AdminActivitiesPage() {
             />
           </div>
 
-          <div className="flex items-end gap-3" style={{ alignSelf: 'end' }}>
+          <div className="flex items-end gap-2" style={{ flexShrink: 0 }}>
             <button type="button" className="adm-btn-refresh" onClick={handleResetFilters}>
               <RefreshCw size={14} /> {t('adminActivities.btnReset')}
             </button>
-            <button type="submit" className="adm-btn-refresh">
+            <button type="button" className="adm-btn-refresh" onClick={handleApplyFilters}>
               <Filter size={14} /> {t('adminActivities.btnApply')}
             </button>
           </div>
-        </form>
+        </div>
 
-        <div className="flex items-end gap-3" style={{ marginTop: '16px', flexWrap: 'wrap' }}>
+        <div className="flex items-end gap-3" style={{ flexWrap: 'wrap' }}>
           <select
             className="adm-filter-select"
             value={bulkStatus}
             onChange={(e) => setBulkStatus(e.target.value)}
             style={{ minWidth: '180px' }}
+            title={t('adminActivities.bulkStatusHint', { defaultValue: 'Chỉ áp dụng cho hoạt động trong tương lai và đang ở trạng thái nháp/đã lên lịch.' })}
           >
-            {STATUS_OPTIONS.filter((item) => item.value).map((item) => (
+            {BULK_STATUS_TARGET_OPTIONS.map((item) => (
               <option key={item.value} value={item.value}>
                 {t(item.i18nKey)}
               </option>
@@ -782,8 +1094,9 @@ export default function AdminActivitiesPage() {
               <input
                 type="datetime-local"
                 className="adm-filter-input"
-                min={getMinDateTimeLocal()}
+                min={editingId ? undefined : getMinDateTimeLocal()}
                 value={form.startAt}
+                readOnly={Boolean(editingId)}
                 onChange={(e) => {
                   const nextStart = e.target.value;
                   const computedMinutes = getAutoDurationMinutes(nextStart, form.endAt || nextStart);
@@ -798,6 +1111,7 @@ export default function AdminActivitiesPage() {
                 className="adm-filter-input"
                 min={form.startAt}
                 value={form.endAt}
+                readOnly={Boolean(editingId)}
                 onChange={(e) => {
                   const nextEnd = e.target.value;
                   const computedMinutes = getAutoDurationMinutes(form.startAt, nextEnd || form.startAt);
@@ -878,7 +1192,7 @@ export default function AdminActivitiesPage() {
                         style={{ width: '16px', height: '16px' }}
                       />
                       <span>
-                        {staff.fullName || staff.email || t('adminActivities.staffFallback')} {staff.role ? `(${staff.role})` : ''}
+                        {toDisplayText(staff.fullName || staff.email, t('adminActivities.staffFallback'))} {staff.role ? `(${toDisplayText(staff.role)})` : ''}
                       </span>
                     </label>
                   );
@@ -917,7 +1231,7 @@ export default function AdminActivitiesPage() {
                 </label>
               </div>
               <div className="adm-participant-picker">
-                {staffOptions.filter(isActivityStaff).map((staff) => {
+                {staffOptions.filter(isActivityStaff).filter((staff) => !form.organizerStaffIds.includes(staff._id)).map((staff) => {
                   const checked = form.supportStaffIds.includes(staff._id);
                   return (
                     <label key={staff._id} className={`adm-participant-option${checked ? ' selected' : ''}`}>
@@ -928,7 +1242,7 @@ export default function AdminActivitiesPage() {
                         style={{ width: '16px', height: '16px' }}
                       />
                       <span>
-                        {staff.fullName || staff.email || t('adminActivities.staffFallback')} {staff.role ? `(${staff.role})` : ''}
+                        {toDisplayText(staff.fullName || staff.email, t('adminActivities.staffFallback'))} {staff.role ? `(${toDisplayText(staff.role)})` : ''}
                       </span>
                     </label>
                   );
@@ -1006,7 +1320,7 @@ export default function AdminActivitiesPage() {
                         style={{ width: '16px', height: '16px' }}
                       />
                       <span>
-                        {resident.fullName || t('adminActivities.residentUnnamed')}{resident.residentCode ? ` (${resident.residentCode})` : ''}
+                        {toDisplayText(resident.fullName, t('adminActivities.residentUnnamed'))}{resident.residentCode ? ` (${toDisplayText(resident.residentCode)})` : ''}
                       </span>
                       {hasAbnormal && (
                         <span className="adm-abnormal-badge">
@@ -1045,7 +1359,7 @@ export default function AdminActivitiesPage() {
                       <div className="adm-warning-list">
                         {selectedAbnormalResidents.map((item) => (
                           <div key={item.resident._id}>
-                            • {item.resident.fullName || t('adminActivities.residentFallback')} ({item.resident.residentCode}) {t('adminActivities.monitorAfterActivity')}
+                            • {toDisplayText(item.resident.fullName, t('adminActivities.residentFallback'))} ({toDisplayText(item.resident.residentCode, '-')}) {t('adminActivities.monitorAfterActivity')}
                           </div>
                         ))}
                       </div>
@@ -1061,7 +1375,7 @@ export default function AdminActivitiesPage() {
                 value={form.status}
                 onChange={(e) => setForm({ ...form, status: e.target.value })}
               >
-                {getStatusOptionsForForm(form.status).filter((item) => item.value).map((item) => (
+                {getStatusOptionsForForm(form.status, Boolean(editingId)).filter((item) => item.value).map((item) => (
                   <option key={item.value} value={item.value}>
                     {t(item.i18nKey)}
                   </option>
@@ -1078,7 +1392,7 @@ export default function AdminActivitiesPage() {
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
               />
             </div>
-            {formError && (
+            {typeof formError === 'string' && (
               <div className="adm-form-message adm-form-field-full">{formError}</div>
             )}
             <div className="adm-form-actions adm-form-field-full">
@@ -1122,7 +1436,7 @@ export default function AdminActivitiesPage() {
               <div style={{ marginTop: '8px', fontSize: '12px', opacity: 0.9 }}>
                 {activitiesWithAbnormal.map(({ activity, count }) => (
                   <div key={activity._id}>
-                    • <strong>{activity.title}</strong> - {t('adminActivities.abnormalPatientCount', { count })}
+                    • <strong>{toDisplayText(activity.title, '-')}</strong> - {t('adminActivities.abnormalPatientCount', { count })}
                   </div>
                 ))}
               </div>
@@ -1164,7 +1478,7 @@ export default function AdminActivitiesPage() {
                     <tr key={activity._id} className="adm-table-row" style={abnormalCount > 0 ? { backgroundColor: '#fffbeb' } : {}}>
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          {activity.title}
+                          {typeof activity.title === 'string' ? activity.title : String(activity.title || '')}
                           {abnormalCount > 0 && (
                             <span
                               style={{
@@ -1186,20 +1500,30 @@ export default function AdminActivitiesPage() {
                           )}
                         </div>
                       </td>
-                      <td>{activity.category || '-'}</td>
+                      <td>{typeof activity.category === 'string' ? activity.category : '-'}</td>
                       <td>{formatActivityDateRange(activity)}</td>
                       <td>
-                        <select
-                          value={activity.status}
-                          onChange={(e) => handleStatusChange(activity, e.target.value)}
-                          style={{ width: '100%', padding: '6px 10px', borderRadius: '10px', borderColor: '#cbd5e1' }}
-                        >
-                          {STATUS_OPTIONS.filter((item) => item.value).map((item) => (
-                            <option key={item.value} value={item.value}>
-                              {t(item.i18nKey)}
-                            </option>
-                          ))}
-                        </select>
+                        {(() => {
+                          const locked = isActivityLocked(activity);
+                          const lockedTooltip = t('adminActivities.lockedActionTooltip', {
+                            defaultValue: 'Hoạt động đã diễn ra hoặc đã ở trạng thái kết thúc.',
+                          });
+                          return (
+                            <select
+                              value={activity.status}
+                              onChange={(e) => handleStatusChange(activity, e.target.value)}
+                              disabled={locked}
+                              title={locked ? lockedTooltip : ''}
+                              style={{ width: '100%', padding: '6px 10px', borderRadius: '10px', borderColor: '#cbd5e1' }}
+                            >
+                              {STATUS_OPTIONS.filter((item) => item.value).map((item) => (
+                                <option key={item.value} value={item.value}>
+                                  {t(item.i18nKey)}
+                                </option>
+                              ))}
+                            </select>
+                          );
+                        })()}
                       </td>
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1223,32 +1547,60 @@ export default function AdminActivitiesPage() {
                         </div>
                       </td>
                       <td>
-                        <button
-                          type="button"
-                          className="adm-btn-refresh"
-                          style={{ marginRight: '8px' }}
-                          onClick={() => setSelectedActivityId(activity._id)}
-                          title={t('adminActivities.btnViewDetail')}
-                        >
-                          <Eye size={14} />
-                        </button>
-                        <button
-                          type="button"
-                          className="adm-btn-refresh"
-                          style={{ marginRight: '8px' }}
-                          onClick={() => handleEdit(activity)}
-                          title={t('adminActivities.btnEdit')}
-                        >
-                          <Edit3 size={14} />
-                        </button>
-                        <button
-                          type="button"
-                          className="adm-btn-refresh"
-                          onClick={() => handleDelete(activity._id)}
-                          title={t('adminActivities.btnDelete')}
-                        >
-                          <Trash2 size={14} />
-                        </button>
+                        {(() => {
+                          const locked = isActivityLocked(activity);
+                          const lockedTitle = t('adminActivities.lockedActionTooltip', {
+                            defaultValue: 'Hoạt động đã diễn ra hoặc đã ở trạng thái kết thúc.',
+                          });
+                          return (
+                            <>
+                              <button
+                                type="button"
+                                className="adm-btn-refresh"
+                                style={{ marginRight: '8px' }}
+                                onClick={() => setSelectedActivityId(activity._id)}
+                                title={t('adminActivities.btnViewDetail')}
+                              >
+                                <Eye size={14} />
+                              </button>
+                              <button
+                                type="button"
+                                className="adm-btn-refresh"
+                                style={{ marginRight: '8px' }}
+                                onClick={() => handleEdit(activity)}
+                                disabled={locked}
+                                title={locked ? lockedTitle : t('adminActivities.btnEdit')}
+                              >
+                                <Edit3 size={14} />
+                              </button>
+                              {activity.seriesId && (
+                                <button
+                                  type="button"
+                                  className="adm-btn-refresh"
+                                  style={{ marginRight: '8px', background: '#7c3aed', color: '#fff', border: 'none' }}
+                                  onClick={() => handleBulkEdit(activity)}
+                                  disabled={locked}
+                                  title={locked ? lockedTitle : t('adminActivities.btnEditSeries')}
+                                >
+                                  <Filter size={14} />
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                className="adm-btn-refresh"
+                                onClick={() => handleDelete(activity._id)}
+                                disabled={!isActivityDeletable(activity)}
+                                title={isActivityDeletable(activity)
+                                  ? t('adminActivities.btnDelete')
+                                  : t('adminActivities.deleteBlockedTooltip', {
+                                      defaultValue: 'Không thể xóa hoạt động đã hoàn thành hoặc đang diễn ra.',
+                                    })}
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </>
+                          );
+                        })()}
                       </td>
                     </tr>
                   );
@@ -1286,7 +1638,7 @@ export default function AdminActivitiesPage() {
       {error && <div style={{ color: '#b91c1c', marginTop: '16px' }}>{error}</div>}
 
       {/* ─── Activity Detail Modal ─── */}
-      {selectedActivityId && (
+      {false && selectedActivityId && (
         <div style={{
           position: 'fixed',
           inset: 0,
@@ -1312,7 +1664,7 @@ export default function AdminActivitiesPage() {
               padding: '16px 20px',
               borderBottom: '1px solid #e2e8f0',
             }}>
-              <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 700 }}>{t('adminActivities.modalTitle')}</h2>
+              <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 700 }}>{detailText('adminActivities.modalTitle')}</h2>
               <button
                 type="button"
                 onClick={() => setSelectedActivityId(null)}
@@ -1324,10 +1676,10 @@ export default function AdminActivitiesPage() {
 
             {/* Content */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
-              {getSelectedActivity() && (() => {
-                const activity = getSelectedActivity();
+              {detailActivity && typeof detailActivity === 'object' ? (() => {
+                const activity = detailActivity;
                 const organizer = staffOptions.find((s) => s._id === activity.organizerStaffId);
-                const participantsList = (activity.participantResidentIds || []).map((resId) => {
+                const participantsList = (Array.isArray(activity.participantResidentIds) ? activity.participantResidentIds : []).map((resId) => {
                   const resident = residents.find((r) => r._id === resId);
                   return resident;
                 }).filter(Boolean);
@@ -1337,7 +1689,7 @@ export default function AdminActivitiesPage() {
                     {/* Title and Status */}
                     <div style={{ marginBottom: '20px' }}>
                       <h3 style={{ margin: '0 0 8px 0', fontSize: '20px', fontWeight: 700 }}>
-                        {activity.title}
+                        {typeof activity.title === 'string' ? activity.title : String(activity.title || '')}
                       </h3>
                       <span style={{
                         display: 'inline-block',
@@ -1350,65 +1702,67 @@ export default function AdminActivitiesPage() {
                       }}>
                         {(() => {
                           const found = STATUS_OPTIONS.find((s) => s.value === activity.status);
-                          return found ? t(found.i18nKey) : activity.status;
+                          const translated = found ? t(found.i18nKey) : activity.status;
+                          return toDisplayText(translated, '-');
                         })()}
                       </span>
                     </div>
 
                     {/* Description */}
-                    {activity.description && (
+                    {activity.description && typeof activity.description === 'string' && (
                       <div style={{ marginBottom: '16px' }}>
-                        <label style={{ display: 'block', fontWeight: 600, marginBottom: '4px', fontSize: '14px' }}>{t('adminActivities.detailDescription')}</label>
+                        <label style={{ display: 'block', fontWeight: 600, marginBottom: '4px', fontSize: '14px' }}>{detailText('adminActivities.detailDescription')}</label>
                         <p style={{ margin: 0, color: '#475569', fontSize: '14px', lineHeight: 1.5 }}>{activity.description}</p>
                       </div>
                     )}
 
                     {/* Category */}
-                    {activity.category && (
+                    {activity.category && typeof activity.category === 'string' && (
                       <div style={{ marginBottom: '16px' }}>
-                        <label style={{ display: 'block', fontWeight: 600, marginBottom: '4px', fontSize: '14px' }}>{t('adminActivities.detailCategory')}</label>
+                        <label style={{ display: 'block', fontWeight: 600, marginBottom: '4px', fontSize: '14px' }}>{detailText('adminActivities.detailCategory')}</label>
                         <p style={{ margin: 0, color: '#475569', fontSize: '14px' }}>{activity.category}</p>
                       </div>
                     )}
 
                     {/* Date Range */}
                     <div style={{ marginBottom: '16px' }}>
-                      <label style={{ display: 'block', fontWeight: 600, marginBottom: '4px', fontSize: '14px' }}>{t('adminActivities.detailDateRange')}</label>
+                      <label style={{ display: 'block', fontWeight: 600, marginBottom: '4px', fontSize: '14px' }}>{detailText('adminActivities.detailDateRange')}</label>
                       <p style={{ margin: 0, color: '#475569', fontSize: '14px' }}>{formatActivityDateRange(activity)}</p>
                     </div>
 
                     {/* Duration */}
-                    {activity.durationMinutes && (
+                    {activity.durationMinutes && typeof activity.durationMinutes === 'number' && (
                       <div style={{ marginBottom: '16px' }}>
-                        <label style={{ display: 'block', fontWeight: 600, marginBottom: '4px', fontSize: '14px' }}>{t('adminActivities.detailDuration')}</label>
+                        <label style={{ display: 'block', fontWeight: 600, marginBottom: '4px', fontSize: '14px' }}>{detailText('adminActivities.detailDuration')}</label>
                         <p style={{ margin: 0, color: '#475569', fontSize: '14px' }}>{formatDurationLabel(activity.durationMinutes, t)}</p>
                       </div>
                     )}
 
                     {/* Location */}
-                    {activity.location && (
+                    {activity.location && typeof activity.location === 'string' && (
                       <div style={{ marginBottom: '16px' }}>
-                        <label style={{ display: 'block', fontWeight: 600, marginBottom: '4px', fontSize: '14px' }}>{t('adminActivities.detailLocation')}</label>
+                        <label style={{ display: 'block', fontWeight: 600, marginBottom: '4px', fontSize: '14px' }}>{detailText('adminActivities.detailLocation')}</label>
                         <p style={{ margin: 0, color: '#475569', fontSize: '14px' }}>{activity.location}</p>
                       </div>
                     )}
 
                     {/* Organizer */}
-                    {organizer && (
+                    {organizer && typeof organizer === 'object' && (
                       <div style={{ marginBottom: '16px' }}>
-                        <label style={{ display: 'block', fontWeight: 600, marginBottom: '4px', fontSize: '14px' }}>{t('adminActivities.detailOrganizer')}</label>
+                        <label style={{ display: 'block', fontWeight: 600, marginBottom: '4px', fontSize: '14px' }}>{detailText('adminActivities.detailOrganizer')}</label>
                         <p style={{ margin: 0, color: '#475569', fontSize: '14px' }}>
-                          {organizer.fullName || organizer.email} {organizer.role ? `(${organizer.role})` : ''}
+                          {toDisplayText(organizer.fullName || organizer.email)} {organizer.role ? `(${toDisplayText(organizer.role)})` : ''}
                         </p>
                       </div>
                     )}
 
                     {/* Participants */}
-                    {participantsList.length > 0 && (
+                    {Array.isArray(participantsList) && participantsList.length > 0 && (
                       <div style={{ marginBottom: '16px' }}>
-                        <label style={{ display: 'block', fontWeight: 600, marginBottom: '8px', fontSize: '14px' }}>{t('adminActivities.detailParticipants', { count: participantsList.length })}</label>
+                        <label style={{ display: 'block', fontWeight: 600, marginBottom: '8px', fontSize: '14px' }}>{detailText('adminActivities.detailParticipants', { count: participantsList.length })}</label>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                           {participantsList.map((resident) => {
+                            if (!resident || typeof resident !== 'object') return null;
                             const isAbnormal = residentsAbnormalStatus[resident._id];
                             return (
                               <div key={resident._id} style={{
@@ -1420,7 +1774,7 @@ export default function AdminActivitiesPage() {
                                 justifyContent: 'space-between',
                                 fontSize: '14px',
                               }}>
-                                <span>{resident.fullName || resident.residentCode}</span>
+                                <span>{toDisplayText(resident?.fullName || resident?.residentCode, '-')}</span>
                                 {isAbnormal && (
                                   <span style={{
                                     fontSize: '11px',
@@ -1430,7 +1784,7 @@ export default function AdminActivitiesPage() {
                                     borderRadius: '4px',
                                     fontWeight: 600,
                                   }}>
-                                    ⚠️ {t('adminActivities.badgeAbnormal')}
+                                    ⚠️ {detailText('adminActivities.badgeAbnormal')}
                                   </span>
                                 )}
                               </div>
@@ -1441,7 +1795,44 @@ export default function AdminActivitiesPage() {
                     )}
                   </>
                 );
-              })()}
+              }) : null}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedActivityId && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          justifyContent: 'flex-end',
+          zIndex: 1000,
+        }}>
+          <div style={{ width: '500px', maxWidth: '100%', height: '100%', backgroundColor: '#fff', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid #e2e8f0' }}>
+              <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 700 }}>{detailText('adminActivities.modalTitle')}</h2>
+              <button type="button" onClick={() => setSelectedActivityId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+                <X size={20} />
+              </button>
+            </div>
+            <div style={{ padding: '20px' }}>
+              {detailActivity && typeof detailActivity === 'object' ? (
+                <>
+                  <h3 style={{ margin: '0 0 16px', fontSize: '20px' }}>{toDisplayText(detailActivity.title, '-')}</h3>
+                  <p><strong>{detailText('adminActivities.fieldStatus')}:</strong> {toDisplayText(detailActivity.status, '-')}</p>
+                  <p><strong>{detailText('adminActivities.detailCategory')}:</strong> {toDisplayText(detailActivity.category, '-')}</p>
+                  <p><strong>{detailText('adminActivities.detailDateRange')}:</strong> {formatActivityDateRange(detailActivity)}</p>
+                  <p><strong>{detailText('adminActivities.detailLocation')}:</strong> {toDisplayText(detailActivity.location, '-')}</p>
+                  <p><strong>{detailText('adminActivities.detailDescription')}:</strong> {toDisplayText(detailActivity.description, '-')}</p>
+                  <p><strong>{detailText('adminActivities.detailOrganizer')}:</strong> {getDetailStaffNames(detailActivity, 'organizerStaffIds', 'organizerStaffId')}</p>
+                  <p><strong>{detailText('adminActivities.fieldSupportStaff')}:</strong> {getDetailStaffNames(detailActivity, 'supportStaffIds', 'supportStaffId')}</p>
+                  <p><strong>{detailText('adminActivities.detailParticipants', { count: Array.isArray(detailActivity.participantResidentIds) ? detailActivity.participantResidentIds.length : 0 })}:</strong> {getDetailResidentNames(detailActivity)}</p>
+                </>
+              ) : (
+                <p>{detailText('adminActivities.loadingActivities')}</p>
+              )}
             </div>
           </div>
         </div>
@@ -1457,6 +1848,32 @@ export default function AdminActivitiesPage() {
           }
         }
       `}</style>
+      {bulkEditActivity && <BulkEditActivityModal
+        bulkEditActivity={bulkEditActivity}
+        bulkEditForm={bulkEditForm}
+        setBulkEditForm={setBulkEditForm}
+        bulkEditError={bulkEditError}
+        bulkSubmitting={bulkSubmitting}
+        bulkSubmit={handleBulkSave}
+        onClose={() => setBulkEditActivity(null)}
+        t={t}
+        staffOptions={staffOptions}
+        residents={residents}
+        isActivityStaff={isActivityStaff}
+      />}
+
+      <ConfirmModal
+        open={Boolean(confirmModal)}
+        tone={confirmModal?.tone || 'warning'}
+        title={confirmModal?.title}
+        message={confirmModal?.message}
+        details={confirmModal?.details}
+        confirmLabel={confirmModal?.confirmLabel}
+        cancelLabel={confirmModal?.cancelLabel}
+        busy={Boolean(confirmModal?.busy)}
+        onConfirm={confirmModal?.run}
+        onClose={closeConfirmModal}
+      />
     </div>
   );
 }

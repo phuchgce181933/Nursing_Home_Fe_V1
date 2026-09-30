@@ -105,6 +105,12 @@ const getCareNotes = async (residentId, params = {}) => {
   return response.data;
 };
 
+// Payment history — wallet topups + paid invoices for a resident
+const getPaymentHistory = async (residentId) => {
+  const response = await axiosClient.get(`/family/residents/${residentId}/payment-history`);
+  return response.data;
+};
+
 export default {
   getFamilyResidents,
   getResidentBillingSummary,
@@ -125,4 +131,5 @@ export default {
   getMedicationHistory,
   getDailyMedicationSchedule,
   getCareNotes,
+  getPaymentHistory,
 };

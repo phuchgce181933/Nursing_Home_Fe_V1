@@ -1,7 +1,4 @@
-/* Dish modals — reuse staff profile modal styles */
-@import '../staff/profiles/profiles.css';
-
-/* Table status badges (aligned with StaffProfilesPage) */
+/* Table status badges */
 .status-badge {
   display: inline-block;
   padding: 2px 10px;
