@@ -2493,15 +2493,14 @@ export default function AdminContractManagementPage() {
                           {contractInvoices.map((inv) => {
                             const statusKey = String(inv.status || '').toLowerCase();
                             const totalAmount = Number(inv.totalAmount || inv.total || 0);
-                            const remainingAmount = Number(inv.remainingAmount || 0);
                             const isZeroAmount = totalAmount === 0;
-                            const isPaid = statusKey === 'paid' || remainingAmount <= 0;
+                            const isUnpaid = ['draft', 'issued', 'partially_paid'].includes(statusKey);
                             // Ưu tiên dueDate; fallback sang billingPeriodEnd / periodEnd nếu chưa set dueDate
                             const dueDateRaw = inv.dueDate || inv.billingPeriodEnd || inv.periodEnd;
                             // Ngày bắt đầu kỳ: billingPeriodStart / periodStart (nếu backend đặt tên khác)
                             const periodStartRaw = inv.billingPeriodStart || inv.periodStart || null;
                             const dueDateObj = dueDateRaw ? new Date(dueDateRaw) : null;
-                            const isOverdue = !isPaid && dueDateObj && !isNaN(dueDateObj.getTime())
+                            const isOverdue = isUnpaid && dueDateObj && !isNaN(dueDateObj.getTime())
                               && dueDateObj.getTime() < new Date(new Date().toDateString()).getTime();
                             const typeLabel = (() => {
                               const typeKey = String(inv.type || '').toUpperCase();

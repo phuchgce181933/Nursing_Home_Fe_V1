@@ -690,44 +690,6 @@ function ItemRow({ item, idx, onChange, onRemove, t, canRemove, errors = {}, exc
           />
         </div>
 
-        {/* PRN Toggle */}
-        <div className="cpf-prn-row">
-          <label className="cpf-prn-toggle">
-            <input
-              type="checkbox"
-              checked={!!item.isPRN}
-              onChange={(e) => onChange(idx, { ...item, isPRN: e.target.checked })}
-            />
-            <span className="cpf-prn-toggle__label">{t('medication.prnLabel')}</span>
-            <span className="cpf-prn-toggle__desc">{t('medication.prnDesc')}</span>
-          </label>
-          {item.isPRN && (
-            <div className="cpf-row-2" style={{ marginTop: 8 }}>
-              <div className="cpf-field">
-                <label className="cpf-label">{t('medication.prnReason')}</label>
-                <input
-                  className="cpf-input"
-                  value={item.prnReason || ''}
-                  onChange={(e) => onChange(idx, { ...item, prnReason: e.target.value })}
-                  placeholder={t('medication.prnReasonPlaceholder')}
-                />
-                {errors[`item_${idx}_prnReason`] && <span className="cpf-error">{errors[`item_${idx}_prnReason`]}</span>}
-              </div>
-              <div className="cpf-field">
-                <label className="cpf-label">{t('medication.maxDailyDoses')}</label>
-                <input
-                  type="number"
-                  className="cpf-input"
-                  value={item.maxDailyDoses || ''}
-                  onChange={(e) => onChange(idx, { ...item, maxDailyDoses: e.target.value })}
-                  min="1"
-                  max="12"
-                  placeholder="4"
-                />
-              </div>
-            </div>
-          )}
-        </div>
       </div>
     </div>
   );
@@ -1266,7 +1228,7 @@ function PrescriptionsTab({ prescriptions, residents, loading, selectedResidentI
         !q ||
         (p.residentId?.fullName || '').toLowerCase().includes(q) ||
         (p.diagnosisNote || '').toLowerCase().includes(q) ||
-        (p.items || []).some((it) => (it.medicationName || '').toLowerCase().includes(q));
+        (p.items || []).some((item) => (item.medicationName || '').toLowerCase().includes(q));
       const matchStatus = !statusFilter || p.status === statusFilter;
       return matchSearch && matchStatus;
     });
